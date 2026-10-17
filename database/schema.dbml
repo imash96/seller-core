@@ -1,0 +1,1496 @@
+// ============================================================================
+// Multi-User E-commerce Operations & Business Management SaaS
+// Target Database: PostgreSQL 16+ / 18+
+// Primary Key Strategy: UUID (gen_random_uuid() / UUIDv7)
+// Root Ownership Entity: users (all tenant business data scoped by user_id)
+// ============================================================================
+
+Project seller_core_saas {
+  database_type: 'PostgreSQL'
+  Note: 'Multi-User E-commerce Operations, Marketplace Management, Fulfillment & Financial Ledger SaaS'
+}
+
+// ----------------------------------------------------------------------------
+// ENUMS
+// ----------------------------------------------------------------------------
+
+Enum user_status {
+  pending_activation
+  active
+  suspended
+  locked
+  deactivated
+}
+
+Enum permission_effect {
+  allow
+  deny
+}
+
+Enum channel_type {
+  marketplace
+  webstore
+  shopping_feed
+  custom
+}
+
+Enum seller_account_status {
+  pending_setup
+  active
+  auth_expired
+  rate_limited
+  suspended
+  disconnected
+}
+
+Enum health_status {
+  healthy
+  warning
+  critical
+  unknown
+}
+
+Enum sync_job_type {
+  order_import
+  catalog_sync
+  inventory_sync
+  tracking_push
+  settlement_import
+  manual_bulk_import
+  export
+}
+
+Enum sync_job_status {
+  queued
+  running
+  completed
+  completed_with_errors
+  failed
+  cancelled
+}
+
+Enum customer_risk_level {
+  low
+  medium
+  high
+  under_review
+  cleared
+}
+
+Enum address_type {
+  shipping
+  billing
+  both
+}
+
+Enum risk_signal_type {
+  shared_address_mismatch
+  proxy_email_change
+  repeated_chargebacks
+  high_return_rate
+  velocity_spike
+  address_verification_failed
+  manual_flag
+}
+
+Enum risk_severity {
+  info
+  low
+  medium
+  high
+  critical
+}
+
+Enum risk_review_status {
+  pending_review
+  investigating
+  confirmed_risk
+  false_positive
+  resolved
+}
+
+Enum product_status {
+  draft
+  active
+  archived
+  discontinued
+}
+
+Enum variant_status {
+  active
+  inactive
+  out_of_stock
+  discontinued
+}
+
+Enum listing_status {
+  draft
+  active
+  paused
+  suppressed
+  ended
+  error
+}
+
+Enum publication_status {
+  unpublished
+  queued
+  published
+  failed
+}
+
+Enum entity_sync_status {
+  not_applicable
+  synced
+  pending
+  error
+  stale
+}
+
+Enum order_source_type {
+  manual
+  marketplace_import
+  api_bulk
+  webstore
+  replacement
+}
+
+Enum order_status {
+  draft
+  pending
+  confirmed
+  processing
+  partially_fulfilled
+  fulfilled
+  delivered
+  cancelled
+  on_hold
+}
+
+Enum order_payment_status {
+  unpaid
+  authorized
+  paid
+  partially_refunded
+  refunded
+  chargeback
+  voided
+}
+
+Enum fulfillment_status {
+  unfulfilled
+  partially_fulfilled
+  fulfilled
+  cancelled
+  returned
+}
+
+Enum shipment_status {
+  pending
+  label_created
+  in_transit
+  out_for_delivery
+  delivered
+  delayed
+  exception
+  failed
+  returned_to_sender
+}
+
+Enum invoice_payment_status {
+  unpaid
+  partially_paid
+  paid
+  disputed
+  overdue
+  voided
+}
+
+Enum invoice_reconciliation_status {
+  unreconciled
+  matched
+  variance_detected
+  resolved
+}
+
+Enum shipping_charge_type {
+  base_freight
+  fuel_surcharge
+  residential_fee
+  remote_area_surcharge
+  customs_duty
+  tax
+  signature_fee
+  dimensional_weight_adjustment
+  address_correction
+  return_shipping
+  other
+}
+
+Enum return_status {
+  requested
+  authorized
+  rejected
+  in_transit
+  received
+  inspected
+  refunded
+  replacement_sent
+  closed
+}
+
+Enum return_reason {
+  defective
+  wrong_item
+  damaged_in_transit
+  not_as_described
+  changed_mind
+  size_fit_issue
+  late_delivery
+  other
+}
+
+Enum return_resolution_type {
+  refund
+  partial_refund
+  replacement
+  store_credit
+  rejected
+}
+
+Enum return_item_condition {
+  unopened
+  like_new
+  used
+  damaged
+  unsellable
+}
+
+Enum refund_status {
+  pending
+  processed
+  failed
+  cancelled
+}
+
+Enum claim_type {
+  a_to_z_guarantee
+  chargeback
+  item_not_received
+  unauthorized_payment
+  nad_dispute
+  other
+}
+
+Enum claim_status {
+  opened
+  under_review
+  action_required
+  seller_funded
+  marketplace_funded
+  won
+  lost
+  appealed
+  closed
+}
+
+Enum financial_account_type {
+  bank_checking
+  bank_savings
+  cash
+  credit_card
+  marketplace_clearing
+  payment_gateway
+}
+
+Enum data_classification {
+  business
+  household_personal
+}
+
+Enum credit_card_status {
+  active
+  frozen
+  expired
+  cancelled
+}
+
+Enum card_channel_usage {
+  ad_spend
+  subscription_fee
+  chargeback_backup
+  shipping_labels
+  primary_billing
+}
+
+Enum finance_category_type {
+  income
+  expense
+}
+
+Enum finance_cost_bucket {
+  cogs
+  shipping
+  marketplace_fee
+  marketing
+  software
+  operations
+  tax
+  personal
+  other_income
+  sales_revenue
+}
+
+Enum financial_transaction_type {
+  income
+  expense
+  transfer
+  credit_card_payment
+  refund_payout
+  marketplace_settlement
+}
+
+Enum financial_transaction_status {
+  pending
+  posted
+  settled
+  reconciled
+  voided
+  overdue
+}
+
+Enum task_type {
+  credit_card_due
+  invoice_due
+  return_review
+  fraud_review
+  restock_alert
+  claim_deadline
+  general
+}
+
+Enum task_priority {
+  low
+  medium
+  high
+  urgent
+}
+
+Enum task_status {
+  pending
+  in_progress
+  completed
+  snoozed
+  dismissed
+}
+
+Enum outbox_event_status {
+  pending
+  processing
+  published
+  failed
+  dead_letter
+}
+
+// ----------------------------------------------------------------------------
+// 1. AUTHENTICATION, RBAC, MODULE ENTITLEMENTS & AUDIT
+// ----------------------------------------------------------------------------
+
+Table users {
+  id uuid [pk, default: `gen_random_uuid()`, note: 'UUIDv7/v4 primary key; root ownership entity for all tenant data']
+  email varchar(255) [not null, unique]
+  full_name varchar(255) [not null]
+  phone varchar(50) [null]
+  password varchar(255) [not null, note: 'Scrypt hashed password; never plaintext']
+  status user_status [not null, default: 'active']
+  is_super_admin boolean [not null, default: false, note: 'Only super administrators can provision new users']
+  failed_login_attempts integer [not null, default: 0]
+  locked_until timestamptz [null]
+  password_changed_at timestamptz [null]
+  last_login_at timestamptz [null]
+  last_login_ip varchar(64) [null]
+  default_currency varchar(3) [not null, default: 'USD']
+  timezone varchar(64) [not null, default: 'UTC']
+  preferences jsonb [not null, default: `{}`]
+  created_by_user_id uuid [null, ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    email [unique, name: 'idx_users_email']
+    status [name: 'idx_users_status']
+    created_by_user_id [name: 'idx_users_created_by']
+  }
+
+  Note: 'Root ownership entity. Public registration is disabled; only system super administrators create users.'
+}
+
+Table roles {
+  id uuid [pk, default: `gen_random_uuid()`]
+  slug varchar(100) [not null, unique]
+  name varchar(150) [not null]
+  description text [null]
+  is_system boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    slug [unique, name: 'idx_roles_slug']
+  }
+
+  Note: 'RBAC role definitions (e.g., super_admin, operations_manager, finance_manager, warehouse_staff, read_only_analyst)'
+}
+
+Table permissions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  slug varchar(150) [not null, unique, note: 'e.g., orders.read, orders.create, orders.update, orders.delete, orders.export']
+  resource varchar(100) [not null]
+  action varchar(100) [not null]
+  description text [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    slug [unique, name: 'idx_permissions_slug']
+    (resource, action) [unique, name: 'idx_permissions_resource_action']
+  }
+
+  Note: 'Granular resource-action permissions'
+}
+
+Table role_permissions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  role_id uuid [not null, ref: > roles.id]
+  permission_id uuid [not null, ref: > permissions.id]
+  effect permission_effect [not null, default: 'allow', note: 'Explicit deny overrides allow across all assigned roles']
+  created_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (role_id, permission_id) [unique, name: 'uq_role_permissions_role_perm']
+    permission_id [name: 'idx_role_permissions_perm']
+  }
+
+  Note: 'Junction linking roles to permissions with explicit allow/deny precedence'
+}
+
+Table user_roles {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  role_id uuid [not null, ref: > roles.id]
+  assigned_by_user_id uuid [null, ref: > users.id]
+  expires_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, role_id) [unique, name: 'uq_user_roles_user_role']
+    role_id [name: 'idx_user_roles_role']
+  }
+
+  Note: 'Many-to-many assignment allowing a user to hold multiple roles simultaneously'
+}
+
+Table module_entitlements {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  module_key varchar(100) [not null, note: 'e.g., orders, catalog, shipments, returns, finance, household_finance, credit_cards, analytics, integrations']
+  is_enabled boolean [not null, default: true]
+  plan_tier varchar(64) [not null, default: 'enterprise']
+  limits jsonb [not null, default: `{}`]
+  expires_at timestamptz [null]
+  updated_by_user_id uuid [null, ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, module_key) [unique, name: 'uq_module_entitlements_user_module']
+    user_id [name: 'idx_module_entitlements_user']
+  }
+
+  Note: 'Feature/module entitlements managed independently from RBAC role permissions'
+}
+
+Table user_sessions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  session_token_hash varchar(128) [not null, unique]
+  ip_address varchar(64) [null]
+  user_agent text [null]
+  is_revoked boolean [not null, default: false]
+  revoked_at timestamptz [null]
+  expires_at timestamptz [not null]
+  last_active_at timestamptz [not null, default: `now()`]
+  created_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    user_id [name: 'idx_user_sessions_user']
+    (user_id, is_revoked) [name: 'idx_user_sessions_active']
+  }
+
+  Note: 'Tracks active sessions and supports immediate session/token revocation upon suspension or password change'
+}
+
+Table password_reset_tokens {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  token_hash varchar(128) [not null, unique]
+  requested_ip varchar(64) [null]
+  expires_at timestamptz [not null]
+  used_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    user_id [name: 'idx_password_reset_tokens_user']
+  }
+
+  Note: 'Hashed one-time recovery tokens for secure password reset lifecycle'
+}
+
+Table audit_logs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  actor_user_id uuid [null, ref: > users.id, note: 'Authenticated user who triggered the action']
+  user_id uuid [null, ref: > users.id, note: 'Tenant owner user_id whose data was affected']
+  action varchar(150) [not null, note: 'e.g., auth.login, user.created, order.imported, refund.processed']
+  entity_type varchar(100) [not null]
+  entity_id uuid [null]
+  request_id varchar(100) [null]
+  correlation_id varchar(100) [null]
+  ip_address varchar(64) [null]
+  user_agent text [null]
+  before_state jsonb [null]
+  after_state jsonb [null]
+  metadata jsonb [not null, default: `{}`]
+  checksum varchar(64) [not null, note: 'SHA-256 tamper-evident digest of actor, action, entity, timestamp, and states']
+  created_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    user_id [name: 'idx_audit_logs_user']
+    actor_user_id [name: 'idx_audit_logs_actor']
+    (entity_type, entity_id) [name: 'idx_audit_logs_entity']
+    correlation_id [name: 'idx_audit_logs_correlation']
+    created_at [name: 'idx_audit_logs_created_at']
+  }
+
+  Note: 'Immutable, append-only tamper-evident audit trail for security and financial operations'
+}
+
+// ----------------------------------------------------------------------------
+// 2. SALES CHANNELS, SELLER ACCOUNTS & INTEGRATIONS
+// ----------------------------------------------------------------------------
+
+Table sales_channels {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code varchar(50) [not null, unique, note: 'amazon, ebay, etsy, website, shopify, google_shopping']
+  name varchar(150) [not null]
+  channel_type channel_type [not null, default: 'marketplace']
+  logo_url text [null]
+  supports_oauth boolean [not null, default: true]
+  default_config jsonb [not null, default: `{}`]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    code [unique, name: 'idx_sales_channels_code']
+  }
+
+  Note: 'System catalog of supported marketplaces and sales channels'
+}
+
+Table seller_accounts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  sales_channel_id uuid [not null, ref: > sales_channels.id]
+  account_name varchar(150) [not null]
+  external_seller_id varchar(150) [not null]
+  marketplace_region varchar(32) [not null, default: 'US', note: 'e.g., US, CA, MX, IN, UK, EU']
+  default_currency varchar(3) [not null, default: 'USD']
+  status seller_account_status [not null, default: 'active']
+  health_status health_status [not null, default: 'healthy']
+  encrypted_credentials text [null, note: 'AES-256-GCM encrypted payload; never stored in plaintext JSONB']
+  credential_vault_ref varchar(255) [null, note: 'External KMS/Secrets Manager reference ARN/URI']
+  oauth_scopes text [null]
+  token_expires_at timestamptz [null]
+  last_credential_rotated_at timestamptz [null]
+  rate_limit_rpm integer [not null, default: 60]
+  retry_policy jsonb [not null, default: `{"maxRetries":3,"backoffMs":1000}`]
+  sync_checkpoint jsonb [not null, default: `{}`]
+  sync_config jsonb [not null, default: `{}`]
+  last_synced_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, sales_channel_id, external_seller_id, marketplace_region) [unique, name: 'uq_seller_accounts_identity']
+    user_id [name: 'idx_seller_accounts_user']
+    status [name: 'idx_seller_accounts_status']
+  }
+
+  Note: 'User-owned marketplace seller accounts with encrypted credential storage and sync checkpoints'
+}
+
+Table sync_jobs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  seller_account_id uuid [null, ref: > seller_accounts.id]
+  job_type sync_job_type [not null]
+  status sync_job_status [not null, default: 'queued']
+  idempotency_key varchar(150) [not null]
+  correlation_id varchar(100) [null]
+  total_records integer [not null, default: 0]
+  processed_records integer [not null, default: 0]
+  succeeded_records integer [not null, default: 0]
+  failed_records integer [not null, default: 0]
+  skipped_duplicates integer [not null, default: 0]
+  checkpoint_cursor varchar(255) [null]
+  error_summary jsonb [not null, default: `{}`]
+  started_at timestamptz [null]
+  completed_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, idempotency_key) [unique, name: 'uq_sync_jobs_user_idempotency']
+    (user_id, status) [name: 'idx_sync_jobs_user_status']
+    seller_account_id [name: 'idx_sync_jobs_seller_account']
+  }
+
+  Note: 'Tracks bulk import/export batches and marketplace synchronization runs with idempotency keys'
+}
+
+Table sync_job_errors {
+  id uuid [pk, default: `gen_random_uuid()`]
+  sync_job_id uuid [not null, ref: > sync_jobs.id]
+  user_id uuid [not null, ref: > users.id]
+  record_index integer [not null, default: 0]
+  external_record_id varchar(150) [null]
+  error_code varchar(100) [not null]
+  error_message text [not null]
+  field_errors jsonb [not null, default: `{}`]
+  raw_excerpt jsonb [null]
+  is_resolved boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    sync_job_id [name: 'idx_sync_job_errors_job']
+    user_id [name: 'idx_sync_job_errors_user']
+  }
+
+  Note: 'Per-record validation and partial import failure diagnostics'
+}
+
+// ----------------------------------------------------------------------------
+// 3. CUSTOMERS, ADDRESSES & FRAUD/RISK SIGNALS
+// ----------------------------------------------------------------------------
+
+Table customers {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  external_customer_id varchar(150) [null]
+  full_name varchar(255) [not null]
+  first_name varchar(120) [null]
+  last_name varchar(120) [null]
+  company_name varchar(200) [null]
+  email varchar(255) [null]
+  normalized_email varchar(255) [null, note: 'Lowercased, trimmed email for repeat-customer identity resolution']
+  proxy_email varchar(255) [null, note: 'Marketplace relay email (e.g., Amazon/eBay anonymized buyer email)']
+  phone varchar(50) [null]
+  normalized_phone varchar(50) [null, note: 'E.164 normalized digits for identity matching']
+  preferred_currency varchar(3) [not null, default: 'USD']
+  orders_count integer [not null, default: 0]
+  total_spent decimal(14,2) [not null, default: 0.00]
+  is_repeat_customer boolean [not null, default: false]
+  risk_level customer_risk_level [not null, default: 'low']
+  risk_score integer [not null, default: 0]
+  merged_into_customer_id uuid [null, ref: > customers.id, note: 'Non-destructive duplicate merge pointer preserving order history']
+  notes text [null]
+  metadata jsonb [not null, default: `{}`]
+  first_order_at timestamptz [null]
+  last_order_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    user_id [name: 'idx_customers_user']
+    (user_id, normalized_email) [name: 'idx_customers_user_norm_email']
+    (user_id, normalized_phone) [name: 'idx_customers_user_norm_phone']
+    (user_id, external_customer_id) [name: 'idx_customers_user_ext_id']
+    (user_id, risk_level) [name: 'idx_customers_user_risk']
+  }
+
+  Note: 'Normalized customer profiles with identity matching and non-destructive merge support'
+}
+
+Table customer_addresses {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  customer_id uuid [not null, ref: > customers.id]
+  address_type address_type [not null, default: 'both']
+  label varchar(100) [null]
+  recipient_name varchar(255) [not null]
+  company_name varchar(200) [null]
+  phone varchar(50) [null]
+  line_1 varchar(255) [not null]
+  line_2 varchar(255) [null]
+  city varchar(150) [not null]
+  state_province varchar(150) [null]
+  postal_code varchar(50) [not null]
+  country_code varchar(2) [not null, default: 'US']
+  address_fingerprint varchar(64) [null, note: 'Normalized hash for detecting shared addresses across profiles']
+  is_default boolean [not null, default: false]
+  is_verified boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    customer_id [name: 'idx_customer_addresses_customer']
+    (user_id, address_fingerprint) [name: 'idx_customer_addresses_fingerprint']
+  }
+
+  Note: 'Multiple shipping/billing addresses per customer'
+}
+
+Table customer_risk_signals {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  customer_id uuid [not null, ref: > customers.id]
+  order_id uuid [null]
+  signal_type risk_signal_type [not null]
+  severity risk_severity [not null, default: 'low']
+  review_status risk_review_status [not null, default: 'pending_review']
+  reason text [not null]
+  evidence jsonb [not null, default: `{}`]
+  reviewed_by_user_id uuid [null, ref: > users.id]
+  reviewed_at timestamptz [null]
+  review_notes text [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, review_status) [name: 'idx_customer_risk_signals_status']
+    customer_id [name: 'idx_customer_risk_signals_customer']
+  }
+
+  Note: 'Explainable fraud/risk signals requiring manual review rather than opaque auto-banning'
+}
+
+// ----------------------------------------------------------------------------
+// 4. PRODUCTS, VARIANTS, ATTRIBUTES & CHANNEL LISTINGS
+// ----------------------------------------------------------------------------
+
+Table brands {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  name varchar(150) [not null]
+  slug varchar(150) [not null]
+  logo_url text [null]
+  website_url text [null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, slug) [unique, name: 'uq_brands_user_slug']
+  }
+
+  Note: 'User-owned brand definitions for catalog organization and brand-level P&L reporting'
+}
+
+Table product_categories {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  parent_id uuid [null, ref: > product_categories.id]
+  name varchar(150) [not null]
+  slug varchar(150) [not null]
+  taxonomy_path text [null]
+  attributes_schema jsonb [not null, default: `[]`]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, slug) [unique, name: 'uq_product_categories_user_slug']
+    parent_id [name: 'idx_product_categories_parent']
+  }
+
+  Note: 'Hierarchical product categories with configurable attribute definitions'
+}
+
+Table products {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  brand_id uuid [null, ref: > brands.id]
+  category_id uuid [null, ref: > product_categories.id]
+  title varchar(255) [not null]
+  slug varchar(255) [not null]
+  sku_prefix varchar(100) [null]
+  description text [null]
+  short_description text [null]
+  status product_status [not null, default: 'draft']
+  has_variants boolean [not null, default: false, note: 'false = standalone product (1 default variant row); true = multi-variant product']
+  variation_dimensions jsonb [not null, default: `[]`, note: 'e.g., ["size", "color", "material"]']
+  weight_grams decimal(10,2) [null]
+  dimensions_cm jsonb [not null, default: `{}`]
+  images jsonb [not null, default: `[]`]
+  tags jsonb [not null, default: `[]`]
+  metadata jsonb [not null, default: `{}`]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, slug) [unique, name: 'uq_products_user_slug']
+    (user_id, status) [name: 'idx_products_user_status']
+    brand_id [name: 'idx_products_brand']
+    category_id [name: 'idx_products_category']
+  }
+
+  Note: 'Parent product catalog record. Standalone products have has_variants=false and one default product_variant row.'
+}
+
+Table product_variants {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  product_id uuid [not null, ref: > products.id]
+  sku varchar(120) [not null]
+  title varchar(255) [not null]
+  is_default boolean [not null, default: false]
+  barcode_upc_ean varchar(64) [null]
+  mpn varchar(100) [null]
+  asin varchar(20) [null]
+  attributes jsonb [not null, default: `{}`]
+  currency_code varchar(3) [not null, default: 'USD']
+  retail_price decimal(14,2) [not null, default: 0.00]
+  compare_at_price decimal(14,2) [null]
+  cost_price decimal(14,2) [not null, default: 0.00, note: 'Unit product acquisition cost']
+  manufacturing_cost decimal(14,2) [not null, default: 0.00]
+  packaging_cost decimal(14,2) [not null, default: 0.00]
+  stock_on_hand integer [not null, default: 0, note: 'CHECK (stock_on_hand >= 0)']
+  stock_reserved integer [not null, default: 0, note: 'CHECK (stock_reserved >= 0)']
+  reorder_point integer [not null, default: 5]
+  weight_grams decimal(10,2) [null]
+  dimensions_cm jsonb [not null, default: `{}`]
+  images jsonb [not null, default: `[]`]
+  status variant_status [not null, default: 'active']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, sku) [unique, name: 'uq_product_variants_user_sku']
+    product_id [name: 'idx_product_variants_product']
+    (user_id, asin) [name: 'idx_product_variants_user_asin']
+  }
+
+  Note: 'Sellable SKU entity referenced by order lines, channel listings, and inventory'
+}
+
+Table product_variant_attributes {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  product_variant_id uuid [not null, ref: > product_variants.id]
+  attribute_name varchar(100) [not null, note: 'e.g., color, size, material, pack_quantity']
+  attribute_value varchar(255) [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (product_variant_id, attribute_name) [unique, name: 'uq_variant_attributes_variant_name']
+    (user_id, attribute_name, attribute_value) [name: 'idx_variant_attributes_lookup']
+  }
+
+  Note: 'Normalized key-value variation attributes enabling relational filtering and indexing'
+}
+
+Table channel_listings {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  seller_account_id uuid [not null, ref: > seller_accounts.id]
+  product_id uuid [not null, ref: > products.id]
+  product_variant_id uuid [not null, ref: > product_variants.id]
+  external_listing_id varchar(150) [not null, note: 'Marketplace item/listing ID']
+  external_variant_id varchar(150) [null]
+  external_sku varchar(150) [null]
+  asin varchar(20) [null]
+  channel_title varchar(500) [null]
+  channel_description text [null]
+  channel_category_id varchar(150) [null]
+  currency_code varchar(3) [not null, default: 'USD']
+  listed_price decimal(14,2) [not null, default: 0.00]
+  allocated_quantity integer [not null, default: 0]
+  listing_status listing_status [not null, default: 'active']
+  publication_status publication_status [not null, default: 'published']
+  sync_status entity_sync_status [not null, default: 'synced']
+  last_sync_error text [null]
+  channel_attributes jsonb [not null, default: `{}`]
+  last_synced_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (seller_account_id, external_listing_id, product_variant_id) [unique, name: 'uq_channel_listings_account_ext_variant']
+    user_id [name: 'idx_channel_listings_user']
+    product_variant_id [name: 'idx_channel_listings_variant']
+  }
+
+  Note: 'Sales-channel-specific listing mappings (Amazon ASINs, eBay Item IDs, Etsy Listings, Storefront URLs)'
+}
+
+// ----------------------------------------------------------------------------
+// 5. ORDERS, ORDER LINE ITEMS & RAW IMPORT PAYLOADS
+// ----------------------------------------------------------------------------
+
+Table orders {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  seller_account_id uuid [null, ref: > seller_accounts.id]
+  customer_id uuid [not null, ref: > customers.id]
+  shipping_address_id uuid [null, ref: > customer_addresses.id]
+  billing_address_id uuid [null, ref: > customer_addresses.id]
+  sync_job_id uuid [null, ref: > sync_jobs.id]
+  order_number varchar(100) [not null]
+  external_order_id varchar(150) [null, note: 'Marketplace order ID; unique per seller_account_id for idempotent imports']
+  source_type order_source_type [not null, default: 'manual']
+  marketplace_code varchar(50) [not null, default: 'direct']
+  status order_status [not null, default: 'pending']
+  payment_status order_payment_status [not null, default: 'paid']
+  fulfillment_status fulfillment_status [not null, default: 'unfulfilled']
+  sync_status entity_sync_status [not null, default: 'not_applicable']
+  currency_code varchar(3) [not null, default: 'USD']
+  reporting_currency_code varchar(3) [not null, default: 'USD']
+  exchange_rate decimal(18,8) [not null, default: 1.00000000]
+  subtotal_amount decimal(14,2) [not null, default: 0.00]
+  discount_amount decimal(14,2) [not null, default: 0.00]
+  tax_amount decimal(14,2) [not null, default: 0.00]
+  shipping_charged_amount decimal(14,2) [not null, default: 0.00]
+  total_amount decimal(14,2) [not null, default: 0.00]
+  marketplace_fees_amount decimal(14,2) [not null, default: 0.00]
+  payment_processing_fees_amount decimal(14,2) [not null, default: 0.00]
+  shipping_cost_amount decimal(14,2) [not null, default: 0.00]
+  cogs_amount decimal(14,2) [not null, default: 0.00]
+  refunded_amount decimal(14,2) [not null, default: 0.00]
+  net_proceeds_amount decimal(14,2) [not null, default: 0.00, note: 'total_amount - marketplace_fees - payment_processing_fees - refunded_amount']
+  gross_profit_amount decimal(14,2) [not null, default: 0.00, note: 'net_sales - cogs_amount - shipping_cost_amount']
+  net_profit_amount decimal(14,2) [not null, default: 0.00, note: 'net_proceeds_amount - cogs_amount - shipping_cost_amount - tax_amount']
+  reporting_total_amount decimal(14,2) [not null, default: 0.00, note: 'total_amount * exchange_rate']
+  shipping_address_snapshot jsonb [null]
+  delivery_notification_sent_at timestamptz [null]
+  buyer_notes text [null]
+  internal_notes text [null]
+  ordered_at timestamptz [not null, default: `now()`]
+  confirmed_at timestamptz [null]
+  shipped_at timestamptz [null]
+  delivered_at timestamptz [null]
+  cancelled_at timestamptz [null]
+  source_created_at timestamptz [null]
+  source_updated_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, order_number) [unique, name: 'uq_orders_user_order_number']
+    (seller_account_id, external_order_id) [unique, name: 'uq_orders_seller_external_id']
+    (user_id, status) [name: 'idx_orders_user_status']
+    (user_id, ordered_at) [name: 'idx_orders_user_ordered_at']
+    customer_id [name: 'idx_orders_customer']
+  }
+
+  Note: 'Normalized order headers with multi-currency totals, fee breakdowns, and order-level P&L metrics'
+}
+
+Table order_line_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  order_id uuid [not null, ref: > orders.id]
+  product_variant_id uuid [null, ref: > product_variants.id]
+  channel_listing_id uuid [null, ref: > channel_listings.id]
+  external_order_line_id varchar(150) [null]
+  sku varchar(120) [not null]
+  title varchar(255) [not null]
+  variant_title varchar(255) [null]
+  asin varchar(20) [null]
+  quantity_ordered integer [not null, note: 'CHECK (quantity_ordered > 0)']
+  quantity_fulfilled integer [not null, default: 0, note: 'CHECK (quantity_fulfilled >= 0 AND quantity_fulfilled <= quantity_ordered)']
+  quantity_returned integer [not null, default: 0, note: 'CHECK (quantity_returned >= 0 AND quantity_returned <= quantity_ordered)']
+  quantity_cancelled integer [not null, default: 0, note: 'CHECK (quantity_cancelled >= 0 AND quantity_cancelled <= quantity_ordered)']
+  currency_code varchar(3) [not null, default: 'USD']
+  unit_price decimal(14,2) [not null, default: 0.00]
+  discount_amount decimal(14,2) [not null, default: 0.00]
+  tax_amount decimal(14,2) [not null, default: 0.00]
+  shipping_amount decimal(14,2) [not null, default: 0.00]
+  line_total_amount decimal(14,2) [not null, default: 0.00]
+  unit_cost_amount decimal(14,2) [not null, default: 0.00]
+  marketplace_fee_amount decimal(14,2) [not null, default: 0.00]
+  refunded_amount decimal(14,2) [not null, default: 0.00]
+  fulfillment_status fulfillment_status [not null, default: 'unfulfilled']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    order_id [name: 'idx_order_line_items_order']
+    product_variant_id [name: 'idx_order_line_items_variant']
+    (order_id, external_order_line_id) [unique, name: 'uq_order_line_items_ext_id']
+  }
+
+  Note: 'Normalized order line items tracking fulfillment, returnable quantities, and line-level cost/revenue'
+}
+
+Table order_import_payloads {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  order_id uuid [not null, ref: > orders.id]
+  sync_job_id uuid [null, ref: > sync_jobs.id]
+  seller_account_id uuid [null, ref: > seller_accounts.id]
+  payload_hash varchar(64) [not null]
+  payload_size_bytes integer [not null, note: 'CHECK (payload_size_bytes <= 262144)']
+  raw_payload jsonb [not null]
+  redacted_fields jsonb [not null, default: `[]`]
+  created_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    order_id [name: 'idx_order_import_payloads_order']
+    (user_id, payload_hash) [name: 'idx_order_import_payloads_hash']
+  }
+
+  Note: 'Isolated raw marketplace payload storage with size limits and PII redaction metadata'
+}
+
+// ----------------------------------------------------------------------------
+// 6. SHIPMENTS, PACKAGES, SHIPMENT ITEMS & SHIPPING INVOICES
+// ----------------------------------------------------------------------------
+
+Table shipments {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  order_id uuid [not null, ref: > orders.id]
+  shipment_number varchar(100) [not null]
+  carrier_code varchar(50) [not null]
+  carrier_name varchar(150) [not null]
+  service_level varchar(100) [null]
+  tracking_number varchar(150) [null]
+  tracking_url text [null]
+  status shipment_status [not null, default: 'pending']
+  packaging_type varchar(100) [null]
+  length_cm decimal(10,2) [null]
+  width_cm decimal(10,2) [null]
+  height_cm decimal(10,2) [null]
+  dead_weight_grams decimal(10,2) [null]
+  volumetric_weight_grams decimal(10,2) [null]
+  billed_weight_grams decimal(10,2) [null]
+  currency_code varchar(3) [not null, default: 'USD']
+  estimated_shipping_cost decimal(14,2) [not null, default: 0.00]
+  actual_invoiced_cost decimal(14,2) [not null, default: 0.00]
+  shipped_at timestamptz [null]
+  estimated_delivery_at timestamptz [null]
+  delivered_at timestamptz [null]
+  delivery_notification_sent boolean [not null, default: false]
+  notes text [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, shipment_number) [unique, name: 'uq_shipments_user_number']
+    order_id [name: 'idx_shipments_order']
+    (user_id, status) [name: 'idx_shipments_user_status']
+    tracking_number [name: 'idx_shipments_tracking']
+  }
+
+  Note: 'Parcel shipments supporting dimensions, dead/volumetric weight, carrier tracking, and delivery alerts'
+}
+
+Table shipment_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  shipment_id uuid [not null, ref: > shipments.id]
+  order_line_item_id uuid [not null, ref: > order_line_items.id]
+  quantity_shipped integer [not null, note: 'CHECK (quantity_shipped > 0)']
+  serial_numbers jsonb [not null, default: `[]`]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (shipment_id, order_line_item_id) [unique, name: 'uq_shipment_items_shipment_line']
+    order_line_item_id [name: 'idx_shipment_items_order_line']
+  }
+
+  Note: 'Many-to-many junction allowing one parcel to contain multiple order lines and one order line to split across multiple shipments'
+}
+
+Table shipping_invoices {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  financial_account_id uuid [null, ref: > financial_accounts.id]
+  carrier_code varchar(50) [not null]
+  carrier_name varchar(150) [not null]
+  invoice_number varchar(100) [not null]
+  currency_code varchar(3) [not null, default: 'USD']
+  subtotal_amount decimal(14,2) [not null, default: 0.00]
+  tax_amount decimal(14,2) [not null, default: 0.00]
+  total_amount decimal(14,2) [not null, default: 0.00]
+  paid_amount decimal(14,2) [not null, default: 0.00]
+  variance_amount decimal(14,2) [not null, default: 0.00]
+  payment_status invoice_payment_status [not null, default: 'unpaid']
+  reconciliation_status invoice_reconciliation_status [not null, default: 'unreconciled']
+  invoice_date date [not null]
+  due_date date [null]
+  paid_at timestamptz [null]
+  payment_reference varchar(150) [null]
+  notes text [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, carrier_code, invoice_number) [unique, name: 'uq_shipping_invoices_user_carrier_num']
+    (user_id, payment_status) [name: 'idx_shipping_invoices_status']
+  }
+
+  Note: 'Carrier billing invoices containing multiple line items and shipment reconciliations'
+}
+
+Table shipping_invoice_lines {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  shipping_invoice_id uuid [not null, ref: > shipping_invoices.id]
+  shipment_id uuid [null, ref: > shipments.id]
+  tracking_number varchar(150) [null]
+  charge_type shipping_charge_type [not null, default: 'base_freight']
+  description varchar(255) [null]
+  currency_code varchar(3) [not null, default: 'USD']
+  expected_amount decimal(14,2) [not null, default: 0.00]
+  billed_amount decimal(14,2) [not null, default: 0.00]
+  variance_amount decimal(14,2) [not null, default: 0.00]
+  allow_duplicate_charge boolean [not null, default: false, note: 'Partial unique index prevents duplicate (shipment_id, charge_type) when false']
+  reconciliation_notes text [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    shipping_invoice_id [name: 'idx_shipping_invoice_lines_invoice']
+    (shipment_id, charge_type) [name: 'idx_shipping_invoice_lines_shipment_charge']
+  }
+
+  Note: 'Unambiguous carrier invoice charge lines linked to shipments with duplicate-charge protection'
+}
+
+// ----------------------------------------------------------------------------
+// 7. RETURNS, REFUNDS & MARKETPLACE CLAIMS
+// ----------------------------------------------------------------------------
+
+Table return_requests {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  order_id uuid [not null, ref: > orders.id]
+  order_line_item_id uuid [not null, ref: > order_line_items.id]
+  customer_id uuid [not null, ref: > customers.id]
+  rma_number varchar(100) [not null]
+  external_return_id varchar(150) [null]
+  status return_status [not null, default: 'requested']
+  return_reason return_reason [not null, default: 'other']
+  resolution_type return_resolution_type [not null, default: 'refund']
+  quantity_requested integer [not null, note: 'CHECK (quantity_requested > 0)']
+  quantity_approved integer [not null, default: 0]
+  quantity_received integer [not null, default: 0]
+  item_condition return_item_condition [null]
+  restock_inventory boolean [not null, default: false]
+  return_carrier varchar(100) [null]
+  return_tracking_number varchar(150) [null]
+  return_label_url text [null]
+  currency_code varchar(3) [not null, default: 'USD']
+  return_shipping_cost decimal(14,2) [not null, default: 0.00]
+  restocking_fee_amount decimal(14,2) [not null, default: 0.00]
+  refund_amount decimal(14,2) [not null, default: 0.00]
+  replacement_order_id uuid [null, ref: > orders.id]
+  customer_comments text [null]
+  internal_notes text [null]
+  evidence_images jsonb [not null, default: `[]`]
+  approval_history jsonb [not null, default: `[]`]
+  reviewed_by_user_id uuid [null, ref: > users.id]
+  requested_at timestamptz [not null, default: `now()`]
+  authorized_at timestamptz [null]
+  received_at timestamptz [null]
+  closed_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, rma_number) [unique, name: 'uq_return_requests_user_rma']
+    order_id [name: 'idx_return_requests_order']
+    order_line_item_id [name: 'idx_return_requests_order_line']
+    (user_id, status) [name: 'idx_return_requests_user_status']
+  }
+
+  Note: 'Full RMA lifecycle per order line with remaining-returnable quantity enforcement'
+}
+
+Table refund_transactions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  order_id uuid [not null, ref: > orders.id]
+  order_line_item_id uuid [null, ref: > order_line_items.id]
+  return_request_id uuid [null, ref: > return_requests.id]
+  financial_account_id uuid [null, ref: > financial_accounts.id]
+  refund_number varchar(100) [not null]
+  external_refund_id varchar(150) [null]
+  status refund_status [not null, default: 'processed']
+  currency_code varchar(3) [not null, default: 'USD']
+  items_refund_amount decimal(14,2) [not null, default: 0.00]
+  shipping_refund_amount decimal(14,2) [not null, default: 0.00]
+  tax_refund_amount decimal(14,2) [not null, default: 0.00]
+  restocking_fee_deducted decimal(14,2) [not null, default: 0.00]
+  total_refund_amount decimal(14,2) [not null, default: 0.00]
+  reason text [null]
+  processed_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, refund_number) [unique, name: 'uq_refund_transactions_user_number']
+    order_id [name: 'idx_refund_transactions_order']
+    return_request_id [name: 'idx_refund_transactions_return']
+  }
+
+  Note: 'Auditable refund records linked to original orders, return requests, and financial accounts'
+}
+
+Table marketplace_claims {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  order_id uuid [not null, ref: > orders.id]
+  seller_account_id uuid [null, ref: > seller_accounts.id]
+  customer_id uuid [null, ref: > customers.id]
+  claim_number varchar(100) [not null]
+  external_claim_id varchar(150) [null]
+  claim_type claim_type [not null, default: 'a_to_z_guarantee']
+  status claim_status [not null, default: 'opened']
+  currency_code varchar(3) [not null, default: 'USD']
+  disputed_amount decimal(14,2) [not null, default: 0.00]
+  seller_liability_amount decimal(14,2) [not null, default: 0.00]
+  reason text [null]
+  evidence_submitted jsonb [not null, default: `{}`]
+  respond_by_at timestamptz [null]
+  resolved_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, claim_number) [unique, name: 'uq_marketplace_claims_user_number']
+    order_id [name: 'idx_marketplace_claims_order']
+    (user_id, status) [name: 'idx_marketplace_claims_status']
+  }
+
+  Note: 'Marketplace disputes, A-to-Z claims, and payment chargebacks'
+}
+
+// ----------------------------------------------------------------------------
+// 8. FINANCIAL ACCOUNTS, CREDIT CARDS, CATEGORIES & MULTI-CURRENCY LEDGER
+// ----------------------------------------------------------------------------
+
+Table financial_accounts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  account_name varchar(150) [not null]
+  account_type financial_account_type [not null, default: 'bank_checking']
+  institution_name varchar(150) [null]
+  account_number_last_4 varchar(4) [null]
+  currency_code varchar(3) [not null, default: 'USD']
+  current_balance decimal(14,2) [not null, default: 0.00]
+  data_classification data_classification [not null, default: 'business']
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    user_id [name: 'idx_financial_accounts_user']
+    (user_id, data_classification) [name: 'idx_financial_accounts_classification']
+  }
+
+  Note: 'Bank, cash, clearing, and credit card accounts separated by business vs household/personal classification'
+}
+
+Table credit_cards {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  financial_account_id uuid [null, ref: > financial_accounts.id]
+  card_label varchar(150) [not null]
+  brand_name varchar(64) [not null, note: 'e.g., Visa, Mastercard, American Express, RuPay']
+  issuer_bank varchar(150) [null]
+  cardholder_name varchar(150) [not null]
+  last_4_digits varchar(4) [not null, note: 'Only last 4 digits stored; full PAN and CVV are strictly prohibited']
+  exp_month integer [not null, note: 'CHECK (exp_month BETWEEN 1 AND 12)']
+  exp_year integer [not null]
+  vault_token_reference varchar(255) [null, note: 'Token reference in PCI-compliant vault']
+  logo_url text [null]
+  currency_code varchar(3) [not null, default: 'USD']
+  credit_limit decimal(14,2) [not null, default: 0.00]
+  current_balance decimal(14,2) [not null, default: 0.00]
+  statement_balance decimal(14,2) [not null, default: 0.00]
+  minimum_payment_due decimal(14,2) [not null, default: 0.00]
+  billing_cycle_day integer [null]
+  payment_due_day integer [null]
+  next_payment_due_date date [null]
+  reminder_days_before integer [not null, default: 5]
+  auto_pay_enabled boolean [not null, default: false]
+  data_classification data_classification [not null, default: 'business']
+  status credit_card_status [not null, default: 'active']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    user_id [name: 'idx_credit_cards_user']
+    (user_id, next_payment_due_date) [name: 'idx_credit_cards_due_date']
+  }
+
+  Note: 'Tokenized credit card metadata with statement cycle and payment due reminder tracking'
+}
+
+Table credit_card_seller_accounts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  credit_card_id uuid [not null, ref: > credit_cards.id]
+  seller_account_id uuid [not null, ref: > seller_accounts.id]
+  usage_purpose card_channel_usage [not null, default: 'primary_billing']
+  is_primary boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (credit_card_id, seller_account_id, usage_purpose) [unique, name: 'uq_card_seller_accounts_purpose']
+    seller_account_id [name: 'idx_card_seller_accounts_seller']
+  }
+
+  Note: 'Many-to-many association allowing multiple cards per user and multiple cards linked to sales channels'
+}
+
+Table finance_categories {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  parent_id uuid [null, ref: > finance_categories.id]
+  name varchar(150) [not null]
+  slug varchar(150) [not null]
+  category_type finance_category_type [not null]
+  data_classification data_classification [not null, default: 'business']
+  cost_bucket finance_cost_bucket [not null, default: 'operations']
+  is_tax_deductible boolean [not null, default: true]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, category_type, slug) [unique, name: 'uq_finance_categories_user_type_slug']
+  }
+
+  Note: 'Structured income and expense categories with cost-bucket classification for profitability reporting'
+}
+
+Table financial_transactions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  financial_account_id uuid [null, ref: > financial_accounts.id]
+  credit_card_id uuid [null, ref: > credit_cards.id]
+  finance_category_id uuid [null, ref: > finance_categories.id]
+  seller_account_id uuid [null, ref: > seller_accounts.id]
+  order_id uuid [null, ref: > orders.id]
+  product_variant_id uuid [null, ref: > product_variants.id]
+  shipping_invoice_id uuid [null, ref: > shipping_invoices.id]
+  reference_number varchar(100) [not null]
+  transaction_type financial_transaction_type [not null]
+  data_classification data_classification [not null, default: 'business']
+  status financial_transaction_status [not null, default: 'posted']
+  description varchar(255) [not null]
+  vendor_or_payer varchar(200) [null]
+  original_currency_code varchar(3) [not null, default: 'USD']
+  original_amount decimal(14,2) [not null]
+  exchange_rate decimal(18,8) [not null, default: 1.00000000]
+  reporting_currency_code varchar(3) [not null, default: 'USD']
+  reporting_amount decimal(14,2) [not null]
+  tax_amount decimal(14,2) [not null, default: 0.00]
+  transaction_date date [not null]
+  conversion_date date [null]
+  due_date date [null]
+  settled_at timestamptz [null]
+  reconciled_at timestamptz [null]
+  receipt_url text [null]
+  notes text [null]
+  metadata jsonb [not null, default: `{}`]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, reference_number) [unique, name: 'uq_financial_transactions_user_ref']
+    (user_id, transaction_type, transaction_date) [name: 'idx_financial_transactions_user_type_date']
+    (user_id, data_classification) [name: 'idx_financial_transactions_classification']
+    order_id [name: 'idx_financial_transactions_order']
+    seller_account_id [name: 'idx_financial_transactions_seller']
+    credit_card_id [name: 'idx_financial_transactions_card']
+  }
+
+  Note: 'Normalized multi-currency financial ledger preventing double-counting between order revenue, settlements, and expenses'
+}
+
+// ----------------------------------------------------------------------------
+// 9. TASKS/REMINDERS, SAVED VIEWS & TRANSACTIONAL OUTBOX
+// ----------------------------------------------------------------------------
+
+Table tasks_reminders {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  related_entity_type varchar(100) [null]
+  related_entity_id uuid [null]
+  credit_card_id uuid [null, ref: > credit_cards.id]
+  title varchar(255) [not null]
+  description text [null]
+  task_type task_type [not null, default: 'general']
+  priority task_priority [not null, default: 'medium']
+  status task_status [not null, default: 'pending']
+  due_at timestamptz [not null]
+  remind_at timestamptz [null]
+  completed_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, status, due_at) [name: 'idx_tasks_reminders_user_status_due']
+    credit_card_id [name: 'idx_tasks_reminders_card']
+  }
+
+  Note: 'Actionable tasks and payment due reminders for credit cards, carrier invoices, returns, and claims'
+}
+
+Table saved_views {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  module_key varchar(100) [not null]
+  name varchar(150) [not null]
+  filters jsonb [not null, default: `{}`]
+  sort_config jsonb [not null, default: `{}`]
+  columns_config jsonb [not null, default: `[]`]
+  is_default boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, module_key, name) [unique, name: 'uq_saved_views_user_module_name']
+  }
+
+  Note: 'User-defined saved filters, table column layouts, and dashboard preferences'
+}
+
+Table outbox_events {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [null, ref: > users.id]
+  aggregate_type varchar(100) [not null]
+  aggregate_id uuid [not null]
+  event_type varchar(150) [not null]
+  idempotency_key varchar(150) [not null, unique]
+  correlation_id varchar(100) [null]
+  payload jsonb [not null]
+  status outbox_event_status [not null, default: 'pending']
+  retry_count integer [not null, default: 0]
+  max_retries integer [not null, default: 5]
+  next_retry_at timestamptz [null]
+  last_error text [null]
+  processed_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (status, next_retry_at) [name: 'idx_outbox_events_status_retry']
+    (aggregate_type, aggregate_id) [name: 'idx_outbox_events_aggregate']
+  }
+
+  Note: 'Transactional outbox ensuring atomic event publication, retries, and dead-letter handling'
+}

@@ -20,11 +20,8 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
               </Link>
             ) : (
               <>
-                <Link route="session.create" className="btn btn--ghost btn--sm">
+                <Link route="session.create" className="btn btn--primary btn--sm">
                   Sign in
-                </Link>
-                <Link route="new_account.create" className="btn btn--primary btn--sm">
-                  Get started
                 </Link>
               </>
             )}

@@ -5,7 +5,7 @@
   "type": "module",
   "license": "UNLICENSED",
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "start": "node bin/server.js",
@@ -73,6 +73,7 @@
     "@adonisjs/vite": "^6.0.3",
     "@inertiajs/core": "^3.9.1",
     "@inertiajs/react": "^3.9.1",
+    "@tailwindcss/vite": "^4.3.3",
     "@tuyau/core": "^1.2.2",
     "@vinejs/vine": "^4.4.0",
     "edge.js": "^6.5.1",
@@ -82,7 +83,8 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "reflect-metadata": "^0.2.2",
-    "sonner": "^2.0.8"
+    "sonner": "^2.0.8",
+    "tailwindcss": "^4.3.3"
   },
   "hotHook": {
     "boundaries": [
