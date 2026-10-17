@@ -1,9 +1,19 @@
+@import 'tailwindcss';
+
 /* ==========================================================================
-   AdonisJS Starter Kit
-   Tokens are the only thing you need to touch to re-theme.
+   Facebook / Meta Astryx Design System + AdonisJS v7 Tokens
    ========================================================================== */
 
 :root {
+  --astryx-primary: #0866ff;
+  --astryx-primary-hover: #0756d8;
+  --astryx-surface: #ffffff;
+  --astryx-canvas: #f0f2f5;
+  --astryx-elevated: #f8f9fb;
+  --astryx-success: #18794e;
+  --astryx-warning: #d97706;
+  --astryx-danger: #dc2626;
+
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
   --serif: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
