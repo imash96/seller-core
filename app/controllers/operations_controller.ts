@@ -1,18 +1,22 @@
 import { DateTime } from 'luxon'
 import type { HttpContext } from '@adonisjs/core/http'
+import db from '@adonisjs/lucid/services/db'
 import User from '#models/user'
 import Role from '#models/role'
 import Permission from '#models/permission'
+import UserRole from '#models/user_role'
 import ModuleEntitlement from '#models/module_entitlement'
 import SalesChannel from '#models/sales_channel'
 import SellerAccount from '#models/seller_account'
 import SyncJob from '#models/sync_job'
 import Customer from '#models/customer'
+import CustomerAddress from '#models/customer_address'
 import CustomerRiskSignal from '#models/customer_risk_signal'
 import Brand from '#models/brand'
 import ProductCategory from '#models/product_category'
 import Product from '#models/product'
 import ProductVariant from '#models/product_variant'
+import ChannelListing from '#models/channel_listing'
 import Order from '#models/order'
 import Shipment from '#models/shipment'
 import ShippingInvoice from '#models/shipping_invoice'
@@ -25,6 +29,7 @@ import CreditCardSellerAccount from '#models/credit_card_seller_account'
 import FinanceCategory from '#models/finance_category'
 import FinancialTransaction from '#models/financial_transaction'
 import TasksReminder from '#models/tasks_reminder'
+import SavedView from '#models/saved_view'
 import AuditLog from '#models/audit_log'
 import { OrderService } from '../services/order_service.js'
 import { CatalogService } from '../services/catalog_service.js'
@@ -90,6 +95,7 @@ export default class OperationsController {
       allRoles,
       allPermissions,
       moduleEntitlements,
+      savedViews,
     ] = await Promise.all([
       RbacService.getEffectivePermissions(user),
       Order.query()
@@ -187,6 +193,7 @@ export default class OperationsController {
       Role.query().preload('permissions').orderBy('name', 'asc'),
       Permission.query().orderBy('slug', 'asc'),
       ModuleEntitlement.query().where('userId', user.id).orderBy('moduleKey', 'asc'),
+      SavedView.query().where('userId', user.id).orderBy('createdAt', 'desc'),
     ])
 
     // Compute Dashboard & Financial Metrics in Reporting Currency (USD)
@@ -284,6 +291,7 @@ export default class OperationsController {
       allRoles: allRoles.map((r) => r.serialize()),
       allPermissions: allPermissions.map((p) => p.serialize()),
       moduleEntitlements: moduleEntitlements.map((me) => me.serialize()),
+      savedViews: savedViews.map((sv) => sv.serialize()),
     })
   }
 
@@ -888,6 +896,468 @@ export default class OperationsController {
       'success',
       `Module "${entitlement.moduleKey}" is now ${entitlement.isEnabled ? 'ENABLED' : 'DISABLED'}.`
     )
+    return response.redirect().back()
+  }
+
+  /**
+   * Merges a duplicate customer record into a primary target customer without destructive data loss.
+   */
+  async mergeCustomers({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const sourceCustomerId = String(request.input('sourceCustomerId', '')).trim()
+    const targetCustomerId = String(request.input('targetCustomerId', '')).trim()
+
+    if (!sourceCustomerId || !targetCustomerId || sourceCustomerId === targetCustomerId) {
+      session.flash('error', 'Select two distinct customers to merge.')
+      return response.redirect().back()
+    }
+
+    const [source, target] = await Promise.all([
+      Customer.query().where('userId', user.id).andWhere('id', sourceCustomerId).firstOrFail(),
+      Customer.query().where('userId', user.id).andWhere('id', targetCustomerId).firstOrFail(),
+    ])
+
+    await db.transaction(async (trx) => {
+      await Order.query({ client: trx })
+        .where('userId', user.id)
+        .andWhere('customerId', source.id)
+        .update({ customerId: target.id })
+
+      await CustomerAddress.query({ client: trx })
+        .where('userId', user.id)
+        .andWhere('customerId', source.id)
+        .update({ customerId: target.id, isDefault: false })
+
+      await CustomerRiskSignal.query({ client: trx })
+        .where('userId', user.id)
+        .andWhere('customerId', source.id)
+        .update({ customerId: target.id })
+
+      await ReturnRequest.query({ client: trx })
+        .where('userId', user.id)
+        .andWhere('customerId', source.id)
+        .update({ customerId: target.id })
+
+      target.useTransaction(trx)
+      target.ordersCount = Number(target.ordersCount || 0) + Number(source.ordersCount || 0)
+      target.totalSpent = (Number(target.totalSpent || 0) + Number(source.totalSpent || 0)).toFixed(
+        2
+      )
+      target.isRepeatCustomer = target.ordersCount > 1
+      await target.save()
+
+      source.useTransaction(trx)
+      source.mergedIntoCustomerId = target.id
+      source.ordersCount = 0
+      await source.save()
+    })
+
+    await RbacService.recordAudit({
+      actorUserId: user.id,
+      userId: user.id,
+      action: 'customer.merged',
+      entityType: 'customers',
+      entityId: target.id,
+      requestId: request.id(),
+      beforeState: { sourceCustomerId: source.id, sourceName: source.fullName },
+      afterState: { targetCustomerId: target.id, targetName: target.fullName },
+    })
+
+    session.flash(
+      'success',
+      `Merged duplicate customer "${source.fullName}" into "${target.fullName}" with zero data loss.`
+    )
+    return response.redirect().back()
+  }
+
+  async deleteCustomer({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const customer = await Customer.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+
+    const orderCount = await Order.query()
+      .where('userId', user.id)
+      .andWhere('customerId', customer.id)
+      .count('* as total')
+    if (Number(orderCount[0].$extras.total) > 0) {
+      session.flash(
+        'error',
+        `Cannot delete customer "${customer.fullName}" because they have historical orders. Use Merge instead.`
+      )
+      return response.redirect().back()
+    }
+
+    await customer.delete()
+    session.flash('success', `Customer "${customer.fullName}" removed.`)
+    return response.redirect().back()
+  }
+
+  async storeBrand({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const name = String(request.input('name', '')).trim()
+    if (!name) {
+      session.flash('error', 'Brand name is required.')
+      return response.redirect().back()
+    }
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+    await Brand.updateOrCreate(
+      { userId: user.id, slug },
+      {
+        userId: user.id,
+        name,
+        slug,
+        websiteUrl: request.input('websiteUrl') || null,
+        isActive: true,
+      }
+    )
+    session.flash('success', `Brand "${name}" saved.`)
+    return response.redirect().back()
+  }
+
+  async storeCategory({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const name = String(request.input('name', '')).trim()
+    if (!name) {
+      session.flash('error', 'Category name is required.')
+      return response.redirect().back()
+    }
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+    await ProductCategory.updateOrCreate(
+      { userId: user.id, slug },
+      {
+        userId: user.id,
+        name,
+        slug,
+        taxonomyPath: `Catalog > ${name}`,
+        attributesSchema: [],
+      }
+    )
+    session.flash('success', `Category "${name}" saved.`)
+    return response.redirect().back()
+  }
+
+  async deleteProduct({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const product = await Product.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+
+    product.status = 'archived'
+    await product.save()
+    session.flash('success', `Product "${product.title}" archived.`)
+    return response.redirect().back()
+  }
+
+  async storeChannelListing({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const productVariantId = String(request.input('productVariantId', '')).trim()
+    const sellerAccountId = String(request.input('sellerAccountId', '')).trim()
+    const channelSku = String(request.input('channelSku', '')).trim()
+    const externalListingId = String(request.input('externalListingId', '')).trim()
+    const listedPrice = Number(request.input('listedPrice', 0))
+
+    const variant = await ProductVariant.query()
+      .where('userId', user.id)
+      .andWhere('id', productVariantId)
+      .firstOrFail()
+    const sellerAccount = await SellerAccount.query()
+      .where('userId', user.id)
+      .andWhere('id', sellerAccountId)
+      .firstOrFail()
+
+    await ChannelListing.create({
+      userId: user.id,
+      sellerAccountId: sellerAccount.id,
+      productId: variant.productId,
+      productVariantId: variant.id,
+      externalListingId: externalListingId || `LST-${Date.now()}`,
+      externalSku: channelSku || variant.sku,
+      currencyCode: sellerAccount.defaultCurrency || 'USD',
+      listedPrice: (listedPrice > 0 ? listedPrice : Number(variant.retailPrice)).toFixed(2),
+      allocatedQuantity: variant.stockOnHand,
+      listingStatus: 'active',
+      publicationStatus: 'published',
+      syncStatus: 'synced',
+      lastSyncedAt: DateTime.now(),
+    })
+
+    session.flash(
+      'success',
+      `Published SKU ${variant.sku} to ${sellerAccount.accountName} (${externalListingId || variant.sku}).`
+    )
+    return response.redirect().back()
+  }
+
+  async updateShipmentStatus({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const shipment = await Shipment.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+
+    const status = String(request.input('status', ShipmentStatus.DELIVERED))
+    shipment.status = status
+    if (status === ShipmentStatus.DELIVERED) {
+      shipment.deliveredAt = DateTime.now()
+      shipment.deliveryNotificationSent = true
+      const order = await Order.query()
+        .where('userId', user.id)
+        .andWhere('id', shipment.orderId)
+        .first()
+      if (order) {
+        order.status = OrderStatus.DELIVERED
+        order.deliveredAt = DateTime.now()
+        order.deliveryNotificationSentAt = DateTime.now()
+        await order.save()
+      }
+    }
+    await shipment.save()
+
+    session.flash('success', `Shipment ${shipment.shipmentNumber} updated to ${status}.`)
+    return response.redirect().back()
+  }
+
+  async updateInvoiceStatus({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const invoice = await ShippingInvoice.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+
+    const status = String(request.input('status', 'paid'))
+    const reconciliationStatus = String(request.input('reconciliationStatus', 'resolved'))
+    invoice.paymentStatus = status
+    invoice.reconciliationStatus = reconciliationStatus
+    if (status === 'paid') {
+      invoice.paidAmount = invoice.totalAmount
+      invoice.paidAt = DateTime.now()
+    }
+    await invoice.save()
+
+    session.flash(
+      'success',
+      `Invoice ${invoice.invoiceNumber} marked ${status} (${reconciliationStatus}).`
+    )
+    return response.redirect().back()
+  }
+
+  async updateReturnStatus({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const rma = await ReturnRequest.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+
+    const status = String(request.input('status', 'received'))
+    const itemCondition = request.input('itemCondition')
+    rma.status = status
+    if (itemCondition) {
+      rma.itemCondition = String(itemCondition)
+    }
+    if (status === 'received') {
+      rma.receivedAt = DateTime.now()
+      rma.quantityReceived = rma.quantityRequested
+    } else if (status === 'closed') {
+      rma.closedAt = DateTime.now()
+    }
+    await rma.save()
+
+    session.flash('success', `RMA ${rma.rmaNumber} updated to ${status}.`)
+    return response.redirect().back()
+  }
+
+  async storeMarketplaceClaim({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const orderId = String(request.input('orderId', '')).trim()
+    const order = await Order.query().where('userId', user.id).andWhere('id', orderId).firstOrFail()
+
+    const claimNumber = String(request.input('claimNumber', `CLM-${Date.now()}`)).trim()
+    const claimType = String(request.input('claimType', 'a_to_z_guarantee'))
+    const disputedAmount = Number(request.input('disputedAmount', order.totalAmount || 50))
+
+    const claim = await MarketplaceClaim.create({
+      userId: user.id,
+      orderId: order.id,
+      sellerAccountId: order.sellerAccountId,
+      claimNumber,
+      externalClaimId: request.input('externalClaimId') || claimNumber,
+      claimType,
+      status: 'under_review',
+      currencyCode: order.currencyCode,
+      disputedAmount: disputedAmount.toFixed(2),
+      sellerLiabilityAmount: '0.00',
+      reason: request.input('reason') || 'Customer marketplace claim opened',
+    })
+
+    session.flash('success', `Marketplace Claim ${claim.claimNumber} logged.`)
+    return response.redirect().back()
+  }
+
+  async updateClaimStatus({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const claim = await MarketplaceClaim.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+
+    const status = String(request.input('status', 'won'))
+    claim.status = status
+    if (['won', 'lost', 'closed'].includes(status)) {
+      claim.resolvedAt = DateTime.now()
+    }
+    await claim.save()
+
+    session.flash('success', `Claim ${claim.claimNumber} status updated to ${status}.`)
+    return response.redirect().back()
+  }
+
+  async storeFinancialAccount({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const accountName = String(request.input('accountName', '')).trim()
+    if (!accountName) {
+      session.flash('error', 'Account name is required.')
+      return response.redirect().back()
+    }
+
+    const account = await FinancialAccount.create({
+      userId: user.id,
+      accountName,
+      accountType: String(request.input('accountType', 'bank_checking')),
+      dataClassification: String(request.input('dataClassification', 'business')),
+      institutionName: request.input('institutionName') || 'Mercury Bank',
+      accountNumberLast4: request.input('accountNumberLast4') || '4401',
+      currencyCode: String(request.input('currencyCode', 'USD')).toUpperCase(),
+      currentBalance: Number(request.input('currentBalance', 0)).toFixed(2),
+      isActive: true,
+    })
+
+    session.flash('success', `Financial account "${account.accountName}" created.`)
+    return response.redirect().back()
+  }
+
+  async voidFinancialTransaction({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const tx = await FinancialTransaction.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+
+    tx.status = 'voided'
+    await tx.save()
+    session.flash('success', `Ledger entry ${tx.referenceNumber} voided.`)
+    return response.redirect().back()
+  }
+
+  async deleteCreditCard({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const card = await CreditCard.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+
+    card.status = CreditCardStatus.CANCELLED
+    await card.save()
+    session.flash('success', `Card "${card.cardLabel}" (•••• ${card.last4Digits}) cancelled.`)
+    return response.redirect().back()
+  }
+
+  async storeTask({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const title = String(request.input('title', '')).trim()
+    if (!title) {
+      session.flash('error', 'Task title is required.')
+      return response.redirect().back()
+    }
+
+    await TasksReminder.create({
+      userId: user.id,
+      taskType: String(request.input('taskType', 'general_task')),
+      priority: String(request.input('priority', 'medium')),
+      status: TaskStatus.PENDING,
+      title,
+      description: request.input('description') || null,
+      dueAt: request.input('dueAt')
+        ? DateTime.fromISO(String(request.input('dueAt')))
+        : DateTime.now().plus({ days: 3 }),
+    })
+
+    session.flash('success', `Task "${title}" added.`)
+    return response.redirect().back()
+  }
+
+  async storeSavedView({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const name = String(request.input('name', '')).trim()
+    const moduleKey = String(request.input('moduleKey', 'orders')).trim()
+    if (!name) {
+      session.flash('error', 'View name is required.')
+      return response.redirect().back()
+    }
+
+    await SavedView.updateOrCreate(
+      { userId: user.id, moduleKey, name },
+      {
+        userId: user.id,
+        moduleKey,
+        name,
+        isDefault: Boolean(request.input('isDefault', false)),
+        filters: { status: request.input('filterStatus', 'all') },
+        sortConfig: { field: 'created_at', direction: 'desc' },
+        columnsConfig: ['order_number', 'status', 'total_amount', 'net_profit_amount'],
+      }
+    )
+
+    session.flash('success', `Saved View "${name}" created for module ${moduleKey}.`)
+    return response.redirect().back()
+  }
+
+  async assignUserRole({ auth, params, request, response, session }: HttpContext) {
+    const actor = auth.getUserOrFail()
+    if (!actor.isSuperAdmin) {
+      session.flash('error', 'Forbidden: Only Super Administrators can modify user roles.')
+      return response.redirect().back()
+    }
+
+    const target = await User.findOrFail(params.id)
+    const roleSlug = String(request.input('roleSlug', '')).trim()
+    const role = await Role.findByOrFail('slug', roleSlug)
+
+    const existing = await UserRole.query()
+      .where('userId', target.id)
+      .andWhere('roleId', role.id)
+      .first()
+
+    if (existing) {
+      await existing.delete()
+      session.flash('success', `Removed role "${role.slug}" from ${target.email}.`)
+    } else {
+      await UserRole.create({
+        userId: target.id,
+        roleId: role.id,
+        assignedByUserId: actor.id,
+      })
+      session.flash('success', `Assigned role "${role.slug}" to ${target.email}.`)
+    }
+
+    await RbacService.recordAudit({
+      actorUserId: actor.id,
+      userId: target.id,
+      action: existing ? 'rbac.role_revoked' : 'rbac.role_assigned',
+      entityType: 'user_roles',
+      entityId: target.id,
+      requestId: request.id(),
+      afterState: { roleSlug: role.slug },
+    })
+
     return response.redirect().back()
   }
 }
