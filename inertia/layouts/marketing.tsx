@@ -1,35 +1,35 @@
-import Logo from '~/components/logo'
-import { type ReactNode } from 'react'
-import { usePage } from '@inertiajs/react'
+import { type ReactElement } from 'react'
 import { Link } from '@adonisjs/inertia/react'
-import FlashToasts from '~/components/flash_toasts'
-import ThemeToggle from '~/components/theme_toggle'
+import { Stack } from '@astryxdesign/core/Stack'
+import { Text } from '@astryxdesign/core/Text'
+import { Button } from '@astryxdesign/core/Button'
 
-export default function MarketingLayout({ children }: { children: ReactNode }) {
-  const { props } = usePage()
+/** Marketing shell: top brand bar + centered content column. */
+export default function MarketingLayout({ children }: { children: ReactElement }) {
   return (
-    <>
-      <header className="header header--floating">
-        <div className="header__inner">
-          <Logo size={28} />
-          <div className="header__right">
-            <ThemeToggle />
-            {props.user ? (
-              <Link route="dashboard" className="btn btn--primary btn--sm">
-                Dashboard
-              </Link>
-            ) : (
-              <>
-                <Link route="session.create" className="btn btn--primary btn--sm">
-                  Sign in
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
-      {children}
-      <FlashToasts />
-    </>
+    <div style={{ minHeight: '100vh', background: 'var(--astryx-color-background-wash, #f0f2f5)' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          maxWidth: 1080,
+          margin: '0 auto',
+          padding: '16px 24px',
+        }}
+      >
+        <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Text type="label" weight="bold">
+            Seller Core
+          </Text>
+        </Link>
+        <Link href="/login">
+          <Button label="Sign in" variant="secondary" size="sm" />
+        </Link>
+      </div>
+      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 24px 48px' }}>
+        <Stack gap={4}>{children}</Stack>
+      </div>
+    </div>
   )
 }

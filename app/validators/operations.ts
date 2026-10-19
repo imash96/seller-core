@@ -1,7 +1,8 @@
 import vine from '@vinejs/vine'
+import { objectId } from './helpers.js'
 
 export const createSellerAccountValidator = vine.create({
-  salesChannelId: vine.string().uuid(),
+  salesChannelId: objectId(),
   accountName: vine.string().trim().minLength(2).maxLength(150),
   externalSellerId: vine.string().trim().minLength(2).maxLength(150),
   marketplaceRegion: vine.string().trim().minLength(2).maxLength(32),
@@ -27,8 +28,8 @@ export const createCustomerValidator = vine.create({
 
 export const createProductValidator = vine.create({
   title: vine.string().trim().minLength(2).maxLength(255),
-  brandId: vine.string().uuid().optional().nullable(),
-  categoryId: vine.string().uuid().optional().nullable(),
+  brandId: objectId().optional().nullable(),
+  categoryId: objectId().optional().nullable(),
   sku: vine.string().trim().minLength(2).maxLength(120),
   asin: vine.string().trim().maxLength(20).optional().nullable(),
   currencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
@@ -45,7 +46,7 @@ export const createProductValidator = vine.create({
 export const createOrderValidator = vine.create({
   orderNumber: vine.string().trim().minLength(2).maxLength(100),
   externalOrderId: vine.string().trim().maxLength(150).optional().nullable(),
-  sellerAccountId: vine.string().uuid().optional().nullable(),
+  sellerAccountId: objectId().optional().nullable(),
   marketplaceCode: vine.string().trim().maxLength(50).optional(),
   currencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
   exchangeRate: vine.number().min(0.0001).optional(),
@@ -69,13 +70,13 @@ export const createOrderValidator = vine.create({
 
 export const bulkOrderImportValidator = vine.create({
   idempotencyKey: vine.string().trim().minLength(3).maxLength(150),
-  sellerAccountId: vine.string().uuid().optional().nullable(),
+  sellerAccountId: objectId().optional().nullable(),
   ordersJson: vine.string().trim().minLength(2),
 })
 
 export const createShipmentValidator = vine.create({
-  orderId: vine.string().uuid(),
-  orderLineItemId: vine.string().uuid(),
+  orderId: objectId(),
+  orderLineItemId: objectId(),
   shipmentNumber: vine.string().trim().minLength(2).maxLength(100),
   carrierCode: vine.string().trim().minLength(2).maxLength(50),
   carrierName: vine.string().trim().minLength(2).maxLength(150),
@@ -109,7 +110,7 @@ export const createShippingInvoiceValidator = vine.create({
   currencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
   invoiceDate: vine.string().trim(),
   dueDate: vine.string().trim().optional(),
-  shipmentId: vine.string().uuid().optional().nullable(),
+  shipmentId: objectId().optional().nullable(),
   chargeType: vine.enum([
     'base_freight',
     'fuel_surcharge',
@@ -128,8 +129,8 @@ export const createShippingInvoiceValidator = vine.create({
 })
 
 export const createReturnRequestValidator = vine.create({
-  orderId: vine.string().uuid(),
-  orderLineItemId: vine.string().uuid(),
+  orderId: objectId(),
+  orderLineItemId: objectId(),
   rmaNumber: vine.string().trim().minLength(2).maxLength(100),
   returnReason: vine.enum([
     'defective',
@@ -150,8 +151,8 @@ export const createReturnRequestValidator = vine.create({
 })
 
 export const createRefundValidator = vine.create({
-  orderId: vine.string().uuid(),
-  returnRequestId: vine.string().uuid().optional().nullable(),
+  orderId: objectId(),
+  returnRequestId: objectId().optional().nullable(),
   refundNumber: vine.string().trim().minLength(2).maxLength(100),
   itemsRefundAmount: vine.number().min(0),
   shippingRefundAmount: vine.number().min(0).optional(),
@@ -173,7 +174,7 @@ export const createCreditCardValidator = vine.create({
   currentBalance: vine.number().min(0).optional(),
   minimumPaymentDue: vine.number().min(0).optional(),
   nextPaymentDueDate: vine.string().trim().optional(),
-  sellerAccountId: vine.string().uuid().optional().nullable(),
+  sellerAccountId: objectId().optional().nullable(),
   usagePurpose: vine
     .enum([
       'ad_spend',
@@ -205,8 +206,132 @@ export const createFinancialTransactionValidator = vine.create({
   reportingCurrencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
   taxAmount: vine.number().min(0).optional(),
   transactionDate: vine.string().trim(),
-  financialAccountId: vine.string().uuid().optional().nullable(),
-  creditCardId: vine.string().uuid().optional().nullable(),
-  sellerAccountId: vine.string().uuid().optional().nullable(),
-  orderId: vine.string().uuid().optional().nullable(),
+  financialAccountId: objectId().optional().nullable(),
+  creditCardId: objectId().optional().nullable(),
+  sellerAccountId: objectId().optional().nullable(),
+  orderId: objectId().optional().nullable(),
+})
+
+/* ------------------------------------------------------------------ */
+/* Update + supporting validators for complete CRUD flows               */
+/* ------------------------------------------------------------------ */
+
+export const updateBrandValidator = vine.create({
+  name: vine.string().trim().minLength(2).maxLength(150).optional(),
+  slug: vine.string().trim().minLength(2).maxLength(150).optional(),
+  websiteUrl: vine.string().trim().maxLength(500).optional().nullable(),
+  isActive: vine.boolean().optional(),
+})
+
+export const updateCategoryValidator = vine.create({
+  name: vine.string().trim().minLength(2).maxLength(150).optional(),
+  slug: vine.string().trim().minLength(2).maxLength(150).optional(),
+  description: vine.string().trim().optional().nullable(),
+  sortOrder: vine.number().min(0).optional(),
+  isActive: vine.boolean().optional(),
+})
+
+export const updateProductValidator = vine.create({
+  title: vine.string().trim().minLength(2).maxLength(255).optional(),
+  brandId: objectId().optional().nullable(),
+  categoryId: objectId().optional().nullable(),
+  description: vine.string().trim().optional().nullable(),
+  status: vine.enum(['draft', 'active', 'archived', 'discontinued'] as const).optional(),
+})
+
+export const updateCustomerValidator = vine.create({
+  fullName: vine.string().trim().minLength(2).maxLength(255).optional(),
+  email: vine.string().email().trim().optional().nullable(),
+  phone: vine.string().trim().optional().nullable(),
+  preferredCurrency: vine.string().fixedLength(3).toUpperCase().optional(),
+  riskLevel: vine.enum(['low', 'medium', 'high', 'under_review', 'cleared'] as const).optional(),
+  notes: vine.string().trim().optional().nullable(),
+})
+
+export const updateSellerAccountValidator = vine.create({
+  accountName: vine.string().trim().minLength(2).maxLength(150).optional(),
+  status: vine
+    .enum([
+      'pending_setup',
+      'active',
+      'auth_expired',
+      'rate_limited',
+      'suspended',
+      'disconnected',
+    ] as const)
+    .optional(),
+  healthStatus: vine.enum(['healthy', 'warning', 'critical', 'unknown'] as const).optional(),
+  rateLimitRpm: vine.number().min(1).max(10000).optional(),
+})
+
+export const updateFinancialAccountValidator = vine.create({
+  accountName: vine.string().trim().minLength(2).maxLength(150).optional(),
+  currentBalance: vine.number().optional(),
+  isActive: vine.boolean().optional(),
+})
+
+export const updateCreditCardValidator = vine.create({
+  cardLabel: vine.string().trim().minLength(2).maxLength(150).optional(),
+  creditLimit: vine.number().min(0).optional(),
+  minimumPaymentDue: vine.number().min(0).optional(),
+  nextPaymentDueDate: vine.string().trim().optional().nullable(),
+  status: vine.enum(['active', 'frozen', 'expired', 'cancelled'] as const).optional(),
+})
+
+export const createTaskValidator = vine.create({
+  title: vine.string().trim().minLength(2).maxLength(255),
+  description: vine.string().trim().optional().nullable(),
+  taskType: vine
+    .enum([
+      'credit_card_due',
+      'confirm_shipment',
+      'message_reply',
+      'invoice_due',
+      'return_review',
+      'fraud_review',
+      'restock_alert',
+      'claim_deadline',
+      'general',
+    ] as const)
+    .optional(),
+  priority: vine.enum(['low', 'medium', 'high', 'urgent'] as const).optional(),
+  dueAt: vine.string().trim().optional(),
+})
+
+export const updateTaskValidator = vine.create({
+  title: vine.string().trim().minLength(2).maxLength(255).optional(),
+  description: vine.string().trim().optional().nullable(),
+  taskType: vine
+    .enum([
+      'credit_card_due',
+      'confirm_shipment',
+      'message_reply',
+      'invoice_due',
+      'return_review',
+      'fraud_review',
+      'restock_alert',
+      'claim_deadline',
+      'general',
+    ] as const)
+    .optional(),
+  priority: vine.enum(['low', 'medium', 'high', 'urgent'] as const).optional(),
+  status: vine
+    .enum(['pending', 'in_progress', 'completed', 'snoozed', 'dismissed'] as const)
+    .optional(),
+  dueAt: vine.string().trim().optional(),
+})
+
+export const createVariantValidator = vine.create({
+  sku: vine.string().trim().minLength(2).maxLength(120),
+  title: vine.string().trim().minLength(1).maxLength(255),
+  retailPrice: vine.number().min(0),
+  costPrice: vine.number().min(0).optional(),
+  stockOnHand: vine.number().min(0).optional(),
+  attributeName: vine.string().trim().maxLength(100).optional(),
+  attributeValue: vine.string().trim().maxLength(255).optional(),
+})
+
+export const updateVariantStockValidator = vine.create({
+  stockOnHand: vine.number().min(0),
+  stockReserved: vine.number().min(0).optional(),
 })

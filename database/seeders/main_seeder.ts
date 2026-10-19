@@ -81,6 +81,7 @@ export default class MainSeeder extends BaseSeeder {
         slug: resource,
         resource,
         action: '*',
+        name: `Full access to ${resource.replace(/_/g, ' ')}`,
         description: `Full access to ${resource} module`,
       })
       permissionMap.set(wildcardPerm.slug, wildcardPerm)
@@ -91,6 +92,7 @@ export default class MainSeeder extends BaseSeeder {
           slug,
           resource,
           action,
+          name: `${action[0].toUpperCase() + action.slice(1)} ${resource.replace(/_/g, ' ')}`,
           description: `Can ${action} records in ${resource}`,
         })
         permissionMap.set(slug, perm)

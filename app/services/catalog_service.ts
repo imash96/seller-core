@@ -10,7 +10,6 @@ import {
   PublicationStatus,
   EntitySyncStatus,
 } from '../enums/index.js'
-import { uuidv7 } from '../utils/uuid.js'
 
 export interface VariantInput {
   sku: string
@@ -74,7 +73,6 @@ export class CatalogService {
 
       const product = new Product()
       product.useTransaction(trx)
-      product.id = uuidv7()
       product.userId = input.userId
       product.brandId = input.brandId ?? null
       product.categoryId = input.categoryId ?? null
@@ -99,7 +97,6 @@ export class CatalogService {
         const vInput = input.variants[i]
         const variant = new ProductVariant()
         variant.useTransaction(trx)
-        variant.id = uuidv7()
         variant.userId = input.userId
         variant.productId = product.id
         variant.sku = vInput.sku.trim()
@@ -135,7 +132,6 @@ export class CatalogService {
             if (attrName && attrValue) {
               const attrRow = new ProductVariantAttribute()
               attrRow.useTransaction(trx)
-              attrRow.id = uuidv7()
               attrRow.userId = input.userId
               attrRow.productVariantId = variant.id
               attrRow.attributeName = attrName.trim().toLowerCase()
@@ -149,7 +145,6 @@ export class CatalogService {
           for (const lInput of vInput.listings) {
             const listing = new ChannelListing()
             listing.useTransaction(trx)
-            listing.id = uuidv7()
             listing.userId = input.userId
             listing.sellerAccountId = lInput.sellerAccountId
             listing.productId = product.id

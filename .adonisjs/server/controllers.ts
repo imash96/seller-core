@@ -5,5 +5,6 @@
 
 export const controllers = {
   Operations: () => import('#controllers/operations_controller'),
+  Pages: () => import('#controllers/pages_controller'),
   Session: () => import('#controllers/session_controller'),
 }
