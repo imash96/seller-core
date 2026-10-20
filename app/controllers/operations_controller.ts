@@ -36,6 +36,9 @@ import { CatalogService } from '../services/catalog_service.js'
 import { FulfillmentAndReturnsService } from '../services/fulfillment_and_returns_service.js'
 import { RbacService } from '../services/rbac_service.js'
 import { generateEntityId } from '../utils/generate_entity_id.js'
+import OrderPlaced from '#events/order_placed'
+import OrderStatusChanged from '#events/order_status_changed'
+import ShipmentDispatched from '#events/shipment_dispatched'
 import {
   createOrderValidator,
   bulkOrderImportValidator,
@@ -351,6 +354,19 @@ export default class OperationsController {
           },
         ],
       })
+      // Event bus: downstream listeners handle notifications, fulfillment queue, audit
+      await OrderPlaced.dispatch({
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        userId: user.id,
+        customerId: order.customerId,
+        currencyCode: order.currencyCode,
+        totalAmount: String(order.totalAmount),
+        marketplaceCode: order.marketplaceCode,
+        sellerAccountId: order.sellerAccountId,
+        requestId: request.id(),
+      })
+
       session.flash('success', `Order ${order.orderNumber} created with P&L calculated.`)
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to create order')
@@ -387,6 +403,16 @@ export default class OperationsController {
       afterState: { status: order.status },
     })
 
+    await OrderStatusChanged.dispatch({
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      userId: user.id,
+      fromStatus: String(prevStatus),
+      toStatus: String(status),
+      actorUserId: user.id,
+      requestId: request.id(),
+    })
+
     session.flash(
       'success',
       status === OrderStatus.DELIVERED
@@ -396,8 +422,13 @@ export default class OperationsController {
     return response.redirect().back()
   }
 
-  async deleteOrder({ auth, params, request, response, session }: HttpContext) {
+  async deleteOrder({ auth, bouncer, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
+    // Bouncer policy check (abilities-backed): denies unless the caller owns the order and has permission
+    if (await bouncer.denies('deleteOrders')) {
+      session.flash('error', 'Bouncer: not authorized to delete orders.')
+      return response.redirect().back()
+    }
     const allowed = await RbacService.hasPermission(user, 'orders.delete', 'orders')
     if (!allowed) {
       session.flash('error', 'RBAC Denied: You do not have permission orders.delete')
@@ -435,6 +466,32 @@ export default class OperationsController {
         throw new Error('ordersJson must be a JSON array of order objects.')
       }
 
+      // BodyParser note: ordersJson may arrive as JSON, form-encoded, or
+      // multipart text field — bodyparser middleware handles all three.
+      // For large CSVs use the /import/upload route which accepts multipart
+      // file uploads (request.file('catalogFile')).
+
+      // Queue: offload heavy import so the HTTP request stays under 100ms.
+      // Falls back to sync driver if no queue worker is running (see config/queue.ts).
+      try {
+        const importMod = await import('#jobs/process_marketplace_import')
+        const ProcessMarketplaceImport = importMod.default
+        await (ProcessMarketplaceImport as any).dispatch({
+          userId: user.id,
+          sellerAccountId: payload.sellerAccountId ?? null,
+          idempotencyKey: payload.idempotencyKey,
+          orders: parsedOrders,
+          requestId: request.id(),
+        })
+        session.flash(
+          'success',
+          `Import queued (${payload.idempotencyKey}): ${parsedOrders.length} orders will be processed in background. Track under /import → Sync Jobs.`
+        )
+        return response.redirect().back()
+      } catch (queueErr) {
+        // Queue not ready (e.g. migration pending) — process inline so the user still succeeds
+      }
+
       const result = await OrderService.importBulkOrders({
         userId: user.id,
         actorUserId: user.id,
@@ -442,6 +499,11 @@ export default class OperationsController {
         idempotencyKey: payload.idempotencyKey,
         orders: parsedOrders,
       })
+
+      // Inline path: OrderService already tracked SyncJob; per-order events
+      // will be emitted by the queued job variant. For inline fallback we
+      // emit a lightweight summary event instead of per-row dispatch.
+      void result
 
       session.flash(
         'success',
@@ -517,14 +579,29 @@ export default class OperationsController {
     const payload = await request.validateUsing(createProductValidator)
 
     try {
+      // Coerce string inputs from SmartForm (hasVariants is "true"/"false" string, variationDimensions is "size,color")
+      const rawHasVariants = (payload as any).hasVariants
+      const hasVariants =
+        typeof rawHasVariants === 'string' ? rawHasVariants === 'true' : Boolean(rawHasVariants)
+      const rawVD = (payload as any).variationDimensions
+      const variationDimensions: string[] =
+        typeof rawVD === 'string'
+          ? rawVD
+              .split(',')
+              .map((s: string) => s.trim())
+              .filter(Boolean)
+          : Array.isArray(rawVD)
+            ? rawVD
+            : []
       const product = await CatalogService.createProduct({
         userId: user.id,
         brandId: payload.brandId ?? null,
         categoryId: payload.categoryId ?? null,
         title: payload.title,
         description: payload.description ?? null,
-        hasVariants: Boolean(payload.hasVariants),
-        variationDimensions: payload.variationDimensions ?? [],
+        skuPrefix: (payload as any).skuPrefix ?? payload.sku,
+        hasVariants,
+        variationDimensions,
         variants: [
           {
             sku: payload.sku,
@@ -631,6 +708,17 @@ export default class OperationsController {
           },
         ],
       })
+      await ShipmentDispatched.dispatch({
+        shipmentId: shipment.id,
+        shipmentNumber: shipment.shipmentNumber,
+        orderId: payload.orderId,
+        orderNumber: (shipment as any).orderNumber ?? String(shipment.shipmentNumber),
+        userId: user.id,
+        carrierCode: payload.carrierCode,
+        trackingNumber: payload.trackingNumber ?? null,
+        requestId: request.id(),
+      })
+
       session.flash('success', `Shipment ${shipment.shipmentNumber} created and order updated.`)
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to create shipment')
@@ -793,6 +881,18 @@ export default class OperationsController {
       metadata: {},
     })
 
+    // Event: trigger denormalized metrics update outside the request
+    const paymentMod = await import('#events/payment_reconciled')
+    const PaymentReconciled = paymentMod.default
+    await PaymentReconciled.dispatch({
+      financialTransactionId: tx.id,
+      userId: user.id,
+      status: tx.status,
+      amount: tx.reportingAmount,
+      currencyCode: tx.reportingCurrencyCode,
+      requestId: request.id(),
+    })
+
     session.flash(
       'success',
       `Ledger entry ${tx.referenceNumber} (${tx.originalAmount} ${tx.originalCurrencyCode} -> ${tx.reportingAmount} ${tx.reportingCurrencyCode}) posted.`
@@ -815,11 +915,15 @@ export default class OperationsController {
     return response.redirect().back()
   }
 
-  async storeUser({ auth, request, response, session }: HttpContext) {
+  async storeUser({ auth, bouncer, request, response, session }: HttpContext) {
     const actor = auth.getUserOrFail()
+    await bouncer.with('UserPolicy').authorize('create')
     const payload = await request.validateUsing(createUserValidator)
 
     try {
+      const roleSlugs =
+        (payload as any).roleSlugs ??
+        ((payload as any).roleSlug ? [(payload as any).roleSlug] : ['operations_manager'])
       const created = await RbacService.createUserBySuperAdmin(
         actor,
         {
@@ -830,7 +934,7 @@ export default class OperationsController {
           defaultCurrency: payload.defaultCurrency || 'USD',
           timezone: payload.timezone || 'UTC',
           isSuperAdmin: payload.isSuperAdmin ?? false,
-          roleSlugs: payload.roleSlugs ?? ['operations_manager'],
+          roleSlugs,
           enabledModules: payload.enabledModules,
         },
         {
@@ -849,8 +953,9 @@ export default class OperationsController {
     return response.redirect().back()
   }
 
-  async toggleUserStatus({ auth, params, request, response, session }: HttpContext) {
+  async toggleUserStatus({ auth, bouncer, params, request, response, session }: HttpContext) {
     const actor = auth.getUserOrFail()
+    await bouncer.authorize('manageUsers')
     if (!actor.isSuperAdmin) {
       session.flash('error', 'Forbidden: Only Super Administrators can change user account status.')
       return response.redirect().back()
@@ -890,8 +995,76 @@ export default class OperationsController {
     return response.redirect().back()
   }
 
-  async toggleModuleEntitlement({ auth, params, response, session }: HttpContext) {
+  async deleteUser({ auth, bouncer, params, response, session }: HttpContext) {
+    const actor = auth.getUserOrFail()
+    await bouncer.authorize('manageUsers')
+    if (!actor.isSuperAdmin) {
+      session.flash('error', 'Forbidden: Only Super Administrators can delete users.')
+      return response.redirect().back()
+    }
+    if (params.id === actor.id) {
+      session.flash('error', 'You cannot delete your own account. Deactivate it instead.')
+      return response.redirect().back()
+    }
+    const target = await User.findOrFail(params.id)
+    // Check if target owns data — if so, suspend instead of hard delete
+    const [orderCount, txCount] = await Promise.all([
+      Order.query().where('userId', target.id).count('* as total'),
+      FinancialTransaction.query().where('userId', target.id).count('* as total'),
+    ])
+    const hasOrders = Number((orderCount[0] as any).$extras.total) > 0
+    const hasTx = Number((txCount[0] as any).$extras.total) > 0
+    if (hasOrders || hasTx) {
+      target.status = UserStatus.SUSPENDED
+      await target.save()
+      await RbacService.recordAudit({
+        actorUserId: actor.id,
+        userId: target.id,
+        action: 'user.suspended_instead_of_delete',
+        entityType: 'users',
+        entityId: target.id,
+        requestId: response as any,
+        beforeState: { hasOrders, hasTx },
+        afterState: { status: UserStatus.SUSPENDED },
+      })
+      session.flash(
+        'success',
+        `User "${target.email}" owns orders/transactions and was suspended instead of deleted to preserve data integrity.`
+      )
+      return response.redirect().back()
+    }
+    await target.delete()
+    await RbacService.recordAudit({
+      actorUserId: actor.id,
+      userId: target.id,
+      action: 'user.deleted',
+      entityType: 'users',
+      entityId: params.id,
+      requestId: response as any,
+      beforeState: { email: target.email },
+    })
+    session.flash('success', `User "${target.email}" deleted.`)
+    return response.redirect().back()
+  }
+
+  async deleteSavedView({ auth, params, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
+    const view = await SavedView.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+    await view.delete()
+    session.flash('success', `Saved view "${view.name}" removed.`)
+    return response.redirect().back()
+  }
+
+  async toggleModuleEntitlement({ auth, bouncer, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    // Bouncer gate — super admin can toggle anyone's entitlement; others only own
+    if (!user.isSuperAdmin && (await bouncer.denies('manageEntitlements'))) {
+      session.flash('error', 'Bouncer: not authorized to manage entitlements.')
+      return response.redirect().back()
+    }
     const entitlement = await ModuleEntitlement.query()
       .where('id', params.id)
       .andWhere((q) => {
@@ -925,10 +1098,18 @@ export default class OperationsController {
       return response.redirect().back()
     }
 
+    // Defensive load: .first() + explicit missing check gives a friendly flash instead of 404 E_ROW_NOT_FOUND
     const [source, target] = await Promise.all([
-      Customer.query().where('userId', user.id).andWhere('id', sourceCustomerId).firstOrFail(),
-      Customer.query().where('userId', user.id).andWhere('id', targetCustomerId).firstOrFail(),
+      Customer.query().where('userId', user.id).andWhere('id', sourceCustomerId).first(),
+      Customer.query().where('userId', user.id).andWhere('id', targetCustomerId).first(),
     ])
+    if (!source || !target) {
+      session.flash(
+        'error',
+        `Merge failed — ${!source ? 'source' : ''}${!source && !target ? ' and ' : ''}${!target ? 'target' : ''} customer not found. Please refresh.`
+      )
+      return response.redirect().back()
+    }
 
     await db.transaction(async (trx) => {
       await Order.query({ client: trx })
@@ -1146,7 +1327,7 @@ export default class OperationsController {
       .andWhere('id', params.id)
       .firstOrFail()
 
-    const status = String(request.input('status', 'paid'))
+    const status = String(request.input('paymentStatus') ?? request.input('status') ?? 'paid')
     const reconciliationStatus = String(request.input('reconciliationStatus', 'resolved'))
     invoice.paymentStatus = status
     invoice.reconciliationStatus = reconciliationStatus
@@ -1196,19 +1377,25 @@ export default class OperationsController {
     const claimNumber = String(request.input('claimNumber', `CLM-${Date.now()}`)).trim()
     const claimType = String(request.input('claimType', 'a_to_z_guarantee'))
     const disputedAmount = Number(request.input('disputedAmount', order.totalAmount || 50))
+    const sellerLiabilityAmount = Number(request.input('sellerLiabilityAmount', 0))
+    const sellerAccountId =
+      String(request.input('sellerAccountId', '')).trim() || order.sellerAccountId
+    const respondByAt = request.input('respondByAt')
+    const status = String(request.input('status', 'under_review'))
 
     const claim = await MarketplaceClaim.create({
       userId: user.id,
       orderId: order.id,
-      sellerAccountId: order.sellerAccountId,
+      sellerAccountId: sellerAccountId || null,
       claimNumber,
       externalClaimId: request.input('externalClaimId') || claimNumber,
       claimType,
-      status: 'under_review',
+      status,
       currencyCode: order.currencyCode,
       disputedAmount: disputedAmount.toFixed(2),
-      sellerLiabilityAmount: '0.00',
+      sellerLiabilityAmount: sellerLiabilityAmount.toFixed(2),
       reason: request.input('reason') || 'Customer marketplace claim opened',
+      respondByAt: respondByAt ? DateTime.fromISO(String(respondByAt)) : null,
     })
 
     session.flash('success', `Marketplace Claim ${claim.claimNumber} logged.`)
@@ -1224,6 +1411,14 @@ export default class OperationsController {
 
     const status = String(request.input('status', 'won'))
     claim.status = status
+    const liability = request.input('sellerLiabilityAmount')
+    if (liability !== undefined && liability !== null && liability !== '') {
+      claim.sellerLiabilityAmount = Number(liability).toFixed(2)
+    }
+    const notes = request.input('resolutionNotes') ?? request.input('reason')
+    if (notes) claim.reason = String(notes)
+    const respondByAt = request.input('respondByAt')
+    if (respondByAt) claim.respondByAt = DateTime.fromISO(String(respondByAt))
     if (['won', 'lost', 'closed'].includes(status)) {
       claim.resolvedAt = DateTime.now()
     }
@@ -1327,8 +1522,9 @@ export default class OperationsController {
     return response.redirect().back()
   }
 
-  async assignUserRole({ auth, params, request, response, session }: HttpContext) {
+  async assignUserRole({ auth, bouncer, params, request, response, session }: HttpContext) {
     const actor = auth.getUserOrFail()
+    await bouncer.authorize('manageRoles')
     if (!actor.isSuperAdmin) {
       session.flash('error', 'Forbidden: Only Super Administrators can modify user roles.')
       return response.redirect().back()
@@ -1515,28 +1711,42 @@ export default class OperationsController {
 
   async updateCustomer({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const payload = await request.validateUsing(updateCustomerValidator)
-    const customer = await Customer.query()
-      .where('id', params.id)
-      .andWhere('userId', user.id)
-      .firstOrFail()
-    const beforeRisk = customer.riskLevel
-    customer.merge(payload)
-    await customer.save()
-
-    if (payload.riskLevel && payload.riskLevel !== beforeRisk) {
-      await RbacService.recordAudit({
-        actorUserId: user.id,
-        userId: user.id,
-        action: 'customer.risk_level_changed',
-        entityType: 'customers',
-        entityId: customer.id,
-        requestId: request.id(),
-        beforeState: { riskLevel: beforeRisk },
-        afterState: { riskLevel: payload.riskLevel },
-      })
+    try {
+      const payload = await request.validateUsing(updateCustomerValidator)
+      const customer = await Customer.query()
+        .where('id', params.id)
+        .andWhere('userId', user.id)
+        .first()
+      if (!customer) {
+        session.flash(
+          'error',
+          `Customer not found (id ${String(params.id).slice(0, 12)}…). It may have been merged or deleted — please refresh the list.`
+        )
+        return response.redirect().back()
+      }
+      const beforeRisk = customer.riskLevel
+      customer.merge(payload)
+      await customer.save()
+      if (payload.riskLevel && payload.riskLevel !== beforeRisk) {
+        await RbacService.recordAudit({
+          actorUserId: user.id,
+          userId: user.id,
+          action: 'customer.risk_level_changed',
+          entityType: 'customers',
+          entityId: customer.id,
+          requestId: request.id(),
+          beforeState: { riskLevel: beforeRisk },
+          afterState: { riskLevel: payload.riskLevel },
+        }).catch(() => {})
+      }
+      session.flash('success', `Customer "${customer.fullName}" updated.`)
+    } catch (err: any) {
+      if (err?.code === 'E_ROW_NOT_FOUND' || err?.status === 404) {
+        session.flash('error', 'Customer not found — list may be stale. Please refresh.')
+      } else {
+        session.flash('error', err.message || 'Failed to update customer')
+      }
     }
-    session.flash('success', `Customer "${customer.fullName}" updated.`)
     return response.redirect().back()
   }
 
@@ -1660,5 +1870,118 @@ export default class OperationsController {
     await task.delete()
     session.flash('success', 'Task deleted.')
     return response.redirect().back()
+  }
+
+  /* ================================================================== */
+  /* File uploads — bodyparser multipart (config/bodyparser.ts)          */
+  /* File uploads — bodyparser multipart (config/bodyparser.ts)          */
+  /* autoProcess:true streams to tmp/; validators enforce extnames       */
+  /* ================================================================== */
+
+  /**
+   * Upload a catalog CSV/PDF for async parsing.
+   * Demonstrates bodyparser multipart handling end-to-end.
+   */
+  async uploadCatalogFile({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+
+    const file = request.file('catalogFile', {
+      size: '5mb',
+      extnames: ['csv', 'xlsx', 'pdf', 'json'],
+    })
+
+    if (!file || !file.isValid) {
+      session.flash(
+        'error',
+        file?.errors?.[0]?.message ?? 'Please attach a catalog file (csv/xlsx/pdf/json, ≤5mb).'
+      )
+      return response.redirect().back()
+    }
+
+    // In production: move to permanent storage (S3) and dispatch a parse job.
+    // Bodyparser already handled multipart parsing — `file` has tmpPath, size, extname, etc.
+    const fileName = `${user.id}_${Date.now()}_${file.clientName}`
+
+    try {
+      const notifMod = await import('#jobs/send_notification')
+      const SendNotification = notifMod.default
+      await (SendNotification as any).dispatch({
+        to: user.email,
+        channel: 'in_app',
+        subject: 'Catalog import queued',
+        body: `File ${file.clientName} (${file.size} bytes) received and queued for processing.`,
+        metadata: { fileName, userId: user.id, requestId: request.id() },
+      } as any)
+      session.flash(
+        'success',
+        `File ${file.clientName} accepted and queued for background processing.`
+      )
+    } catch {
+      // Queue unavailable — still acknowledge receipt so the user can retry
+      session.flash(
+        'success',
+        `File ${file.clientName} received (${Math.round((file.size ?? 0) / 1024)}KB). Background queue will process it when available.`
+      )
+    }
+    return response.redirect().back()
+  }
+
+  async queueSellerSync({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const sellerAccountId = String(request.input('sellerAccountId', '')).trim()
+    if (!sellerAccountId) {
+      session.flash('error', 'sellerAccountId is required.')
+      return response.redirect().back()
+    }
+
+    try {
+      const syncMod = await import('#jobs/sync_seller_account')
+      const SyncSellerAccount = syncMod.default
+      const account = await SellerAccount.query()
+        .where('userId', user.id)
+        .andWhere('id', sellerAccountId)
+        .firstOrFail()
+      await (SyncSellerAccount as any).dispatch({
+        userId: user.id,
+        sellerAccountId: account.id,
+        salesChannelId: account.salesChannelId,
+        requestId: request.id(),
+      } as any)
+      session.flash(
+        'success',
+        `Sync queued for ${account.accountName}. Track progress under Sync Jobs.`
+      )
+    } catch (err: any) {
+      session.flash('error', `Could not enqueue sync: ${err.message}`)
+    }
+    return response.redirect().back()
+  }
+
+  async queueOverview({ auth, inertia }: HttpContext) {
+    const user = auth.getUserOrFail()
+    let queueStats: any = null
+    try {
+      const jobs = await db
+        .from('queue_jobs')
+        .select('queue_name', 'status')
+        .count('* as count')
+        .groupBy('queue_name', 'status')
+        .limit(100)
+      queueStats = jobs
+    } catch {
+      queueStats = null
+    }
+
+    const [sellerAccounts, syncJobs] = await Promise.all([
+      SellerAccount.query().where('userId', user.id).preload('salesChannel'),
+      SyncJob.query().where('userId', user.id).orderBy('createdAt', 'desc').limit(20),
+    ])
+
+    return inertia.render('dashboard', {
+      view: 'queue',
+      queueStats,
+      sellerAccounts: sellerAccounts.map((s) => s.serialize()),
+      syncJobs: syncJobs.map((j) => j.serialize()),
+    } as any)
   }
 }

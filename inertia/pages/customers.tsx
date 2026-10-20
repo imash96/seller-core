@@ -1,81 +1,261 @@
 import { Stack } from '@astryxdesign/core/Stack'
+import { Text } from '@astryxdesign/core/Text'
+import { Card } from '@astryxdesign/core/Card'
+import { Button } from '@astryxdesign/core/Button'
+import { Badge } from '@astryxdesign/core/Badge'
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import AppLayout from '~/layouts/app'
-import { PageSection, DataTable, SmartForm, RowAction, StatusForm, col, type Row } from '~/lib/ui'
+import {
+  PageSection,
+  FormModal,
+  ResponsiveDataView,
+  SavedViewsBar,
+  col,
+  type Row,
+  money,
+} from '~/lib/ui'
+import { useState } from 'react'
 
-type Props = {
-  customers: Row[]
-  riskSignals: Row[]
-}
+type Props = { customers: Row[]; riskSignals: Row[]; savedViews?: Row[] }
 
 Customers.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
 
 const RISK_LEVELS = ['low', 'medium', 'high', 'under_review', 'cleared']
 
-export default function Customers({ customers, riskSignals }: Props) {
+export default function Customers({ customers, riskSignals, savedViews }: Props) {
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editRow, setEditRow] = useState<Row | null>(null)
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [reviewRow, setReviewRow] = useState<Row | null>(null)
+
   return (
     <Stack gap={4}>
-      <PageSection
-        title="Create customer"
-        description="Customers are per-user. Shared addresses or proxy emails never auto-flag fraud — they only raise explainable risk signals for manual review."
-      >
-        <SmartForm
-          action="/customers"
-          submitLabel="Create customer"
-          fields={[
-            { name: 'fullName', label: 'Full name', required: true, width: 220 },
-            { name: 'email', label: 'Email', kind: 'email', width: 220 },
-            { name: 'proxyEmail', label: 'Proxy email', kind: 'email', width: 200 },
-            { name: 'phone', label: 'Phone', width: 150 },
-            {
-              name: 'preferredCurrency',
-              label: 'Currency',
-              kind: 'select',
-              width: 120,
-              default: 'USD',
-              options: ['USD', 'EUR', 'GBP', 'JPY', 'INR', 'AED'].map((c) => ({
-                value: c,
-                label: c,
-              })),
-            },
-            {
-              name: 'riskLevel',
-              label: 'Risk level',
-              kind: 'select',
-              width: 150,
-              default: 'low',
-              options: RISK_LEVELS.map((r) => ({ value: r, label: r.replace(/_/g, ' ') })),
-            },
-            { name: 'line1', label: 'Address line 1', width: 220 },
-            { name: 'city', label: 'City', width: 150 },
-            { name: 'stateProvince', label: 'State', width: 130 },
-            { name: 'postalCode', label: 'Postal code', width: 120 },
-            { name: 'countryCode', label: 'Country', default: 'US', width: 90 },
-          ]}
-        />
-      </PageSection>
+      <Card padding={4}>
+        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
+          <Button label="+ Create Customer" variant="primary" onClick={() => setCreateOpen(true)} />
+          <Button label="Merge Duplicates" variant="secondary" onClick={() => setMergeOpen(true)} />
+          <Text type="supporting" as="div">
+            {customers.length} customers · {riskSignals.length} risk signals
+          </Text>
+        </Stack>
+      </Card>
+      {savedViews && savedViews.length > 0 ? <SavedViewsBar views={savedViews} /> : null}
 
-      <PageSection
+      <FormModal
+        isOpen={createOpen}
+        onOpenChange={setCreateOpen}
+        title="Create customer"
+        subtitle="Customers are per-user. Shared addresses never auto-flag fraud — they raise explainable risk signals."
+        submitLabel="Create customer"
+        action="/customers"
+        fields={[
+          { name: 'fullName', label: 'Full name', required: true },
+          { name: 'email', label: 'Email', kind: 'email' },
+          { name: 'proxyEmail', label: 'Proxy email', kind: 'email' },
+          { name: 'phone', label: 'Phone' },
+          {
+            name: 'preferredCurrency',
+            label: 'Currency',
+            kind: 'select',
+            default: 'USD',
+            options: ['USD', 'EUR', 'GBP', 'JPY', 'INR', 'AED'].map((c) => ({
+              value: c,
+              label: c,
+            })),
+          },
+          {
+            name: 'riskLevel',
+            label: 'Risk level',
+            kind: 'select',
+            default: 'low',
+            options: RISK_LEVELS.map((r) => ({ value: r, label: r.replace(/_/g, ' ') })),
+          },
+          { name: 'line1', label: 'Address line 1' },
+          { name: 'city', label: 'City' },
+          { name: 'stateProvince', label: 'State' },
+          { name: 'postalCode', label: 'Postal code' },
+          { name: 'countryCode', label: 'Country', default: 'US' },
+        ]}
+      />
+
+      <FormModal
+        isOpen={!!editRow}
+        onOpenChange={(o) => {
+          if (!o) setEditRow(null)
+        }}
+        title={`Edit customer: ${String(editRow?.fullName ?? '')}`}
+        submitLabel="Save customer"
+        action={editRow ? `/customers/${editRow.id}` : '/customers/placeholder'}
+        initialValues={
+          editRow
+            ? {
+                fullName: String(editRow.fullName ?? ''),
+                email: String(editRow.email ?? ''),
+                proxyEmail: String(editRow.proxyEmail ?? ''),
+                phone: String(editRow.phone ?? ''),
+                preferredCurrency: String(editRow.preferredCurrency ?? 'USD'),
+                notes: String(editRow.notes ?? ''),
+                riskLevel: String(editRow.riskLevel ?? 'low'),
+              }
+            : undefined
+        }
+        fields={[
+          { name: 'fullName', label: 'Full name' },
+          { name: 'email', label: 'Email', kind: 'email' },
+          { name: 'proxyEmail', label: 'Proxy email', kind: 'email' },
+          { name: 'phone', label: 'Phone' },
+          {
+            name: 'preferredCurrency',
+            label: 'Currency',
+            kind: 'select',
+            options: ['USD', 'EUR', 'GBP', 'JPY', 'INR', 'AED'].map((c) => ({
+              value: c,
+              label: c,
+            })),
+          },
+          {
+            name: 'riskLevel',
+            label: 'Risk level',
+            kind: 'select',
+            options: RISK_LEVELS.map((r) => ({ value: r, label: r.replace(/_/g, ' ') })),
+          },
+          { name: 'notes', label: 'Notes', kind: 'textarea' },
+        ]}
+      />
+
+      <FormModal
+        isOpen={mergeOpen}
+        onOpenChange={setMergeOpen}
         title="Merge duplicate customers"
-        description="Non-destructive merge: the source customer is linked via merged_into_customer_id; orders keep both IDs in history."
-      >
-        <SmartForm
-          action="/customers/merge"
-          submitLabel="Merge customers"
-          compact
-          fields={[
-            { name: 'sourceCustomerId', label: 'Source customer ID (absorbed)', required: true },
-            { name: 'targetCustomerId', label: 'Target customer ID (survives)', required: true },
-          ]}
-        />
-      </PageSection>
+        subtitle="Non-destructive: source is linked via merged_into_customer_id."
+        submitLabel="Merge customers"
+        action="/customers/merge"
+        fields={[
+          {
+            name: 'sourceCustomerId',
+            label: 'Source (absorbed)',
+            kind: 'select',
+            required: true,
+            options: customers.map((c) => ({
+              value: String(c.id),
+              label: `${c.fullName} (${c.email ?? 'no email'})`,
+            })),
+          },
+          {
+            name: 'targetCustomerId',
+            label: 'Target (survives)',
+            kind: 'select',
+            required: true,
+            options: customers.map((c) => ({
+              value: String(c.id),
+              label: `${c.fullName} (${c.email ?? 'no email'})`,
+            })),
+          },
+        ]}
+      />
+
+      <FormModal
+        isOpen={!!reviewRow}
+        onOpenChange={(o) => {
+          if (!o) setReviewRow(null)
+        }}
+        title={`Review risk signal: ${String((reviewRow as any)?.signalType ?? reviewRow?.signalCode ?? '—')}`}
+        submitLabel="Submit review"
+        action={
+          reviewRow ? `/risk-signals/${reviewRow.id}/review` : '/risk-signals/placeholder/review'
+        }
+        fields={[
+          {
+            name: 'reviewStatus',
+            label: 'Review status',
+            kind: 'select',
+            required: true,
+            options: [
+              { value: 'pending_review', label: 'Pending' },
+              { value: 'investigating', label: 'Investigating' },
+              { value: 'confirmed_risk', label: 'Confirmed risk' },
+              { value: 'false_positive', label: 'False positive' },
+              { value: 'resolved', label: 'Resolved' },
+            ],
+          },
+          { name: 'reviewNotes', label: 'Review notes', kind: 'textarea' },
+        ]}
+      />
 
       <PageSection
         title="Customers"
-        description="Edit risk level and details inline, or delete a customer you no longer need."
+        description="Risk level, lifetime spend and repeat-buyer status per customer."
       >
-        <DataTable
+        <ResponsiveDataView
           rows={customers}
-          empty="No customers yet."
+          searchKeys={['fullName', 'email', 'proxyEmail', 'phone']}
+          filterKey="riskLevel"
+          filterPills={[
+            { value: 'all', label: 'All' },
+            { value: 'high', label: 'High risk' },
+            { value: 'under_review', label: 'Under review' },
+            { value: 'low', label: 'Low' },
+            { value: 'cleared', label: 'Cleared' },
+          ]}
+          createLabel="+ Create Customer"
+          onCreateClick={() => setCreateOpen(true)}
+          toCard={(row) => ({
+            title: String(row.fullName),
+            subtitle: String(row.email ?? row.phone ?? '').slice(0, 36),
+            avatarText: String(row.fullName ?? 'U').slice(0, 2),
+            idBadge: row.proxyEmail ? `proxy ${String(row.proxyEmail).slice(0, 18)}` : undefined,
+            statusBadge: {
+              label: String(row.riskLevel ?? 'low').replace(/_/g, ' '),
+              variant:
+                row.riskLevel === 'high'
+                  ? 'error'
+                  : row.riskLevel === 'under_review'
+                    ? 'info'
+                    : row.riskLevel === 'medium'
+                      ? 'warning'
+                      : 'success',
+            },
+            metrics: [
+              { label: 'Orders', value: String(row.ordersCount ?? 0) },
+              {
+                label: 'Lifetime spend',
+                value: money(String(row.preferredCurrency ?? 'USD'), row.totalSpent),
+              },
+              { label: 'Risk score', value: String(row.riskScore ?? 0) },
+              { label: 'Repeat buyer', value: row.isRepeatCustomer ? 'Yes' : 'No' },
+            ],
+            actions: (
+              <Stack direction="horizontal" gap={2}>
+                <Button
+                  label="Edit"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setEditRow(row)}
+                />
+                <Button
+                  label="Delete"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm(`Delete ${row.fullName}?`)) {
+                      const f = document.createElement('form')
+                      f.method = 'POST'
+                      f.action = `/customers/${row.id}/delete`
+                      const t = document.createElement('input')
+                      t.type = 'hidden'
+                      t.name = '_csrf'
+                      t.value =
+                        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
+                          ?.content ?? ''
+                      f.appendChild(t)
+                      document.body.appendChild(f)
+                      f.submit()
+                    }
+                  }}
+                />
+              </Stack>
+            ),
+          })}
           columns={[
             col.text('fullName', 'Name', 170),
             col.text('email', 'Email', 190),
@@ -93,18 +273,32 @@ export default function Customers({ customers, riskSignals }: Props) {
             col.text('isRepeatCustomer', 'Repeat', 80),
             col.action('Actions', (row) => (
               <Stack direction="horizontal" gap={2} wrap="wrap">
-                <StatusForm
-                  action={`/customers/${row.id}`}
-                  fieldName="riskLevel"
-                  label="Risk level"
-                  current={String(row.riskLevel ?? 'low')}
-                  options={RISK_LEVELS.map((r) => ({ value: r, label: r.replace(/_/g, ' ') }))}
+                <Button
+                  label="Edit"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setEditRow(row)}
                 />
-                <RowAction
-                  action={`/customers/${row.id}/delete`}
+                <Button
                   label="Delete"
                   variant="ghost"
-                  confirmText="Delete this customer? Orders reference customers and may block deletion."
+                  size="sm"
+                  onClick={() => {
+                    if (confirm(`Delete ${row.fullName}?`)) {
+                      const f = document.createElement('form')
+                      f.method = 'POST'
+                      f.action = `/customers/${row.id}/delete`
+                      const t = document.createElement('input')
+                      t.type = 'hidden'
+                      t.name = '_csrf'
+                      t.value =
+                        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
+                          ?.content ?? ''
+                      f.appendChild(t)
+                      document.body.appendChild(f)
+                      f.submit()
+                    }
+                  }}
                 />
               </Stack>
             )),
@@ -114,11 +308,50 @@ export default function Customers({ customers, riskSignals }: Props) {
 
       <PageSection
         title="Customer risk signals"
-        description="Explainable signals (shared address mismatch, proxy email change, chargeback history…) reviewed manually — never automatic fraud labels."
+        description="Explainable signals — reviewed manually, never auto-flagged as fraud."
       >
-        <DataTable
+        <ResponsiveDataView
           rows={riskSignals}
-          empty="No risk signals raised."
+          searchKeys={['signalType', 'reason', 'severity']}
+          filterKey="reviewStatus"
+          filterPills={[
+            { value: 'all', label: 'All' },
+            { value: 'pending_review', label: 'Pending' },
+            { value: 'confirmed_risk', label: 'Confirmed' },
+            { value: 'false_positive', label: 'False positive' },
+          ]}
+          toCard={(row) => ({
+            title: String(row.signalType ?? row.signalCode ?? 'Risk signal'),
+            subtitle: String(row.reason ?? '').slice(0, 38),
+            statusBadge: {
+              label: String(row.severity ?? ''),
+              variant:
+                String(row.severity) === 'critical' || String(row.severity) === 'high'
+                  ? 'error'
+                  : String(row.severity) === 'medium'
+                    ? 'warning'
+                    : 'neutral',
+            },
+            metrics: [
+              { label: 'Reason', value: String(row.reason ?? row.explanation ?? '—').slice(0, 54) },
+              {
+                label: 'Customer',
+                value: String((row.customer as any)?.fullName ?? row.customerId ?? '—').slice(
+                  0,
+                  22
+                ),
+              },
+              { label: 'Review status', value: String(row.reviewStatus).replace(/_/g, ' ') },
+            ],
+            actions: (
+              <Button
+                label="Review"
+                variant="secondary"
+                size="sm"
+                onClick={() => setReviewRow(row)}
+              />
+            ),
+          })}
           columns={[
             col.text('signalType', 'Signal', 170),
             col.badge('severity', 'Severity', {
@@ -136,59 +369,14 @@ export default function Customers({ customers, riskSignals }: Props) {
               resolved: 'neutral',
             }),
             col.text('reason', 'Reason', 260),
-            col.action('Review', (row) => (
-              <StatusForm
-                action={`/risk-signals/${row.id}/review`}
-                fieldName="reviewStatus"
-                label="Review status"
-                current={String(row.reviewStatus ?? 'pending_review')}
-                options={[
-                  { value: 'pending_review', label: 'Pending review' },
-                  { value: 'investigating', label: 'Investigating' },
-                  { value: 'confirmed_risk', label: 'Confirmed risk' },
-                  { value: 'false_positive', label: 'False positive' },
-                  { value: 'resolved', label: 'Resolved' },
-                ]}
+            col.action('Actions', (row) => (
+              <Button
+                label="Review"
+                variant="secondary"
+                size="sm"
+                onClick={() => setReviewRow(row)}
               />
             )),
-          ]}
-        />
-      </PageSection>
-
-      <PageSection
-        title="Update customer details"
-        description="Choose a customer, change any fields, and save — only fields you fill are changed."
-      >
-        <SmartForm
-          action="/customers"
-          actionFor={(v) => `/customers/${v.id}`}
-          submitLabel="Update customer"
-          fields={[
-            {
-              name: 'id',
-              label: 'Customer',
-              kind: 'select',
-              required: true,
-              width: 240,
-              options: customers.map((c) => ({
-                value: String(c.id),
-                label: `${c.fullName} (${String(c.email ?? 'no email')})`,
-              })),
-            },
-            { name: 'fullName', label: 'Full name', width: 200 },
-            { name: 'email', label: 'Email', kind: 'email', width: 200 },
-            { name: 'phone', label: 'Phone', width: 150 },
-            {
-              name: 'preferredCurrency',
-              label: 'Currency',
-              kind: 'select',
-              width: 110,
-              options: ['USD', 'EUR', 'GBP', 'JPY', 'INR', 'AED'].map((c) => ({
-                value: c,
-                label: c,
-              })),
-            },
-            { name: 'notes', label: 'Notes', width: 220 },
           ]}
         />
       </PageSection>

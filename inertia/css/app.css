@@ -7,3 +7,67 @@ body,
 #app {
   height: 100%;
 }
+
+/* ---- Sonner toasts: align with Astryx palette ---- */
+[data-sonner-toaster] {
+  --normal-bg: var(--astryx-color-background-surface, #ffffff);
+  --normal-border: var(--astryx-color-border-default, #e5e7eb);
+  --normal-text: var(--astryx-color-text-primary, #0f172a);
+  --success-bg: #ecfdf5;
+  --success-border: #a7f3d0;
+  --success-text: #065f46;
+  --error-bg: #fef2f2;
+  --error-border: #fecaca;
+  --error-text: #991b1b;
+  --info-bg: #eff6ff;
+  --info-border: #bfdbfe;
+  --info-text: #1e40af;
+  font-family: inherit;
+}
+
+/* ---- Shared app polish ---- */
+:root {
+  --sc-radius-xl: 16px;
+  --sc-radius-lg: 12px;
+  --sc-shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+/* Smooth anchor scroll for marketing page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus ring */
+*:focus-visible {
+  outline: 2px solid var(--astryx-color-background-accent, #0866ff);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Compact scrollbars inside tables/cards */
+* {
+  scrollbar-width: thin;
+}
+
+/* Auth split-screen: collapse brand panel on tablet */
+@media (max-width: 900px) {
+  .auth-brand-panel {
+    display: none !important;
+  }
+}
+
+/* Subtle page transitions */
+#app {
+  animation: sc-fade-in 180ms ease-out;
+}
+
+@keyframes sc-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -13,6 +13,7 @@ export const createUserValidator = vine.create({
   defaultCurrency: vine.string().fixedLength(3).toUpperCase().optional(),
   timezone: vine.string().trim().optional(),
   isSuperAdmin: vine.boolean().optional(),
+  roleSlug: vine.string().trim().optional(),
   roleSlugs: vine.array(vine.string()).optional(),
   enabledModules: vine.array(vine.string()).optional(),
 })

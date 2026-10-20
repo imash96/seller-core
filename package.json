@@ -34,6 +34,7 @@
     "#database/*": "./database/*.js",
     "#tests/*": "./tests/*.js",
     "#start/*": "./start/*.js",
+    "#jobs/*": "./app/jobs/*.js",
     "#config/*": "./config/*.js"
   },
   "devDependencies": {
@@ -69,15 +70,19 @@
   },
   "dependencies": {
     "@adonisjs/auth": "^10.1.0",
+    "@adonisjs/bouncer": "^3.1.6",
     "@adonisjs/core": "^7.6.0",
     "@adonisjs/cors": "^3.0.0",
+    "@adonisjs/events": "^10.2.0",
     "@adonisjs/inertia": "^5.0.3",
     "@adonisjs/lucid": "^22.4.2",
+    "@adonisjs/queue": "0.6.2",
     "@adonisjs/session": "^8.1.0",
     "@adonisjs/shield": "^9.0.0",
     "@adonisjs/static": "^2.0.1",
     "@adonisjs/vite": "^6.0.3",
     "@astryxdesign/core": "0.7.1",
+    "@boringnode/queue": "0.6.0",
     "@inertiajs/core": "^3.9.1",
     "@inertiajs/react": "^3.9.1",
     "@stylexjs/stylex": "^0.19.1",

@@ -161,5 +161,5 @@
 
 ### Seeded Verification Accounts
 
-- **System Super Administrator**: `admin@sellercore.io` / `Admin@SellerCore2026!`
-- **Secondary Operations User**: `ops.merchant@sellercore.io` / `Ops@SellerCore2026!`
+- **System Super Administrator**: `admin@sellercore.io` / `Password123!`
+- **Secondary Operations User**: `ops@sellercore.io` / `Password123!`

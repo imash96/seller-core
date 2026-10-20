@@ -63,8 +63,8 @@ router
 
     /* ---------- Customers, merge & risk review ---------- */
     router.post('/customers', [OperationsController, 'storeCustomer']).as('customers.store')
-    router.post('/customers/:id', [OperationsController, 'updateCustomer']).as('customers.update')
     router.post('/customers/merge', [OperationsController, 'mergeCustomers']).as('customers.merge')
+    router.post('/customers/:id', [OperationsController, 'updateCustomer']).as('customers.update')
     router
       .post('/customers/:id/delete', [OperationsController, 'deleteCustomer'])
       .as('customers.delete')
@@ -167,8 +167,16 @@ router
     router.post('/tasks/:id/delete', [OperationsController, 'deleteTask']).as('tasks.delete')
     router.post('/saved-views', [OperationsController, 'storeSavedView']).as('saved_views.store')
 
+    /* ---------- Saved view delete ---------- */
+    router
+      .post('/saved-views/:id/delete', [OperationsController, 'deleteSavedView'])
+      .as('saved_views.delete')
+
     /* ---------- Super-admin provisioning, RBAC & entitlements ---------- */
     router.post('/admin/users', [OperationsController, 'storeUser']).as('admin.users.store')
+    router
+      .post('/admin/users/:id/delete', [OperationsController, 'deleteUser'])
+      .as('admin.users.delete')
     router
       .post('/admin/users/:id/status', [OperationsController, 'toggleUserStatus'])
       .as('admin.users.toggle_status')
@@ -178,5 +186,21 @@ router
     router
       .post('/admin/entitlements/:id/toggle', [OperationsController, 'toggleModuleEntitlement'])
       .as('admin.entitlements.toggle')
+
+    /* ---------- File uploads — bodyparser multipart demo ---------- */
+    // Multipart routes demonstrate config/bodyparser.ts handling:
+    // autoProcess=true streams files to tmp/, validators check extnames/sizes,
+    // handlers move files to permanent storage or enqueue processing jobs.
+    router
+      .post('/import/upload-catalog', [OperationsController, 'uploadCatalogFile'])
+      .as('import.upload_catalog')
+    router
+      .post('/import/sync-accounts', [OperationsController, 'queueSellerSync'])
+      .as('import.queue_sync')
+
+    /* ---------- Queue ops — inspect/retry (super-admin) ---------- */
+    router
+      .get('/admin/queue/overview', [OperationsController, 'queueOverview'])
+      .as('admin.queue.overview')
   })
   .use(middleware.auth())

@@ -1,4 +1,12 @@
 import { Stack } from '@astryxdesign/core/Stack'
+import { Text } from '@astryxdesign/core/Text'
+import { Heading } from '@astryxdesign/core/Heading'
+import { Card } from '@astryxdesign/core/Card'
+import { Button } from '@astryxdesign/core/Button'
+import { Badge } from '@astryxdesign/core/Badge'
+import { Grid } from '@astryxdesign/core/Grid'
+import { Divider } from '@astryxdesign/core/Divider'
+import { Banner } from '@astryxdesign/core/Banner'
 import AppLayout from '~/layouts/app'
 import {
   PageSection,
@@ -6,11 +14,17 @@ import {
   SmartForm,
   RowAction,
   StatusForm,
+  FormModal,
+  ResponsiveDataView,
+  SavedViewsBar,
   col,
   STATUS_TONES,
   money,
+  short,
   type Row,
 } from '~/lib/ui'
+import { useState } from 'react'
+import { Pencil, Eye, Trash2, Plus } from 'lucide-react'
 
 type Props = {
   orders: Row[]
@@ -21,6 +35,7 @@ type Props = {
   salesChannels: Row[]
   orderLineItems: Row[]
   financeCategories: Row[]
+  savedViews?: Row[]
 }
 
 Orders.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
@@ -37,114 +52,271 @@ const ORDER_STATUS = [
   'on_hold',
 ]
 
-export default function Orders({ orders, sellerAccounts }: Props) {
+export default function Orders({ orders, sellerAccounts, customers, savedViews }: Props) {
+  const [createOpen, setCreateOpen] = useState(false)
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [editRow, setEditRow] = useState<Row | null>(null)
+  const [detailRow, setDetailRow] = useState<Row | null>(null)
+
+  const sampleJson = JSON.stringify(
+    [
+      {
+        orderNumber: 'AMZ-1',
+        externalOrderId: 'X1',
+        customerFullName: 'Jane Doe',
+        currencyCode: 'USD',
+        lines: [{ sku: 'SKU-001', title: 'Wireless Mouse', quantityOrdered: 2, unitPrice: 29.99 }],
+      },
+    ],
+    null,
+    2
+  )
+
   return (
     <Stack gap={4}>
-      <PageSection
-        title="Create order"
-        description="Manual order entry with customer, P&L inputs and one order line. Money values use numeric(14,2) precision."
-      >
-        <SmartForm
-          action="/orders"
-          submitLabel="Create order"
-          fields={[
-            { name: 'orderNumber', label: 'Order number', required: true, width: 180 },
-            { name: 'customerFullName', label: 'Customer name', required: true, width: 200 },
-            { name: 'customerEmail', label: 'Customer email', kind: 'email', width: 200 },
-            {
-              name: 'sellerAccountId',
-              label: 'Seller account',
-              kind: 'select',
-              width: 220,
-              options: sellerAccounts.map((s) => ({
-                value: String(s.id),
-                label: String(s.accountName ?? s.id),
-              })),
-            },
-            { name: 'externalOrderId', label: 'External order ID', width: 170 },
-            {
-              name: 'marketplaceCode',
-              label: 'Marketplace',
-              kind: 'select',
-              width: 150,
-              options: [
-                { value: 'direct', label: 'Direct' },
-                { value: 'amazon', label: 'Amazon' },
-                { value: 'ebay', label: 'eBay' },
-                { value: 'shopify', label: 'Shopify' },
-                { value: 'walmart', label: 'Walmart' },
-              ],
-            },
-            { name: 'currencyCode', label: 'Currency', default: 'USD', width: 100 },
-            {
-              name: 'exchangeRate',
-              label: 'Exchange rate',
-              kind: 'number',
-              default: '1',
-              width: 120,
-            },
-            { name: 'sku', label: 'SKU', required: true, width: 140 },
-            { name: 'itemTitle', label: 'Item title', required: true, width: 220 },
-            {
-              name: 'quantityOrdered',
-              label: 'Qty',
-              kind: 'number',
-              required: true,
-              default: '1',
-              width: 80,
-            },
-            { name: 'unitPrice', label: 'Unit price', kind: 'number', required: true, width: 110 },
-            { name: 'unitCostAmount', label: 'Unit cost', kind: 'number', width: 110 },
-            { name: 'taxAmount', label: 'Tax', kind: 'number', width: 90 },
-            { name: 'discountAmount', label: 'Discount', kind: 'number', width: 90 },
-            { name: 'shippingChargedAmount', label: 'Ship charged', kind: 'number', width: 120 },
-            { name: 'shippingCostAmount', label: 'Ship cost', kind: 'number', width: 110 },
-            { name: 'shippingLine1', label: 'Ship-to street', width: 200 },
-            { name: 'shippingCity', label: 'City', width: 130 },
-            { name: 'shippingPostalCode', label: 'Postal code', width: 120 },
-            { name: 'shippingCountryCode', label: 'Country', default: 'US', width: 90 },
-          ]}
-        />
-      </PageSection>
+      {/* Toolbar */}
+      <Card padding={4}>
+        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
+          <Button label="+ Create Order" variant="primary" onClick={() => setCreateOpen(true)} />
+          <Button label="Bulk Import" variant="secondary" onClick={() => setBulkOpen(true)} />
+          <Text type="supporting" as="div">
+            {orders.length} orders in workspace
+          </Text>
+        </Stack>
+      </Card>
 
-      <PageSection
+      {savedViews && savedViews.length > 0 ? <SavedViewsBar views={savedViews} /> : null}
+
+      {/* Create Order Modal */}
+      <FormModal
+        isOpen={createOpen}
+        onOpenChange={setCreateOpen}
+        title="Create order"
+        subtitle="Manual order entry with P&L calculation — all amounts use numeric(14,2) precision."
+        submitLabel="Create order"
+        action="/orders"
+        fields={[
+          { name: 'orderNumber', label: 'Order number', required: true },
+          { name: 'externalOrderId', label: 'External order ID' },
+          {
+            name: 'sellerAccountId',
+            label: 'Seller account',
+            kind: 'select',
+            options: sellerAccounts.map((s) => ({
+              value: String(s.id),
+              label: String(s.accountName ?? s.id),
+            })),
+          },
+          {
+            name: 'marketplaceCode',
+            label: 'Marketplace',
+            kind: 'select',
+            default: 'direct',
+            options: [
+              { value: 'direct', label: 'Direct' },
+              { value: 'amazon', label: 'Amazon' },
+              { value: 'ebay', label: 'eBay' },
+              { value: 'shopify', label: 'Shopify' },
+              { value: 'walmart', label: 'Walmart' },
+            ],
+          },
+          { name: 'currencyCode', label: 'Currency', default: 'USD' },
+          { name: 'exchangeRate', label: 'Exchange rate', kind: 'number', default: '1' },
+          { name: 'customerFullName', label: 'Customer name', required: true },
+          { name: 'customerEmail', label: 'Customer email', kind: 'email' },
+          { name: 'sku', label: 'SKU', required: true },
+          { name: 'itemTitle', label: 'Item title', required: true },
+          { name: 'quantityOrdered', label: 'Qty', kind: 'number', required: true, default: '1' },
+          { name: 'unitPrice', label: 'Unit price', kind: 'number', required: true },
+          { name: 'unitCostAmount', label: 'Unit cost', kind: 'number' },
+          { name: 'taxAmount', label: 'Tax', kind: 'number' },
+          { name: 'discountAmount', label: 'Discount', kind: 'number' },
+          { name: 'shippingChargedAmount', label: 'Ship charged', kind: 'number' },
+          { name: 'shippingCostAmount', label: 'Ship cost', kind: 'number' },
+          { name: 'shippingLine1', label: 'Ship-to street' },
+          { name: 'shippingCity', label: 'City' },
+          { name: 'shippingPostalCode', label: 'Postal code' },
+          { name: 'shippingCountryCode', label: 'Country', default: 'US' },
+        ]}
+      />
+
+      {/* Bulk Import Modal */}
+      <FormModal
+        isOpen={bulkOpen}
+        onOpenChange={setBulkOpen}
         title="Bulk marketplace import"
-        description="Idempotent JSON import: duplicate external order IDs are skipped and raw payloads are stored redacted in order_import_payloads."
+        subtitle="Idempotent JSON import — duplicates are skipped, raw payloads stored redacted."
+        submitLabel="Import orders"
+        action="/orders/bulk-import"
+        fields={[
+          { name: 'idempotencyKey', label: 'Import idempotency key', required: true },
+          {
+            name: 'sellerAccountId',
+            label: 'Seller account',
+            kind: 'select',
+            options: sellerAccounts.map((s) => ({
+              value: String(s.id),
+              label: String(s.accountName ?? s.id),
+            })),
+          },
+          {
+            name: 'ordersJson',
+            label: 'Orders JSON array',
+            kind: 'textarea',
+            required: true,
+            placeholder:
+              '[{"orderNumber":"AMZ-1","externalOrderId":"X1","customerFullName":"Jane","lines":[{"sku":"A","title":"Item","quantityOrdered":1,"unitPrice":10}]}]',
+          },
+        ]}
       >
-        <SmartForm
-          action="/orders/bulk-import"
-          submitLabel="Import orders"
-          compact
-          fields={[
-            { name: 'idempotencyKey', label: 'Import idempotency key', required: true },
-            {
-              name: 'sellerAccountId',
-              label: 'Seller account',
-              kind: 'select',
-              options: sellerAccounts.map((s) => ({
-                value: String(s.id),
-                label: String(s.accountName ?? s.id),
-              })),
-            },
-            {
-              name: 'ordersJson',
-              label: 'Orders JSON array',
-              kind: 'textarea',
-              required: true,
-              placeholder:
-                '[{"orderNumber":"AMZ-1","externalOrderId":"X1","customerFullName":"Jane","lines":[{"sku":"A","title":"Item","quantityOrdered":1,"unitPrice":10}]}]',
-            },
-          ]}
+        <Button
+          label="Load Sample JSON Payload"
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            const el = document.querySelector(
+              'textarea[name="ordersJson"]'
+            ) as HTMLTextAreaElement | null
+            if (el) {
+              el.value = sampleJson
+              el.dispatchEvent(new Event('input', { bubbles: true }))
+              el.dispatchEvent(new Event('change', { bubbles: true }))
+            }
+          }}
         />
-      </PageSection>
+      </FormModal>
+
+      {/* Update Order Status Modal */}
+      <FormModal
+        isOpen={!!editRow}
+        onOpenChange={(open) => {
+          if (!open) setEditRow(null)
+        }}
+        title={`Update order ${editRow?.orderNumber ?? ''}`}
+        subtitle="Change order status — delivery triggers customer notification."
+        submitLabel="Update status"
+        action={editRow ? `/orders/${editRow.id}/status` : '/orders/placeholder/status'}
+        initialValues={{ status: String(editRow?.status ?? 'confirmed') }}
+        fields={[
+          {
+            name: 'status',
+            label: 'Order status',
+            kind: 'select',
+            required: true,
+            options: ORDER_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
+          },
+        ]}
+      />
+
+      {/* Order Detail Modal */}
+      {detailRow ? (
+        <Card padding={5}>
+          <Stack gap={3}>
+            <Stack direction="horizontal" gap={2} align="center">
+              <Heading level={3}>Order {String(detailRow.orderNumber)} detail</Heading>
+              <Badge
+                variant={(STATUS_TONES[String(detailRow.status)] as any) ?? 'neutral'}
+                label={String(detailRow.status)}
+              />
+            </Stack>
+            <Grid columns={{ minWidth: 160, max: 3 }} gap={3}>
+              <Stack gap={1}>
+                <Text type="supporting" as="div">
+                  Total
+                </Text>
+                <Text type="body" as="div" weight="bold">
+                  {money(String(detailRow.currencyCode), detailRow.totalAmount)}
+                </Text>
+              </Stack>
+              <Stack gap={1}>
+                <Text type="supporting" as="div">
+                  Net Profit
+                </Text>
+                <Text type="body" as="div" weight="bold">
+                  {money(String(detailRow.reportingCurrencyCode), detailRow.netProfitAmount)}
+                </Text>
+              </Stack>
+              <Stack gap={1}>
+                <Text type="supporting" as="div">
+                  Customer
+                </Text>
+                <Text type="body" as="div">
+                  {String(
+                    (detailRow.customer as any)?.fullName ?? detailRow.customerFullName ?? '—'
+                  )}
+                </Text>
+              </Stack>
+            </Grid>
+            {Array.isArray(detailRow.lineItems) && detailRow.lineItems.length > 0 ? (
+              <DataTable
+                rows={detailRow.lineItems as Row[]}
+                columns={[
+                  col.text('sku', 'SKU', 120),
+                  col.text('title', 'Title', 180),
+                  col.text('quantityOrdered', 'Qty', 60),
+                  col.money('unitPrice', 'Unit price'),
+                ]}
+              />
+            ) : null}
+            <Button label="Close" variant="secondary" onClick={() => setDetailRow(null)} />
+          </Stack>
+        </Card>
+      ) : null}
 
       <PageSection
         title="Orders"
-        description="All orders owned by your account, with status workflow and P&L."
+        description="All orders in your workspace with P&L and fulfillment state."
+        actions={<Button label="Table / Card toggle via toolbar" variant="ghost" size="sm" />}
       >
-        <DataTable
+        <ResponsiveDataView
           rows={orders}
-          empty="No orders yet."
+          searchKeys={['orderNumber', 'externalOrderId', 'status', 'customerFullName']}
+          filterKey="status"
+          filterPills={[
+            { value: 'all', label: 'All' },
+            { value: 'delivered', label: 'Delivered' },
+            { value: 'confirmed', label: 'Confirmed' },
+            { value: 'processing', label: 'Processing' },
+            { value: 'pending', label: 'Pending' },
+            { value: 'cancelled', label: 'Cancelled' },
+          ]}
+          pageSizeOptions={[10, 25, 50]}
+          createLabel="+ Create Order"
+          onCreateClick={() => setCreateOpen(true)}
+          toCard={(row) => ({
+            title: String(row.orderNumber),
+            idBadge: short(row.id),
+            statusBadge: {
+              label: String(row.status).replace(/_/g, ' '),
+              variant: STATUS_TONES[String(row.status)] ?? 'neutral',
+            },
+            metrics: [
+              { label: 'Total', value: money(String(row.currencyCode), row.totalAmount) },
+              {
+                label: 'Net Profit',
+                value: money(String(row.reportingCurrencyCode), row.netProfitAmount),
+              },
+              { label: 'Marketplace', value: String(row.marketplaceCode ?? '—') },
+              { label: 'Ordered', value: new Date(String(row.orderedAt)).toLocaleDateString() },
+            ],
+            actions: (
+              <Stack direction="horizontal" gap={2} wrap="wrap">
+                <Button label="View" variant="ghost" size="sm" onClick={() => setDetailRow(row)} />
+                <Button
+                  label="Edit"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setEditRow(row)}
+                />
+                <RowAction
+                  action={`/orders/${row.id}/delete`}
+                  label="Delete"
+                  variant="ghost"
+                  confirmText="Delete this order and its lines?"
+                />
+              </Stack>
+            ),
+          })}
           columns={[
             col.text('orderNumber', 'Order #', 140),
             col.text('externalOrderId', 'External ID', 120),
@@ -161,13 +333,19 @@ export default function Orders({ orders, sellerAccounts }: Props) {
             col.money('cogsAmount', 'COGS', 'currencyCode'),
             col.money('netProfitAmount', 'Net profit', 'reportingCurrencyCode'),
             col.date('orderedAt', 'Ordered'),
-            col.action('Workflow', (row) => (
+            col.action('Actions', (row) => (
               <Stack direction="horizontal" gap={2} wrap="wrap">
-                <StatusForm
-                  action={`/orders/${row.id}/status`}
-                  options={ORDER_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') }))}
-                  current={String(row.status ?? '')}
-                  label="Order status"
+                <Button
+                  label="Edit"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setEditRow(row)}
+                />
+                <Button
+                  label="Detail"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDetailRow(row)}
                 />
                 <RowAction
                   action={`/orders/${row.id}/delete`}
@@ -185,9 +363,20 @@ export default function Orders({ orders, sellerAccounts }: Props) {
         title="Order economics"
         description="Gross sales, fees and refunds per order in reporting currency."
       >
-        <DataTable
+        <ResponsiveDataView
           rows={orders}
-          empty="No economics to show."
+          searchKeys={['orderNumber']}
+          toCard={(row) => ({
+            title: String(row.orderNumber),
+            metrics: [
+              { label: 'Subtotal', value: money(String(row.currencyCode), row.subtotalAmount) },
+              {
+                label: 'Gross Profit',
+                value: money(String(row.reportingCurrencyCode), row.grossProfitAmount),
+              },
+              { label: 'Refunded', value: money(String(row.currencyCode), row.refundedAmount) },
+            ],
+          })}
           columns={[
             col.text('orderNumber', 'Order #', 140),
             col.money('subtotalAmount', 'Subtotal', 'currencyCode'),

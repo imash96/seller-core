@@ -1,6 +1,7 @@
 import app from '@adonisjs/core/services/app'
 import { type HttpContext, ExceptionHandler } from '@adonisjs/core/http'
 import type { StatusPageRange, StatusPageRenderer } from '@adonisjs/core/types/http'
+import { errors as bouncerErrors } from '@adonisjs/bouncer'
 
 export default class HttpExceptionHandler extends ExceptionHandler {
   /**
@@ -30,6 +31,36 @@ export default class HttpExceptionHandler extends ExceptionHandler {
    * response to the client
    */
   async handle(error: unknown, ctx: HttpContext) {
+    if (error instanceof bouncerErrors.E_AUTHORIZATION_FAILURE) {
+      const msg: string = (error as any).message || 'Not authorized'
+      const status: number = (error as any).status ?? 403
+
+      const session: any = (ctx as any).session
+      if (session && typeof session.flash === 'function') {
+        session.flash('error', msg)
+      }
+
+      const wantsJson = ctx.request.header('accept')?.includes('application/json')
+      if (wantsJson) {
+        return ctx.response.status(status).send({ message: msg })
+      }
+
+      const referer = ctx.request.header('referer')
+      const isInertia =
+        typeof (ctx.request as any).isInertiaRequest === 'function'
+          ? (ctx.request as any).isInertiaRequest()
+          : !!ctx.request.header('x-inertia')
+      if (referer && isInertia) {
+        return ctx.response.redirect().back()
+      }
+
+      if (!app.inProduction) {
+        return ctx.response.status(status).send(`Forbidden: ${msg}`)
+      }
+
+      return super.handle(error, ctx)
+    }
+
     return super.handle(error, ctx)
   }
 

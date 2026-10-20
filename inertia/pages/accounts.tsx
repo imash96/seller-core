@@ -1,6 +1,18 @@
 import { Stack } from '@astryxdesign/core/Stack'
+import { Text } from '@astryxdesign/core/Text'
+import { Card } from '@astryxdesign/core/Card'
+import { Button } from '@astryxdesign/core/Button'
 import AppLayout from '~/layouts/app'
-import { PageSection, DataTable, SmartForm, RowAction, StatusForm, col, type Row } from '~/lib/ui'
+import {
+  PageSection,
+  FormModal,
+  ResponsiveDataView,
+  SavedViewsBar,
+  col,
+  STATUS_TONES,
+  type Row,
+} from '~/lib/ui'
+import { useState } from 'react'
 
 type Props = {
   sellerAccounts: Row[]
@@ -10,6 +22,7 @@ type Props = {
   orders: Row[]
   orderLineItems: Row[]
   financeCategories: Row[]
+  savedViews?: Row[]
 }
 
 Accounts.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
@@ -24,59 +37,150 @@ const ACCOUNT_STATUS = [
 ]
 const HEALTH = ['healthy', 'warning', 'critical', 'unknown']
 
-export default function Accounts({ sellerAccounts, salesChannels }: Props) {
+export default function Accounts({ sellerAccounts, salesChannels, savedViews }: Props) {
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editRow, setEditRow] = useState<Row | null>(null)
+
   return (
     <Stack gap={4}>
-      <PageSection
+      <Card padding={4}>
+        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
+          <Button
+            label="+ Connect Seller Account"
+            variant="primary"
+            onClick={() => setCreateOpen(true)}
+          />
+          <Text type="supporting" as="div">
+            {sellerAccounts.length} connected accounts
+          </Text>
+        </Stack>
+      </Card>
+      {savedViews && savedViews.length > 0 ? <SavedViewsBar views={savedViews} /> : null}
+
+      <FormModal
+        isOpen={createOpen}
+        onOpenChange={setCreateOpen}
         title="Connect seller account"
-        description="Credentials are AES-256-GCM encrypted at rest via a dedicated keyring — plaintext API keys are never persisted."
-      >
-        <SmartForm
-          action="/seller-accounts"
-          submitLabel="Connect account"
-          fields={[
-            {
-              name: 'salesChannelId',
-              label: 'Sales channel',
-              kind: 'select',
-              required: true,
-              width: 200,
-              options: salesChannels.map((c) => ({ value: String(c.id), label: String(c.name) })),
-            },
-            { name: 'accountName', label: 'Account name', required: true, width: 200 },
-            { name: 'externalSellerId', label: 'External seller ID', required: true, width: 180 },
-            { name: 'marketplaceRegion', label: 'Region', default: 'US', width: 100 },
-            {
-              name: 'defaultCurrency',
-              label: 'Currency',
-              kind: 'select',
-              default: 'USD',
-              width: 110,
-              options: ['USD', 'EUR', 'GBP', 'JPY', 'INR', 'AED'].map((c) => ({
-                value: c,
-                label: c,
-              })),
-            },
-            {
-              name: 'rateLimitRpm',
-              label: 'Rate limit / min',
-              kind: 'number',
-              default: '60',
-              width: 130,
-            },
-            { name: 'apiKey', label: 'API key (encrypted)', kind: 'password', width: 200 },
-            { name: 'apiSecret', label: 'API secret (encrypted)', kind: 'password', width: 200 },
-          ]}
-        />
-      </PageSection>
+        subtitle="Credentials are AES-256-GCM encrypted at rest — plaintext API keys are never persisted."
+        submitLabel="Connect account"
+        action="/seller-accounts"
+        fields={[
+          {
+            name: 'salesChannelId',
+            label: 'Sales channel',
+            kind: 'select',
+            required: true,
+            options: salesChannels.map((c) => ({ value: String(c.id), label: String(c.name) })),
+          },
+          { name: 'accountName', label: 'Account name', required: true },
+          { name: 'externalSellerId', label: 'External seller ID', required: true },
+          { name: 'marketplaceRegion', label: 'Region', default: 'US' },
+          {
+            name: 'defaultCurrency',
+            label: 'Currency',
+            kind: 'select',
+            default: 'USD',
+            options: ['USD', 'EUR', 'GBP', 'JPY', 'INR', 'AED'].map((c) => ({
+              value: c,
+              label: c,
+            })),
+          },
+          { name: 'rateLimitRpm', label: 'Rate limit / min', kind: 'number', default: '60' },
+          { name: 'apiKey', label: 'API key (encrypted)', kind: 'password' },
+          { name: 'apiSecret', label: 'API secret (encrypted)', kind: 'password' },
+        ]}
+      />
+
+      <FormModal
+        isOpen={!!editRow}
+        onOpenChange={(o) => {
+          if (!o) setEditRow(null)
+        }}
+        title={`Edit seller account: ${String(editRow?.accountName ?? '')}`}
+        submitLabel="Save account"
+        action={editRow ? `/seller-accounts/${editRow.id}` : '/seller-accounts/placeholder'}
+        initialValues={
+          editRow
+            ? {
+                accountName: String(editRow.accountName ?? ''),
+                status: String(editRow.status ?? 'active'),
+                healthStatus: String(editRow.healthStatus ?? 'healthy'),
+                rateLimitRpm: String(editRow.rateLimitRpm ?? 60),
+              }
+            : undefined
+        }
+        fields={[
+          { name: 'accountName', label: 'Account name' },
+          {
+            name: 'status',
+            label: 'Status',
+            kind: 'select',
+            options: ACCOUNT_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
+          },
+          {
+            name: 'healthStatus',
+            label: 'Health',
+            kind: 'select',
+            options: HEALTH.map((s) => ({ value: s, label: s })),
+          },
+          { name: 'rateLimitRpm', label: 'Rate limit / min', kind: 'number' },
+        ]}
+      />
 
       <PageSection
         title="Seller accounts"
         description="Health, sync status and credential rotation per connected account."
       >
-        <DataTable
+        <ResponsiveDataView
           rows={sellerAccounts}
-          empty="No seller accounts connected yet."
+          searchKeys={['accountName', 'externalSellerId', 'marketplaceRegion']}
+          filterKey="status"
+          filterPills={[
+            { value: 'all', label: 'All' },
+            { value: 'active', label: 'Active' },
+            { value: 'auth_expired', label: 'Auth expired' },
+            { value: 'suspended', label: 'Suspended' },
+          ]}
+          createLabel="+ Connect Account"
+          onCreateClick={() => setCreateOpen(true)}
+          toCard={(row) => ({
+            title: String(row.accountName),
+            idBadge: String(row.externalSellerId ?? '').slice(0, 20),
+            statusBadge: {
+              label: String(row.status).replace(/_/g, ' '),
+              variant: STATUS_TONES[String(row.status)] ?? 'neutral',
+            },
+            metrics: [
+              { label: 'Region', value: String(row.marketplaceRegion ?? '—') },
+              { label: 'Health', value: String(row.healthStatus ?? '—') },
+              { label: 'RPM', value: String(row.rateLimitRpm ?? '—') },
+              { label: 'Credentials', value: String(row.encryptedCredentials ?? '—').slice(0, 20) },
+            ],
+            actions: (
+              <Stack direction="horizontal" gap={2} wrap="wrap">
+                <Button
+                  label="Edit"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setEditRow(row)}
+                />
+                <Button
+                  label="Disconnect"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm('Disconnect this seller account?')) {
+                      const f = document.createElement('form')
+                      f.method = 'POST'
+                      f.action = `/seller-accounts/${row.id}/delete`
+                      document.body.appendChild(f)
+                      f.submit()
+                    }
+                  }}
+                />
+              </Stack>
+            ),
+          })}
           columns={[
             col.text('accountName', 'Account', 170),
             col.text('externalSellerId', 'Seller ID', 130),
@@ -100,51 +204,28 @@ export default function Accounts({ sellerAccounts, salesChannels }: Props) {
             col.date('lastSyncedAt', 'Last sync'),
             col.action('Actions', (row) => (
               <Stack direction="horizontal" gap={2} wrap="wrap">
-                <StatusForm
-                  action={`/seller-accounts/${row.id}`}
-                  fieldName="status"
-                  label="Status"
-                  current={String(row.status ?? 'active')}
-                  options={ACCOUNT_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') }))}
+                <Button
+                  label="Edit"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setEditRow(row)}
                 />
-                <StatusForm
-                  action={`/seller-accounts/${row.id}`}
-                  fieldName="healthStatus"
-                  label="Health"
-                  current={String(row.healthStatus ?? 'healthy')}
-                  options={HEALTH.map((s) => ({ value: s, label: s }))}
-                />
-                <RowAction
-                  action={`/seller-accounts/${row.id}/delete`}
+                <Button
                   label="Disconnect"
                   variant="ghost"
-                  confirmText="Disconnect and remove this seller account?"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm('Disconnect this seller account?')) {
+                      const f = document.createElement('form')
+                      f.method = 'POST'
+                      f.action = `/seller-accounts/${row.id}/delete`
+                      document.body.appendChild(f)
+                      f.submit()
+                    }
+                  }}
                 />
               </Stack>
             )),
-          ]}
-        />
-      </PageSection>
-
-      <PageSection title="Update account details">
-        <SmartForm
-          action="/seller-accounts"
-          actionFor={(v) => `/seller-accounts/${v.id}`}
-          submitLabel="Update account"
-          fields={[
-            {
-              name: 'id',
-              label: 'Seller account',
-              kind: 'select',
-              required: true,
-              width: 230,
-              options: sellerAccounts.map((s) => ({
-                value: String(s.id),
-                label: String(s.accountName ?? s.id),
-              })),
-            },
-            { name: 'accountName', label: 'New account name', width: 200 },
-            { name: 'rateLimitRpm', label: 'Rate limit / min', kind: 'number', width: 140 },
           ]}
         />
       </PageSection>

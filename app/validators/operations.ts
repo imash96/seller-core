@@ -31,6 +31,7 @@ export const createProductValidator = vine.create({
   brandId: objectId().optional().nullable(),
   categoryId: objectId().optional().nullable(),
   sku: vine.string().trim().minLength(2).maxLength(120),
+  skuPrefix: vine.string().trim().maxLength(20).optional(),
   asin: vine.string().trim().maxLength(20).optional().nullable(),
   currencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
   retailPrice: vine.number().min(0),
@@ -38,8 +39,8 @@ export const createProductValidator = vine.create({
   manufacturingCost: vine.number().min(0).optional(),
   packagingCost: vine.number().min(0).optional(),
   stockOnHand: vine.number().min(0).optional(),
-  hasVariants: vine.boolean().optional(),
-  variationDimensions: vine.array(vine.string()).optional(),
+  hasVariants: vine.string().trim().optional(),
+  variationDimensions: vine.string().trim().optional(),
   description: vine.string().trim().optional().nullable(),
 })
 
