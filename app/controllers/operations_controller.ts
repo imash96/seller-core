@@ -396,8 +396,13 @@ export default class OperationsController {
     return response.redirect().back()
   }
 
-  async deleteOrder({ auth, params, request, response, session }: HttpContext) {
+  async deleteOrder({ auth, bouncer, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
+    // Bouncer policy check (abilities-backed): denies unless the caller owns the order and has permission
+    if (await bouncer.denies('deleteOrders')) {
+      session.flash('error', 'Bouncer: not authorized to delete orders.')
+      return response.redirect().back()
+    }
     const allowed = await RbacService.hasPermission(user, 'orders.delete', 'orders')
     if (!allowed) {
       session.flash('error', 'RBAC Denied: You do not have permission orders.delete')
@@ -830,8 +835,9 @@ export default class OperationsController {
     return response.redirect().back()
   }
 
-  async storeUser({ auth, request, response, session }: HttpContext) {
+  async storeUser({ auth, bouncer, request, response, session }: HttpContext) {
     const actor = auth.getUserOrFail()
+    await bouncer.with('UserPolicy').authorize('create')
     const payload = await request.validateUsing(createUserValidator)
 
     try {
@@ -867,8 +873,9 @@ export default class OperationsController {
     return response.redirect().back()
   }
 
-  async toggleUserStatus({ auth, params, request, response, session }: HttpContext) {
+  async toggleUserStatus({ auth, bouncer, params, request, response, session }: HttpContext) {
     const actor = auth.getUserOrFail()
+    await bouncer.authorize('manageUsers')
     if (!actor.isSuperAdmin) {
       session.flash('error', 'Forbidden: Only Super Administrators can change user account status.')
       return response.redirect().back()
@@ -908,8 +915,9 @@ export default class OperationsController {
     return response.redirect().back()
   }
 
-  async deleteUser({ auth, params, response, session }: HttpContext) {
+  async deleteUser({ auth, bouncer, params, response, session }: HttpContext) {
     const actor = auth.getUserOrFail()
+    await bouncer.authorize('manageUsers')
     if (!actor.isSuperAdmin) {
       session.flash('error', 'Forbidden: Only Super Administrators can delete users.')
       return response.redirect().back()
@@ -970,8 +978,13 @@ export default class OperationsController {
     return response.redirect().back()
   }
 
-  async toggleModuleEntitlement({ auth, params, response, session }: HttpContext) {
+  async toggleModuleEntitlement({ auth, bouncer, params, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
+    // Bouncer gate — super admin can toggle anyone's entitlement; others only own
+    if (!user.isSuperAdmin && (await bouncer.denies('manageEntitlements'))) {
+      session.flash('error', 'Bouncer: not authorized to manage entitlements.')
+      return response.redirect().back()
+    }
     const entitlement = await ModuleEntitlement.query()
       .where('id', params.id)
       .andWhere((q) => {
@@ -1421,8 +1434,9 @@ export default class OperationsController {
     return response.redirect().back()
   }
 
-  async assignUserRole({ auth, params, request, response, session }: HttpContext) {
+  async assignUserRole({ auth, bouncer, params, request, response, session }: HttpContext) {
     const actor = auth.getUserOrFail()
+    await bouncer.authorize('manageRoles')
     if (!actor.isSuperAdmin) {
       session.flash('error', 'Forbidden: Only Super Administrators can modify user roles.')
       return response.redirect().back()

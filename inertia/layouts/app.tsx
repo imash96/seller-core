@@ -1,19 +1,17 @@
-import { type ReactNode, useState } from 'react'
-import type { Data } from '@generated/data'
+import { type ReactNode, useState, useCallback } from 'react'
 import { usePage } from '@inertiajs/react'
 import { Form, Link } from '@adonisjs/inertia/react'
+import type { Data } from '@generated/data'
 import { AppShell } from '@astryxdesign/core/AppShell'
 import { TopNav } from '@astryxdesign/core/TopNav'
 import { SideNav, SideNavSection, SideNavItem } from '@astryxdesign/core/SideNav'
 import { Button } from '@astryxdesign/core/Button'
 import { Badge } from '@astryxdesign/core/Badge'
-import { Card } from '@astryxdesign/core/Card'
-import { Banner } from '@astryxdesign/core/Banner'
 import { Stack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
-import { IconButton } from '@astryxdesign/core/IconButton'
 import { Theme } from '@astryxdesign/core'
 import { themes, defaultThemeSlug } from '~/astryx_themes'
+import { useFlashToasts } from '~/lib/toast'
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -28,10 +26,9 @@ import {
   Upload,
   Shield,
   History,
-  LogOut,
   Sun,
   Moon,
-  Menu,
+  Home,
 } from 'lucide-react'
 
 type NavItem = { href: string; label: string; icon: ReactNode; adminOnly?: boolean }
@@ -39,7 +36,7 @@ type NavItem = { href: string; label: string; icon: ReactNode; adminOnly?: boole
 const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
   {
     title: 'Overview',
-    items: [{ href: '/dashboard', label: 'Dashboard & KPIs', icon: <LayoutDashboard size={16} /> }],
+    items: [{ href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={16} /> }],
   },
   {
     title: 'Commerce & Catalog',
@@ -60,7 +57,7 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
     ],
   },
   {
-    title: 'Finance & Operations',
+    title: 'Finance & Ops',
     items: [
       { href: '/finance', label: 'Finance & Cards', icon: <Wallet size={16} /> },
       { href: '/tasks', label: 'Tasks & Reminders', icon: <CheckSquare size={16} /> },
@@ -76,7 +73,7 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
 ]
 
 const PAGE_TITLES: Record<string, string> = {
-  '/dashboard': 'Dashboard & KPIs',
+  '/dashboard': 'Dashboard',
   '/orders': 'Orders',
   '/customers': 'Customers & Risk',
   '/products': 'Products & Catalog',
@@ -91,34 +88,39 @@ const PAGE_TITLES: Record<string, string> = {
   '/audit': 'Audit History',
 }
 
-function getPageTitle(url: string): string {
+const PAGE_DESCRIPTIONS: Record<string, string> = {
+  '/dashboard': 'P&L waterfall, fulfillment health and workspace activity.',
+  '/orders': 'Marketplace orders with lifecycle status and payment breakdown.',
+  '/customers': 'Customer profiles, merge tools and explainable risk reviews.',
+  '/products': 'Catalog brands, categories, products, variants and channel listings.',
+  '/seller-accounts': 'Marketplace connections with AES-256-GCM credential rotation.',
+  '/shipments': 'Fulfillment shipments and carrier invoice reconciliation.',
+  '/returns': 'RMAs, refunds and variance controls.',
+  '/claims': 'Marketplace claims and chargeback evidence packs.',
+  '/finance': 'Financial accounts, credit cards and ledger entries.',
+  '/tasks': 'Operational tasks and reminders.',
+  '/import': 'Idempotent bulk import with duplicate detection and job history.',
+  '/admin': 'User provisioning, roles and module entitlements.',
+  '/audit': 'Append-only audit trail (SHA-256 checksummed).',
+}
+
+function getPageMeta(url: string) {
   const path = url.split('?')[0] ?? '/'
-  // exact match first, then prefix match
-  if (PAGE_TITLES[path]) return PAGE_TITLES[path]
   for (const [prefix, title] of Object.entries(PAGE_TITLES)) {
-    if (path.startsWith(prefix)) return title
+    if (path === prefix || (prefix !== '/dashboard' && path.startsWith(prefix))) {
+      return { path: prefix, title, desc: PAGE_DESCRIPTIONS[prefix] }
+    }
   }
-  return 'Operations Console'
+  return { path: '/', title: 'Operations Console', desc: '' }
 }
 
 export default function AppLayout({ children }: { children: ReactNode }) {
-  const { props, flash, url } = usePage<Data.SharedProps>()
+  const { props, url } = usePage<Data.SharedProps>()
+  useFlashToasts()
+
   const user = props.user
-  const [flashDismissed, setFlashDismissed] = useState(false)
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light')
-
-  const path = url.split('?')[0] ?? '/'
-  const pageTitle = getPageTitle(url)
-  const showFlash = !flashDismissed && (flash?.success || flash?.error)
-
-  // Reset dismissal when flash changes
-  const flashKey = `${flash?.success ?? ''}|${flash?.error ?? ''}`
-  const [lastFlashKey, setLastFlashKey] = useState(flashKey)
-  if (flashKey !== lastFlashKey) {
-    setLastFlashKey(flashKey)
-    if (flashDismissed) setFlashDismissed(false)
-  }
-
+  const { path, title: pageTitle, desc: pageDesc } = getPageMeta(url)
   const initials = user
     ? user.fullName
         .split(' ')
@@ -128,6 +130,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         .toUpperCase()
     : '?'
 
+  const toggleTheme = useCallback(() => {
+    const next = themeMode === 'light' ? 'dark' : 'light'
+    setThemeMode(next)
+    document.cookie = `app_theme=${next}; path=/; max-age=31536000`
+  }, [themeMode])
+
   return (
     <Theme theme={themes[defaultThemeSlug]} mode={themeMode}>
       <AppShell
@@ -136,7 +144,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         variant="wash"
         topNav={
           <TopNav
-            label="Application top navigation"
+            label="Application navigation"
             heading={
               <Link
                 href="/dashboard"
@@ -145,39 +153,45 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                   color: 'inherit',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
+                  gap: 10,
                 }}
               >
                 <span
                   style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
                     background: 'var(--astryx-color-background-accent, #0866ff)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: 'white',
-                    fontWeight: 700,
-                    fontSize: 14,
+                    fontWeight: 800,
+                    fontSize: 13,
+                    letterSpacing: -0.5,
                   }}
                 >
                   SC
                 </span>
-                <strong>Seller Core</strong>
+                <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
+                  <strong style={{ fontSize: 14 }}>Seller Core</strong>
+                  <span style={{ fontSize: 11, opacity: 0.6 }}>Ops workspace</span>
+                </span>
               </Link>
             }
             endContent={
               <Stack direction="horizontal" gap={2} align="center">
-                <Text type="supporting" as="div">
-                  {pageTitle}
-                </Text>
+                {/* Page pill — shows where you are */}
+                <Badge
+                  variant="neutral"
+                  label={
+                    pageTitle === 'Dashboard'
+                      ? 'Workspace'
+                      : pageTitle.replace(' & ', ' · ').replace(' & Catalog', '')
+                  }
+                />
                 <button
-                  onClick={() => {
-                    const next = themeMode === 'light' ? 'dark' : 'light'
-                    setThemeMode(next)
-                    document.cookie = `app_theme=${next}; path=/; max-age=31536000`
-                  }}
+                  onClick={toggleTheme}
                   style={{
                     background: 'none',
                     border: '1px solid var(--astryx-color-border-default, #d1d5db)',
@@ -185,43 +199,48 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                     padding: 6,
                     cursor: 'pointer',
                     display: 'flex',
+                    alignItems: 'center',
                   }}
                   aria-label="Toggle theme"
+                  title="Toggle theme"
                 >
                   {themeMode === 'light' ? <Moon size={16} /> : <Sun size={16} />}
                 </button>
+
                 {user ? (
                   <>
                     <div
                       style={{
-                        width: 32,
-                        height: 32,
+                        width: 34,
+                        height: 34,
                         borderRadius: '50%',
-                        background: user.isSuperAdmin ? '#7c3aed' : '#0866ff',
+                        background: user.isSuperAdmin ? '#581c87' : '#1d4ed8',
                         color: 'white',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: 12,
-                        fontWeight: 700,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        letterSpacing: 0.5,
                       }}
                     >
                       {initials}
                     </div>
-                    <Stack gap={0}>
-                      <Text type="label" as="div" weight="medium">
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
                         {user.fullName}
-                      </Text>
-                      <Text type="supporting" as="div">
+                      </div>
+                      <div style={{ fontSize: 12, opacity: 0.6, whiteSpace: 'nowrap' }}>
                         {user.email}
-                      </Text>
-                    </Stack>
+                      </div>
+                    </div>
                     <Badge
                       variant={user.isSuperAdmin ? 'info' : 'neutral'}
-                      label={user.isSuperAdmin ? 'Super Admin' : 'Operations'}
+                      label={user.isSuperAdmin ? 'Super admin' : 'Operator'}
                     />
                   </>
                 ) : null}
+
                 <Form action="/logout" method="post">
                   {({ processing }) => (
                     <Button
@@ -240,22 +259,25 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         sideNav={
           <SideNav
             header={
-              <strong style={{ fontSize: 13, letterSpacing: 0.5, opacity: 0.7 }}>
-                SELLER CORE
-              </strong>
+              <Stack gap={1}>
+                <div style={{ fontSize: 11, letterSpacing: 0.8, opacity: 0.55, fontWeight: 800 }}>
+                  SELLER CORE
+                </div>
+                {!user?.isSuperAdmin ? (
+                  <Text type="supporting" as="span">
+                    Operator workspace
+                  </Text>
+                ) : null}
+              </Stack>
             }
           >
             {NAV_GROUPS.map((group) => (
               <SideNavSection key={group.title} title={group.title}>
                 {group.items
-                  .filter((item) => {
-                    if (item.adminOnly && !user?.isSuperAdmin) return false
-                    return true
-                  })
+                  .filter((item) => (item.adminOnly ? !!user?.isSuperAdmin : true))
                   .map((item) => {
                     const isActive =
-                      path === item.href ||
-                      (item.href !== '/dashboard' && path.startsWith(item.href))
+                      path === item.href || (item.href !== '/dashboard' && path.startsWith(item.href))
                     return (
                       <SideNavItem
                         key={item.href}
@@ -271,46 +293,33 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </SideNav>
         }
       >
+        {/* Page header */}
         <Stack gap={4}>
-          {/* Breadcrumb + title */}
-          <Stack direction="horizontal" align="center" wrap="wrap" gap={3}>
-            <Text type="supporting" as="div">
-              <Link href="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
-                Home
-              </Link>{' '}
-              / {pageTitle}
-            </Text>
-          </Stack>
-          <Stack direction="horizontal" align="center" wrap="wrap" gap={3}>
-            <Text type="display-2" as="h1" weight="bold">
+          <Stack direction="horizontal" gap={2} align="center" wrap="wrap">
+            <Link href="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <Badge variant="neutral" label="Home" />
+            </Link>
+            <span style={{ opacity: 0.35 }}>›</span>
+            <Text type="supporting" as="span">
               {pageTitle}
             </Text>
-            {user ? (
-              <Badge
-                variant={user.isSuperAdmin ? 'info' : 'neutral'}
-                label={`${user.fullName}${user.isSuperAdmin ? ' · super admin' : ''}`}
-              />
-            ) : null}
           </Stack>
 
-          {showFlash && flash?.success ? (
-            <Banner
-              status="success"
-              title={flash.success}
-              isDismissable
-              onDismiss={() => setFlashDismissed(true)}
-              container="card"
-            />
-          ) : null}
-          {showFlash && flash?.error ? (
-            <Banner
-              status="error"
-              title={flash.error}
-              isDismissable
-              onDismiss={() => setFlashDismissed(true)}
-              container="card"
-            />
-          ) : null}
+          <Stack gap={1}>
+            <Stack direction="horizontal" gap={2} align="center" wrap="wrap">
+              <Text type="display-2" as="h1" weight="bold">
+                {pageTitle}
+              </Text>
+              {pageTitle === 'Dashboard' && user?.isSuperAdmin ? (
+                <Badge variant="info" label="Super admin view" />
+              ) : null}
+            </Stack>
+            {pageDesc ? (
+              <Text type="supporting" as="p" style={{ maxWidth: 720 }}>
+                {pageDesc}
+              </Text>
+            ) : null}
+          </Stack>
 
           {children}
         </Stack>

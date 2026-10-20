@@ -2,20 +2,13 @@ import { Stack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
+import { Badge } from '@astryxdesign/core/Badge'
+import { Grid } from '@astryxdesign/core/Grid'
+import { Divider } from '@astryxdesign/core/Divider'
 import AppLayout from '~/layouts/app'
-import {
-  PageSection,
-  DataTable,
-  SmartForm,
-  RowAction,
-  StatusForm,
-  FormModal,
-  ResponsiveDataView,
-  col,
-  type Row,
-  short,
-} from '~/lib/ui'
+import { PageHeader, StatStrip, ResponsiveDataView, FormModal, col, type Row } from '~/lib/ui'
 import { useState } from 'react'
+import { Shield, Users, KeyRound, Layers, Lock, Sparkles } from 'lucide-react'
 
 type Props = { allUsers: Row[]; allRoles: Row[]; allPermissions: Row[]; moduleEntitlements: Row[] }
 
@@ -28,31 +21,108 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
   const [editUserRow, setEditUserRow] = useState<Row | null>(null)
   const [assignRoleOpen, setAssignRoleOpen] = useState(false)
 
+  const activeCount = allUsers.filter((u) => u.status === 'active').length
+  const suspendedCount = allUsers.filter((u) => u.status === 'suspended').length
+
   return (
     <Stack gap={4}>
-      <Card padding={4}>
-        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
-          <Button
-            label="+ Provision User"
-            variant="primary"
-            onClick={() => setProvisionOpen(true)}
-          />
-          <Button
-            label="Assign / Revoke Role"
-            variant="secondary"
-            onClick={() => setAssignRoleOpen(true)}
-          />
-          <Text type="supporting" as="div">
-            {allUsers.length} users · {allRoles.length} roles · {allPermissions.length} permissions
+      <PageHeader
+        title="Users & RBAC"
+        description="Provision users, assign roles, and manage module entitlements. Protected by @adonisjs/bouncer — only Super Admin abilities can mutate users or RBAC."
+        eyebrow={<Badge variant="info" label="Super admin only" />}
+        actions={
+          <>
+            <Button label="Provision user" variant="primary" onClick={() => setProvisionOpen(true)} />
+            <Button
+              label="Assign / revoke role"
+              variant="secondary"
+              onClick={() => setAssignRoleOpen(true)}
+            />
+          </>
+        }
+        meta={
+          <Stack direction="horizontal" gap={2} wrap="wrap">
+            <Badge variant="success" label={`${activeCount} active`} />
+            <Badge variant="neutral" label={`${allUsers.length} users`} />
+            <Badge variant="info" label={`${allRoles.length} roles`} />
+          </Stack>
+        }
+      />
+
+      <StatStrip
+        items={[
+          { label: 'Users', value: String(allUsers.length) },
+          { label: 'Active', value: String(activeCount), hint: `${suspendedCount} suspended` },
+          { label: 'Roles', value: String(allRoles.length) },
+          { label: 'Permissions', value: String(allPermissions.length) },
+          { label: 'Entitlements', value: String(moduleEntitlements.length) },
+          { label: 'Authz', value: 'Bouncer', hint: 'abilities + policies' },
+        ]}
+      />
+
+      <Card padding={4} variant="muted">
+        <Stack direction="horizontal" gap={2} align="center" wrap="wrap">
+          <Shield size={16} color="#581c87" />
+          <Text type="label" as="span" weight="semibold">
+            Authorization model
           </Text>
+          <Badge variant="info" label="deny-overrides-allow" />
+          <Badge variant="neutral" label="Ability: manageUsers / manageRoles" />
+          <Badge variant="neutral" label="Policy: UserPolicy" />
         </Stack>
       </Card>
 
+      <Grid columns={{ minWidth: 360, max: 3 }} gap={3}>
+        <Card padding={4}>
+          <Stack gap={2}>
+            <Stack direction="horizontal" gap={2} align="center">
+              <Users size={16} />
+              <Text type="label" as="span" weight="semibold">
+                How provisioning works
+              </Text>
+            </Stack>
+            <Text type="supporting" as="p">
+              Public signup is disabled. Super admins call <Text type="code">storeUser</Text> after
+              <Text type="code">bouncer.authorize('manageUsers')</Text>.
+            </Text>
+          </Stack>
+        </Card>
+        <Card padding={4}>
+          <Stack gap={2}>
+            <Stack direction="horizontal" gap={2} align="center">
+              <KeyRound size={16} />
+              <Text type="label" as="span" weight="semibold">
+                Roles & permissions
+              </Text>
+            </Stack>
+            <Text type="supporting" as="p">
+              Role grants use <Text type="code">allow/deny</Text> effect — any explicit deny beats
+              allows. Audited on assignment via <Text type="code">UserPolicy.assignRole</Text>.
+            </Text>
+          </Stack>
+        </Card>
+        <Card padding={4}>
+          <Stack gap={2}>
+            <Stack direction="horizontal" gap={2} align="center">
+              <Layers size={16} />
+              <Text type="label" as="span" weight="semibold">
+                Entitlements
+              </Text>
+            </Stack>
+            <Text type="supporting" as="p">
+              Gate whole modules independently of roles. Toggle emits{' '}
+              <Text type="code">rbac.entitlement_toggled</Text> audit. Super admin only.
+            </Text>
+          </Stack>
+        </Card>
+      </Grid>
+
+      {/* Modals */}
       <FormModal
         isOpen={provisionOpen}
         onOpenChange={setProvisionOpen}
         title="Provision user (super admin only)"
-        subtitle="Public registration is disabled — accounts exist only when a super admin creates them."
+        subtitle="Public registration is disabled — accounts exist only when a super admin creates them. Bouncer checks `manageUsers` ability before this form is reachable."
         submitLabel="Create user"
         action="/admin/users"
         fields={[
@@ -85,7 +155,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
           if (!o) setEditUserRow(null)
         }}
         title={`Edit user: ${String(editUserRow?.email ?? '')}`}
-        submitLabel="Update user"
+        submitLabel="Update status"
         action={
           editUserRow ? `/admin/users/${editUserRow.id}/status` : '/admin/users/placeholder/status'
         }
@@ -105,7 +175,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
         isOpen={assignRoleOpen}
         onOpenChange={setAssignRoleOpen}
         title="Assign / revoke role"
-        subtitle="Toggle a role for a user — same route assigns and revokes."
+        subtitle="Same ability toggles assignment: bouncer re-checks before removing or granting."
         submitLabel="Toggle role"
         action="/admin/users"
         actionFor={(v) => `/admin/users/${v.userId}/roles`}
@@ -117,7 +187,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
             required: true,
             options: allUsers.map((u) => ({
               value: String(u.id),
-              label: `${u.fullName} (${u.email})`,
+              label: `${u.fullName} — ${u.email}`,
             })),
           },
           {
@@ -130,226 +200,254 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
         ]}
       />
 
-      <PageSection
-        title="Users"
-        description="Multi-role RBAC: a user may hold several roles; explicit DENY always overrides ALLOW."
-      >
-        <ResponsiveDataView
-          rows={allUsers}
-          searchKeys={['fullName', 'email', 'status']}
-          filterKey="status"
-          filterPills={[
-            { value: 'all', label: 'All' },
-            { value: 'active', label: 'Active' },
-            { value: 'suspended', label: 'Suspended' },
-            { value: 'locked', label: 'Locked' },
-          ]}
-          createLabel="+ Provision User"
-          onCreateClick={() => setProvisionOpen(true)}
-          toCard={(row) => ({
-            title: String(row.fullName),
-            idBadge: String(row.email),
-            statusBadge: {
-              label: String(row.status).replace(/_/g, ' '),
-              variant:
-                row.status === 'active'
-                  ? 'success'
-                  : row.status === 'suspended' || row.status === 'locked'
-                    ? 'error'
-                    : row.status === 'pending_activation'
-                      ? 'warning'
-                      : 'neutral',
-            },
-            metrics: [
-              {
-                label: 'Super admin',
-                value:
-                  String(row.isSuperAdmin) === 'true' || row.isSuperAdmin === true ? 'Yes' : 'No',
+      {/* Users table */}
+      <Card padding={5}>
+        <Stack gap={4}>
+          <Stack gap={1}>
+            <Text type="label" as="div" weight="semibold">
+              Users
+            </Text>
+            <Text type="supporting" as="div">
+              Toggle status or delete. Delete is gated by{' '}
+              <Text type="code" as="span">
+                UserPolicy.delete
+              </Text>{' '}
+              and ownership-data checks.
+            </Text>
+          </Stack>
+          <Divider />
+          <ResponsiveDataView
+            rows={allUsers}
+            searchKeys={['fullName', 'email', 'status']}
+            filterKey="status"
+            filterPills={[
+              { value: 'all', label: 'All' },
+              { value: 'active', label: 'Active' },
+              { value: 'suspended', label: 'Suspended' },
+              { value: 'locked', label: 'Locked' },
+            ]}
+            createLabel="Provision user"
+            onCreateClick={() => setProvisionOpen(true)}
+            toCard={(row) => ({
+              title: String(row.fullName),
+              idBadge: String(row.email),
+              statusBadge: {
+                label: String(row.status).replace(/_/g, ' '),
+                variant:
+                  row.status === 'active'
+                    ? 'success'
+                    : row.status === 'suspended' || row.status === 'locked'
+                      ? 'error'
+                      : row.status === 'pending_activation'
+                        ? 'warning'
+                        : 'neutral',
               },
-              { label: 'Roles', value: String(((row.roles as Row[]) ?? []).length) },
-              {
-                label: 'Created',
-                value: row.createdAt ? new Date(String(row.createdAt)).toLocaleDateString() : '—',
+              metrics: [
+                {
+                  label: 'Super admin',
+                  value:
+                    String(row.isSuperAdmin) === 'true' || row.isSuperAdmin === true ? 'Yes' : 'No',
+                },
+                { label: 'Roles', value: String(((row.roles as Row[]) ?? []).length) },
+                {
+                  label: 'Created',
+                  value: row.createdAt ? new Date(String(row.createdAt)).toLocaleDateString() : '—',
+                },
+              ],
+              actions: (
+                <Stack direction="horizontal" gap={2} wrap="wrap">
+                  <Button
+                    label="Edit status"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setEditUserRow(row)}
+                  />
+                  <Button
+                    label="Delete"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (
+                        confirm(
+                          `Delete ${row.email}? If they own data, they will be suspended instead.`
+                        )
+                      ) {
+                        const f = document.createElement('form')
+                        f.method = 'POST'
+                        f.action = `/admin/users/${row.id}/delete`
+                        document.body.appendChild(f)
+                        f.submit()
+                      }
+                    }}
+                  />
+                </Stack>
+              ),
+            })}
+            columns={[
+              col.text('fullName', 'Name', 160),
+              col.text('email', 'Email', 210),
+              col.badge('status', 'Status', {
+                active: 'success',
+                pending_activation: 'warning',
+                suspended: 'error',
+                locked: 'error',
+                deactivated: 'neutral',
+              }),
+              col.text('isSuperAdmin', 'Super admin', 110),
+              col.action('Actions', (row) => (
+                <Stack direction="horizontal" gap={2} wrap="wrap">
+                  <Button
+                    label="Edit"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setEditUserRow(row)}
+                  />
+                  <Button
+                    label="Delete"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (
+                        confirm(
+                          `Delete ${row.email}? If they own data, they will be suspended instead.`
+                        )
+                      ) {
+                        const f = document.createElement('form')
+                        f.method = 'POST'
+                        f.action = `/admin/users/${row.id}/delete`
+                        document.body.appendChild(f)
+                        f.submit()
+                      }
+                    }}
+                  />
+                </Stack>
+              )),
+            ]}
+          />
+        </Stack>
+      </Card>
+
+      <Card padding={5}>
+        <Stack gap={4}>
+          <Text type="label" as="div" weight="semibold">
+            Roles & permissions
+          </Text>
+          <ResponsiveDataView
+            rows={allRoles}
+            searchKeys={['slug', 'name']}
+            toCard={(row) => ({
+              title: String(row.name),
+              idBadge: String(row.slug),
+              metrics: [
+                { label: 'System', value: String(row.isSystem) },
+                { label: 'Permissions', value: String(((row.permissions as Row[]) ?? []).length) },
+              ],
+            })}
+            columns={[
+              col.text('slug', 'Slug', 150),
+              col.text('name', 'Name', 180),
+              col.text('isSystem', 'System', 90),
+              col.action('Permissions', (row) => (
+                <span style={{ fontSize: 12 }}>
+                  {((row.permissions as Row[]) ?? []).length} granted
+                </span>
+              )),
+            ]}
+          />
+        </Stack>
+      </Card>
+
+      <Card padding={5}>
+        <Stack gap={4}>
+          <Stack direction="horizontal" gap={2} align="center">
+            <Sparkles size={16} color="#7c3aed" />
+            <Text type="label" as="div" weight="semibold">
+              Module entitlements
+            </Text>
+            <Badge variant="info" label="Super admin only" />
+          </Stack>
+          <Text type="supporting" as="div">
+            Controlled via <Text type="code">manageEntitlements</Text> ability. Each toggle writes
+            an audit event.
+          </Text>
+          <Divider />
+          <ResponsiveDataView
+            rows={moduleEntitlements}
+            searchKeys={['moduleKey', 'planTier']}
+            toCard={(row) => ({
+              title: String(row.moduleKey),
+              statusBadge: {
+                label:
+                  String(row.isEnabled) === 'true' || row.isEnabled === true ? 'Enabled' : 'Disabled',
+                variant:
+                  String(row.isEnabled) === 'true' || row.isEnabled === true ? 'success' : 'error',
               },
-            ],
-            actions: (
-              <Stack direction="horizontal" gap={2} wrap="wrap">
+              metrics: [{ label: 'Plan tier', value: String(row.planTier ?? '—') }],
+              actions: (
                 <Button
-                  label="Edit status"
+                  label={
+                    String(row.isEnabled) === 'true' || row.isEnabled === true ? 'Disable' : 'Enable'
+                  }
                   variant="secondary"
                   size="sm"
-                  onClick={() => setEditUserRow(row)}
-                />
-                <Button
-                  label="Delete"
-                  variant="ghost"
-                  size="sm"
                   onClick={() => {
-                    if (
-                      confirm(
-                        `Delete user ${row.email}? If they own data, they will be suspended instead.`
-                      )
-                    ) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/admin/users/${row.id}/delete`
-                      document.body.appendChild(f)
-                      f.submit()
-                    }
+                    const f = document.createElement('form')
+                    f.method = 'POST'
+                    f.action = `/admin/entitlements/${row.id}/toggle`
+                    document.body.appendChild(f)
+                    f.submit()
                   }}
                 />
-              </Stack>
-            ),
-          })}
-          columns={[
-            col.text('fullName', 'Name', 150),
-            col.text('email', 'Email', 200),
-            col.badge('status', 'Status', {
-              active: 'success',
-              pending_activation: 'warning',
-              suspended: 'error',
-              locked: 'error',
-              deactivated: 'neutral',
-            }),
-            col.text('isSuperAdmin', 'Super admin', 100),
-            col.action('Actions', (row) => (
-              <Stack direction="horizontal" gap={2} wrap="wrap">
+              ),
+            })}
+            columns={[
+              col.text('moduleKey', 'Module', 170),
+              col.badge('isEnabled', 'Enabled', { true: 'success', false: 'error' }),
+              col.text('planTier', 'Plan tier', 120),
+              col.action('Toggle', (row) => (
                 <Button
-                  label="Edit"
+                  label={row.isEnabled ? 'Disable' : 'Enable'}
                   variant="secondary"
                   size="sm"
-                  onClick={() => setEditUserRow(row)}
-                />
-                <Button
-                  label="Delete"
-                  variant="ghost"
-                  size="sm"
                   onClick={() => {
-                    if (
-                      confirm(
-                        `Delete user ${row.email}? If they own data, they will be suspended instead.`
-                      )
-                    ) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/admin/users/${row.id}/delete`
-                      document.body.appendChild(f)
-                      f.submit()
-                    }
+                    const f = document.createElement('form')
+                    f.method = 'POST'
+                    f.action = `/admin/entitlements/${row.id}/toggle`
+                    document.body.appendChild(f)
+                    f.submit()
                   }}
                 />
-              </Stack>
-            )),
-          ]}
-        />
-      </PageSection>
+              )),
+            ]}
+          />
+        </Stack>
+      </Card>
 
-      <PageSection
-        title="Roles & permissions"
-        description="Role → permission grants with allow/deny effect."
-      >
-        <ResponsiveDataView
-          rows={allRoles}
-          searchKeys={['slug', 'name']}
-          toCard={(row) => ({
-            title: String(row.name),
-            idBadge: String(row.slug),
-            metrics: [
-              { label: 'System', value: String(row.isSystem) },
-              { label: 'Permissions', value: String(((row.permissions as Row[]) ?? []).length) },
-            ],
-          })}
-          columns={[
-            col.text('slug', 'Slug', 140),
-            col.text('name', 'Name', 170),
-            col.text('isSystem', 'System', 80),
-            col.action('Permissions', (row) => (
-              <span style={{ fontSize: 12 }}>
-                {((row.permissions as Row[]) ?? []).length} granted
-              </span>
-            )),
-          ]}
-        />
-      </PageSection>
-
-      <PageSection
-        title="Module entitlements"
-        description="Entitlements gate whole modules independently from role permissions."
-      >
-        <ResponsiveDataView
-          rows={moduleEntitlements}
-          searchKeys={['moduleKey', 'planTier']}
-          toCard={(row) => ({
-            title: String(row.moduleKey),
-            statusBadge: {
-              label:
-                String(row.isEnabled) === 'true' || row.isEnabled === true ? 'Enabled' : 'Disabled',
-              variant:
-                String(row.isEnabled) === 'true' || row.isEnabled === true ? 'success' : 'error',
-            },
-            metrics: [{ label: 'Plan tier', value: String(row.planTier ?? '—') }],
-            actions: (
-              <Button
-                label={
-                  String(row.isEnabled) === 'true' || row.isEnabled === true ? 'Disable' : 'Enable'
-                }
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  const f = document.createElement('form')
-                  f.method = 'POST'
-                  f.action = `/admin/entitlements/${row.id}/toggle`
-                  document.body.appendChild(f)
-                  f.submit()
-                }}
-              />
-            ),
-          })}
-          columns={[
-            col.text('moduleKey', 'Module', 160),
-            col.badge('isEnabled', 'Enabled', { true: 'success', false: 'error' }),
-            col.text('planTier', 'Plan tier', 110),
-            col.action('Toggle', (row) => (
-              <Button
-                label={row.isEnabled ? 'Disable' : 'Enable'}
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  const f = document.createElement('form')
-                  f.method = 'POST'
-                  f.action = `/admin/entitlements/${row.id}/toggle`
-                  document.body.appendChild(f)
-                  f.submit()
-                }}
-              />
-            )),
-          ]}
-        />
-      </PageSection>
-
-      <PageSection
-        title="Permission catalog"
-        description="All defined permissions across resources and actions."
-      >
-        <ResponsiveDataView
-          rows={allPermissions}
-          searchKeys={['slug', 'resource', 'action']}
-          toCard={(row) => ({
-            title: String(row.slug),
-            metrics: [
-              { label: 'Resource', value: String(row.resource) },
-              { label: 'Action', value: String(row.action) },
-              { label: 'Description', value: String(row.description ?? '—').slice(0, 60) },
-            ],
-          })}
-          columns={[
-            col.text('slug', 'Slug', 190),
-            col.text('resource', 'Resource', 130),
-            col.text('action', 'Action', 100),
-            col.text('description', 'Description', 260),
-          ]}
-        />
-      </PageSection>
+      <Card padding={5}>
+        <Stack gap={4}>
+          <Text type="label" as="div" weight="semibold">
+            Permission catalog
+          </Text>
+          <ResponsiveDataView
+            rows={allPermissions}
+            searchKeys={['slug', 'resource', 'action']}
+            toCard={(row) => ({
+              title: String(row.slug),
+              metrics: [
+                { label: 'Resource', value: String(row.resource) },
+                { label: 'Action', value: String(row.action) },
+                { label: 'Description', value: String(row.description ?? '—').slice(0, 70) },
+              ],
+            })}
+            columns={[
+              col.text('slug', 'Slug', 200),
+              col.text('resource', 'Resource', 140),
+              col.text('action', 'Action', 110),
+              col.text('description', 'Description', 260),
+            ]}
+          />
+        </Stack>
+      </Card>
     </Stack>
   )
 }

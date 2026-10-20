@@ -1,27 +1,23 @@
-import { Form, Link } from '@adonisjs/inertia/react'
-import { usePage } from '@inertiajs/react'
-import type { Data } from '@generated/data'
+import { Form } from '@adonisjs/inertia/react'
+import { Link } from '@adonisjs/inertia/react'
 import { Stack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
 import { Badge } from '@astryxdesign/core/Badge'
-import { Banner } from '@astryxdesign/core/Banner'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Divider } from '@astryxdesign/core/Divider'
 import { Theme } from '@astryxdesign/core'
 import { themes, defaultThemeSlug } from '~/astryx_themes'
 import AuthLayout from '~/layouts/auth'
 import { useState, useEffect } from 'react'
-import { Eye, EyeOff, Shield, Zap, Crown, UserCheck } from 'lucide-react'
+import { Eye, EyeOff, Crown, UserCheck, ArrowUpRight, ShieldCheck } from 'lucide-react'
 
 export default function Login() {
-  const { props, flash } = usePage<Data.SharedProps>()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
-  // Read ?demo=admin or ?demo=ops
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const demo = params.get('demo')
@@ -47,35 +43,34 @@ export default function Login() {
     <Theme theme={themes[defaultThemeSlug]}>
       <AuthLayout title="Sign in to Seller Core">
         <Stack gap={4}>
-          {flash?.error ? (
-            <Banner status="error" title={flash.error} isDismissable container="card" />
-          ) : null}
-          {flash?.success ? (
-            <Banner status="success" title={flash.success} isDismissable container="card" />
-          ) : null}
-
           <Card padding={3} variant="muted">
             <Stack gap={2}>
-              <Badge variant="info" label="Admin-provisioned accounts only" />
+              <Stack direction="horizontal" gap={2} align="center">
+                <Badge variant="info" label="Admin-provisioned accounts only" />
+                <Badge variant="success" label="Sonner + Bouncer" />
+              </Stack>
               <Text type="supporting" as="p">
                 Public self-registration is disabled. Use credentials provisioned by your system
-                super administrator.
+                Super Administrator — session flash now surfaces as Sonner toasts.
               </Text>
             </Stack>
           </Card>
 
-          {/* One-click demo switcher */}
+          {/* Demo switcher */}
           <Stack gap={2}>
-            <Text type="label" as="div" weight="semibold">
-              Quick demo access — one click to fill
-            </Text>
+            <Stack direction="horizontal" gap={2} align="center">
+              <ShieldCheck size={14} />
+              <Text type="label" as="div" weight="semibold">
+                Quick demo access — one click to fill
+              </Text>
+            </Stack>
             <Stack direction="horizontal" gap={3} wrap="wrap">
               <button
                 onClick={fillAdmin}
                 style={{
-                  flex: '1 1 180px',
+                  flex: '1 1 190px',
                   padding: 16,
-                  borderRadius: 12,
+                  borderRadius: 14,
                   border:
                     email === 'admin@sellercore.io'
                       ? '2px solid #0866ff'
@@ -94,7 +89,7 @@ export default function Login() {
                       style={{
                         width: 32,
                         height: 32,
-                        borderRadius: 8,
+                        borderRadius: 9,
                         background: '#7c3aed',
                         display: 'flex',
                         alignItems: 'center',
@@ -118,9 +113,9 @@ export default function Login() {
               <button
                 onClick={fillOps}
                 style={{
-                  flex: '1 1 180px',
+                  flex: '1 1 190px',
                   padding: 16,
-                  borderRadius: 12,
+                  borderRadius: 14,
                   border:
                     email === 'ops@sellercore.io'
                       ? '2px solid #0866ff'
@@ -139,7 +134,7 @@ export default function Login() {
                       style={{
                         width: 32,
                         height: 32,
-                        borderRadius: 8,
+                        borderRadius: 9,
                         background: '#0891b2',
                         display: 'flex',
                         alignItems: 'center',
@@ -197,11 +192,12 @@ export default function Login() {
                     style={{
                       position: 'absolute',
                       right: 12,
-                      top: 36,
+                      top: 34,
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
                       opacity: 0.6,
+                      display: 'flex',
                     }}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
@@ -216,17 +212,27 @@ export default function Login() {
                   isDisabled={processing}
                 />
                 <Text type="supporting" as="div">
-                  Public registration is disabled — accounts are provisioned by Super Administrators
-                  only. Your session is secured with SHA-256 tokens and 2-hour expiry.
+                  Session secured with SHA-256 tokens and 2-hour expiry. Lockout after 5 failed
+                  attempts. Authorization checks use @adonisjs/bouncer abilities and policies.
                 </Text>
               </Stack>
             )}
           </Form>
 
-          <Stack direction="horizontal" gap={2}>
+          <Stack direction="horizontal" gap={2} align="center">
             <Link href="/">
               <Button label="← Back to home" variant="ghost" size="sm" />
             </Link>
+            <a
+              href="/login?demo=admin"
+              onClick={(e) => {
+                e.preventDefault()
+                fillAdmin()
+              }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13 }}
+            >
+              Prefill Super Admin demo <ArrowUpRight size={14} />
+            </a>
           </Stack>
         </Stack>
       </AuthLayout>

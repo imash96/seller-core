@@ -83,9 +83,79 @@ export function displayValue(v: unknown): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* Page scaffolding                                                     */
+/* Page scaffolding — new shared primitives for the UI refresh         */
 /* ------------------------------------------------------------------ */
 
+export function PageHeader({
+  title,
+  description,
+  eyebrow,
+  actions,
+  meta,
+}: {
+  title: string
+  description?: string
+  eyebrow?: ReactNode
+  actions?: ReactNode
+  meta?: ReactNode
+}) {
+  return (
+    <Stack gap={2}>
+      {eyebrow ? (
+        <Stack direction="horizontal" gap={2} align="center" wrap="wrap">
+          {eyebrow}
+        </Stack>
+      ) : null}
+      <Stack direction="horizontal" gap={3} align="center" wrap="wrap">
+        <Text type="display-2" as="h2" weight="bold">
+          {title}
+        </Text>
+        {meta}
+      </Stack>
+      {description ? (
+        <Text type="supporting" as="p" style={{ maxWidth: 760 }}>
+          {description}
+        </Text>
+      ) : null}
+      {actions ? (
+        <Stack direction="horizontal" gap={2} wrap="wrap">
+          {actions}
+        </Stack>
+      ) : null}
+    </Stack>
+  )
+}
+
+export function StatStrip({
+  items,
+}: {
+  items: Array<{ label: string; value: ReactNode; hint?: string }>
+}) {
+  if (!items?.length) return null
+  return (
+    <Card padding={3} variant="muted">
+      <Grid columns={{ minWidth: 140, max: 6 }} gap={2}>
+        {items.map((it) => (
+          <Stack key={it.label} gap={1} align="start">
+            <Text type="supporting" as="div" color="secondary">
+              {it.label}
+            </Text>
+            <Text type="display-3" as="div" weight="bold">
+              {it.value}
+            </Text>
+            {it.hint ? (
+              <Text type="supporting" as="div">
+                {it.hint}
+              </Text>
+            ) : null}
+          </Stack>
+        ))}
+      </Grid>
+    </Card>
+  )
+}
+
+/* Keep legacy PageSection for gradual migration — now delegates to new primitives. */
 export function PageSection({
   id,
   title,

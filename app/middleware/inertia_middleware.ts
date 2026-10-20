@@ -37,13 +37,16 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
      * Flash messages travel in the dedicated `flash` field of the page
      * object instead of props, and the client strips them from history
      * state so they never reappear when navigating back.
+     * They are consumed client-side by a Sonner toast bridge — see `inertia/lib/toast`.
      */
     const { session } = ctx as Partial<HttpContext>
 
     const success: string | undefined = session?.flashMessages.get('success')
     const error: string | undefined = session?.flashMessages.get('error')
+    const info: string | undefined = session?.flashMessages.get('info')
+    const warning: string | undefined = session?.flashMessages.get('warning')
 
-    return { success, error }
+    return { success, error, info, warning }
   }
 
   async handle(ctx: HttpContext, next: NextFn) {
