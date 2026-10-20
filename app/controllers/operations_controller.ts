@@ -1098,10 +1098,18 @@ export default class OperationsController {
       return response.redirect().back()
     }
 
+    // Defensive load: .first() + explicit missing check gives a friendly flash instead of 404 E_ROW_NOT_FOUND
     const [source, target] = await Promise.all([
-      Customer.query().where('userId', user.id).andWhere('id', sourceCustomerId).firstOrFail(),
-      Customer.query().where('userId', user.id).andWhere('id', targetCustomerId).firstOrFail(),
+      Customer.query().where('userId', user.id).andWhere('id', sourceCustomerId).first(),
+      Customer.query().where('userId', user.id).andWhere('id', targetCustomerId).first(),
     ])
+    if (!source || !target) {
+      session.flash(
+        'error',
+        `Merge failed — ${!source ? 'source' : ''}${!source && !target ? ' and ' : ''}${!target ? 'target' : ''} customer not found. Please refresh.`
+      )
+      return response.redirect().back()
+    }
 
     await db.transaction(async (trx) => {
       await Order.query({ client: trx })
@@ -1703,28 +1711,42 @@ export default class OperationsController {
 
   async updateCustomer({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const payload = await request.validateUsing(updateCustomerValidator)
-    const customer = await Customer.query()
-      .where('id', params.id)
-      .andWhere('userId', user.id)
-      .firstOrFail()
-    const beforeRisk = customer.riskLevel
-    customer.merge(payload)
-    await customer.save()
-
-    if (payload.riskLevel && payload.riskLevel !== beforeRisk) {
-      await RbacService.recordAudit({
-        actorUserId: user.id,
-        userId: user.id,
-        action: 'customer.risk_level_changed',
-        entityType: 'customers',
-        entityId: customer.id,
-        requestId: request.id(),
-        beforeState: { riskLevel: beforeRisk },
-        afterState: { riskLevel: payload.riskLevel },
-      })
+    try {
+      const payload = await request.validateUsing(updateCustomerValidator)
+      const customer = await Customer.query()
+        .where('id', params.id)
+        .andWhere('userId', user.id)
+        .first()
+      if (!customer) {
+        session.flash(
+          'error',
+          `Customer not found (id ${String(params.id).slice(0, 12)}…). It may have been merged or deleted — please refresh the list.`
+        )
+        return response.redirect().back()
+      }
+      const beforeRisk = customer.riskLevel
+      customer.merge(payload)
+      await customer.save()
+      if (payload.riskLevel && payload.riskLevel !== beforeRisk) {
+        await RbacService.recordAudit({
+          actorUserId: user.id,
+          userId: user.id,
+          action: 'customer.risk_level_changed',
+          entityType: 'customers',
+          entityId: customer.id,
+          requestId: request.id(),
+          beforeState: { riskLevel: beforeRisk },
+          afterState: { riskLevel: payload.riskLevel },
+        }).catch(() => {})
+      }
+      session.flash('success', `Customer "${customer.fullName}" updated.`)
+    } catch (err: any) {
+      if (err?.code === 'E_ROW_NOT_FOUND' || err?.status === 404) {
+        session.flash('error', 'Customer not found — list may be stale. Please refresh.')
+      } else {
+        session.flash('error', err.message || 'Failed to update customer')
+      }
     }
-    session.flash('success', `Customer "${customer.fullName}" updated.`)
     return response.redirect().back()
   }
 

@@ -201,7 +201,9 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
           onCreateClick={() => setCreateOpen(true)}
           toCard={(row) => ({
             title: String(row.fullName),
-            idBadge: String(row.email ?? row.id).slice(0, 24),
+            subtitle: String(row.email ?? row.phone ?? '').slice(0, 36),
+            avatarText: String(row.fullName ?? 'U').slice(0, 2),
+            idBadge: row.proxyEmail ? `proxy ${String(row.proxyEmail).slice(0, 18)}` : undefined,
             statusBadge: {
               label: String(row.riskLevel ?? 'low').replace(/_/g, ' '),
               variant:
@@ -216,11 +218,11 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             metrics: [
               { label: 'Orders', value: String(row.ordersCount ?? 0) },
               {
-                label: 'Spend',
+                label: 'Lifetime spend',
                 value: money(String(row.preferredCurrency ?? 'USD'), row.totalSpent),
               },
-              { label: 'Score', value: String(row.riskScore ?? 0) },
-              { label: 'Repeat', value: row.isRepeatCustomer ? 'Yes' : 'No' },
+              { label: 'Risk score', value: String(row.riskScore ?? 0) },
+              { label: 'Repeat buyer', value: row.isRepeatCustomer ? 'Yes' : 'No' },
             ],
             actions: (
               <Stack direction="horizontal" gap={2}>
@@ -319,7 +321,8 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             { value: 'false_positive', label: 'False positive' },
           ]}
           toCard={(row) => ({
-            title: String(row.signalType ?? row.signalCode ?? '—'),
+            title: String(row.signalType ?? row.signalCode ?? 'Risk signal'),
+            subtitle: String(row.reason ?? '').slice(0, 38),
             statusBadge: {
               label: String(row.severity ?? ''),
               variant:
@@ -330,12 +333,15 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
                     : 'neutral',
             },
             metrics: [
-              { label: 'Reason', value: String(row.reason ?? row.explanation ?? '—').slice(0, 60) },
+              { label: 'Reason', value: String(row.reason ?? row.explanation ?? '—').slice(0, 54) },
               {
                 label: 'Customer',
-                value: String((row.customer as any)?.fullName ?? row.customerId ?? '—'),
+                value: String((row.customer as any)?.fullName ?? row.customerId ?? '—').slice(
+                  0,
+                  22
+                ),
               },
-              { label: 'Review', value: String(row.reviewStatus).replace(/_/g, ' ') },
+              { label: 'Review status', value: String(row.reviewStatus).replace(/_/g, ' ') },
             ],
             actions: (
               <Button

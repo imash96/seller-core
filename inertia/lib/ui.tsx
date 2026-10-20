@@ -793,17 +793,20 @@ export const STATUS_TONES: Record<string, string> = {
 
 type FilterPill = { value: string; label: string }
 
+type CardData = {
+  title: string
+  subtitle?: string
+  idBadge?: string
+  avatarText?: string
+  statusBadge?: { label: string; variant: string }
+  metrics: Array<{ label: string; value: ReactNode; icon?: ReactNode }>
+  actions?: ReactNode
+}
+
 type ResponsiveDataViewProps = {
   rows: Row[]
   columns: TableColumn<Row>[]
-  /** Maps row -> { title, idBadge, statusBadge?: {label, variant}, metrics: Array<{label, value}>, actions?: ReactNode } */
-  toCard: (row: Row) => {
-    title: string
-    idBadge?: string
-    statusBadge?: { label: string; variant: string }
-    metrics: Array<{ label: string; value: ReactNode }>
-    actions?: ReactNode
-  }
+  toCard: (row: Row) => CardData
   emptyTitle?: string
   emptyDescription?: string
   emptyAction?: ReactNode
@@ -814,6 +817,17 @@ type ResponsiveDataViewProps = {
   pageSizeOptions?: number[]
   createLabel?: string
   onCreateClick?: () => void
+}
+
+function accentForVariant(variant: string): string {
+  const map: Record<string, string> = {
+    success: '#16a34a',
+    error: '#dc2626',
+    warning: '#d97706',
+    info: '#2563eb',
+    neutral: '#6b7280',
+  }
+  return map[variant] || map.neutral
 }
 
 export function ResponsiveDataView({
@@ -844,14 +858,23 @@ export function ResponsiveDataView({
     }
     return defaultViewMode
   })
-  const [isMobile, setIsMobile] = useState(false)
+  const [isNarrow, setIsNarrow] = useState(false)
+  const [isTablet, setIsTablet] = useState(false)
 
   useEffect(() => {
-    const mql = window.matchMedia('(max-width: 1023px)')
-    const handler = () => setIsMobile(mql.matches)
+    const mNarrow = window.matchMedia('(max-width: 639px)')
+    const mTablet = window.matchMedia('(max-width: 1023px)')
+    const handler = () => {
+      setIsNarrow(mNarrow.matches)
+      setIsTablet(mTablet.matches)
+    }
     handler()
-    mql.addEventListener('change', handler)
-    return () => mql.removeEventListener('change', handler)
+    mNarrow.addEventListener('change', handler)
+    mTablet.addEventListener('change', handler)
+    return () => {
+      mNarrow.removeEventListener('change', handler)
+      mTablet.removeEventListener('change', handler)
+    }
   }, [])
 
   useEffect(() => {
@@ -861,10 +884,9 @@ export function ResponsiveDataView({
   const effectiveMode: 'table' | 'cards' = useMemo(() => {
     if (viewMode === 'cards') return 'cards'
     if (viewMode === 'table') return 'table'
-    return isMobile ? 'cards' : 'table'
-  }, [viewMode, isMobile])
+    return isTablet ? 'cards' : 'table'
+  }, [viewMode, isTablet])
 
-  // Filtering
   const filtered = useMemo(() => {
     let out = rows
     if (search.trim() && searchKeys.length > 0) {
@@ -884,7 +906,6 @@ export function ResponsiveDataView({
     return out
   }, [rows, search, searchKeys, filterPills, filterKey, activeFilter])
 
-  // Sorting
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
     const copy = [...filtered]
@@ -902,7 +923,6 @@ export function ResponsiveDataView({
     return copy
   }, [filtered, sortKey, sortDir])
 
-  // Pagination
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize))
   const currentPage = Math.min(page, totalPages)
   const paginated = useMemo(() => {
@@ -910,15 +930,14 @@ export function ResponsiveDataView({
     return sorted.slice(start, start + pageSize)
   }, [sorted, currentPage, pageSize])
 
-  // Reset page when filters change
   useEffect(() => {
     setPage(1)
   }, [search, activeFilter, pageSize])
 
-  const handleSort = (key: string) => {
-    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+  const handleSort = (colKey: string) => {
+    if (sortKey === colKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else {
-      setSortKey(key)
+      setSortKey(colKey)
       setSortDir('asc')
     }
   }
@@ -941,61 +960,158 @@ export function ResponsiveDataView({
 
   return (
     <Stack gap={3}>
-      {/* Toolbar */}
-      <Stack gap={3}>
-        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
-          {/* Search */}
-          {searchKeys.length > 0 ? (
-            <div style={{ position: 'relative', flex: '1 1 220px', maxWidth: 340 }}>
-              <span
+      {/* ---------- Toolbar — stacks vertically on narrow screens ---------- */}
+      <Card padding={3}>
+        <Stack gap={3}>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 12,
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            {/* Search */}
+            {searchKeys.length > 0 ? (
+              <div
                 style={{
-                  position: 'absolute',
-                  left: 10,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  opacity: 0.5,
-                  pointerEvents: 'none',
+                  position: 'relative',
+                  flex: isNarrow ? '1 1 100%' : '1 1 220px',
+                  maxWidth: isNarrow ? '100%' : 360,
+                  minWidth: 180,
                 }}
               >
-                <Search size={16} />
-              </span>
-              <input
-                type="text"
-                placeholder="Search…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 32px 8px 32px',
-                  borderRadius: 8,
-                  border: '1px solid var(--astryx-color-border-default, #d1d5db)',
-                  fontSize: 14,
-                  outline: 'none',
-                }}
-              />
-              {search ? (
-                <button
-                  onClick={() => setSearch('')}
+                <span
                   style={{
                     position: 'absolute',
-                    right: 8,
+                    left: 10,
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    opacity: 0.6,
+                    opacity: 0.5,
+                    pointerEvents: 'none',
+                    display: 'flex',
                   }}
                 >
-                  <X size={14} />
-                </button>
+                  <Search size={16} />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 34px 9px 32px',
+                    borderRadius: 10,
+                    border: '1px solid var(--astryx-color-border-default, #e5e7eb)',
+                    background: 'var(--astryx-color-background-surface, #fff)',
+                    fontSize: 14,
+                    outline: 'none',
+                    transition: 'border-color 120ms',
+                  }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0866ff')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = '#e5e7eb')}
+                />
+                {search ? (
+                  <button
+                    aria-label="Clear search"
+                    onClick={() => setSearch('')}
+                    style={{
+                      position: 'absolute',
+                      right: 8,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'var(--astryx-color-background-muted, #f3f4f6)',
+                      border: 'none',
+                      borderRadius: 999,
+                      width: 22,
+                      height: 22,
+                      display: 'grid',
+                      placeItems: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* View mode switcher + create */}
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                marginLeft: isNarrow ? 0 : 'auto',
+              }}
+            >
+              <div
+                role="group"
+                aria-label="View mode"
+                style={{
+                  display: 'inline-flex',
+                  border: '1px solid var(--astryx-color-border-default, #e5e7eb)',
+                  borderRadius: 10,
+                  overflow: 'hidden',
+                  background: 'var(--astryx-color-background-muted, #f8fafc)',
+                  padding: 2,
+                }}
+              >
+                {[
+                  { mode: 'cards' as const, icon: <LayoutGrid size={15} />, label: 'Cards' },
+                  { mode: 'table' as const, icon: <Table2 size={15} />, label: 'Table' },
+                  { mode: 'auto' as const, icon: <Sparkles size={15} />, label: 'Auto' },
+                ].map((opt) => {
+                  const active = viewMode === opt.mode
+                  return (
+                    <button
+                      key={opt.mode}
+                      onClick={() => setViewMode(opt.mode)}
+                      aria-pressed={active}
+                      title={opt.label}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: active ? '#111827' : 'transparent',
+                        color: active ? '#fff' : 'inherit',
+                        fontSize: 13,
+                        fontWeight: active ? 600 : 500,
+                        cursor: 'pointer',
+                        transition: 'all 120ms',
+                      }}
+                    >
+                      {opt.icon}
+                      <span className="hide-on-narrow">{opt.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              {onCreateClick && createLabel ? (
+                <Button label={createLabel} variant="primary" size="sm" onClick={onCreateClick} />
               ) : null}
             </div>
-          ) : null}
+          </div>
 
-          {/* Filter pills */}
+          {/* Filter pills — horizontally scrollable on mobile */}
           {filterPills && filterKey ? (
-            <Stack direction="horizontal" gap={2} wrap="wrap">
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+                paddingBottom: 2,
+                alignItems: 'center',
+              }}
+            >
               {filterPills.map((pill) => {
                 const isActive = activeFilter === pill.value
                 const count =
@@ -1007,72 +1123,71 @@ export function ResponsiveDataView({
                     key={pill.value}
                     onClick={() => setActiveFilter(pill.value)}
                     style={{
-                      padding: '4px 12px',
+                      flex: '0 0 auto',
+                      padding: '6px 14px',
                       borderRadius: 999,
-                      border: '1px solid var(--astryx-color-border-default, #d1d5db)',
-                      background: isActive
-                        ? 'var(--astryx-color-background-accent, #0866ff)'
-                        : 'transparent',
-                      color: isActive ? 'white' : 'inherit',
+                      border: isActive
+                        ? '1px solid #111827'
+                        : '1px solid var(--astryx-color-border-default, #e5e7eb)',
+                      background: isActive ? '#111827' : '#fff',
+                      color: isActive ? '#fff' : '#374151',
                       fontSize: 13,
-                      fontWeight: isActive ? 600 : 400,
+                      fontWeight: isActive ? 600 : 500,
                       cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 120ms',
                     }}
                   >
-                    {pill.label} <span style={{ opacity: isActive ? 0.9 : 0.6 }}>({count})</span>
+                    {pill.label}{' '}
+                    <span style={{ opacity: isActive ? 0.85 : 0.55, fontWeight: 400 }}>
+                      ({count})
+                    </span>
                   </button>
                 )
               })}
-            </Stack>
+            </div>
           ) : null}
 
-          {/* View mode switcher */}
-          <Stack direction="horizontal" gap={1} align="center">
-            <Button
-              label=""
-              variant={effectiveMode === 'cards' ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => setViewMode('cards')}
-            >
-              <LayoutGrid size={16} />
-            </Button>
-            <Button
-              label=""
-              variant={effectiveMode === 'table' ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => setViewMode('table')}
-            >
-              <Table2 size={16} />
-            </Button>
-          </Stack>
-
-          {onCreateClick && createLabel ? (
-            <Button label={createLabel} variant="primary" size="sm" onClick={onCreateClick} />
-          ) : null}
+          {/* Result meta */}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 10,
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Text type="supporting" as="div" color="secondary">
+              Showing <strong style={{ color: '#111827' }}>{paginated.length}</strong> of{' '}
+              <strong style={{ color: '#111827' }}>{sorted.length}</strong>{' '}
+              {sorted.length === 1 ? 'record' : 'records'}
+              {search || activeFilter !== 'all' ? (
+                <span style={{ opacity: 0.7 }}> · filtered from {rows.length}</span>
+              ) : null}
+              {sortKey ? (
+                <span style={{ opacity: 0.7 }}>
+                  {' '}
+                  · sorted by {sortKey} {sortDir === 'asc' ? '↑' : '↓'}
+                </span>
+              ) : null}
+            </Text>
+            {sorted.length > (pageSizeOptions[0] ?? 10) ? (
+              <Selector
+                label="Per page"
+                isLabelHidden
+                value={String(pageSize)}
+                onChange={(v) => setPageSize(Number(v ?? 10))}
+                options={pageSizeOptions.map((n) => ({ value: String(n), label: `${n} / page` }))}
+                size="sm"
+                width={116}
+              />
+            ) : null}
+          </div>
         </Stack>
+      </Card>
 
-        {/* Result count + page size */}
-        <Stack direction="horizontal" gap={2} align="center" wrap="wrap">
-          <Text type="supporting" as="div">
-            Showing {paginated.length} of {sorted.length}{' '}
-            {sorted.length === 1 ? 'record' : 'records'}
-            {search || activeFilter !== 'all' ? ` (filtered from ${rows.length})` : ''}
-          </Text>
-          {sorted.length > pageSizeOptions[0] ? (
-            <Selector
-              label="Per page"
-              isLabelHidden
-              value={String(pageSize)}
-              onChange={(v) => setPageSize(Number(v ?? 10))}
-              options={pageSizeOptions.map((n) => ({ value: String(n), label: `${n} / page` }))}
-              size="sm"
-              width={110}
-            />
-          ) : null}
-        </Stack>
-      </Stack>
-
-      {/* Content */}
+      {/* ---------- Content ---------- */}
       {sorted.length === 0 ? (
         <EmptyState
           title="No matching records"
@@ -1090,99 +1205,301 @@ export function ResponsiveDataView({
           }
         />
       ) : effectiveMode === 'cards' ? (
-        <Grid columns={{ minWidth: 300, max: 3 }} gap={3}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: isNarrow
+              ? '1fr'
+              : isTablet
+                ? 'repeat(2, minmax(0,1fr))'
+                : 'repeat(3, minmax(0,1fr))',
+            gap: 16,
+          }}
+        >
           {paginated.map((row) => {
             const card = toCard(row)
+            const accent = card.statusBadge ? accentForVariant(card.statusBadge.variant) : '#e5e7eb'
+            const initials = card.avatarText ?? card.title.slice(0, 2).toUpperCase()
             return (
-              <Card key={String(row.id ?? JSON.stringify(row).slice(0, 20))} padding={4}>
-                <Stack gap={3}>
-                  {/* Header */}
-                  <Stack direction="horizontal" gap={2} align="center" wrap="wrap">
-                    <Stack gap={1}>
-                      <Text type="label" as="div" weight="semibold">
-                        {card.title}
-                      </Text>
-                      {card.idBadge ? (
-                        <Text type="code" as="div" color="secondary">
-                          {card.idBadge}
-                        </Text>
-                      ) : null}
-                    </Stack>
-                    {card.statusBadge ? (
-                      <Badge
-                        variant={card.statusBadge.variant as any}
-                        label={card.statusBadge.label}
-                      />
-                    ) : null}
-                  </Stack>
-                  <Divider />
-                  {/* Metrics */}
-                  <Grid columns={2} gap={2}>
-                    {card.metrics.map((m, i) => (
-                      <Stack key={i} gap={1}>
-                        <Text type="supporting" as="div" color="secondary">
-                          {m.label}
-                        </Text>
-                        <Text type="body" as="div" weight="medium">
-                          {m.value}
-                        </Text>
-                      </Stack>
-                    ))}
-                  </Grid>
-                  {card.actions ? (
-                    <>
-                      <Divider />
-                      <div>{card.actions}</div>
-                    </>
-                  ) : null}
-                </Stack>
-              </Card>
-            )
-          })}
-        </Grid>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <Table
-            data={paginated}
-            columns={columns}
-            idKey={(row: Row) => String(row.id ?? JSON.stringify(row).slice(0, 40))}
-            density="compact"
-            dividers="rows"
-            isStriped
-            hasHover
-            textOverflow="truncate"
-          />
-          {/* Sortable header overlay — clickable headers */}
-          <Stack direction="horizontal" gap={2} wrap="wrap">
-            {columns
-              .filter((c) => c.key !== '__action')
-              .map((c) => (
-                <button
-                  key={c.key}
-                  onClick={() => handleSort(c.key)}
+              <div
+                key={String(row.id ?? JSON.stringify(row).slice(0, 24))}
+                style={{
+                  position: 'relative',
+                  background: '#fff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 14,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'box-shadow 140ms, transform 140ms',
+                }}
+                onMouseEnter={(e) => {
+                  ;(e.currentTarget as HTMLDivElement).style.boxShadow =
+                    '0 8px 24px rgba(0,0,0,0.08)'
+                  ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'
+                }}
+                onMouseLeave={(e) => {
+                  ;(e.currentTarget as HTMLDivElement).style.boxShadow = 'none'
+                  ;(e.currentTarget as HTMLDivElement).style.transform = 'none'
+                }}
+              >
+                {/* Accent strip */}
+                <div style={{ height: 3, background: accent }} />
+
+                <div
                   style={{
-                    fontSize: 12,
-                    padding: '2px 8px',
-                    borderRadius: 4,
-                    border: '1px solid transparent',
-                    background:
-                      sortKey === c.key
-                        ? 'var(--astryx-color-background-muted, #f0f2f5)'
-                        : 'transparent',
-                    cursor: 'pointer',
-                    fontWeight: sortKey === c.key ? 600 : 400,
+                    padding: 16,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 14,
+                    flex: 1,
                   }}
                 >
-                  {c.header} {sortKey === c.key ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
-                </button>
-              ))}
-          </Stack>
+                  {/* Header */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 12,
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: 12,
+                        alignItems: 'center',
+                        minWidth: 0,
+                        flex: 1,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 999,
+                          background: `${accent}14`,
+                          border: `1px solid ${accent}22`,
+                          color: accent,
+                          display: 'grid',
+                          placeItems: 'center',
+                          fontWeight: 700,
+                          fontSize: 13,
+                          flex: '0 0 40px',
+                        }}
+                      >
+                        {initials.slice(0, 2)}
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div
+                          title={card.title}
+                          style={{
+                            fontWeight: 650,
+                            fontSize: 15,
+                            lineHeight: 1.25,
+                            color: '#111827',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {card.title}
+                        </div>
+                        {card.subtitle ? (
+                          <div
+                            style={{
+                              fontSize: 12.5,
+                              color: '#6b7280',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {card.subtitle}
+                          </div>
+                        ) : card.idBadge ? (
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: '#6b7280',
+                              fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {card.idBadge}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    {card.statusBadge ? (
+                      <span style={{ flex: '0 0 auto' }}>
+                        <Badge
+                          variant={card.statusBadge.variant as any}
+                          label={card.statusBadge.label}
+                        />
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* Metrics */}
+                  {card.metrics?.length ? (
+                    <>
+                      <div style={{ height: 1, background: '#f3f4f6', margin: '2px 0' }} />
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                          gap: 12,
+                        }}
+                      >
+                        {card.metrics.map((m, i) => (
+                          <div key={i} style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                letterSpacing: 0.04 * 11,
+                                textTransform: 'uppercase',
+                                color: '#9ca3af',
+                                marginBottom: 4,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {m.label}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 14,
+                                fontWeight: 600,
+                                color: '#111827',
+                                lineHeight: 1.3,
+                                wordBreak: 'break-word',
+                              }}
+                            >
+                              {m.value}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {/* Footer actions — sticks to bottom */}
+                  {card.actions ? (
+                    <div
+                      style={{
+                        marginTop: 'auto',
+                        paddingTop: 12,
+                        borderTop: '1px solid #f3f4f6',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 8,
+                      }}
+                    >
+                      {card.actions}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div style={{ position: 'relative' }}>
+          {/* Scroll shadows — indicate overflow */}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+              background:
+                'linear-gradient(90deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 24px, rgba(255,255,255,0) calc(100% - 24px), rgba(255,255,255,1) 100%)',
+              opacity: 0.0,
+            }}
+          />
+          <div
+            style={{
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              background: '#fff',
+            }}
+          >
+            <div style={{ minWidth: 720 }}>
+              <Table
+                data={paginated}
+                columns={columns.map((c) => {
+                  // Make headers sortable inline — inject sort indicator
+                  if (c.key === '__action') return c
+                  const isSorted = sortKey === c.key
+                  return {
+                    ...c,
+                    header: `${c.header}${isSorted ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}`,
+                  }
+                })}
+                idKey={(row: Row) => String(row.id ?? JSON.stringify(row).slice(0, 40))}
+                density="compact"
+                dividers="rows"
+                isStriped
+                hasHover
+                textOverflow="truncate"
+              />
+            </div>
+          </div>
+          {/* Sort bar — compact pill row, accessible */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+            {columns
+              .filter((c) => c.key !== '__action')
+              .slice(0, 6)
+              .map((c) => {
+                const isSorted = sortKey === c.key
+                return (
+                  <button
+                    key={c.key}
+                    onClick={() => handleSort(c.key)}
+                    aria-pressed={isSorted}
+                    style={{
+                      fontSize: 12.5,
+                      padding: '5px 10px',
+                      borderRadius: 999,
+                      border: isSorted ? '1px solid #111827' : '1px solid #e5e7eb',
+                      background: isSorted ? '#111827' : '#fff',
+                      color: isSorted ? '#fff' : '#374151',
+                      cursor: 'pointer',
+                      fontWeight: isSorted ? 600 : 500,
+                    }}
+                  >
+                    {c.header} {isSorted ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
+                  </button>
+                )
+              })}
+          </div>
+          {paginated.length !== sorted.length ? (
+            <Text type="supporting" as="div" color="secondary" style={{ marginTop: 8 }}>
+              Tip: swipe horizontally to see all columns · tap a column pill to sort
+            </Text>
+          ) : null}
         </div>
       )}
 
-      {/* Pagination */}
+      {/* Pagination — thumb-friendly */}
       {totalPages > 1 ? (
-        <Stack direction="horizontal" gap={2} align="center" justify="center">
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '6px 0',
+            flexWrap: 'wrap',
+          }}
+        >
           <Button
             label=""
             variant="secondary"
@@ -1192,9 +1509,20 @@ export function ResponsiveDataView({
           >
             <ChevronLeft size={16} />
           </Button>
-          <Text type="supporting" as="div">
-            Page {currentPage} of {totalPages}
-          </Text>
+          <span
+            style={{
+              fontSize: 13,
+              color: '#6b7280',
+              background: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: 999,
+              padding: '6px 14px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Page <strong style={{ color: '#111827' }}>{currentPage}</strong> of {totalPages} ·{' '}
+            {sorted.length} records
+          </span>
           <Button
             label=""
             variant="secondary"
@@ -1204,12 +1532,40 @@ export function ResponsiveDataView({
           >
             <ChevronRight size={16} />
           </Button>
-        </Stack>
+          {/* Quick jump on mobile */}
+          {totalPages > 3 ? (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                const n = i + 1 + Math.max(0, currentPage - 3)
+                if (n > totalPages) return null
+                const active = n === currentPage
+                return (
+                  <button
+                    key={n}
+                    onClick={() => setPage(n)}
+                    style={{
+                      minWidth: 32,
+                      height: 32,
+                      borderRadius: 999,
+                      border: active ? '1px solid #111827' : '1px solid #e5e7eb',
+                      background: active ? '#111827' : '#fff',
+                      color: active ? '#fff' : '#374151',
+                      fontSize: 13,
+                      fontWeight: active ? 600 : 500,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {n}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </Stack>
   )
 }
-
 /* ------------------------------------------------------------------ */
 /* SavedViews bar                                                       */
 /* ------------------------------------------------------------------ */

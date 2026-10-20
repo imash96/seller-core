@@ -63,8 +63,8 @@ router
 
     /* ---------- Customers, merge & risk review ---------- */
     router.post('/customers', [OperationsController, 'storeCustomer']).as('customers.store')
-    router.post('/customers/:id', [OperationsController, 'updateCustomer']).as('customers.update')
     router.post('/customers/merge', [OperationsController, 'mergeCustomers']).as('customers.merge')
+    router.post('/customers/:id', [OperationsController, 'updateCustomer']).as('customers.update')
     router
       .post('/customers/:id/delete', [OperationsController, 'deleteCustomer'])
       .as('customers.delete')
