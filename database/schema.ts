@@ -74,6 +74,8 @@ export class BrandSchema extends BaseModel {
     'isActive',
     'logoUrl',
     'name',
+    'regNo',
+    'serialNo',
     'slug',
     'updatedAt',
     'userId',
@@ -90,6 +92,10 @@ export class BrandSchema extends BaseModel {
   declare logoUrl: string | null
   @column()
   declare name: string
+  @column()
+  declare regNo: string | null
+  @column()
+  declare serialNo: string | null
   @column()
   declare slug: string
   @column.dateTime({ autoCreate: true, autoUpdate: true })
@@ -304,6 +310,7 @@ export class CustomerAddressSchema extends BaseModel {
     'label',
     'line1',
     'line2',
+    'line3',
     'phone',
     'postalCode',
     'recipientName',
@@ -338,6 +345,8 @@ export class CustomerAddressSchema extends BaseModel {
   declare line1: string
   @column()
   declare line2: string | null
+  @column()
+  declare line3: string | null
   @column()
   declare phone: string | null
   @column()
@@ -775,6 +784,54 @@ export class ModuleEntitlementSchema extends BaseModel {
   declare userId: string
 }
 
+export class NotificationSchema extends BaseModel {
+  static $columns = [
+    'body',
+    'channel',
+    'createdAt',
+    'entityId',
+    'entityType',
+    'id',
+    'isRead',
+    'readAt',
+    'recipientAddress',
+    'sentAt',
+    'title',
+    'type',
+    'updatedAt',
+    'userId',
+  ] as const
+  $columns = NotificationSchema.$columns
+  @column()
+  declare body: string | null
+  @column()
+  declare channel: string
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare entityId: string | null
+  @column()
+  declare entityType: string | null
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare isRead: boolean
+  @column.dateTime()
+  declare readAt: DateTime | null
+  @column()
+  declare recipientAddress: string | null
+  @column.dateTime()
+  declare sentAt: DateTime | null
+  @column()
+  declare title: string
+  @column()
+  declare type: string
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+  @column()
+  declare userId: string
+}
+
 export class OrderImportPayloadSchema extends BaseModel {
   static $columns = [
     'createdAt',
@@ -1135,6 +1192,7 @@ export class PermissionSchema extends BaseModel {
     'createdAt',
     'description',
     'id',
+    'name',
     'resource',
     'slug',
     'updatedAt',
@@ -1149,6 +1207,8 @@ export class PermissionSchema extends BaseModel {
   @column({ isPrimary: true })
   declare id: string
   @column()
+  declare name: string
+  @column()
   declare resource: string
   @column()
   declare slug: string
@@ -1160,10 +1220,13 @@ export class ProductCategorySchema extends BaseModel {
   static $columns = [
     'attributesSchema',
     'createdAt',
+    'description',
     'id',
+    'isActive',
     'name',
-    'parentId',
+    'parentCategoryId',
     'slug',
+    'sortOrder',
     'taxonomyPath',
     'updatedAt',
     'userId',
@@ -1176,14 +1239,20 @@ export class ProductCategorySchema extends BaseModel {
   declare attributesSchema: any
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
+  @column()
+  declare description: string | null
   @column({ isPrimary: true })
   declare id: string
   @column()
+  declare isActive: boolean
+  @column()
   declare name: string
   @column()
-  declare parentId: string | null
+  declare parentCategoryId: string | null
   @column()
   declare slug: string
+  @column()
+  declare sortOrder: number
   @column()
   declare taxonomyPath: string | null
   @column.dateTime({ autoCreate: true, autoUpdate: true })
@@ -1237,6 +1306,7 @@ export class ProductVariantSchema extends BaseModel {
     'retailPrice',
     'sku',
     'status',
+    'stockAvailable',
     'stockOnHand',
     'stockReserved',
     'title',
@@ -1293,6 +1363,8 @@ export class ProductVariantSchema extends BaseModel {
   @column()
   declare status: string
   @column()
+  declare stockAvailable: number | null
+  @column()
   declare stockOnHand: number
   @column()
   declare stockReserved: number
@@ -1310,19 +1382,28 @@ export class ProductSchema extends BaseModel {
   static $columns = [
     'brandId',
     'categoryId',
+    'collectionName',
     'createdAt',
     'description',
     'dimensionsCm',
+    'extendedDescription',
     'hasVariants',
     'id',
     'images',
+    'listPrice',
     'metadata',
+    'salePrice',
     'shortDescription',
     'skuPrefix',
     'slug',
     'status',
+    'subTitle',
+    'subTitle125',
     'tags',
     'title',
+    'title75',
+    'title80',
+    'type',
     'updatedAt',
     'userId',
     'variationDimensions',
@@ -1333,6 +1414,8 @@ export class ProductSchema extends BaseModel {
   declare brandId: string | null
   @column()
   declare categoryId: string | null
+  @column()
+  declare collectionName: string | null
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
   @column()
@@ -1342,6 +1425,8 @@ export class ProductSchema extends BaseModel {
       v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
   })
   declare dimensionsCm: any
+  @column()
+  declare extendedDescription: string | null
   @column()
   declare hasVariants: boolean
   @column({ isPrimary: true })
@@ -1355,7 +1440,17 @@ export class ProductSchema extends BaseModel {
     prepare: (v) =>
       v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
   })
+  declare listPrice: any
+  @column({
+    prepare: (v) =>
+      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
+  })
   declare metadata: any
+  @column({
+    prepare: (v) =>
+      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
+  })
+  declare salePrice: any
   @column()
   declare shortDescription: string | null
   @column()
@@ -1364,6 +1459,10 @@ export class ProductSchema extends BaseModel {
   declare slug: string
   @column()
   declare status: string
+  @column()
+  declare subTitle: string | null
+  @column()
+  declare subTitle125: string | null
   @column({
     prepare: (v) =>
       v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
@@ -1371,6 +1470,12 @@ export class ProductSchema extends BaseModel {
   declare tags: any
   @column()
   declare title: string
+  @column()
+  declare title75: string | null
+  @column()
+  declare title80: string | null
+  @column()
+  declare type: string | null
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
   @column()
@@ -1689,7 +1794,10 @@ export class SavedViewSchema extends BaseModel {
 
 export class SellerAccountSchema extends BaseModel {
   static $columns = [
+    'accountCode',
+    'accountEmail',
     'accountName',
+    'accountPhone',
     'createdAt',
     'credentialVaultRef',
     'defaultCurrency',
@@ -1713,7 +1821,13 @@ export class SellerAccountSchema extends BaseModel {
   ] as const
   $columns = SellerAccountSchema.$columns
   @column()
+  declare accountCode: string | null
+  @column()
+  declare accountEmail: string | null
+  @column()
   declare accountName: string
+  @column()
+  declare accountPhone: string | null
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
   @column()
@@ -1821,6 +1935,8 @@ export class ShipmentSchema extends BaseModel {
     'shipmentNumber',
     'shippedAt',
     'status',
+    'thirdPartyTrackingNumber',
+    'thirdPartyTrackingUrl',
     'trackingNumber',
     'trackingUrl',
     'updatedAt',
@@ -1871,6 +1987,10 @@ export class ShipmentSchema extends BaseModel {
   declare shippedAt: DateTime | null
   @column()
   declare status: string
+  @column()
+  declare thirdPartyTrackingNumber: string | null
+  @column()
+  declare thirdPartyTrackingUrl: string | null
   @column()
   declare trackingNumber: string | null
   @column()
@@ -2226,6 +2346,7 @@ export class UserSessionSchema extends BaseModel {
 
 export class UserSchema extends BaseModel {
   static $columns = [
+    'companyName',
     'createdAt',
     'createdByUserId',
     'defaultCurrency',
@@ -2246,6 +2367,8 @@ export class UserSchema extends BaseModel {
     'updatedAt',
   ] as const
   $columns = UserSchema.$columns
+  @column()
+  declare companyName: string | null
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
   @column()

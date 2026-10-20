@@ -1,35 +1,30 @@
-import Page from '~/components/page'
-import { type ReactNode } from 'react'
-import NavLink, { type NavItem } from '~/components/nav_link'
+import { type ReactElement } from 'react'
+import { Stack } from '@astryxdesign/core/Stack'
+import { Text } from '@astryxdesign/core/Text'
 
-/**
- * The pages of the settings area, listed in the sidebar. Register a route
- * for each page and add it here, for example:
- *
- * `{ label: 'Profile', route: 'settings.profile', icon: User }`
- */
-const items: NavItem[] = []
-
-/**
- * Renders the settings heading, a sidebar of links and a card holding the
- * current page. Nest it under the app layout from each settings page:
- *
- * `Profile.layout = [AppLayout, SettingsLayout]`
- */
-export default function SettingsLayout({ children }: { children: ReactNode }) {
+/** Settings shell: narrow column with a page title above the content. */
+export default function SettingsLayout({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description?: string
+  children: ReactElement
+}) {
   return (
-    <Page title="Settings" description="Manage your account settings and preferences.">
-      <div className="sidebar-layout">
-        <nav className="sidebar-layout__nav" aria-label="Settings">
-          {items.map(({ label, route, icon: Icon }) => (
-            <NavLink key={label} route={route} exact className="sidebar-layout__item">
-              {Icon && <Icon size={16} />}
-              {label}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="sidebar-layout__content panel">{children}</div>
-      </div>
-    </Page>
+    <Stack gap={4} padding={4} width="100%" maxWidth={760}>
+      <Stack gap={1}>
+        <Text type="display-3" as="h1" weight="bold">
+          {title}
+        </Text>
+        {description ? (
+          <Text type="supporting" as="div">
+            {description}
+          </Text>
+        ) : null}
+      </Stack>
+      {children}
+    </Stack>
   )
 }

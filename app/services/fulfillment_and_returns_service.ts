@@ -25,7 +25,6 @@ import {
   DataClassification,
   OutboxEventStatus,
 } from '../enums/index.js'
-import { uuidv7 } from '../utils/uuid.js'
 
 function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
@@ -84,7 +83,6 @@ export class FulfillmentAndReturnsService {
       const isDelivered = input.status === ShipmentStatus.DELIVERED
       const shipment = new Shipment()
       shipment.useTransaction(trx)
-      shipment.id = uuidv7()
       shipment.userId = input.userId
       shipment.orderId = order.id
       shipment.shipmentNumber = input.shipmentNumber
@@ -133,7 +131,6 @@ export class FulfillmentAndReturnsService {
 
         const shipmentItem = new ShipmentItem()
         shipmentItem.useTransaction(trx)
-        shipmentItem.id = uuidv7()
         shipmentItem.userId = input.userId
         shipmentItem.shipmentId = shipment.id
         shipmentItem.orderLineItemId = line.id
@@ -195,7 +192,6 @@ export class FulfillmentAndReturnsService {
       if (isDelivered) {
         const outbox = new OutboxEvent()
         outbox.useTransaction(trx)
-        outbox.id = uuidv7()
         outbox.userId = input.userId
         outbox.aggregateType = 'shipments'
         outbox.aggregateId = shipment.id
@@ -250,7 +246,6 @@ export class FulfillmentAndReturnsService {
 
       const invoice = new ShippingInvoice()
       invoice.useTransaction(trx)
-      invoice.id = uuidv7()
       invoice.userId = input.userId
       invoice.financialAccountId = input.financialAccountId ?? null
       invoice.carrierCode = input.carrierCode
@@ -278,7 +273,6 @@ export class FulfillmentAndReturnsService {
 
         const invLine = new ShippingInvoiceLine()
         invLine.useTransaction(trx)
-        invLine.id = uuidv7()
         invLine.userId = input.userId
         invLine.shippingInvoiceId = invoice.id
         invLine.shipmentId = lineInput.shipmentId ?? null
@@ -375,7 +369,6 @@ export class FulfillmentAndReturnsService {
 
       const returnReq = new ReturnRequest()
       returnReq.useTransaction(trx)
-      returnReq.id = uuidv7()
       returnReq.userId = input.userId
       returnReq.orderId = order.id
       returnReq.orderLineItemId = line.id
@@ -452,7 +445,6 @@ export class FulfillmentAndReturnsService {
 
       const refund = new RefundTransaction()
       refund.useTransaction(trx)
-      refund.id = uuidv7()
       refund.userId = input.userId
       refund.orderId = order.id
       refund.orderLineItemId = input.orderLineItemId ?? null
@@ -522,7 +514,6 @@ export class FulfillmentAndReturnsService {
       const exchangeRate = Number(order.exchangeRate || 1)
       const ledgerTx = new FinancialTransaction()
       ledgerTx.useTransaction(trx)
-      ledgerTx.id = uuidv7()
       ledgerTx.userId = input.userId
       ledgerTx.financialAccountId = input.financialAccountId ?? null
       ledgerTx.sellerAccountId = order.sellerAccountId

@@ -299,7 +299,7 @@ export const ClaimType = {
   CHARGEBACK: 'chargeback',
   ITEM_NOT_RECEIVED: 'item_not_received',
   UNAUTHORIZED_PAYMENT: 'unauthorized_payment',
-  NAD_DISPUTE: 'nad_dispute',
+  NOT_AS_DESCRIBED: 'not_as_described',
   OTHER: 'other',
 } as const
 export type ClaimTypeValue = (typeof ClaimType)[keyof typeof ClaimType]
@@ -365,6 +365,7 @@ export const FinanceCostBucket = {
   MARKETING: 'marketing',
   SOFTWARE: 'software',
   OPERATIONS: 'operations',
+  MANUFACTURING: 'manufacturing',
   TAX: 'tax',
   PERSONAL: 'personal',
   OTHER_INCOME: 'other_income',
@@ -396,6 +397,8 @@ export type FinancialTransactionStatusType =
 
 export const TaskType = {
   CREDIT_CARD_DUE: 'credit_card_due',
+  CONFIRM_SHIPMENT: 'confirm_shipment',
+  MESSAGE_REPLY: 'message_reply',
   INVOICE_DUE: 'invoice_due',
   RETURN_REVIEW: 'return_review',
   FRAUD_REVIEW: 'fraud_review',

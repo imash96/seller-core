@@ -35,6 +35,7 @@ import { OrderService } from '../services/order_service.js'
 import { CatalogService } from '../services/catalog_service.js'
 import { FulfillmentAndReturnsService } from '../services/fulfillment_and_returns_service.js'
 import { RbacService } from '../services/rbac_service.js'
+import { generateEntityId } from '../utils/generate_entity_id.js'
 import {
   createOrderValidator,
   bulkOrderImportValidator,
@@ -47,6 +48,16 @@ import {
   createRefundValidator,
   createCreditCardValidator,
   createFinancialTransactionValidator,
+  updateBrandValidator,
+  updateCategoryValidator,
+  updateProductValidator,
+  updateCustomerValidator,
+  updateSellerAccountValidator,
+  updateFinancialAccountValidator,
+  updateCreditCardValidator,
+  createTaskValidator,
+  updateTaskValidator,
+  createVariantValidator,
 } from '#validators/operations'
 import { createUserValidator } from '#validators/user'
 import {
@@ -58,6 +69,8 @@ import {
   CreditCardStatus,
   FinancialTransactionStatus,
   TaskStatus,
+  TaskType,
+  TaskPriority,
   UserStatus,
 } from '../enums/index.js'
 
@@ -1272,25 +1285,19 @@ export default class OperationsController {
 
   async storeTask({ auth, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const title = String(request.input('title', '')).trim()
-    if (!title) {
-      session.flash('error', 'Task title is required.')
-      return response.redirect().back()
-    }
+    const payload = await request.validateUsing(createTaskValidator)
 
     await TasksReminder.create({
       userId: user.id,
-      taskType: String(request.input('taskType', 'general_task')),
-      priority: String(request.input('priority', 'medium')),
+      taskType: payload.taskType ?? TaskType.GENERAL,
+      priority: payload.priority ?? TaskPriority.MEDIUM,
       status: TaskStatus.PENDING,
-      title,
-      description: request.input('description') || null,
-      dueAt: request.input('dueAt')
-        ? DateTime.fromISO(String(request.input('dueAt')))
-        : DateTime.now().plus({ days: 3 }),
+      title: payload.title,
+      description: payload.description || null,
+      dueAt: payload.dueAt ? DateTime.fromISO(payload.dueAt) : DateTime.now().plus({ days: 3 }),
     })
 
-    session.flash('success', `Task "${title}" added.`)
+    session.flash('success', `Task "${payload.title}" added.`)
     return response.redirect().back()
   }
 
@@ -1358,6 +1365,300 @@ export default class OperationsController {
       afterState: { roleSlug: role.slug },
     })
 
+    return response.redirect().back()
+  }
+
+  /* ================================================================== */
+  /* Brands — full CRUD                                                  */
+  /* ================================================================== */
+
+  async updateBrand({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const payload = await request.validateUsing(updateBrandValidator)
+    const brand = await Brand.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    brand.merge(payload)
+    await brand.save()
+    session.flash('success', `Brand "${brand.name}" updated.`)
+    return response.redirect().back()
+  }
+
+  async deleteBrand({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const brand = await Brand.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    await brand.delete()
+    session.flash('success', 'Brand deleted.')
+    return response.redirect().back()
+  }
+
+  /* ================================================================== */
+  /* Product categories — full CRUD                                      */
+  /* ================================================================== */
+
+  async updateCategory({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const payload = await request.validateUsing(updateCategoryValidator)
+    const category = await ProductCategory.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    category.merge(payload)
+    await category.save()
+    session.flash('success', `Category "${category.name}" updated.`)
+    return response.redirect().back()
+  }
+
+  async deleteCategory({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const category = await ProductCategory.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    await category.delete()
+    session.flash('success', 'Category deleted.')
+    return response.redirect().back()
+  }
+
+  /* ================================================================== */
+  /* Products & variants — update / create / delete                      */
+  /* ================================================================== */
+
+  async updateProduct({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const payload = await request.validateUsing(updateProductValidator)
+    const product = await Product.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    product.merge(payload)
+    await product.save()
+    session.flash('success', `Product "${product.title}" updated.`)
+    return response.redirect().back()
+  }
+
+  async storeVariant({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const payload = await request.validateUsing(createVariantValidator)
+    const product = await Product.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+
+    await db.transaction(async (trx) => {
+      const variant = await ProductVariant.create(
+        {
+          userId: user.id,
+          productId: product.id,
+          sku: payload.sku,
+          title: payload.title,
+          retailPrice: payload.retailPrice.toFixed(2),
+          costPrice: (payload.costPrice ?? 0).toFixed(2),
+          stockOnHand: payload.stockOnHand ?? 0,
+          stockReserved: 0,
+          currencyCode: 'USD',
+          isDefault: false,
+          status: 'active',
+        },
+        { client: trx }
+      )
+      if (payload.attributeName && payload.attributeValue) {
+        await trx.table('product_variant_attributes').insert({
+          id: generateEntityId('pattr'),
+          user_id: user.id,
+          product_variant_id: variant.id,
+          attribute_name: payload.attributeName,
+          attribute_value: payload.attributeValue,
+          created_at: new Date(),
+        })
+      }
+      if (!product.hasVariants && product.variationDimensions.length === 0) {
+        product.useTransaction(trx)
+        product.hasVariants = true
+        await product.save()
+      }
+    })
+
+    session.flash('success', `Variant ${payload.sku} created.`)
+    return response.redirect().back()
+  }
+
+  async deleteVariant({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const variant = await ProductVariant.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    await variant.delete()
+    session.flash('success', 'Variant deleted.')
+    return response.redirect().back()
+  }
+
+  async deleteChannelListing({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const listing = await ChannelListing.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    await listing.delete()
+    session.flash('success', 'Channel listing removed.')
+    return response.redirect().back()
+  }
+
+  /* ================================================================== */
+  /* Customers — update                                                  */
+  /* ================================================================== */
+
+  async updateCustomer({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const payload = await request.validateUsing(updateCustomerValidator)
+    const customer = await Customer.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    const beforeRisk = customer.riskLevel
+    customer.merge(payload)
+    await customer.save()
+
+    if (payload.riskLevel && payload.riskLevel !== beforeRisk) {
+      await RbacService.recordAudit({
+        actorUserId: user.id,
+        userId: user.id,
+        action: 'customer.risk_level_changed',
+        entityType: 'customers',
+        entityId: customer.id,
+        requestId: request.id(),
+        beforeState: { riskLevel: beforeRisk },
+        afterState: { riskLevel: payload.riskLevel },
+      })
+    }
+    session.flash('success', `Customer "${customer.fullName}" updated.`)
+    return response.redirect().back()
+  }
+
+  /* ================================================================== */
+  /* Seller accounts — update / delete                                   */
+  /* ================================================================== */
+
+  async updateSellerAccount({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const payload = await request.validateUsing(updateSellerAccountValidator)
+    const account = await SellerAccount.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    account.merge(payload)
+    await account.save()
+    session.flash('success', `Seller account "${account.accountName}" updated.`)
+    return response.redirect().back()
+  }
+
+  async deleteSellerAccount({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const account = await SellerAccount.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    await account.delete()
+    session.flash('success', 'Seller account disconnected and removed.')
+    return response.redirect().back()
+  }
+
+  /* ================================================================== */
+  /* Financial accounts — update / delete                                */
+  /* ================================================================== */
+
+  async updateFinancialAccount({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const payload = await request.validateUsing(updateFinancialAccountValidator)
+    const account = await FinancialAccount.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    if (payload.accountName !== undefined) account.accountName = payload.accountName
+    if (payload.currentBalance !== undefined)
+      account.currentBalance = String(payload.currentBalance)
+    if (payload.isActive !== undefined) account.isActive = payload.isActive
+    await account.save()
+    session.flash('success', `Financial account "${account.accountName}" updated.`)
+    return response.redirect().back()
+  }
+
+  async deleteFinancialAccount({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const account = await FinancialAccount.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    await account.delete()
+    session.flash('success', 'Financial account deleted.')
+    return response.redirect().back()
+  }
+
+  /* ================================================================== */
+  /* Credit cards — update                                               */
+  /* ================================================================== */
+
+  async updateCreditCard({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const payload = await request.validateUsing(updateCreditCardValidator)
+    const card = await CreditCard.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    if (payload.cardLabel !== undefined) card.cardLabel = payload.cardLabel
+    if (payload.creditLimit !== undefined) card.creditLimit = String(payload.creditLimit)
+    if (payload.minimumPaymentDue !== undefined) {
+      card.minimumPaymentDue = String(payload.minimumPaymentDue)
+    }
+    if (payload.nextPaymentDueDate !== undefined) {
+      card.nextPaymentDueDate = payload.nextPaymentDueDate
+        ? DateTime.fromISO(payload.nextPaymentDueDate)
+        : null
+    }
+    if (payload.status !== undefined) card.status = payload.status
+    await card.save()
+    session.flash('success', `Card "${card.cardLabel}" updated.`)
+    return response.redirect().back()
+  }
+
+  /* ================================================================== */
+  /* Tasks — update / delete                                             */
+  /* ================================================================== */
+
+  async updateTask({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const payload = await request.validateUsing(updateTaskValidator)
+    const task = await TasksReminder.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    if (payload.title !== undefined) task.title = payload.title
+    if (payload.description !== undefined) task.description = payload.description
+    if (payload.taskType !== undefined) task.taskType = payload.taskType
+    if (payload.priority !== undefined) task.priority = payload.priority
+    if (payload.status !== undefined) {
+      task.status = payload.status
+      if (payload.status === 'completed') task.completedAt = DateTime.now()
+    }
+    if (payload.dueAt !== undefined) task.dueAt = DateTime.fromISO(payload.dueAt)
+    await task.save()
+    session.flash('success', 'Task updated.')
+    return response.redirect().back()
+  }
+
+  async deleteTask({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const task = await TasksReminder.query()
+      .where('id', params.id)
+      .andWhere('userId', user.id)
+      .firstOrFail()
+    await task.delete()
+    session.flash('success', 'Task deleted.')
     return response.redirect().back()
   }
 }

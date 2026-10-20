@@ -1,83 +1,99 @@
-import { Form } from '@adonisjs/inertia/react'
-import { ShieldCheck, Lock } from 'lucide-react'
-import { AstryxBadge } from '~/components/astryx'
+import { Form, Link } from '@adonisjs/inertia/react'
+import { Stack } from '@astryxdesign/core/Stack'
+import { Text } from '@astryxdesign/core/Text'
+import { Card } from '@astryxdesign/core/Card'
+import { Button } from '@astryxdesign/core/Button'
+import { Badge } from '@astryxdesign/core/Badge'
+import { TextInput } from '@astryxdesign/core/TextInput'
+import { Theme } from '@astryxdesign/core'
+import { themes, defaultThemeSlug } from '~/astryx_themes'
+import { useState } from 'react'
 
 export default function Login() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
   return (
-    <div className="max-w-md mx-auto px-6 py-16">
-      <div className="bg-[var(--card)] border border-[var(--line-2)] rounded-2xl p-8 shadow-sm space-y-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <AstryxBadge tone="primary">
-              <ShieldCheck size={12} /> Admin-Provisioned Auth
-            </AstryxBadge>
-            <AstryxBadge tone="neutral">Astryx Security</AstryxBadge>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">
-            Sign in to SellerCore
-          </h1>
-          <p className="text-xs text-[var(--muted)] leading-relaxed">
-            Public self-registration is disabled by security policy. Enter credentials provisioned
-            by your System Super Administrator.
-          </p>
-        </div>
+    <Theme theme={themes[defaultThemeSlug]}>
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--astryx-color-background-wash, #f0f2f5)',
+          padding: 24,
+        }}
+      >
+        <Card padding={6} width={420}>
+          <Stack gap={4}>
+            <Stack gap={2}>
+              <Badge variant="info" label="Admin-provisioned accounts only" />
+              <Text type="display-2" as="h1" weight="bold">
+                Sign in to Seller Core
+              </Text>
+              <Text type="supporting" as="p">
+                Public self-registration is disabled by security policy. Use credentials provisioned
+                by your system super administrator.
+              </Text>
+            </Stack>
 
-        <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-xs space-y-1.5">
-          <div className="font-semibold text-[#0866FF] dark:text-blue-300 flex items-center gap-1.5">
-            <Lock size={13} /> Seeded Accounts (Ready for Verification)
-          </div>
-          <div className="mono text-[11px] text-[var(--ink)]">
-            <div>
-              <strong>Super Admin:</strong> admin@sellercore.io / Admin@SellerCore2026!
-            </div>
-            <div>
-              <strong>Ops Operator:</strong> ops.merchant@sellercore.io / Ops@SellerCore2026!
-            </div>
-          </div>
-        </div>
+            <Card padding={3} variant="muted">
+              <Stack gap={1}>
+                <Text type="label" as="div" weight="semibold">
+                  Seeded demo accounts
+                </Text>
+                <Text type="code" as="div">
+                  admin@sellercore.io / Password123!
+                </Text>
+                <Text type="code" as="div">
+                  ops@sellercore.io / Password123!
+                </Text>
+              </Stack>
+            </Card>
 
-        <Form route="session.store" className="space-y-4">
-          {({ errors, processing }) => (
-            <>
-              <div className="field">
-                <label htmlFor="email">Work Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  id="email"
-                  defaultValue="admin@sellercore.io"
-                  autoComplete="username"
-                  data-invalid={errors.email ? 'true' : undefined}
-                  required
-                />
-                {errors.email && <p className="field-error">{errors.email}</p>}
-              </div>
+            <Form action="/login" method="post">
+              {({ errors, processing }) => (
+                <Stack gap={3}>
+                  <TextInput
+                    label="Email"
+                    type="email"
+                    htmlName="email"
+                    value={email}
+                    onChange={setEmail}
+                    isRequired
+                    width="100%"
+                    status={errors.email ? { type: 'error', message: errors.email } : undefined}
+                  />
+                  <TextInput
+                    label="Password"
+                    type="password"
+                    htmlName="password"
+                    value={password}
+                    onChange={setPassword}
+                    isRequired
+                    width="100%"
+                    status={
+                      errors.password ? { type: 'error', message: errors.password } : undefined
+                    }
+                  />
+                  <Button
+                    label="Sign in"
+                    type="submit"
+                    variant="primary"
+                    size="lg"
+                    isDisabled={processing}
+                  />
+                </Stack>
+              )}
+            </Form>
 
-              <div className="field">
-                <label htmlFor="password">Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  id="password"
-                  defaultValue="Admin@SellerCore2026!"
-                  autoComplete="current-password"
-                  data-invalid={errors.password ? 'true' : undefined}
-                  required
-                />
-                {errors.password && <p className="field-error">{errors.password}</p>}
-              </div>
-
-              <button
-                type="submit"
-                disabled={processing}
-                className="w-full h-10 rounded-xl bg-[#0866FF] hover:bg-[#0756D8] text-white font-semibold text-sm transition cursor-pointer disabled:opacity-50"
-              >
-                {processing ? 'Authenticating...' : 'Sign in to Operations Console'}
-              </button>
-            </>
-          )}
-        </Form>
+            <Link href="/">
+              <Button label="← Back to home" variant="ghost" size="sm" />
+            </Link>
+          </Stack>
+        </Card>
       </div>
-    </div>
+    </Theme>
   )
 }

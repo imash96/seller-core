@@ -21,7 +21,8 @@ import {
   SyncJobStatus,
   OutboxEventStatus,
 } from '../enums/index.js'
-import { uuidv7, normalizeEmail, normalizePhone, computeAddressFingerprint } from '../utils/uuid.js'
+import { generateEntityId } from '../utils/generate_entity_id.js'
+import { normalizeEmail, normalizePhone, computeAddressFingerprint } from '../utils/identity.js'
 
 export interface OrderLineInput {
   productVariantId?: string | null
@@ -134,7 +135,6 @@ export class OrderService {
       if (!customer) {
         customer = new Customer()
         customer.useTransaction(trx)
-        customer.id = uuidv7()
         customer.userId = input.userId
         customer.externalCustomerId = input.customer.externalCustomerId ?? null
         customer.fullName = input.customer.fullName.trim()
@@ -166,7 +166,6 @@ export class OrderService {
         if (!address) {
           address = new CustomerAddress()
           address.useTransaction(trx)
-          address.id = uuidv7()
           address.userId = input.userId
           address.customerId = customer.id
           address.addressType = 'both'
@@ -256,7 +255,6 @@ export class OrderService {
         cogsAmount = roundMoney(cogsAmount + qty * unitCost)
 
         const lineModel = new OrderLineItem()
-        lineModel.id = uuidv7()
         lineModel.userId = input.userId
         lineModel.productVariantId = variant?.id ?? null
         lineModel.externalOrderLineId = lineInput.externalOrderLineId ?? null
@@ -302,7 +300,6 @@ export class OrderService {
       // 4. Create Order header
       const order = new Order()
       order.useTransaction(trx)
-      order.id = uuidv7()
       order.userId = input.userId
       order.sellerAccountId = input.sellerAccountId ?? null
       order.customerId = customer.id
@@ -380,7 +377,6 @@ export class OrderService {
         }
         const payloadRecord = new OrderImportPayload()
         payloadRecord.useTransaction(trx)
-        payloadRecord.id = uuidv7()
         payloadRecord.userId = input.userId
         payloadRecord.orderId = order.id
         payloadRecord.syncJobId = input.syncJobId ?? null
@@ -407,7 +403,6 @@ export class OrderService {
       // 8. Transactional outbox event & audit log
       const outbox = new OutboxEvent()
       outbox.useTransaction(trx)
-      outbox.id = uuidv7()
       outbox.userId = input.userId
       outbox.aggregateType = 'orders'
       outbox.aggregateId = order.id
@@ -488,7 +483,7 @@ export class OrderService {
       jobType: SyncJobType.MANUAL_BULK_IMPORT,
       status: SyncJobStatus.RUNNING,
       idempotencyKey: input.idempotencyKey,
-      correlationId: input.correlationId ?? uuidv7(),
+      correlationId: input.correlationId ?? generateEntityId(),
       totalRecords: input.orders.length,
       processedRecords: 0,
       succeededRecords: 0,

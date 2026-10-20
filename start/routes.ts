@@ -3,16 +3,19 @@
 | Routes file
 |--------------------------------------------------------------------------
 |
-| The routes file is used for defining the HTTP routes.
-| Note: Public registration is strictly disabled per security policy.
-| Only authenticated system super administrators can provision new users.
+| Public registration is strictly disabled per security policy: only
+| authenticated System Super Administrators can provision new users.
 |
 */
 import { middleware } from '#start/kernel'
 import router from '@adonisjs/core/services/router'
+
 const SessionController = () => import('#controllers/session_controller')
 const OperationsController = () => import('#controllers/operations_controller')
+const PagesController = () => import('#controllers/pages_controller')
+
 router.on('/').renderInertia('home', {}).as('home')
+
 // Explicitly block public registration
 router.any('/signup', ({ response, session }) => {
   session.flash(
@@ -21,17 +24,34 @@ router.any('/signup', ({ response, session }) => {
   )
   return response.redirect('/login')
 })
+
 router
   .group(() => {
     router.get('login', [SessionController, 'create']).as('session.create')
     router.post('login', [SessionController, 'store']).as('session.store')
   })
   .use(middleware.guest())
+
 router
   .group(() => {
+    /* ---------- Read pages (full CRUD workspaces) ---------- */
     router.get('/dashboard', [OperationsController, 'index']).as('dashboard')
+    router.get('/orders', [PagesController, 'ordersPage']).as('pages.orders')
+    router.get('/customers', [PagesController, 'customersPage']).as('pages.customers')
+    router.get('/products', [PagesController, 'productsPage']).as('pages.products')
+    router.get('/seller-accounts', [PagesController, 'accountsPage']).as('pages.accounts')
+    router.get('/shipments', [PagesController, 'shipmentsPage']).as('pages.shipments')
+    router.get('/returns', [PagesController, 'returnsPage']).as('pages.returns')
+    router.get('/claims', [PagesController, 'claimsPage']).as('pages.claims')
+    router.get('/finance', [PagesController, 'financePage']).as('pages.finance')
+    router.get('/tasks', [PagesController, 'tasksPage']).as('pages.tasks')
+    router.get('/admin', [PagesController, 'adminPage']).as('pages.admin')
+    router.get('/audit', [PagesController, 'auditPage']).as('pages.audit')
+    router.get('/import', [PagesController, 'importPage']).as('pages.import')
+
     router.post('/logout', [SessionController, 'destroy']).as('session.destroy')
-    // Orders & Bulk Marketplace Import
+
+    /* ---------- Orders & bulk marketplace import ---------- */
     router.post('/orders', [OperationsController, 'storeOrder']).as('orders.store')
     router
       .post('/orders/bulk-import', [OperationsController, 'importBulkOrders'])
@@ -40,8 +60,10 @@ router
       .post('/orders/:id/status', [OperationsController, 'updateOrderStatus'])
       .as('orders.update_status')
     router.post('/orders/:id/delete', [OperationsController, 'deleteOrder']).as('orders.delete')
-    // Customers, Duplicate Merge & Fraud/Risk Review
+
+    /* ---------- Customers, merge & risk review ---------- */
     router.post('/customers', [OperationsController, 'storeCustomer']).as('customers.store')
+    router.post('/customers/:id', [OperationsController, 'updateCustomer']).as('customers.update')
     router.post('/customers/merge', [OperationsController, 'mergeCustomers']).as('customers.merge')
     router
       .post('/customers/:id/delete', [OperationsController, 'deleteCustomer'])
@@ -49,24 +71,49 @@ router
     router
       .post('/risk-signals/:id/review', [OperationsController, 'reviewRiskSignal'])
       .as('risk_signals.review')
-    // Catalog, Brands, Categories, Products, Variants & Channel Listings
+
+    /* ---------- Catalog: brands, categories, products, variants, listings ---------- */
     router.post('/brands', [OperationsController, 'storeBrand']).as('brands.store')
+    router.post('/brands/:id', [OperationsController, 'updateBrand']).as('brands.update')
+    router.post('/brands/:id/delete', [OperationsController, 'deleteBrand']).as('brands.delete')
     router.post('/categories', [OperationsController, 'storeCategory']).as('categories.store')
+    router.post('/categories/:id', [OperationsController, 'updateCategory']).as('categories.update')
+    router
+      .post('/categories/:id/delete', [OperationsController, 'deleteCategory'])
+      .as('categories.delete')
     router.post('/products', [OperationsController, 'storeProduct']).as('products.store')
+    router.post('/products/:id', [OperationsController, 'updateProduct']).as('products.update')
     router
       .post('/products/:id/delete', [OperationsController, 'deleteProduct'])
       .as('products.delete')
+    router
+      .post('/products/:id/variants', [OperationsController, 'storeVariant'])
+      .as('variants.store')
+    router
+      .post('/variants/:id/delete', [OperationsController, 'deleteVariant'])
+      .as('variants.delete')
     router
       .post('/variants/:id/stock', [OperationsController, 'updateVariantStock'])
       .as('variants.update_stock')
     router
       .post('/channel-listings', [OperationsController, 'storeChannelListing'])
       .as('channel_listings.store')
-    // Marketplace Seller Accounts
+    router
+      .post('/channel-listings/:id/delete', [OperationsController, 'deleteChannelListing'])
+      .as('channel_listings.delete')
+
+    /* ---------- Marketplace seller accounts ---------- */
     router
       .post('/seller-accounts', [OperationsController, 'storeSellerAccount'])
       .as('seller_accounts.store')
-    // Shipments & Carrier Invoices
+    router
+      .post('/seller-accounts/:id', [OperationsController, 'updateSellerAccount'])
+      .as('seller_accounts.update')
+    router
+      .post('/seller-accounts/:id/delete', [OperationsController, 'deleteSellerAccount'])
+      .as('seller_accounts.delete')
+
+    /* ---------- Shipments & carrier invoices ---------- */
     router.post('/shipments', [OperationsController, 'storeShipment']).as('shipments.store')
     router
       .post('/shipments/:id/status', [OperationsController, 'updateShipmentStatus'])
@@ -77,7 +124,8 @@ router
     router
       .post('/shipping-invoices/:id/status', [OperationsController, 'updateInvoiceStatus'])
       .as('shipping_invoices.update_status')
-    // Returns (RMA), Refunds & Marketplace Claims
+
+    /* ---------- Returns (RMA), refunds & claims ---------- */
     router.post('/returns', [OperationsController, 'storeReturnRequest']).as('returns.store')
     router
       .post('/returns/:id/status', [OperationsController, 'updateReturnStatus'])
@@ -87,11 +135,21 @@ router
     router
       .post('/claims/:id/status', [OperationsController, 'updateClaimStatus'])
       .as('claims.update_status')
-    // Financial Accounts, Credit Cards & Multi-Currency Financial Ledger
+
+    /* ---------- Financial accounts, credit cards & ledger ---------- */
     router
       .post('/financial-accounts', [OperationsController, 'storeFinancialAccount'])
       .as('financial_accounts.store')
+    router
+      .post('/financial-accounts/:id', [OperationsController, 'updateFinancialAccount'])
+      .as('financial_accounts.update')
+    router
+      .post('/financial-accounts/:id/delete', [OperationsController, 'deleteFinancialAccount'])
+      .as('financial_accounts.delete')
     router.post('/credit-cards', [OperationsController, 'storeCreditCard']).as('credit_cards.store')
+    router
+      .post('/credit-cards/:id', [OperationsController, 'updateCreditCard'])
+      .as('credit_cards.update')
     router
       .post('/credit-cards/:id/delete', [OperationsController, 'deleteCreditCard'])
       .as('credit_cards.delete')
@@ -101,11 +159,15 @@ router
     router
       .post('/financial-transactions/:id/void', [OperationsController, 'voidFinancialTransaction'])
       .as('financial_transactions.void')
-    // Tasks, Reminders & Saved Views
+
+    /* ---------- Tasks, reminders & saved views ---------- */
     router.post('/tasks', [OperationsController, 'storeTask']).as('tasks.store')
+    router.post('/tasks/:id', [OperationsController, 'updateTask']).as('tasks.update')
     router.post('/tasks/:id/complete', [OperationsController, 'completeTask']).as('tasks.complete')
+    router.post('/tasks/:id/delete', [OperationsController, 'deleteTask']).as('tasks.delete')
     router.post('/saved-views', [OperationsController, 'storeSavedView']).as('saved_views.store')
-    // Super-Admin User Provisioning, RBAC & Module Entitlements
+
+    /* ---------- Super-admin provisioning, RBAC & entitlements ---------- */
     router.post('/admin/users', [OperationsController, 'storeUser']).as('admin.users.store')
     router
       .post('/admin/users/:id/status', [OperationsController, 'toggleUserStatus'])

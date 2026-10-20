@@ -35,7 +35,7 @@ import {
   SellerAccountStatus,
   HealthStatus,
 } from '../../app/enums/index.js'
-import { uuidv7 } from '../../app/utils/uuid.js'
+import { generateEntityId, isEntityId } from '../../app/utils/generate_entity_id.js'
 
 test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (group) => {
   let superAdmin: User
@@ -52,6 +52,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
         slug: 'orders.view',
         resource: 'orders',
         action: 'view',
+        name: 'View orders',
         description: 'View orders',
       }
     )
@@ -61,6 +62,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
         slug: 'orders.delete',
         resource: 'orders',
         action: 'delete',
+        name: 'Delete orders',
         description: 'Delete orders',
       }
     )
@@ -178,11 +180,12 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
     await sellerAccountA.save()
   })
 
-  test('1. UUIDv7 generation & Super-Admin-only user provisioning (blocks non-super-admin)', async ({
+  test('1. ULID entity ids & Super-Admin-only user provisioning (blocks non-super-admin)', async ({
     assert,
   }) => {
-    const id = uuidv7()
-    assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+    const id = generateEntityId('usr')
+    assert.isTrue(isEntityId(id))
+    assert.match(id, /^usr_[0-9A-HJKMNP-TV-Z]{26}$/)
 
     // Password is hashed, never stored in plaintext
     assert.notEqual(merchantA.password, 'MerchantAlpha@2026!')
@@ -717,7 +720,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
     // Attempting to insert a credit card with 16 digits into last_4_digits violates chk_credit_cards_metadata_valid
     await assert.rejects(async () => {
       await db.table('credit_cards').insert({
-        id: uuidv7(),
+        id: generateEntityId('ccard'),
         user_id: merchantA.id,
         card_label: 'Invalid Full PAN Card',
         brand_name: 'Visa',
@@ -737,6 +740,58 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
         created_at: new Date(),
         updated_at: new Date(),
       })
+    })
+  })
+
+  test('11. Audit history captures INSERT/UPDATE/DELETE and audit_logs are append-only', async ({
+    assert,
+  }) => {
+    const customerId = generateEntityId('cust')
+
+    // INSERT is recorded
+    await db.table('customers').insert({
+      id: customerId,
+      user_id: merchantA.id,
+      full_name: 'Audit Trail Customer',
+      email: 'audit.trail@example.com',
+      preferred_currency: 'USD',
+      orders_count: 0,
+      total_spent: 0,
+      is_repeat_customer: false,
+      risk_level: 'low',
+      risk_score: 0,
+      created_at: new Date(),
+      updated_at: new Date(),
+    })
+    let logs = await db.from('audit_logs').where('entity_id', customerId).select('*')
+    assert.isAbove(logs.length, 0)
+    assert.equal(logs[0].action, 'INSERT')
+    assert.equal(logs[0].entity_type, 'customers')
+    assert.equal(logs[0].user_id, merchantA.id)
+    assert.isString(logs[0].checksum)
+    // empty-diff writes produce no log rows
+    const emptyInsertLogCount = logs.length
+
+    // UPDATE is recorded with changed field names
+    await db.from('customers').where('id', customerId).update({ full_name: 'Audit Renamed' })
+    logs = await db.from('audit_logs').where('entity_id', customerId).orderBy('created_at', 'asc')
+    assert.isAbove(logs.length, emptyInsertLogCount)
+    const updateLog = logs.find((l) => l.action === 'UPDATE')
+    assert.isOk(updateLog)
+    assert.deepEqual(updateLog.metadata.changed_fields, ['full_name'])
+
+    // DELETE is recorded
+    await db.from('customers').where('id', customerId).delete()
+    logs = await db.from('audit_logs').where('entity_id', customerId)
+    assert.isTrue(logs.some((l) => l.action === 'DELETE'))
+
+    // Append-only: UPDATE and DELETE on audit_logs are rejected by trigger
+    const anyLog = logs[0]
+    await assert.rejects(async () => {
+      await db.from('audit_logs').where('id', anyLog.id).update({ action: 'TAMPERED' })
+    })
+    await assert.rejects(async () => {
+      await db.from('audit_logs').where('id', anyLog.id).delete()
     })
   })
 })

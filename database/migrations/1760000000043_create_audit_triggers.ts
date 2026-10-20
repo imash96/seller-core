@@ -1,0 +1,17 @@
+import { BaseSchema } from '@adonisjs/lucid/schema'
+
+export default class extends BaseSchema {
+  protected tableName = 'audit_triggers'
+
+  public async up() {
+    this.schema.raw(
+      "\nCREATE OR REPLACE FUNCTION fn_audit_log_capture() RETURNS trigger AS $fn$\nDECLARE\n  v_new jsonb;\n  v_old jsonb;\n  v_changed text[] := '{}';\n  v_k text;\n  v_action text;\n  v_entity_id text;\n  v_user_id text;\n  v_actor text;\n  v_checksum text;\nBEGIN\n  IF TG_OP = 'INSERT' THEN\n    v_new := to_jsonb(NEW); v_old := NULL; v_action := 'INSERT';\n  ELSIF TG_OP = 'UPDATE' THEN\n    v_new := to_jsonb(NEW); v_old := to_jsonb(OLD); v_action := 'UPDATE';\n    FOR v_k IN SELECT jsonb_object_keys(v_new) LOOP\n      IF v_k = ANY(ARRAY['updated_at','created_at']) THEN CONTINUE; END IF;\n      IF v_new->v_k IS DISTINCT FROM v_old->v_k THEN\n        v_changed := v_changed || v_k;\n      END IF;\n    END LOOP;\n    IF COALESCE(array_length(v_changed, 1), 0) = 0 THEN\n      RETURN NULL;\n    END IF;\n  ELSE\n    v_new := NULL; v_old := to_jsonb(OLD); v_action := 'DELETE';\n    v_changed := ARRAY(SELECT jsonb_object_keys(v_old));\n  END IF;\n\n  v_entity_id := COALESCE(v_new->>'id', v_old->>'id');\n  v_user_id := COALESCE(v_new->>'user_id', v_old->>'user_id');\n  v_actor := NULLIF(current_setting('app.actor_user_id', true), '');\n  v_checksum := encode(sha256(convert_to(\n    COALESCE(v_new::text, '') || '|' || COALESCE(v_old::text, '') || '|' || COALESCE(v_changed::text, ''),\n    'UTF8')), 'hex');\n\n  INSERT INTO audit_logs (id, actor_user_id, user_id, action, entity_type, entity_id, before_state, after_state, metadata, checksum, created_at)\n  VALUES (\n    'aud_' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 26)),\n    v_actor, v_user_id, v_action, TG_TABLE_NAME, v_entity_id,\n    v_old, v_new,\n    jsonb_build_object('changed_fields', to_jsonb(v_changed)),\n    v_checksum, now()\n  );\n  RETURN NULL;\nEND $fn$ LANGUAGE plpgsql;\n\nCREATE OR REPLACE FUNCTION fn_audit_log_append_only() RETURNS trigger AS $fn$\nBEGIN\n  RAISE EXCEPTION 'audit_logs is append-only: % is not allowed', TG_OP USING ERRCODE = '42501';\nEND $fn$ LANGUAGE plpgsql;\n\nDROP TRIGGER IF EXISTS trg_audit_logs_append_only ON audit_logs;\nCREATE TRIGGER trg_audit_logs_append_only BEFORE UPDATE OR DELETE ON audit_logs\n  FOR EACH ROW EXECUTE FUNCTION fn_audit_log_append_only();\n\nDO $$\nDECLARE t record;\nBEGIN\n  FOR t IN SELECT tablename FROM pg_tables\n    WHERE schemaname = 'public' AND tablename <> 'audit_logs' AND tablename NOT LIKE 'adonis%'\n  LOOP\n    EXECUTE format('DROP TRIGGER IF EXISTS trg_audit_capture ON %I', t.tablename);\n    EXECUTE format('CREATE TRIGGER trg_audit_capture AFTER INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture()', t.tablename);\n  END LOOP;\nEND $$;\n\nCREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs (entity_type, entity_id);\nCREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs (user_id, created_at);\n"
+    )
+  }
+
+  public async down() {
+    this.schema.raw(
+      "DROP TRIGGER IF EXISTS trg_audit_logs_append_only ON audit_logs;\nDO $$ DECLARE t record; BEGIN\n  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'audit_logs' AND tablename NOT LIKE 'adonis%' LOOP\n    EXECUTE format('DROP TRIGGER IF EXISTS trg_audit_capture ON %I', t.tablename);\n  END LOOP;\nEND $$;\nDROP FUNCTION IF EXISTS fn_audit_log_capture();\nDROP FUNCTION IF EXISTS fn_audit_log_append_only();"
+    )
+  }
+}

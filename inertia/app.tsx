@@ -4,8 +4,10 @@ import { createRoot } from 'react-dom/client'
 import { TuyauProvider } from '@adonisjs/inertia/react'
 import { resolvePageComponent } from '@adonisjs/inertia/helpers'
 import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react'
+import { Theme } from '@astryxdesign/core'
+import { themes, defaultThemeSlug } from './astryx_themes'
 
-const appName = import.meta.env.VITE_APP_NAME || 'AdonisJS'
+const appName = import.meta.env.VITE_APP_NAME || 'Seller Core'
 
 createInertiaApp({
   title: (title) => (title ? `${title} - ${appName}` : appName),
@@ -19,11 +21,13 @@ createInertiaApp({
   setup({ el, App, props }) {
     createRoot(el).render(
       <TuyauProvider client={client}>
-        <App {...props} />
+        <Theme theme={themes[defaultThemeSlug]}>
+          <App {...props} />
+        </Theme>
       </TuyauProvider>
     )
   },
   progress: {
-    color: '#4B5563',
+    color: '#0866ff',
   },
 })

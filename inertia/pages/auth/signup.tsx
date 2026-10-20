@@ -1,28 +1,42 @@
 import { Link } from '@adonisjs/inertia/react'
-import { ShieldAlert } from 'lucide-react'
+import { Stack } from '@astryxdesign/core/Stack'
+import { Text } from '@astryxdesign/core/Text'
+import { Card } from '@astryxdesign/core/Card'
+import { Button } from '@astryxdesign/core/Button'
+import { Badge } from '@astryxdesign/core/Badge'
+import { Theme } from '@astryxdesign/core'
+import { themes, defaultThemeSlug } from '~/astryx_themes'
 
 export default function SignupDisabled() {
   return (
-    <div className="max-w-md mx-auto px-6 py-16">
-      <div className="bg-[var(--card)] border border-[var(--line-2)] rounded-2xl p-8 space-y-4">
-        <div className="flex items-center gap-2 text-red-600 font-semibold text-sm">
-          <ShieldAlert size={18} />
-          <span>Public Registration Disabled</span>
-        </div>
-        <h1 className="text-xl font-bold text-[var(--ink)]">
-          Super Administrator Provisioning Required
-        </h1>
-        <p className="text-xs text-[var(--muted)] leading-relaxed">
-          Self-service registration is prohibited. Only authenticated System Super Administrators
-          can create user accounts and assign RBAC roles or module entitlements.
-        </p>
-        <Link
-          route="session.create"
-          className="inline-flex items-center justify-center h-9 px-4 rounded-lg bg-[#0866FF] text-white text-xs font-semibold"
-        >
-          Return to Sign In
-        </Link>
+    <Theme theme={themes[defaultThemeSlug]}>
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--astryx-color-background-wash, #f0f2f5)',
+          padding: 24,
+        }}
+      >
+        <Card padding={6} width={440}>
+          <Stack gap={4}>
+            <Badge variant="error" label="Registration disabled" />
+            <Text type="display-2" as="h1" weight="bold">
+              Public sign-up is disabled
+            </Text>
+            <Text type="body" as="p">
+              For security, Seller Core has no public registration. User accounts can only be
+              provisioned by a system super administrator. If you need access, contact your
+              administrator.
+            </Text>
+            <Link href="/login">
+              <Button label="Go to sign in" variant="primary" />
+            </Link>
+          </Stack>
+        </Card>
       </div>
-    </div>
+    </Theme>
   )
 }

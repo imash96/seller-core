@@ -6,7 +6,7 @@ import UserSession from '#models/user_session'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import { PermissionEffect, UserStatus } from '../enums/index.js'
-import { uuidv7 } from '../utils/uuid.js'
+import { generateEntityId } from '../utils/generate_entity_id.js'
 
 export interface EffectivePermissionsResult {
   isSuperAdmin: boolean
@@ -147,7 +147,6 @@ export class RbacService {
     return await db.transaction(async (trx) => {
       const newUser = new User()
       newUser.useTransaction(trx)
-      newUser.id = uuidv7()
       newUser.email = input.email.trim().toLowerCase()
       newUser.fullName = input.fullName.trim()
       newUser.password = input.password
@@ -164,7 +163,7 @@ export class RbacService {
         const roles = await Role.query({ client: trx }).whereIn('slug', input.roleSlugs)
         for (const role of roles) {
           await trx.table('user_roles').insert({
-            id: uuidv7(),
+            id: generateEntityId('urol'),
             user_id: newUser.id,
             role_id: role.id,
             assigned_by_user_id: actor.id,
@@ -188,7 +187,7 @@ export class RbacService {
 
       for (const moduleKey of modulesToEnable) {
         await trx.table('module_entitlements').insert({
-          id: uuidv7(),
+          id: generateEntityId('ment'),
           user_id: newUser.id,
           module_key: moduleKey,
           is_enabled: true,

@@ -14,7 +14,13 @@ const dbConfig = defineConfig({
      */
     pg: {
       client: 'pg',
-      connection: env.get('DATABASE_URL'),
+      /**
+       * In the test environment, swap the database name to `seller_core_test`
+       * so the suite never migrates/rolls back the dev database.
+       */
+      connection: app.inTest
+        ? env.get('DATABASE_URL').replace(/\/[^/?]+(\?.*)?$/, '/seller_core_test$1')
+        : env.get('DATABASE_URL'),
       migrations: {
         naturalSort: true,
         paths: ['database/migrations'],
