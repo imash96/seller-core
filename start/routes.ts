@@ -167,8 +167,16 @@ router
     router.post('/tasks/:id/delete', [OperationsController, 'deleteTask']).as('tasks.delete')
     router.post('/saved-views', [OperationsController, 'storeSavedView']).as('saved_views.store')
 
+    /* ---------- Saved view delete ---------- */
+    router
+      .post('/saved-views/:id/delete', [OperationsController, 'deleteSavedView'])
+      .as('saved_views.delete')
+
     /* ---------- Super-admin provisioning, RBAC & entitlements ---------- */
     router.post('/admin/users', [OperationsController, 'storeUser']).as('admin.users.store')
+    router
+      .post('/admin/users/:id/delete', [OperationsController, 'deleteUser'])
+      .as('admin.users.delete')
     router
       .post('/admin/users/:id/status', [OperationsController, 'toggleUserStatus'])
       .as('admin.users.toggle_status')

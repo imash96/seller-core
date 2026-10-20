@@ -3,6 +3,8 @@
   "compilerOptions": {
     "module": "ESNext",
     "jsx": "react-jsx",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "paths": {
       "~/*": ["./*"],
       "@generated/*": ["../.adonisjs/client/*"]

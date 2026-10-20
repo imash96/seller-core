@@ -78,8 +78,18 @@ export default class SessionController {
           existingUser.lockedUntil = DateTime.now().plus({ minutes: 30 })
         }
         await existingUser.save()
+        const remaining = Math.max(0, 5 - existingUser.failedLoginAttempts)
+        session.flash(
+          'error',
+          `Invalid email or password. ${remaining} attempts remaining before temporary lockout.`
+        )
+        return response.redirect().back()
       }
-      throw error
+      session.flash(
+        'error',
+        'Invalid email or password. Please check your credentials and try again.'
+      )
+      return response.redirect().back()
     }
   }
 

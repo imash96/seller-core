@@ -517,14 +517,29 @@ export default class OperationsController {
     const payload = await request.validateUsing(createProductValidator)
 
     try {
+      // Coerce string inputs from SmartForm (hasVariants is "true"/"false" string, variationDimensions is "size,color")
+      const rawHasVariants = (payload as any).hasVariants
+      const hasVariants =
+        typeof rawHasVariants === 'string' ? rawHasVariants === 'true' : Boolean(rawHasVariants)
+      const rawVD = (payload as any).variationDimensions
+      const variationDimensions: string[] =
+        typeof rawVD === 'string'
+          ? rawVD
+              .split(',')
+              .map((s: string) => s.trim())
+              .filter(Boolean)
+          : Array.isArray(rawVD)
+            ? rawVD
+            : []
       const product = await CatalogService.createProduct({
         userId: user.id,
         brandId: payload.brandId ?? null,
         categoryId: payload.categoryId ?? null,
         title: payload.title,
         description: payload.description ?? null,
-        hasVariants: Boolean(payload.hasVariants),
-        variationDimensions: payload.variationDimensions ?? [],
+        skuPrefix: (payload as any).skuPrefix ?? payload.sku,
+        hasVariants,
+        variationDimensions,
         variants: [
           {
             sku: payload.sku,
@@ -820,6 +835,9 @@ export default class OperationsController {
     const payload = await request.validateUsing(createUserValidator)
 
     try {
+      const roleSlugs =
+        (payload as any).roleSlugs ??
+        ((payload as any).roleSlug ? [(payload as any).roleSlug] : ['operations_manager'])
       const created = await RbacService.createUserBySuperAdmin(
         actor,
         {
@@ -830,7 +848,7 @@ export default class OperationsController {
           defaultCurrency: payload.defaultCurrency || 'USD',
           timezone: payload.timezone || 'UTC',
           isSuperAdmin: payload.isSuperAdmin ?? false,
-          roleSlugs: payload.roleSlugs ?? ['operations_manager'],
+          roleSlugs,
           enabledModules: payload.enabledModules,
         },
         {
@@ -887,6 +905,68 @@ export default class OperationsController {
     } catch (err: any) {
       session.flash('error', err.message)
     }
+    return response.redirect().back()
+  }
+
+  async deleteUser({ auth, params, response, session }: HttpContext) {
+    const actor = auth.getUserOrFail()
+    if (!actor.isSuperAdmin) {
+      session.flash('error', 'Forbidden: Only Super Administrators can delete users.')
+      return response.redirect().back()
+    }
+    if (params.id === actor.id) {
+      session.flash('error', 'You cannot delete your own account. Deactivate it instead.')
+      return response.redirect().back()
+    }
+    const target = await User.findOrFail(params.id)
+    // Check if target owns data — if so, suspend instead of hard delete
+    const [orderCount, txCount] = await Promise.all([
+      Order.query().where('userId', target.id).count('* as total'),
+      FinancialTransaction.query().where('userId', target.id).count('* as total'),
+    ])
+    const hasOrders = Number((orderCount[0] as any).$extras.total) > 0
+    const hasTx = Number((txCount[0] as any).$extras.total) > 0
+    if (hasOrders || hasTx) {
+      target.status = UserStatus.SUSPENDED
+      await target.save()
+      await RbacService.recordAudit({
+        actorUserId: actor.id,
+        userId: target.id,
+        action: 'user.suspended_instead_of_delete',
+        entityType: 'users',
+        entityId: target.id,
+        requestId: response as any,
+        beforeState: { hasOrders, hasTx },
+        afterState: { status: UserStatus.SUSPENDED },
+      })
+      session.flash(
+        'success',
+        `User "${target.email}" owns orders/transactions and was suspended instead of deleted to preserve data integrity.`
+      )
+      return response.redirect().back()
+    }
+    await target.delete()
+    await RbacService.recordAudit({
+      actorUserId: actor.id,
+      userId: target.id,
+      action: 'user.deleted',
+      entityType: 'users',
+      entityId: params.id,
+      requestId: response as any,
+      beforeState: { email: target.email },
+    })
+    session.flash('success', `User "${target.email}" deleted.`)
+    return response.redirect().back()
+  }
+
+  async deleteSavedView({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const view = await SavedView.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+    await view.delete()
+    session.flash('success', `Saved view "${view.name}" removed.`)
     return response.redirect().back()
   }
 
@@ -1146,7 +1226,7 @@ export default class OperationsController {
       .andWhere('id', params.id)
       .firstOrFail()
 
-    const status = String(request.input('status', 'paid'))
+    const status = String(request.input('paymentStatus') ?? request.input('status') ?? 'paid')
     const reconciliationStatus = String(request.input('reconciliationStatus', 'resolved'))
     invoice.paymentStatus = status
     invoice.reconciliationStatus = reconciliationStatus
@@ -1196,19 +1276,25 @@ export default class OperationsController {
     const claimNumber = String(request.input('claimNumber', `CLM-${Date.now()}`)).trim()
     const claimType = String(request.input('claimType', 'a_to_z_guarantee'))
     const disputedAmount = Number(request.input('disputedAmount', order.totalAmount || 50))
+    const sellerLiabilityAmount = Number(request.input('sellerLiabilityAmount', 0))
+    const sellerAccountId =
+      String(request.input('sellerAccountId', '')).trim() || order.sellerAccountId
+    const respondByAt = request.input('respondByAt')
+    const status = String(request.input('status', 'under_review'))
 
     const claim = await MarketplaceClaim.create({
       userId: user.id,
       orderId: order.id,
-      sellerAccountId: order.sellerAccountId,
+      sellerAccountId: sellerAccountId || null,
       claimNumber,
       externalClaimId: request.input('externalClaimId') || claimNumber,
       claimType,
-      status: 'under_review',
+      status,
       currencyCode: order.currencyCode,
       disputedAmount: disputedAmount.toFixed(2),
-      sellerLiabilityAmount: '0.00',
+      sellerLiabilityAmount: sellerLiabilityAmount.toFixed(2),
       reason: request.input('reason') || 'Customer marketplace claim opened',
+      respondByAt: respondByAt ? DateTime.fromISO(String(respondByAt)) : null,
     })
 
     session.flash('success', `Marketplace Claim ${claim.claimNumber} logged.`)
@@ -1224,6 +1310,14 @@ export default class OperationsController {
 
     const status = String(request.input('status', 'won'))
     claim.status = status
+    const liability = request.input('sellerLiabilityAmount')
+    if (liability !== undefined && liability !== null && liability !== '') {
+      claim.sellerLiabilityAmount = Number(liability).toFixed(2)
+    }
+    const notes = request.input('resolutionNotes') ?? request.input('reason')
+    if (notes) claim.reason = String(notes)
+    const respondByAt = request.input('respondByAt')
+    if (respondByAt) claim.respondByAt = DateTime.fromISO(String(respondByAt))
     if (['won', 'lost', 'closed'].includes(status)) {
       claim.resolvedAt = DateTime.now()
     }

@@ -1,10 +1,9 @@
 import { Stack } from '@astryxdesign/core/Stack'
+import { Text } from '@astryxdesign/core/Text'
 import AppLayout from '~/layouts/app'
-import { PageSection, DataTable, col, type Row } from '~/lib/ui'
+import { PageSection, ResponsiveDataView, col, type Row, short, displayValue } from '~/lib/ui'
 
-type Props = {
-  auditLogs: Row[]
-}
+type Props = { auditLogs: Row[] }
 
 Audit.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
 
@@ -15,9 +14,34 @@ export default function Audit({ auditLogs }: Props) {
         title="Audit history"
         description="Append-only, tamper-evident trail: every INSERT/UPDATE/DELETE on business tables is captured with SHA-256 checksums. Updates and deletes on this table are rejected by trigger."
       >
-        <DataTable
+        <ResponsiveDataView
           rows={auditLogs}
-          empty="No audit events recorded."
+          searchKeys={['action', 'entityType', 'entityId']}
+          filterKey="action"
+          filterPills={[
+            { value: 'all', label: 'All' },
+            { value: 'INSERT', label: 'INSERT' },
+            { value: 'UPDATE', label: 'UPDATE' },
+            { value: 'DELETE', label: 'DELETE' },
+          ]}
+          toCard={(row) => {
+            const actor = displayValue(row.actor)
+            const owner = displayValue(row.user)
+            return {
+              title: String(row.action),
+              idBadge: short(row.entityId),
+              statusBadge: { label: String(row.entityType), variant: 'neutral' },
+              metrics: [
+                { label: 'Owner', value: owner },
+                { label: 'Actor', value: actor },
+                { label: 'Checksum', value: String(row.checksum ?? '—').slice(0, 12) + '…' },
+                {
+                  label: 'When',
+                  value: row.createdAt ? new Date(String(row.createdAt)).toLocaleString() : '—',
+                },
+              ],
+            }
+          }}
           columns={[
             col.badge('action', 'Action', {
               'INSERT': 'success',
@@ -27,9 +51,10 @@ export default function Audit({ auditLogs }: Props) {
               'rbac.role_revoked': 'warning',
               'customer.risk_level_changed': 'warning',
             }),
-            col.text('entityType', 'Entity type', 150),
+            col.text('entityType', 'Entity type', 130),
             col.id('entityId', 'Entity ID'),
             col.text('user', 'Owner', 140),
+            col.text('actor', 'Actor', 140),
             col.text('checksum', 'Checksum', 130),
             col.date('createdAt', 'When'),
             col.action('Changed fields', (row) => {
