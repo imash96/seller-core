@@ -71,7 +71,10 @@ export default function MarketingLayout({ children }: { children: ReactElement }
             </Link>
 
             <Stack direction="horizontal" gap={2} align="center">
-              <a href="#platform" style={{ textDecoration: 'none', color: 'inherit', fontSize: 14 }}>
+              <a
+                href="#platform"
+                style={{ textDecoration: 'none', color: 'inherit', fontSize: 14 }}
+              >
                 Platform
               </a>
               <a

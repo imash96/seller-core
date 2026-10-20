@@ -4,7 +4,15 @@ import { Card } from '@astryxdesign/core/Card'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Divider } from '@astryxdesign/core/Divider'
 import AppLayout from '~/layouts/app'
-import { PageHeader, StatStrip, ResponsiveDataView, col, type Row, short, displayValue } from '~/lib/ui'
+import {
+  PageHeader,
+  StatStrip,
+  ResponsiveDataView,
+  col,
+  type Row,
+  short,
+  displayValue,
+} from '~/lib/ui'
 import { ShieldCheck, Lock } from 'lucide-react'
 
 type Props = { auditLogs: Row[] }
@@ -96,9 +104,9 @@ export default function Audit({ auditLogs }: Props) {
             }}
             columns={[
               col.badge('action', 'Action', {
-                INSERT: 'success',
-                UPDATE: 'info',
-                DELETE: 'error',
+                'INSERT': 'success',
+                'UPDATE': 'info',
+                'DELETE': 'error',
                 'rbac.role_assigned': 'info',
                 'rbac.role_revoked': 'warning',
                 'customer.risk_level_changed': 'warning',

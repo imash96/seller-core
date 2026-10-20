@@ -21,10 +21,8 @@ export function useFlashToasts() {
   useEffect(() => {
     if (!flash) return
     // Support both shapes: InertiaMiddleware.flash() object and legacy singletons
-    const success: string | undefined =
-      (flash as any).success ?? (flash as any).data?.success
-    const error: string | undefined =
-      (flash as any).error ?? (flash as any).data?.error
+    const success: string | undefined = (flash as any).success ?? (flash as any).data?.success
+    const error: string | undefined = (flash as any).error ?? (flash as any).data?.error
     const info: string | undefined = (flash as any).info ?? (flash as any).data?.info
     const warning: string | undefined = (flash as any).warning ?? (flash as any).data?.warning
 

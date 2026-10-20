@@ -31,6 +31,7 @@ export default defineConfig({
     () => import('@adonisjs/session/commands'),
     () => import('@adonisjs/inertia/commands'),
     () => import('@adonisjs/bouncer/commands'),
+    () => import('@adonisjs/queue/commands'),
   ],
 
   /*
@@ -60,6 +61,7 @@ export default defineConfig({
     () => import('@adonisjs/inertia/inertia_provider'),
     () => import('@adonisjs/auth/auth_provider'),
     () => import('@adonisjs/bouncer/bouncer_provider'),
+    () => import('@adonisjs/queue/queue_provider'),
     () => import('#providers/api_provider'),
   ],
 
@@ -75,6 +77,7 @@ export default defineConfig({
     () => import('#start/routes'),
     () => import('#start/kernel'),
     () => import('#start/validator'),
+    () => import('#start/events'),
   ],
 
   /*

@@ -32,7 +32,11 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
         eyebrow={<Badge variant="info" label="Super admin only" />}
         actions={
           <>
-            <Button label="Provision user" variant="primary" onClick={() => setProvisionOpen(true)} />
+            <Button
+              label="Provision user"
+              variant="primary"
+              onClick={() => setProvisionOpen(true)}
+            />
             <Button
               label="Assign / revoke role"
               variant="secondary"
@@ -83,7 +87,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
             </Stack>
             <Text type="supporting" as="p">
               Public signup is disabled. Super admins call <Text type="code">storeUser</Text> after
-              <Text type="code">bouncer.authorize('manageUsers')</Text>.
+              <Text type="code">bouncer.authorize(&apos;manageUsers&apos;)</Text>.
             </Text>
           </Stack>
         </Card>
@@ -378,7 +382,9 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
               title: String(row.moduleKey),
               statusBadge: {
                 label:
-                  String(row.isEnabled) === 'true' || row.isEnabled === true ? 'Enabled' : 'Disabled',
+                  String(row.isEnabled) === 'true' || row.isEnabled === true
+                    ? 'Enabled'
+                    : 'Disabled',
                 variant:
                   String(row.isEnabled) === 'true' || row.isEnabled === true ? 'success' : 'error',
               },
@@ -386,7 +392,9 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
               actions: (
                 <Button
                   label={
-                    String(row.isEnabled) === 'true' || row.isEnabled === true ? 'Disable' : 'Enable'
+                    String(row.isEnabled) === 'true' || row.isEnabled === true
+                      ? 'Disable'
+                      : 'Enable'
                   }
                   variant="secondary"
                   size="sm"

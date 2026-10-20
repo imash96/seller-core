@@ -59,7 +59,10 @@ const PILLARS = [
   { icon: <Database size={16} />, label: '40 migrations · 40 Lucid models · 44 enums' },
   { icon: <Lock size={16} />, label: 'AES-256-GCM keyring · Scrypt passwords · 5-attempt lockout' },
   { icon: <FileCheck size={16} />, label: 'Append-only audit logs · SHA-256 checksummed' },
-  { icon: <BellRing size={16} />, label: 'Sonner toasts for every action · Bouncer checks on every route' },
+  {
+    icon: <BellRing size={16} />,
+    label: 'Sonner toasts for every action · Bouncer checks on every route',
+  },
 ]
 
 Home.layout = (page: React.ReactElement) => <MarketingLayout>{page}</MarketingLayout>
@@ -73,10 +76,7 @@ export default function Home() {
           <Grid columns={{ minWidth: 380, max: 2 }} gap={6}>
             <Stack gap={4}>
               <Stack direction="horizontal" gap={2} align="center" wrap="wrap">
-                <Badge
-                  variant="info"
-                  label="Multi-user e-commerce operations platform"
-                />
+                <Badge variant="info" label="Multi-user e-commerce operations platform" />
                 <Badge variant="success" label="Sonner · Bouncer ready" />
               </Stack>
               <Text
@@ -301,7 +301,10 @@ export default function Home() {
                 { k: '40', v: 'UUIDv7 migrations with PostgreSQL enums & constraints' },
                 { k: '40', v: 'Lucid models with AES-256-GCM encryption' },
                 { k: '44', v: 'TypeScript enums for every domain status' },
-                { k: '∞', v: 'Every mutation flashes a Sonner toast; every sensitive route checks bouncer' },
+                {
+                  k: '∞',
+                  v: 'Every mutation flashes a Sonner toast; every sensitive route checks bouncer',
+                },
               ].map((item) => (
                 <Stack key={item.v} gap={1}>
                   <Text type="display-1" as="div" weight="bold">

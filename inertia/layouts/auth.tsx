@@ -55,12 +55,18 @@ export default function AuthLayout({ title, children }: { title: string; childre
           </Link>
 
           <Stack gap={3}>
-            <Text type="display-1" as="h1" weight="bold" style={{ color: 'white', lineHeight: 1.08 }}>
+            <Text
+              type="display-1"
+              as="h1"
+              weight="bold"
+              style={{ color: 'white', lineHeight: 1.08 }}
+            >
               Secure operations start here.
             </Text>
             <Text type="large" as="p" style={{ color: 'rgba(255,255,255,0.78)', maxWidth: 520 }}>
               Multi-marketplace P&L, fulfillment, finance and team governance — protected by
-              enterprise-grade security and deny-overrides-allow RBAC. Managed via @adonisjs/bouncer.
+              enterprise-grade security and deny-overrides-allow RBAC. Managed via
+              @adonisjs/bouncer.
             </Text>
           </Stack>
 

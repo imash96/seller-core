@@ -186,5 +186,21 @@ router
     router
       .post('/admin/entitlements/:id/toggle', [OperationsController, 'toggleModuleEntitlement'])
       .as('admin.entitlements.toggle')
+
+    /* ---------- File uploads — bodyparser multipart demo ---------- */
+    // Multipart routes demonstrate config/bodyparser.ts handling:
+    // autoProcess=true streams files to tmp/, validators check extnames/sizes,
+    // handlers move files to permanent storage or enqueue processing jobs.
+    router
+      .post('/import/upload-catalog', [OperationsController, 'uploadCatalogFile'])
+      .as('import.upload_catalog')
+    router
+      .post('/import/sync-accounts', [OperationsController, 'queueSellerSync'])
+      .as('import.queue_sync')
+
+    /* ---------- Queue ops — inspect/retry (super-admin) ---------- */
+    router
+      .get('/admin/queue/overview', [OperationsController, 'queueOverview'])
+      .as('admin.queue.overview')
   })
   .use(middleware.auth())

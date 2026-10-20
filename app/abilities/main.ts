@@ -94,30 +94,22 @@ export const bulkImport = Bouncer.ability(async (user: User) => {
  * Ownership check — resource bel belongs to the actor. Call with the resource
  * record that carries `userId`. SuperAdmin bypasses ownership.
  */
-export const ownsOrder = Bouncer.ability(
-  (user: User, order: { userId: string }) => {
-    if (user.isSuperAdmin) return true
-    return order.userId === user.id
-  }
-)
+export const ownsOrder = Bouncer.ability((user: User, order: { userId: string }) => {
+  if (user.isSuperAdmin) return true
+  return order.userId === user.id
+})
 
-export const ownsProduct = Bouncer.ability(
-  (user: User, product: { userId: string }) => {
-    if (user.isSuperAdmin) return true
-    return product.userId === user.id
-  }
-)
+export const ownsProduct = Bouncer.ability((user: User, product: { userId: string }) => {
+  if (user.isSuperAdmin) return true
+  return product.userId === user.id
+})
 
-export const ownsShipment = Bouncer.ability(
-  (user: User, shipment: { userId: string }) => {
-    if (user.isSuperAdmin) return true
-    return shipment.userId === user.id
-  }
-)
+export const ownsShipment = Bouncer.ability((user: User, shipment: { userId: string }) => {
+  if (user.isSuperAdmin) return true
+  return shipment.userId === user.id
+})
 
-export const ownsFinancialAccount = Bouncer.ability(
-  (user: User, account: { userId: string }) => {
-    if (user.isSuperAdmin) return true
-    return account.userId === user.id
-  }
-)
+export const ownsFinancialAccount = Bouncer.ability((user: User, account: { userId: string }) => {
+  if (user.isSuperAdmin) return true
+  return account.userId === user.id
+})

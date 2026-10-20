@@ -1,40 +1,36 @@
 import { defineConfig } from '@adonisjs/core/bodyparser'
 
+/**
+ * BodyParser — how every HTTP request body is interpreted.
+ *
+ * Mounted as `@adonisjs/core/bodyparser_middleware` in the router stack
+ * (start/kernel.ts). The middleware inspects Content-Type and delegates
+ * to the matching parser below.
+ *
+ * Security-relevant choices:
+ *  - JSON / form / multipart each have explicit `types` allowlists so
+ *    unknown content types are rejected before reaching controllers.
+ *  - `convertEmptyStringsToNull` normalizes "" → null so validators can
+ *    use `optional().nullable()` consistently and the DB never stores
+ *    ambiguous empty strings.
+ *  - Multipart `limit` caps uploads (product images, bulk CSV) and
+ *    `autoProcess` moves files to tmpDir for safe streaming validation.
+ */
 const bodyParserConfig = defineConfig({
   /**
-   * Parse request bodies for these HTTP methods.
-   * Keep this aligned with methods that receive payloads in your routes.
+   * Only these HTTP methods are examined for a body. GET/HEAD/OPTIONS
+   * never carry one, so skipping them avoids false positives.
    */
   allowedMethods: ['POST', 'PUT', 'PATCH', 'DELETE'],
 
   /**
-   * Config for the "application/x-www-form-urlencoded"
-   * content-type parser.
-   */
-  form: {
-    /**
-     * Normalize empty string values to null.
-     */
-    convertEmptyStringsToNull: true,
-
-    /**
-     * Content types handled by the form parser.
-     */
-    types: ['application/x-www-form-urlencoded'],
-  },
-
-  /**
-   * Config for the JSON parser.
+   * JSON — primary API and Inertia form payloads.
+   * The `csp-report` type is needed for `reportOnly` CSP violations.
    */
   json: {
-    /**
-     * Normalize empty string values to null.
-     */
     convertEmptyStringsToNull: true,
-
-    /**
-     * Content types handled by the JSON parser.
-     */
+    limit: '1mb',
+    strict: true,
     types: [
       'application/json',
       'application/json-patch+json',
@@ -44,33 +40,29 @@ const bodyParserConfig = defineConfig({
   },
 
   /**
-   * Config for the "multipart/form-data" content-type parser.
-   * File uploads are handled by the multipart parser.
+   * URL-encoded — classic HTML forms.
+   */
+  form: {
+    convertEmptyStringsToNull: true,
+    limit: '1mb',
+    types: ['application/x-www-form-urlencoded'],
+  },
+
+  /**
+   * Multipart — file uploads.
+   *
+   * Files are auto-processed into `tmp/` (see config/app.ts tmpDir).
+   * Controllers receive them via `request.file('field')` and must
+   * validate with vine before moving to permanent storage.
+   *
+   * Increase `limit` per-field via `request.file('avatar', { size: '2mb' })`
+   * rather than raising the global cap.
    */
   multipart: {
-    /**
-     * Automatically process uploaded files into the system tmp directory.
-     */
     autoProcess: true,
-
-    /**
-     * Normalize empty string values to null.
-     */
     convertEmptyStringsToNull: true,
-
-    /**
-     * Routes where multipart processing is handled manually.
-     */
     processManually: [],
-
-    /**
-     * Maximum accepted payload size for multipart requests.
-     */
     limit: '20mb',
-
-    /**
-     * Content types handled by the multipart parser.
-     */
     types: ['multipart/form-data'],
   },
 })

@@ -277,7 +277,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                   .filter((item) => (item.adminOnly ? !!user?.isSuperAdmin : true))
                   .map((item) => {
                     const isActive =
-                      path === item.href || (item.href !== '/dashboard' && path.startsWith(item.href))
+                      path === item.href ||
+                      (item.href !== '/dashboard' && path.startsWith(item.href))
                     return (
                       <SideNavItem
                         key={item.href}
