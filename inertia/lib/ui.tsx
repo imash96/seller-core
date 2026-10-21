@@ -8,16 +8,19 @@ import { Form } from '@adonisjs/inertia/react'
 import { Stack, StackItem } from '@astryxdesign/core/Stack'
 import { Heading } from '@astryxdesign/core/Heading'
 import { Text } from '@astryxdesign/core/Text'
-import { Heading } from '@astryxdesign/core/Heading'
 import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
 import { Badge } from '@astryxdesign/core/Badge'
+import { Grid } from '@astryxdesign/core/Grid'
 import { Table, proportional, pixel } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { TextArea } from '@astryxdesign/core/TextArea'
 import { Selector } from '@astryxdesign/core/Selector'
 import { Divider } from '@astryxdesign/core/Divider'
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
+import { EmptyState } from '@astryxdesign/core/EmptyState'
+import { Package, Search, X, Filter, LayoutGrid, Table2, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatMoney, formatDate, shortId } from '~/lib/utils'
 
 /* ------------------------------------------------------------------ */
@@ -354,7 +357,7 @@ export function SmartForm({
                 />
               )
             })}
-          </Stack>
+          </Grid>
           <Stack direction="horizontal">
             <Button
               label={submitLabel}
@@ -365,9 +368,8 @@ export function SmartForm({
             />
           </Stack>
         </Stack>
-  )
-}
-    </Form >
+      )}
+    </Form>
   )
 }
 

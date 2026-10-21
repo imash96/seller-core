@@ -17,6 +17,7 @@ public/assets
 # Build tools specific
 npm-debug.log
 yarn-error.log
+inertia-old
 
 # Editors specific
 .fleet
