@@ -1,28 +1,15 @@
-/*
-|--------------------------------------------------------------------------
-| Bouncer abilities — thin wrappers over RbacService + isSuperAdmin
-|--------------------------------------------------------------------------
-| Every ability receives the authenticated user as its first argument.
-| `user` is never null here because abilities are only evaluated inside
-| `auth` middleware groups. Return `true` to allow, `false` to deny.
-| For richer denials (status/message) wrap with AuthorizationResponse.
-*/
-
 import { Bouncer } from '@adonisjs/bouncer'
 import type User from '#models/user'
 import { RbacService } from '#services/rbac_service'
 
-/** Super-admin bypass — used by most abilities via composition. */
 export const isSuperAdmin = Bouncer.ability((user: User) => {
   return user.isSuperAdmin === true
 })
 
-/** Any authenticated user may view the dashboard. */
 export const viewDashboard = Bouncer.ability((user: User) => {
   return !!user
 })
 
-/** User & RBAC provisioning — super-admin only. */
 export const manageUsers = Bouncer.ability((user: User) => {
   return user.isSuperAdmin === true
 })
@@ -39,10 +26,13 @@ export const viewAudit = Bouncer.ability((user: User) => {
   return !!user
 })
 
-/** Permission-gated abilities — superAdmin or explicit RBAC permission. */
 export const manageOrders = Bouncer.ability(async (user: User) => {
   if (user.isSuperAdmin) return true
-  return RbacService.hasPermission(user, 'orders.create', 'orders')
+  const [canCreate, canUpdate] = await Promise.all([
+    RbacService.hasPermission(user, 'orders.create', 'orders'),
+    RbacService.hasPermission(user, 'orders.update', 'orders'),
+  ])
+  return canCreate || canUpdate
 })
 
 export const deleteOrders = Bouncer.ability(async (user: User) => {
@@ -52,48 +42,68 @@ export const deleteOrders = Bouncer.ability(async (user: User) => {
 
 export const manageCustomers = Bouncer.ability(async (user: User) => {
   if (user.isSuperAdmin) return true
-  return RbacService.hasPermission(user, 'customers.manage', 'customers')
+  const [canCreate, canUpdate] = await Promise.all([
+    RbacService.hasPermission(user, 'customers.create', 'customers'),
+    RbacService.hasPermission(user, 'customers.update', 'customers'),
+  ])
+  return canCreate || canUpdate
 })
 
 export const manageCatalog = Bouncer.ability(async (user: User) => {
   if (user.isSuperAdmin) return true
-  return RbacService.hasPermission(user, 'catalog.manage', 'products')
+  const [canCreate, canUpdate] = await Promise.all([
+    RbacService.hasPermission(user, 'catalog.create', 'catalog'),
+    RbacService.hasPermission(user, 'catalog.update', 'catalog'),
+  ])
+  return canCreate || canUpdate
 })
 
 export const manageSellerAccounts = Bouncer.ability(async (user: User) => {
   if (user.isSuperAdmin) return true
-  return RbacService.hasPermission(user, 'seller_accounts.manage', 'seller-accounts')
+  const [canCreate, canUpdate] = await Promise.all([
+    RbacService.hasPermission(user, 'integrations.create', 'integrations'),
+    RbacService.hasPermission(user, 'integrations.update', 'integrations'),
+  ])
+  return canCreate || canUpdate
 })
 
 export const manageShipments = Bouncer.ability(async (user: User) => {
   if (user.isSuperAdmin) return true
-  return RbacService.hasPermission(user, 'shipments.manage', 'shipments')
+  const [canCreate, canUpdate] = await Promise.all([
+    RbacService.hasPermission(user, 'shipments.create', 'shipments'),
+    RbacService.hasPermission(user, 'shipments.update', 'shipments'),
+  ])
+  return canCreate || canUpdate
 })
 
 export const manageReturns = Bouncer.ability(async (user: User) => {
   if (user.isSuperAdmin) return true
-  return RbacService.hasPermission(user, 'returns.manage', 'returns')
+  const [canCreate, canUpdate] = await Promise.all([
+    RbacService.hasPermission(user, 'returns.create', 'returns'),
+    RbacService.hasPermission(user, 'returns.update', 'returns'),
+  ])
+  return canCreate || canUpdate
 })
 
 export const manageFinance = Bouncer.ability(async (user: User) => {
   if (user.isSuperAdmin) return true
-  return RbacService.hasPermission(user, 'finance.manage', 'finance')
+  const [canCreate, canUpdate] = await Promise.all([
+    RbacService.hasPermission(user, 'finance.create', 'finance'),
+    RbacService.hasPermission(user, 'finance.update', 'finance'),
+  ])
+  return canCreate || canUpdate
 })
 
 export const manageTasks = Bouncer.ability(async (user: User) => {
   if (user.isSuperAdmin) return true
-  return RbacService.hasPermission(user, 'tasks.manage', 'tasks')
+  return !!user
 })
 
 export const bulkImport = Bouncer.ability(async (user: User) => {
   if (user.isSuperAdmin) return true
-  return RbacService.hasPermission(user, 'orders.bulk_import', 'orders')
+  return RbacService.hasPermission(user, 'orders.create', 'orders')
 })
 
-/**
- * Ownership check — resource bel belongs to the actor. Call with the resource
- * record that carries `userId`. SuperAdmin bypasses ownership.
- */
 export const ownsOrder = Bouncer.ability((user: User, order: { userId: string }) => {
   if (user.isSuperAdmin) return true
   return order.userId === user.id

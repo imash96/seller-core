@@ -2,7 +2,7 @@ import { Stack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-import AppLayout from '~/layouts/app'
+
 import {
   PageSection,
   FormModal,
@@ -28,7 +28,7 @@ type Props = {
   savedViews?: Row[]
 }
 
-Returns.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
+
 
 const RETURN_STATUS = [
   'requested',
@@ -120,20 +120,25 @@ export default function Returns({
             label: 'Order line',
             kind: 'select',
             required: true,
-            options:
-              filteredLineItems.length > 0
-                ? filteredLineItems.map((li) => ({
+            options: (vals) => {
+              const activeOrderId = vals.orderId || selectedOrderId
+              const matching = activeOrderId
+                ? orderLineItems.filter((li) => String((li as any).orderId) === activeOrderId)
+                : []
+              return matching.length > 0
+                ? matching.map((li) => ({
                     value: String(li.id),
                     label: `${li.sku} · qty ${li.quantityOrdered} · remaining ${Math.max(0, Number(li.quantityOrdered) - Number((li as any).quantityReturned ?? 0))}`,
                   }))
                 : [
                     {
                       value: '',
-                      label: selectedOrderId
+                      label: activeOrderId
                         ? 'No line items for this order'
-                        : 'Select an order first',
+                        : 'Select an order above first',
                     },
-                  ],
+                  ]
+            },
           },
           { name: 'rmaNumber', label: 'RMA number', required: true },
           {

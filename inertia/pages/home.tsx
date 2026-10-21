@@ -6,8 +6,7 @@ import { Badge } from '@astryxdesign/core/Badge'
 import { Grid } from '@astryxdesign/core/Grid'
 import { Divider } from '@astryxdesign/core/Divider'
 import { Link } from '@adonisjs/inertia/react'
-import { Theme } from '@astryxdesign/core'
-import { themes, defaultThemeSlug } from '~/astryx_themes'
+
 import MarketingLayout from '~/layouts/marketing'
 import {
   Shield,
@@ -69,8 +68,7 @@ Home.layout = (page: React.ReactElement) => <MarketingLayout>{page}</MarketingLa
 
 export default function Home() {
   return (
-    <Theme theme={themes[defaultThemeSlug]}>
-      <Stack gap={8}>
+    <Stack gap={8}>
         {/* Hero */}
         <div style={{ padding: '42px 0 12px' }}>
           <Grid columns={{ minWidth: 380, max: 2 }} gap={6}>
@@ -342,7 +340,6 @@ export default function Home() {
             </Stack>
           </Stack>
         </Card>
-      </Stack>
-    </Theme>
+    </Stack>
   )
 }

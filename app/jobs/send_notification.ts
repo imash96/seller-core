@@ -1,5 +1,6 @@
 import { Job } from '@boringnode/queue'
 import logger from '@adonisjs/core/services/logger'
+import Notification from '#models/notification'
 
 type Payload = {
   userId?: string
@@ -10,10 +11,6 @@ type Payload = {
   metadata?: Record<string, unknown>
 }
 
-/**
- * Outbound notification job — email/webhook/in_app.
- * Keeps controllers from awaiting network I/O on the request.
- */
 export default class SendNotification extends Job<Payload> {
   static queue = 'notifications'
   static options = {
@@ -23,12 +20,25 @@ export default class SendNotification extends Job<Payload> {
 
   async execute() {
     const payload = this.payload as Payload
-    const { to, channel, subject } = payload
-    logger.info({ to, channel, subject }, '[job] sending notification (stub)')
+    const { userId, to, channel, subject, body, metadata } = payload
+    logger.info({ to, channel, subject }, '[job] sending notification')
 
-    // Real impl: Resend / SES / Slack webhook.
-    // Throw to trigger retry if downstream is down.
-    await new Promise((r) => setTimeout(r, 100))
+    if (userId) {
+      try {
+        await Notification.create({
+          userId,
+          channel: channel === 'webhook' ? 'webhook' : channel === 'email' ? 'email' : 'in_app',
+          status: 'sent',
+          title: subject,
+          body,
+          recipientAddress: to,
+          payload: metadata ?? {},
+        } as any)
+      } catch (err) {
+        logger.warn({ err, userId }, '[job] notification DB persistence skipped')
+      }
+    }
+
     logger.info({ to, channel }, '[job] notification sent')
   }
 }

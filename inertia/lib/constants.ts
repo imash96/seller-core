@@ -3,21 +3,7 @@
  * and breadcrumb label resolution.
  */
 import type { LucideIcon } from 'lucide-react'
-import {
-  LayoutDashboard,
-  Package,
-  Truck,
-  Box,
-  RotateCcw,
-  Scale,
-  Building2,
-  Users,
-  CreditCard,
-  ListChecks,
-  Upload,
-  ScrollText,
-  Shield,
-} from 'lucide-react'
+import { LayoutDashboard, Package, Truck, Box, RotateCcw, Scale, Building2, Users, CreditCard, ListChecks, Upload, ScrollText, Shield, Tags, Warehouse, MapPin, } from 'lucide-react'
 
 export type NavItem = {
   href: string
@@ -35,7 +21,7 @@ export const NAVIGATION: NavSection[] = [
   {
     title: 'Dashboard',
     items: [
-      { href: '/dashboard', label: 'Dashboard & KPIs', icon: LayoutDashboard },
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     ],
   },
   {
@@ -43,10 +29,17 @@ export const NAVIGATION: NavSection[] = [
     items: [
       { href: '/orders', label: 'Orders', icon: Package },
       { href: '/shipments', label: 'Shipments & Invoices', icon: Truck },
-      { href: '/products', label: 'Products & Catalog', icon: Box },
       { href: '/returns', label: 'Returns & Refunds', icon: RotateCcw },
       { href: '/claims', label: 'Marketplace Claims', icon: Scale },
       { href: '/seller-accounts', label: 'Seller Accounts', icon: Building2 },
+    ],
+  },
+  {
+    title: 'Product & Catalog',
+    items: [
+      { href: '/inventory', label: 'Inventory', icon: Warehouse },
+      { href: '/products', label: 'Products', icon: Box },
+      { href: '/catalogs', label: 'Catalogs', icon: Tags },
     ],
   },
   {
@@ -67,6 +60,7 @@ export const NAVIGATION: NavSection[] = [
       { href: '/tasks', label: 'Tasks & Reminders', icon: ListChecks },
       { href: '/import', label: 'Bulk Import', icon: Upload },
       { href: '/audit', label: 'Audit History', icon: ScrollText },
+      { href: '/address-cleanup', label: 'Address Cleanup', icon: MapPin },
     ],
   },
   {
@@ -78,7 +72,7 @@ export const NAVIGATION: NavSection[] = [
 ]
 
 /** Flat list for TopNav / simple iteration */
-export const NAV_FLAT: NavItem[] = NAVIGATION.flatMap((s) => s.items)
+export const NAV_FLAT: NavItem[] = NAVIGATION.flatMap((section) => section.items,)
 
 /**
  * Pages that should NOT get the authenticated AppLayout wrapper.
@@ -90,7 +84,7 @@ export const PUBLIC_PAGES = [
   'auth/signup',
   'errors/not_found',
   'errors/server_error',
-]
+] as const
 
 /**
  * URL segment → human-readable label for breadcrumb generation.
@@ -100,7 +94,9 @@ export const ROUTE_LABELS: Record<string, string> = {
   dashboard: 'Dashboard',
   orders: 'Orders',
   shipments: 'Shipments',
+  inventory: 'Inventory',
   products: 'Products',
+  catalogs: 'Catalogs',
   returns: 'Returns',
   claims: 'Claims',
   customers: 'Customers',
@@ -108,6 +104,7 @@ export const ROUTE_LABELS: Record<string, string> = {
   tasks: 'Tasks',
   import: 'Bulk Import',
   audit: 'Audit History',
+  'address-cleanup': 'Address Cleanup',
   admin: 'Users & RBAC',
   'seller-accounts': 'Seller Accounts',
   accounts: 'Accounts',
@@ -116,4 +113,53 @@ export const ROUTE_LABELS: Record<string, string> = {
   signup: 'Sign Up',
   settings: 'Settings',
   tools: 'Tools',
+}
+
+/**
+ * Normalize a URL path so trailing slashes and query strings do not
+ * interfere with route matching.
+ */
+export function normalizePath(pathname: string): string {
+  const path = pathname.split(/[?#]/, 1)[0] || '/'
+  const normalized = `/${path.split('/').filter(Boolean).join('/')}`
+  return normalized === '/' ? '/' : normalized.replace(/\/+$/, '')
+}
+
+/**
+ * Check whether a page identifier is public.
+ * Accepts paths such as /auth/login and /errors/not_found.
+ */
+export function isPublicPage(pathname: string): boolean {
+  const normalized = normalizePath(pathname)
+  const pageId = normalized.replace(/^\/+/, '')
+
+  return PUBLIC_PAGES.some((page) => page === pageId)
+}
+
+/**
+ * Resolve breadcrumb labels from a URL path.
+ * Unknown segments are converted from kebab-case to readable text.
+ */
+export function getBreadcrumbs(pathname: string): Array<{
+  href: string
+  label: string
+}> {
+  const normalized = normalizePath(pathname)
+  const segments = normalized.split('/').filter(Boolean)
+
+  if (segments.length === 0) {
+    return [{ href: '/', label: ROUTE_LABELS[''] }]
+  }
+
+  return segments.map((segment, index) => {
+    const href = `/${segments.slice(0, index + 1).join('/')}`
+    const fallbackLabel = decodeURIComponent(segment)
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase())
+
+    return {
+      href,
+      label: ROUTE_LABELS[segment] ?? fallbackLabel,
+    }
+  })
 }

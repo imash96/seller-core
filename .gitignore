@@ -26,3 +26,4 @@ inertia-old
 
 # Platform specific
 .DS_Store
+node_modules

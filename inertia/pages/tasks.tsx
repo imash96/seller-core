@@ -3,7 +3,7 @@ import { Text } from '@astryxdesign/core/Text'
 import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
 import { Badge } from '@astryxdesign/core/Badge'
-import AppLayout from '~/layouts/app'
+
 import {
   PageSection,
   FormModal,
@@ -14,10 +14,11 @@ import {
   type Row,
 } from '~/lib/ui'
 import { useState } from 'react'
+import { router } from '@inertiajs/react'
 
 type Props = { tasksReminders: Row[]; savedViews?: Row[] }
 
-Tasks.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
+
 
 const TASK_TYPES = [
   'credit_card_due',
@@ -174,11 +175,7 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/tasks/${row.id}/complete`
-                      document.body.appendChild(f)
-                      f.submit()
+                      router.post(`/tasks/${row.id}/complete`, {}, { preserveScroll: true })
                     }}
                   />
                 ) : null}
@@ -187,12 +184,8 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Delete task?')) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/tasks/${row.id}/delete`
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm('Delete task?')) {
+                      router.post(`/tasks/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
                 />
@@ -230,11 +223,7 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/tasks/${row.id}/complete`
-                      document.body.appendChild(f)
-                      f.submit()
+                      router.post(`/tasks/${row.id}/complete`, {}, { preserveScroll: true })
                     }}
                   />
                 ) : null}
@@ -243,12 +232,8 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Delete task?')) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/tasks/${row.id}/delete`
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm('Delete task?')) {
+                      router.post(`/tasks/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
                 />
@@ -281,12 +266,8 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Delete saved view?')) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/saved-views/${row.id}/delete`
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm('Delete saved view?')) {
+                      router.post(`/saved-views/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
                 />
@@ -302,12 +283,8 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Delete saved view?')) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/saved-views/${row.id}/delete`
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm('Delete saved view?')) {
+                      router.post(`/saved-views/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
                 />

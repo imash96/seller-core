@@ -13,24 +13,24 @@ export default class ProductPolicy extends BasePolicy {
 
   async create(user: User): Promise<AuthorizerResponse> {
     if (user.isSuperAdmin) return true
-    return RbacService.hasPermission(user, 'catalog.manage', 'products')
+    return RbacService.hasPermission(user, 'catalog.create', 'catalog')
   }
 
   async update(user: User, product: Owned): Promise<AuthorizerResponse> {
     if (product.userId !== user.id) return false
     if (user.isSuperAdmin) return true
-    return RbacService.hasPermission(user, 'catalog.manage', 'products')
+    return RbacService.hasPermission(user, 'catalog.update', 'catalog')
   }
 
   async delete(user: User, product: Owned): Promise<AuthorizerResponse> {
     if (product.userId !== user.id) return false
     if (user.isSuperAdmin) return true
-    return RbacService.hasPermission(user, 'catalog.manage', 'products')
+    return RbacService.hasPermission(user, 'catalog.delete', 'catalog')
   }
 
   async manageVariants(user: User, product: Owned): Promise<AuthorizerResponse> {
     if (product.userId !== user.id) return false
     if (user.isSuperAdmin) return true
-    return RbacService.hasPermission(user, 'catalog.manage', 'products')
+    return RbacService.hasPermission(user, 'catalog.update', 'catalog')
   }
 }

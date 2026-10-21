@@ -4,7 +4,19 @@
  */
 
 export const controllers = {
+  AddressCleanup: () => import('#controllers/address_cleanup_controller'),
+  Admin: () => import('#controllers/admin_controller'),
+  Claims: () => import('#controllers/claims_controller'),
+  Customers: () => import('#controllers/customers_controller'),
+  Dashboard: () => import('#controllers/dashboard_controller'),
+  Finance: () => import('#controllers/finance_controller'),
   Operations: () => import('#controllers/operations_controller'),
+  Orders: () => import('#controllers/orders_controller'),
   Pages: () => import('#controllers/pages_controller'),
+  Products: () => import('#controllers/products_controller'),
+  Returns: () => import('#controllers/returns_controller'),
+  SellerAccounts: () => import('#controllers/seller_accounts_controller'),
   Session: () => import('#controllers/session_controller'),
+  Shipments: () => import('#controllers/shipments_controller'),
+  Tools: () => import('#controllers/tools_controller'),
 }

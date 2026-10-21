@@ -3,4 +3,20 @@
  * DO NOT EDIT manually
  */
 
-export const events = {}
+import Base from '#events/base'
+import OrderPlaced from '#events/order_placed'
+import OrderStatusChanged from '#events/order_status_changed'
+import PaymentReconciled from '#events/payment_reconciled'
+import RiskSignalFlagged from '#events/risk_signal_flagged'
+import ShipmentDispatched from '#events/shipment_dispatched'
+import UserOnboarded from '#events/user_onboarded'
+
+export const events = {
+  Base: Base,
+  OrderPlaced: OrderPlaced,
+  OrderStatusChanged: OrderStatusChanged,
+  PaymentReconciled: PaymentReconciled,
+  RiskSignalFlagged: RiskSignalFlagged,
+  ShipmentDispatched: ShipmentDispatched,
+  UserOnboarded: UserOnboarded,
+}

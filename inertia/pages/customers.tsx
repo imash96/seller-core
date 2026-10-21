@@ -4,7 +4,7 @@ import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
-import AppLayout from '~/layouts/app'
+
 import {
   PageSection,
   FormModal,
@@ -15,10 +15,11 @@ import {
   money,
 } from '~/lib/ui'
 import { useState } from 'react'
+import { router } from '@inertiajs/react'
 
 type Props = { customers: Row[]; riskSignals: Row[]; savedViews?: Row[] }
 
-Customers.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
+
 
 const RISK_LEVELS = ['low', 'medium', 'high', 'under_review', 'cleared']
 
@@ -237,19 +238,8 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm(`Delete ${row.fullName}?`)) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/customers/${row.id}/delete`
-                      const t = document.createElement('input')
-                      t.type = 'hidden'
-                      t.name = '_csrf'
-                      t.value =
-                        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
-                          ?.content ?? ''
-                      f.appendChild(t)
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm(`Delete ${row.fullName}?`)) {
+                      router.post(`/customers/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
                 />
@@ -284,19 +274,8 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm(`Delete ${row.fullName}?`)) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/customers/${row.id}/delete`
-                      const t = document.createElement('input')
-                      t.type = 'hidden'
-                      t.name = '_csrf'
-                      t.value =
-                        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
-                          ?.content ?? ''
-                      f.appendChild(t)
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm(`Delete ${row.fullName}?`)) {
+                      router.post(`/customers/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
                 />

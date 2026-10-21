@@ -1,19 +1,10 @@
+import { useState } from 'react'
+import { router } from '@inertiajs/react'
 import { Stack } from '@astryxdesign/core/Stack'
-import { Text } from '@astryxdesign/core/Text'
-import { Heading } from '@astryxdesign/core/Heading'
-import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-import { Badge } from '@astryxdesign/core/Badge'
-import { Grid } from '@astryxdesign/core/Grid'
-import { Divider } from '@astryxdesign/core/Divider'
-import { Banner } from '@astryxdesign/core/Banner'
-import AppLayout from '~/layouts/app'
 import {
   PageSection,
-  DataTable,
-  SmartForm,
   RowAction,
-  StatusForm,
   FormModal,
   ResponsiveDataView,
   SavedViewsBar,
@@ -23,8 +14,10 @@ import {
   short,
   type Row,
 } from '~/lib/ui'
-import { useState } from 'react'
-import { Pencil, Eye, Trash2, Plus } from 'lucide-react'
+import { ModulePageHeader } from '~/modules/common/page-header'
+import { OrderCard } from '~/modules/order/order-card'
+import { OrderDetailsDrawer } from '~/modules/order/order-detail-drawer'
+import { Download, CheckSquare } from 'lucide-react'
 
 type Props = {
   orders: Row[]
@@ -38,8 +31,6 @@ type Props = {
   savedViews?: Row[]
 }
 
-Orders.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
-
 const ORDER_STATUS = [
   'draft',
   'pending',
@@ -52,17 +43,19 @@ const ORDER_STATUS = [
   'on_hold',
 ]
 
-export default function Orders({ orders, sellerAccounts, customers, savedViews }: Props) {
+export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [editRow, setEditRow] = useState<Row | null>(null)
   const [detailRow, setDetailRow] = useState<Row | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkStatus, setBulkStatus] = useState('confirmed')
 
   const sampleJson = JSON.stringify(
     [
       {
-        orderNumber: 'AMZ-1',
-        externalOrderId: 'X1',
+        orderNumber: 'AMZ-2026-901',
+        externalOrderId: 'EXT-901',
         customerFullName: 'Jane Doe',
         currencyCode: 'USD',
         lines: [{ sku: 'SKU-001', title: 'Wireless Mouse', quantityOrdered: 2, unitPrice: 29.99 }],
@@ -72,20 +65,86 @@ export default function Orders({ orders, sellerAccounts, customers, savedViews }
     2
   )
 
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => (checked ? [...new Set([...prev, id])] : prev.filter((item) => item !== id)))
+  }
+
+  const handleBulkStatus = () => {
+    if (selectedIds.length === 0) return
+    router.post(
+      '/orders/bulk/status',
+      { ids: selectedIds, status: bulkStatus },
+      { preserveScroll: true, onSuccess: () => setSelectedIds([]) }
+    )
+  }
+
   return (
     <Stack gap={4}>
-      {/* Toolbar */}
-      <Card padding={4}>
-        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
-          <Button label="+ Create Order" variant="primary" onClick={() => setCreateOpen(true)} />
-          <Button label="Bulk Import" variant="secondary" onClick={() => setBulkOpen(true)} />
-          <Text type="supporting" as="div">
-            {orders.length} orders in workspace
-          </Text>
-        </Stack>
-      </Card>
+      <ModulePageHeader
+        title="Orders & P&L"
+        subtitle="Multi-channel order management with real-time COGS, marketplace fee waterfall, and multi-currency net profit."
+        badge={`${orders.length} orders`}
+        actions={
+          <>
+            <form method="POST" action="/orders/bulk/export" className="inline">
+              <button
+                type="submit"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] transition"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export CSV
+              </button>
+            </form>
+            <Button label="Bulk Import JSON" variant="secondary" onClick={() => setBulkOpen(true)} />
+            <Button label="+ Create Order" variant="primary" onClick={() => setCreateOpen(true)} />
+          </>
+        }
+      />
+
+      {selectedIds.length > 0 ? (
+        <div className="px-4 py-3 rounded-xl border border-blue-500/30 bg-blue-500/10 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
+            <CheckSquare className="w-4 h-4 text-blue-600" />
+            <span>{selectedIds.length} orders selected</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={bulkStatus}
+              onChange={(e) => setBulkStatus(e.target.value)}
+              className="px-2.5 py-1.5 rounded-lg text-xs border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)]"
+            >
+              {ORDER_STATUS.map((s) => (
+                <option key={s} value={s}>
+                  {s.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </select>
+            <Button label="Apply Bulk Status" variant="primary" size="sm" onClick={handleBulkStatus} />
+            <Button label="Clear" variant="ghost" size="sm" onClick={() => setSelectedIds([])} />
+          </div>
+        </div>
+      ) : null}
 
       {savedViews && savedViews.length > 0 ? <SavedViewsBar views={savedViews} /> : null}
+
+      {/* Featured Card Grid from inertia-old */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {orders.slice(0, 6).map((order) => (
+          <OrderCard
+            key={String(order.id)}
+            order={order}
+            selected={selectedIds.includes(String(order.id))}
+            onSelect={toggleSelect}
+            onView={(o) => setDetailRow(o)}
+            onEdit={(o) => setEditRow(o)}
+            onDelete={(o) => {
+              if (window.confirm(`Delete order ${o.orderNumber}?`)) {
+                router.post(`/orders/${o.id}/delete`, {}, { preserveScroll: true })
+              }
+            }}
+          />
+        ))}
+      </div>
 
       {/* Create Order Modal */}
       <FormModal
@@ -148,6 +207,15 @@ export default function Orders({ orders, sellerAccounts, customers, savedViews }
         subtitle="Idempotent JSON import — duplicates are skipped, raw payloads stored redacted."
         submitLabel="Import orders"
         action="/orders/bulk-import"
+        presetActions={[
+          {
+            label: 'Load Sample JSON Payload',
+            values: {
+              idempotencyKey: `batch-${Date.now()}`,
+              ordersJson: sampleJson,
+            },
+          },
+        ]}
         fields={[
           { name: 'idempotencyKey', label: 'Import idempotency key', required: true },
           {
@@ -168,23 +236,7 @@ export default function Orders({ orders, sellerAccounts, customers, savedViews }
               '[{"orderNumber":"AMZ-1","externalOrderId":"X1","customerFullName":"Jane","lines":[{"sku":"A","title":"Item","quantityOrdered":1,"unitPrice":10}]}]',
           },
         ]}
-      >
-        <Button
-          label="Load Sample JSON Payload"
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            const el = document.querySelector(
-              'textarea[name="ordersJson"]'
-            ) as HTMLTextAreaElement | null
-            if (el) {
-              el.value = sampleJson
-              el.dispatchEvent(new Event('input', { bubbles: true }))
-              el.dispatchEvent(new Event('change', { bubbles: true }))
-            }
-          }}
-        />
-      </FormModal>
+      />
 
       {/* Update Order Status Modal */}
       <FormModal
@@ -208,65 +260,20 @@ export default function Orders({ orders, sellerAccounts, customers, savedViews }
         ]}
       />
 
-      {/* Order Detail Modal */}
-      {detailRow ? (
-        <Card padding={5}>
-          <Stack gap={3}>
-            <Stack direction="horizontal" gap={2} align="center">
-              <Heading level={3}>Order {String(detailRow.orderNumber)} detail</Heading>
-              <Badge
-                variant={(STATUS_TONES[String(detailRow.status)] as any) ?? 'neutral'}
-                label={String(detailRow.status)}
-              />
-            </Stack>
-            <Grid columns={{ minWidth: 160, max: 3 }} gap={3}>
-              <Stack gap={1}>
-                <Text type="supporting" as="div">
-                  Total
-                </Text>
-                <Text type="body" as="div" weight="bold">
-                  {money(String(detailRow.currencyCode), detailRow.totalAmount)}
-                </Text>
-              </Stack>
-              <Stack gap={1}>
-                <Text type="supporting" as="div">
-                  Net Profit
-                </Text>
-                <Text type="body" as="div" weight="bold">
-                  {money(String(detailRow.reportingCurrencyCode), detailRow.netProfitAmount)}
-                </Text>
-              </Stack>
-              <Stack gap={1}>
-                <Text type="supporting" as="div">
-                  Customer
-                </Text>
-                <Text type="body" as="div">
-                  {String(
-                    (detailRow.customer as any)?.fullName ?? detailRow.customerFullName ?? '—'
-                  )}
-                </Text>
-              </Stack>
-            </Grid>
-            {Array.isArray(detailRow.lineItems) && detailRow.lineItems.length > 0 ? (
-              <DataTable
-                rows={detailRow.lineItems as Row[]}
-                columns={[
-                  col.text('sku', 'SKU', 120),
-                  col.text('title', 'Title', 180),
-                  col.text('quantityOrdered', 'Qty', 60),
-                  col.money('unitPrice', 'Unit price'),
-                ]}
-              />
-            ) : null}
-            <Button label="Close" variant="secondary" onClick={() => setDetailRow(null)} />
-          </Stack>
-        </Card>
-      ) : null}
+      {/* Slide-over Order Details & P&L Waterfall Drawer */}
+      <OrderDetailsDrawer
+        order={detailRow}
+        open={!!detailRow}
+        onClose={() => setDetailRow(null)}
+        onEditStatus={(o) => {
+          setDetailRow(null)
+          setEditRow(o)
+        }}
+      />
 
       <PageSection
-        title="Orders"
-        description="All orders in your workspace with P&L and fulfillment state."
-        actions={<Button label="Table / Card toggle via toolbar" variant="ghost" size="sm" />}
+        title="All Workspace Orders"
+        description="Search, filter, sort, or switch between table and card views."
       >
         <ResponsiveDataView
           rows={orders}
@@ -301,7 +308,7 @@ export default function Orders({ orders, sellerAccounts, customers, savedViews }
             ],
             actions: (
               <Stack direction="horizontal" gap={2} wrap="wrap">
-                <Button label="View" variant="ghost" size="sm" onClick={() => setDetailRow(row)} />
+                <Button label="Inspect P&L" variant="ghost" size="sm" onClick={() => setDetailRow(row)} />
                 <Button
                   label="Edit"
                   variant="secondary"
@@ -342,7 +349,7 @@ export default function Orders({ orders, sellerAccounts, customers, savedViews }
                   onClick={() => setEditRow(row)}
                 />
                 <Button
-                  label="Detail"
+                  label="P&L Drawer"
                   variant="ghost"
                   size="sm"
                   onClick={() => setDetailRow(row)}
@@ -354,42 +361,6 @@ export default function Orders({ orders, sellerAccounts, customers, savedViews }
                   confirmText="Delete this order and its lines?"
                 />
               </Stack>
-            )),
-          ]}
-        />
-      </PageSection>
-
-      <PageSection
-        title="Order economics"
-        description="Gross sales, fees and refunds per order in reporting currency."
-      >
-        <ResponsiveDataView
-          rows={orders}
-          searchKeys={['orderNumber']}
-          toCard={(row) => ({
-            title: String(row.orderNumber),
-            metrics: [
-              { label: 'Subtotal', value: money(String(row.currencyCode), row.subtotalAmount) },
-              {
-                label: 'Gross Profit',
-                value: money(String(row.reportingCurrencyCode), row.grossProfitAmount),
-              },
-              { label: 'Refunded', value: money(String(row.currencyCode), row.refundedAmount) },
-            ],
-          })}
-          columns={[
-            col.text('orderNumber', 'Order #', 140),
-            col.money('subtotalAmount', 'Subtotal', 'currencyCode'),
-            col.money('shippingChargedAmount', 'Ship charged', 'currencyCode'),
-            col.money('paymentProcessingFeesAmount', 'Payment fees', 'currencyCode'),
-            col.money('shippingCostAmount', 'Ship cost', 'currencyCode'),
-            col.money('refundedAmount', 'Refunded', 'currencyCode'),
-            col.money('grossProfitAmount', 'Gross profit', 'reportingCurrencyCode'),
-            col.action('Totals', (row) => (
-              <span style={{ fontSize: 12 }}>
-                {money(String(row.reportingCurrencyCode ?? 'USD'), row.reportingTotalAmount)}{' '}
-                reporting
-              </span>
             )),
           ]}
         />

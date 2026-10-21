@@ -19,7 +19,11 @@ export default class OrderPolicy extends BasePolicy {
   async updateStatus(user: User, order: Owned): Promise<AuthorizerResponse> {
     if (user.isSuperAdmin) return true
     if (order.userId !== user.id) return false
-    return RbacService.hasPermission(user, 'orders.create', 'orders')
+    const [canUpdate, canCreate] = await Promise.all([
+      RbacService.hasPermission(user, 'orders.update', 'orders'),
+      RbacService.hasPermission(user, 'orders.create', 'orders'),
+    ])
+    return canUpdate || canCreate
   }
 
   async delete(user: User, order: Owned): Promise<AuthorizerResponse> {
@@ -30,6 +34,6 @@ export default class OrderPolicy extends BasePolicy {
 
   async bulkImport(user: User): Promise<AuthorizerResponse> {
     if (user.isSuperAdmin) return true
-    return RbacService.hasPermission(user, 'orders.bulk_import', 'orders')
+    return RbacService.hasPermission(user, 'orders.create', 'orders')
   }
 }

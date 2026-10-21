@@ -1,59 +1,61 @@
-/* Astryx Design System (Meta) — required foundation */
 @import '@astryxdesign/core/reset.css';
 @import '@astryxdesign/core/astryx.css';
+@import 'tailwindcss';
+@import './light.css';
+@import './dark.css';
+
+@theme inline {
+  --font-sans: 'Inter', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
 
 html,
 body,
 #app {
-  height: 100%;
+  min-height: 100%;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Spacing for page sections (replaces inline style on <section>) */
-.page-section {
-  margin-block-end: var(--spacing-6);
-  scroll-margin-block-start: var(--spacing-5);
-}
-
-/* Unstyled link — removes text decoration and inherits parent color */
 .unstyled-link {
   text-decoration: none;
   color: inherit;
-}
-
-/* Fixed position bar at bottom center of viewport */
-.bulk-bar-fixed {
-  position: fixed;
-  inset-block-end: var(--spacing-5);
-  inset-inline-start: 50%;
-  transform: translateX(-50%);
-  z-index: 50;
-}
-
-/* Animation used by BulkActionsBar entrance */
-@keyframes bulkBarSlideUp {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(16px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-}
-
-.bulk-bar-enter {
-  animation: bulkBarSlideUp 0.3s ease-out;
-}
-
-/* Uppercase label styling for metadata sections (key-value.tsx Meta) */
-.meta-label {
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* Search form wrapper for list-page-header */
-.search-form {
-  flex: 1;
-  max-width: 360px;
 }

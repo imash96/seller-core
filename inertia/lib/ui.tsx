@@ -218,7 +218,7 @@ export type FieldDef = {
   name: string
   label: string
   kind?: 'text' | 'number' | 'email' | 'date' | 'select' | 'textarea' | 'password'
-  options?: Array<{ value: string; label: string }>
+  options?: Array<{ value: string; label: string }> | ((values: Record<string, string>) => Array<{ value: string; label: string }>)
   required?: boolean
   placeholder?: string
   default?: string
@@ -312,7 +312,7 @@ export function SmartForm({
                     htmlName={shared.htmlName}
                     value={shared.value}
                     onChange={(v: string | null) => set(f.name)(v ?? '')}
-                    options={(f.options ?? []).map((o) => ({ value: o.value, label: o.label }))}
+                    options={(typeof f.options === 'function' ? f.options(values) : (f.options ?? [])).map((o) => ({ value: o.value, label: o.label }))}
                     isRequired={shared.isRequired}
                     isLabelHidden={false}
                     placeholder={f.placeholder ?? 'Select…'}
@@ -469,6 +469,7 @@ export function FormModal({
   initialValues,
   actionFor,
   onSuccess,
+  presetActions,
   children,
 }: {
   isOpen: boolean
@@ -481,6 +482,7 @@ export function FormModal({
   initialValues?: Record<string, string>
   actionFor?: (values: Record<string, string>) => string
   onSuccess?: () => void
+  presetActions?: Array<{ label: string; values: Record<string, string> }>
   children?: ReactNode
 }) {
   const defaults = useMemo(
@@ -524,6 +526,19 @@ export function FormModal({
         >
           {({ errors, processing }) => (
             <Stack gap={4}>
+              {presetActions && presetActions.length > 0 ? (
+                <Stack direction="horizontal" gap={2} wrap="wrap">
+                  {presetActions.map((preset) => (
+                    <Button
+                      key={preset.label}
+                      label={preset.label}
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setValues((prev) => ({ ...prev, ...preset.values }))}
+                    />
+                  ))}
+                </Stack>
+              ) : null}
               {children}
               <Grid columns={{ minWidth: 260, max: 2 }} gap={3}>
                 {fields.map((f) => {
@@ -537,7 +552,7 @@ export function FormModal({
                         htmlName={f.name}
                         value={values[f.name] ?? ''}
                         onChange={(v: string | null) => set(f.name)(v ?? '')}
-                        options={(f.options ?? []).map((o) => ({ value: o.value, label: o.label }))}
+                        options={(typeof f.options === 'function' ? f.options(values) : (f.options ?? [])).map((o) => ({ value: o.value, label: o.label }))}
                         isRequired={f.required}
                         placeholder={f.placeholder ?? 'Select…'}
                         hasClear
@@ -683,7 +698,7 @@ export const col = {
     key,
     header,
     width: width ? pixel(width) : proportional(1),
-    renderCell: (row: Row) => <Text type="body">{String(row[key] ?? '—')}</Text>,
+    renderCell: (row: Row) => <Text type="body">{displayValue(row[key])}</Text>,
   }),
   id: (key: string, header = 'ID'): TableColumn<Row> => ({
     key,

@@ -3,7 +3,7 @@ import { Text } from '@astryxdesign/core/Text'
 import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
-import AppLayout from '~/layouts/app'
+
 import { PageSection, FormModal, ResponsiveDataView, SavedViewsBar, col, type Row } from '~/lib/ui'
 import { useState } from 'react'
 
@@ -20,7 +20,7 @@ type Props = {
   savedViews?: Row[]
 }
 
-Import.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
+
 
 export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) {
   const [importOpen, setImportOpen] = useState(false)
@@ -73,6 +73,15 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
         subtitle="Idempotent: same key → duplicates skipped. One bad record never blocks the batch."
         submitLabel="Run import"
         action="/orders/bulk-import"
+        presetActions={[
+          {
+            label: 'Load Sample JSON Payload',
+            values: {
+              idempotencyKey: `sample-${Date.now()}`,
+              ordersJson: sampleJson,
+            },
+          },
+        ]}
         fields={[
           {
             name: 'idempotencyKey',

@@ -2,7 +2,7 @@ import { Stack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-import AppLayout from '~/layouts/app'
+
 import {
   PageSection,
   FormModal,
@@ -27,7 +27,7 @@ type Props = {
   savedViews?: Row[]
 }
 
-Claims.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
+
 
 const CLAIM_STATUS = [
   'opened',

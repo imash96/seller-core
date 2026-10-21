@@ -5,14 +5,15 @@ import { Button } from '@astryxdesign/core/Button'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Grid } from '@astryxdesign/core/Grid'
 import { Divider } from '@astryxdesign/core/Divider'
-import AppLayout from '~/layouts/app'
+
 import { PageHeader, StatStrip, ResponsiveDataView, FormModal, col, type Row } from '~/lib/ui'
 import { useState } from 'react'
+import { router } from '@inertiajs/react'
 import { Shield, Users, KeyRound, Layers, Lock, Sparkles } from 'lucide-react'
 
 type Props = { allUsers: Row[]; allRoles: Row[]; allPermissions: Row[]; moduleEntitlements: Row[] }
 
-Admin.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
+
 
 const USER_STATUS = ['pending_activation', 'active', 'suspended', 'locked', 'deactivated']
 
@@ -276,11 +277,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
                           `Delete ${row.email}? If they own data, they will be suspended instead.`
                         )
                       ) {
-                        const f = document.createElement('form')
-                        f.method = 'POST'
-                        f.action = `/admin/users/${row.id}/delete`
-                        document.body.appendChild(f)
-                        f.submit()
+                        router.post(`/admin/users/${row.id}/delete`, {}, { preserveScroll: true })
                       }
                     }}
                   />
@@ -316,11 +313,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
                           `Delete ${row.email}? If they own data, they will be suspended instead.`
                         )
                       ) {
-                        const f = document.createElement('form')
-                        f.method = 'POST'
-                        f.action = `/admin/users/${row.id}/delete`
-                        document.body.appendChild(f)
-                        f.submit()
+                        router.post(`/admin/users/${row.id}/delete`, {}, { preserveScroll: true })
                       }
                     }}
                   />
@@ -399,11 +392,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
                   variant="secondary"
                   size="sm"
                   onClick={() => {
-                    const f = document.createElement('form')
-                    f.method = 'POST'
-                    f.action = `/admin/entitlements/${row.id}/toggle`
-                    document.body.appendChild(f)
-                    f.submit()
+                    router.post(`/admin/entitlements/${row.id}/toggle`, {}, { preserveScroll: true })
                   }}
                 />
               ),
@@ -418,11 +407,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
                   variant="secondary"
                   size="sm"
                   onClick={() => {
-                    const f = document.createElement('form')
-                    f.method = 'POST'
-                    f.action = `/admin/entitlements/${row.id}/toggle`
-                    document.body.appendChild(f)
-                    f.submit()
+                    router.post(`/admin/entitlements/${row.id}/toggle`, {}, { preserveScroll: true })
                   }}
                 />
               )),

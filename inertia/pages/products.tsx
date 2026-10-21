@@ -6,7 +6,7 @@ import { Button } from '@astryxdesign/core/Button'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Grid } from '@astryxdesign/core/Grid'
 import { Divider } from '@astryxdesign/core/Divider'
-import AppLayout from '~/layouts/app'
+
 import {
   PageSection,
   DataTable,
@@ -37,7 +37,7 @@ type Props = {
   savedViews?: Row[]
 }
 
-Products.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
+
 
 const PRODUCT_STATUS = ['draft', 'active', 'archived', 'discontinued']
 

@@ -2,7 +2,7 @@ import { Stack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-import AppLayout from '~/layouts/app'
+
 import {
   PageSection,
   FormModal,
@@ -29,7 +29,7 @@ type Props = {
   savedViews?: Row[]
 }
 
-Shipments.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
+
 
 const SHIPMENT_STATUS = [
   'pending',
@@ -116,26 +116,30 @@ export default function Shipments({
             required: true,
             options: orders.map((o) => ({ value: String(o.id), label: String(o.orderNumber) })),
           },
-          // line items filtered by selected order — rendered via custom logic below
           {
             name: 'orderLineItemId',
             label: 'Order line item',
             kind: 'select',
             required: true,
-            options:
-              filteredLineItems.length > 0
-                ? filteredLineItems.map((li) => ({
+            options: (vals) => {
+              const activeOrderId = vals.orderId || selectedOrderId
+              const matching = activeOrderId
+                ? orderLineItems.filter((li) => String((li as any).orderId) === activeOrderId)
+                : []
+              return matching.length > 0
+                ? matching.map((li) => ({
                     value: String(li.id),
-                    label: `${li.sku} · ${li.title ?? li.sku} · ordered ${li.quantityOrdered}${(li as any).quantityFulfilled !== undefined ? ` · remaining ${Number(li.quantityOrdered) - Number((li as any).quantityFulfilled ?? 0)}` : ''}`,
+                    label: `${li.sku} · ${li.title ?? li.sku} · ordered ${li.quantityOrdered} · remaining ${Math.max(0, Number(li.quantityOrdered) - Number((li as any).quantityFulfilled ?? 0))}`,
                   }))
                 : [
                     {
                       value: '',
-                      label: selectedOrderId
+                      label: activeOrderId
                         ? 'No line items for this order'
-                        : 'Select an order first',
+                        : 'Select an order above first',
                     },
-                  ],
+                  ]
+            },
           },
           { name: 'shipmentNumber', label: 'Shipment number', required: true },
           { name: 'carrierCode', label: 'Carrier code', required: true },

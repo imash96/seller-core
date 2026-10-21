@@ -3,7 +3,7 @@ import { Text } from '@astryxdesign/core/Text'
 import { Card } from '@astryxdesign/core/Card'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Divider } from '@astryxdesign/core/Divider'
-import AppLayout from '~/layouts/app'
+
 import {
   PageHeader,
   StatStrip,
@@ -17,7 +17,7 @@ import { ShieldCheck, Lock } from 'lucide-react'
 
 type Props = { auditLogs: Row[] }
 
-Audit.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
+
 
 export default function Audit({ auditLogs }: Props) {
   const inserts = auditLogs.filter((r) => String(r.action) === 'INSERT').length

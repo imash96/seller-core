@@ -1,25 +1,28 @@
 import logger from '@adonisjs/core/services/logger'
+import { DateTime } from 'luxon'
+import TasksReminder from '#models/tasks_reminder'
+import { TaskPriority, TaskStatus, TaskType } from '../enums/index.js'
 import type RiskSignalFlagged from '#events/risk_signal_flagged'
 
-/**
- * When a risk signal is flagged, create a review task asynchronously.
- * Keeps the hot path (order creation) from blocking on task creation.
- */
 export default class EnqueueRiskReview {
   async handle(event: InstanceType<typeof RiskSignalFlagged>) {
-    const { signalId, customerId, severity } = event.payload
-    logger.info({ signalId, customerId, severity }, '[events] risk signal → review task enqueued')
+    const { signalId, customerId, userId, reason, severity } = event.payload
+    logger.info({ signalId, customerId, severity }, '[events] risk signal -> creating fraud review task')
 
     try {
-      const reportMod = await import('#jobs/generate_finance_report')
-      const GenerateFinanceReport = reportMod.default
-      await (GenerateFinanceReport as any).dispatch({
-        context: `risk-review-${signalId}`,
-        severity,
-        customerId,
-      } as any)
+      await TasksReminder.create({
+        userId,
+        relatedEntityType: 'customer_risk_signals',
+        relatedEntityId: signalId,
+        taskType: TaskType.FRAUD_REVIEW,
+        priority: severity === 'critical' || severity === 'high' ? TaskPriority.URGENT : TaskPriority.HIGH,
+        status: TaskStatus.PENDING,
+        title: `Review ${severity.toUpperCase()} Risk Signal (${signalId.slice(0, 10)})`,
+        description: reason || `Manual fraud/risk review required for customer ${customerId}`,
+        dueAt: DateTime.now().plus({ days: 1 }),
+      })
     } catch (err) {
-      logger.warn({ err, signalId }, '[events] risk review dispatch failed')
+      logger.warn({ err, signalId }, '[events] failed to create risk review task')
     }
   }
 }

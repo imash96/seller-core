@@ -17,6 +17,7 @@ declare module '@adonisjs/inertia/types' {
     'audit': ExtractProps<(typeof import('../../inertia/pages/audit.tsx'))['default']>
     'auth/login': ExtractProps<(typeof import('../../inertia/pages/auth/login.tsx'))['default']>
     'auth/signup': ExtractProps<(typeof import('../../inertia/pages/auth/signup.tsx'))['default']>
+    'catalogs': ExtractProps<(typeof import('../../inertia/pages/catalogs.tsx'))['default']>
     'claims': ExtractProps<(typeof import('../../inertia/pages/claims.tsx'))['default']>
     'customers': ExtractProps<(typeof import('../../inertia/pages/customers.tsx'))['default']>
     'dashboard': ExtractProps<(typeof import('../../inertia/pages/dashboard.tsx'))['default']>
@@ -25,10 +26,12 @@ declare module '@adonisjs/inertia/types' {
     'finance': ExtractProps<(typeof import('../../inertia/pages/finance.tsx'))['default']>
     'home': ExtractProps<(typeof import('../../inertia/pages/home.tsx'))['default']>
     'import': ExtractProps<(typeof import('../../inertia/pages/import.tsx'))['default']>
+    'inventory': ExtractProps<(typeof import('../../inertia/pages/inventory.tsx'))['default']>
     'orders': ExtractProps<(typeof import('../../inertia/pages/orders.tsx'))['default']>
     'products': ExtractProps<(typeof import('../../inertia/pages/products.tsx'))['default']>
     'returns': ExtractProps<(typeof import('../../inertia/pages/returns.tsx'))['default']>
     'shipments': ExtractProps<(typeof import('../../inertia/pages/shipments.tsx'))['default']>
     'tasks': ExtractProps<(typeof import('../../inertia/pages/tasks.tsx'))['default']>
+    'tools/address-cleanup': ExtractProps<(typeof import('../../inertia/pages/tools/address-cleanup.tsx'))['default']>
   }
 }

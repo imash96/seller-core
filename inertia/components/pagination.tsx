@@ -22,7 +22,7 @@ export function Pagination({ meta, onPageChange }: PaginationProps) {
   if (meta.lastPage <= 1) return null
 
   return (
-    <Stack direction="horizontal" align="center" justify="space-between" padding={4}>
+    <Stack direction="horizontal" align="center" justify="between" padding={4}>
       <Text type="supporting" as="span">
         Page {meta.currentPage} of {meta.lastPage} ({meta.total} total)
       </Text>

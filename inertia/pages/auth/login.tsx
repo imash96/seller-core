@@ -1,4 +1,6 @@
 import { Form } from '@adonisjs/inertia/react'
+import { usePage } from '@inertiajs/react'
+import { Banner } from '@astryxdesign/core/Banner'
 import { Link } from '@adonisjs/inertia/react'
 import { Stack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
@@ -7,8 +9,7 @@ import { Button } from '@astryxdesign/core/Button'
 import { Badge } from '@astryxdesign/core/Badge'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Divider } from '@astryxdesign/core/Divider'
-import { Theme } from '@astryxdesign/core'
-import { themes, defaultThemeSlug } from '~/astryx_themes'
+
 import AuthLayout from '~/layouts/auth'
 import { useState, useEffect } from 'react'
 import { Eye, EyeOff, Crown, UserCheck, ArrowUpRight, ShieldCheck } from 'lucide-react'
@@ -17,6 +18,8 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const pageProps = usePage().props as { flash?: { error?: string; success?: string } }
+  const flash = pageProps?.flash
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -40,9 +43,10 @@ export default function Login() {
   }
 
   return (
-    <Theme theme={themes[defaultThemeSlug]}>
-      <AuthLayout title="Sign in to Seller Core">
+    <AuthLayout title="Sign in to Seller Core">
         <Stack gap={4}>
+          {flash?.error ? <Banner variant="error" title="Authentication notice" description={flash.error} /> : null}
+          {flash?.success ? <Banner variant="success" title="Success" description={flash.success} /> : null}
           <Card padding={3} variant="muted">
             <Stack gap={2}>
               <Stack direction="horizontal" gap={2} align="center">
@@ -235,7 +239,6 @@ export default function Login() {
             </a>
           </Stack>
         </Stack>
-      </AuthLayout>
-    </Theme>
+    </AuthLayout>
   )
 }
