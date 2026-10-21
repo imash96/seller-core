@@ -8,37 +8,15 @@ import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { DateTime } from 'luxon'
 
 export class AuditLogSchema extends BaseModel {
-  static $columns = [
-    'action',
-    'actorUserId',
-    'afterState',
-    'beforeState',
-    'checksum',
-    'correlationId',
-    'createdAt',
-    'entityId',
-    'entityType',
-    'id',
-    'ipAddress',
-    'metadata',
-    'requestId',
-    'userAgent',
-    'userId',
-  ] as const
+  static $columns = ['action', 'actorUserId', 'afterState', 'beforeState', 'checksum', 'correlationId', 'createdAt', 'entityId', 'entityType', 'id', 'ipAddress', 'metadata', 'requestId', 'userAgent', 'userId'] as const
   $columns = AuditLogSchema.$columns
   @column()
   declare action: string
   @column()
   declare actorUserId: string | null
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare afterState: any | null
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare beforeState: any | null
   @column()
   declare checksum: string
@@ -54,10 +32,7 @@ export class AuditLogSchema extends BaseModel {
   declare id: string
   @column()
   declare ipAddress: string | null
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare metadata: any
   @column()
   declare requestId: string | null
@@ -68,19 +43,7 @@ export class AuditLogSchema extends BaseModel {
 }
 
 export class BrandSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'id',
-    'isActive',
-    'logoUrl',
-    'name',
-    'regNo',
-    'serialNo',
-    'slug',
-    'updatedAt',
-    'userId',
-    'websiteUrl',
-  ] as const
+  static $columns = ['createdAt', 'id', 'isActive', 'logoUrl', 'name', 'regNo', 'serialNo', 'slug', 'updatedAt', 'userId', 'websiteUrl'] as const
   $columns = BrandSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -107,40 +70,13 @@ export class BrandSchema extends BaseModel {
 }
 
 export class ChannelListingSchema extends BaseModel {
-  static $columns = [
-    'allocatedQuantity',
-    'asin',
-    'channelAttributes',
-    'channelCategoryId',
-    'channelDescription',
-    'channelTitle',
-    'createdAt',
-    'currencyCode',
-    'externalListingId',
-    'externalSku',
-    'externalVariantId',
-    'id',
-    'lastSyncError',
-    'lastSyncedAt',
-    'listedPrice',
-    'listingStatus',
-    'productId',
-    'productVariantId',
-    'publicationStatus',
-    'sellerAccountId',
-    'syncStatus',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['allocatedQuantity', 'asin', 'channelAttributes', 'channelCategoryId', 'channelDescription', 'channelTitle', 'createdAt', 'currencyCode', 'externalListingId', 'externalSku', 'externalVariantId', 'id', 'lastSyncError', 'lastSyncedAt', 'listedPrice', 'listingStatus', 'productId', 'productVariantId', 'publicationStatus', 'sellerAccountId', 'syncStatus', 'updatedAt', 'userId'] as const
   $columns = ChannelListingSchema.$columns
   @column()
   declare allocatedQuantity: number
   @column()
   declare asin: string | null
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare channelAttributes: any
   @column()
   declare channelCategoryId: string | null
@@ -185,15 +121,7 @@ export class ChannelListingSchema extends BaseModel {
 }
 
 export class CreditCardSellerAccountSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'creditCardId',
-    'id',
-    'isPrimary',
-    'sellerAccountId',
-    'usagePurpose',
-    'userId',
-  ] as const
+  static $columns = ['createdAt', 'creditCardId', 'id', 'isPrimary', 'sellerAccountId', 'usagePurpose', 'userId'] as const
   $columns = CreditCardSellerAccountSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -212,34 +140,7 @@ export class CreditCardSellerAccountSchema extends BaseModel {
 }
 
 export class CreditCardSchema extends BaseModel {
-  static $columns = [
-    'autoPayEnabled',
-    'billingCycleDay',
-    'brandName',
-    'cardLabel',
-    'cardholderName',
-    'createdAt',
-    'creditLimit',
-    'currencyCode',
-    'currentBalance',
-    'dataClassification',
-    'expMonth',
-    'expYear',
-    'financialAccountId',
-    'id',
-    'issuerBank',
-    'last4Digits',
-    'logoUrl',
-    'minimumPaymentDue',
-    'nextPaymentDueDate',
-    'paymentDueDay',
-    'reminderDaysBefore',
-    'statementBalance',
-    'status',
-    'updatedAt',
-    'userId',
-    'vaultTokenReference',
-  ] as const
+  static $columns = ['autoPayEnabled', 'billingCycleDay', 'brandName', 'cardLabel', 'cardholderName', 'createdAt', 'creditLimit', 'currencyCode', 'currentBalance', 'dataClassification', 'expMonth', 'expYear', 'financialAccountId', 'id', 'issuerBank', 'last4Digits', 'logoUrl', 'minimumPaymentDue', 'nextPaymentDueDate', 'paymentDueDay', 'reminderDaysBefore', 'statementBalance', 'status', 'updatedAt', 'userId', 'vaultTokenReference'] as const
   $columns = CreditCardSchema.$columns
   @column()
   declare autoPayEnabled: boolean
@@ -296,28 +197,7 @@ export class CreditCardSchema extends BaseModel {
 }
 
 export class CustomerAddressSchema extends BaseModel {
-  static $columns = [
-    'addressFingerprint',
-    'addressType',
-    'city',
-    'companyName',
-    'countryCode',
-    'createdAt',
-    'customerId',
-    'id',
-    'isDefault',
-    'isVerified',
-    'label',
-    'line1',
-    'line2',
-    'line3',
-    'phone',
-    'postalCode',
-    'recipientName',
-    'stateProvince',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['addressFingerprint', 'addressType', 'city', 'companyName', 'countryCode', 'createdAt', 'customerId', 'id', 'isDefault', 'isVerified', 'label', 'line1', 'line2', 'line3', 'phone', 'postalCode', 'recipientName', 'stateProvince', 'updatedAt', 'userId'] as const
   $columns = CustomerAddressSchema.$columns
   @column()
   declare addressFingerprint: string | null
@@ -362,31 +242,13 @@ export class CustomerAddressSchema extends BaseModel {
 }
 
 export class CustomerRiskSignalSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'customerId',
-    'evidence',
-    'id',
-    'orderId',
-    'reason',
-    'reviewNotes',
-    'reviewStatus',
-    'reviewedAt',
-    'reviewedByUserId',
-    'severity',
-    'signalType',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['createdAt', 'customerId', 'evidence', 'id', 'orderId', 'reason', 'reviewNotes', 'reviewStatus', 'reviewedAt', 'reviewedByUserId', 'severity', 'signalType', 'updatedAt', 'userId'] as const
   $columns = CustomerRiskSignalSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
   @column()
   declare customerId: string
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare evidence: any
   @column({ isPrimary: true })
   declare id: string
@@ -413,33 +275,7 @@ export class CustomerRiskSignalSchema extends BaseModel {
 }
 
 export class CustomerSchema extends BaseModel {
-  static $columns = [
-    'companyName',
-    'createdAt',
-    'email',
-    'externalCustomerId',
-    'firstName',
-    'firstOrderAt',
-    'fullName',
-    'id',
-    'isRepeatCustomer',
-    'lastName',
-    'lastOrderAt',
-    'mergedIntoCustomerId',
-    'metadata',
-    'normalizedEmail',
-    'normalizedPhone',
-    'notes',
-    'ordersCount',
-    'phone',
-    'preferredCurrency',
-    'proxyEmail',
-    'riskLevel',
-    'riskScore',
-    'totalSpent',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['companyName', 'createdAt', 'email', 'externalCustomerId', 'firstName', 'firstOrderAt', 'fullName', 'id', 'isRepeatCustomer', 'lastName', 'lastOrderAt', 'mergedIntoCustomerId', 'metadata', 'normalizedEmail', 'normalizedPhone', 'notes', 'ordersCount', 'phone', 'preferredCurrency', 'proxyEmail', 'riskLevel', 'riskScore', 'totalSpent', 'updatedAt', 'userId'] as const
   $columns = CustomerSchema.$columns
   @column()
   declare companyName: string | null
@@ -465,10 +301,7 @@ export class CustomerSchema extends BaseModel {
   declare lastOrderAt: DateTime | null
   @column()
   declare mergedIntoCustomerId: string | null
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare metadata: any
   @column()
   declare normalizedEmail: string | null
@@ -497,20 +330,7 @@ export class CustomerSchema extends BaseModel {
 }
 
 export class FinanceCategorySchema extends BaseModel {
-  static $columns = [
-    'categoryType',
-    'costBucket',
-    'createdAt',
-    'dataClassification',
-    'id',
-    'isActive',
-    'isTaxDeductible',
-    'name',
-    'parentId',
-    'slug',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['categoryType', 'costBucket', 'createdAt', 'dataClassification', 'id', 'isActive', 'isTaxDeductible', 'name', 'parentId', 'slug', 'updatedAt', 'userId'] as const
   $columns = FinanceCategorySchema.$columns
   @column()
   declare categoryType: string
@@ -539,20 +359,7 @@ export class FinanceCategorySchema extends BaseModel {
 }
 
 export class FinancialAccountSchema extends BaseModel {
-  static $columns = [
-    'accountName',
-    'accountNumberLast4',
-    'accountType',
-    'createdAt',
-    'currencyCode',
-    'currentBalance',
-    'dataClassification',
-    'id',
-    'institutionName',
-    'isActive',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['accountName', 'accountNumberLast4', 'accountType', 'createdAt', 'currencyCode', 'currentBalance', 'dataClassification', 'id', 'institutionName', 'isActive', 'updatedAt', 'userId'] as const
   $columns = FinancialAccountSchema.$columns
   @column()
   declare accountName: string
@@ -581,39 +388,7 @@ export class FinancialAccountSchema extends BaseModel {
 }
 
 export class FinancialTransactionSchema extends BaseModel {
-  static $columns = [
-    'conversionDate',
-    'createdAt',
-    'creditCardId',
-    'dataClassification',
-    'description',
-    'dueDate',
-    'exchangeRate',
-    'financeCategoryId',
-    'financialAccountId',
-    'id',
-    'metadata',
-    'notes',
-    'orderId',
-    'originalAmount',
-    'originalCurrencyCode',
-    'productVariantId',
-    'receiptUrl',
-    'reconciledAt',
-    'referenceNumber',
-    'reportingAmount',
-    'reportingCurrencyCode',
-    'sellerAccountId',
-    'settledAt',
-    'shippingInvoiceId',
-    'status',
-    'taxAmount',
-    'transactionDate',
-    'transactionType',
-    'updatedAt',
-    'userId',
-    'vendorOrPayer',
-  ] as const
+  static $columns = ['conversionDate', 'createdAt', 'creditCardId', 'dataClassification', 'description', 'dueDate', 'exchangeRate', 'financeCategoryId', 'financialAccountId', 'id', 'metadata', 'notes', 'orderId', 'originalAmount', 'originalCurrencyCode', 'productVariantId', 'receiptUrl', 'reconciledAt', 'referenceNumber', 'reportingAmount', 'reportingCurrencyCode', 'sellerAccountId', 'settledAt', 'shippingInvoiceId', 'status', 'taxAmount', 'transactionDate', 'transactionType', 'updatedAt', 'userId', 'vendorOrPayer'] as const
   $columns = FinancialTransactionSchema.$columns
   @column.date()
   declare conversionDate: DateTime | null
@@ -635,10 +410,7 @@ export class FinancialTransactionSchema extends BaseModel {
   declare financialAccountId: string | null
   @column({ isPrimary: true })
   declare id: string
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare metadata: any
   @column()
   declare notes: string | null
@@ -683,26 +455,7 @@ export class FinancialTransactionSchema extends BaseModel {
 }
 
 export class MarketplaceClaimSchema extends BaseModel {
-  static $columns = [
-    'claimNumber',
-    'claimType',
-    'createdAt',
-    'currencyCode',
-    'customerId',
-    'disputedAmount',
-    'evidenceSubmitted',
-    'externalClaimId',
-    'id',
-    'orderId',
-    'reason',
-    'resolvedAt',
-    'respondByAt',
-    'sellerAccountId',
-    'sellerLiabilityAmount',
-    'status',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['claimNumber', 'claimType', 'createdAt', 'currencyCode', 'customerId', 'disputedAmount', 'evidenceSubmitted', 'externalClaimId', 'id', 'orderId', 'reason', 'resolvedAt', 'respondByAt', 'sellerAccountId', 'sellerLiabilityAmount', 'status', 'updatedAt', 'userId'] as const
   $columns = MarketplaceClaimSchema.$columns
   @column()
   declare claimNumber: string
@@ -716,10 +469,7 @@ export class MarketplaceClaimSchema extends BaseModel {
   declare customerId: string | null
   @column()
   declare disputedAmount: string
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare evidenceSubmitted: any
   @column()
   declare externalClaimId: string | null
@@ -746,18 +496,7 @@ export class MarketplaceClaimSchema extends BaseModel {
 }
 
 export class ModuleEntitlementSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'expiresAt',
-    'id',
-    'isEnabled',
-    'limits',
-    'moduleKey',
-    'planTier',
-    'updatedAt',
-    'updatedByUserId',
-    'userId',
-  ] as const
+  static $columns = ['createdAt', 'expiresAt', 'id', 'isEnabled', 'limits', 'moduleKey', 'planTier', 'updatedAt', 'updatedByUserId', 'userId'] as const
   $columns = ModuleEntitlementSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -767,10 +506,7 @@ export class ModuleEntitlementSchema extends BaseModel {
   declare id: string
   @column()
   declare isEnabled: boolean
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare limits: any
   @column()
   declare moduleKey: string
@@ -785,22 +521,7 @@ export class ModuleEntitlementSchema extends BaseModel {
 }
 
 export class NotificationSchema extends BaseModel {
-  static $columns = [
-    'body',
-    'channel',
-    'createdAt',
-    'entityId',
-    'entityType',
-    'id',
-    'isRead',
-    'readAt',
-    'recipientAddress',
-    'sentAt',
-    'title',
-    'type',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['body', 'channel', 'createdAt', 'entityId', 'entityType', 'id', 'isRead', 'readAt', 'recipientAddress', 'sentAt', 'title', 'type', 'updatedAt', 'userId'] as const
   $columns = NotificationSchema.$columns
   @column()
   declare body: string | null
@@ -833,18 +554,7 @@ export class NotificationSchema extends BaseModel {
 }
 
 export class OrderImportPayloadSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'id',
-    'orderId',
-    'payloadHash',
-    'payloadSizeBytes',
-    'rawPayload',
-    'redactedFields',
-    'sellerAccountId',
-    'syncJobId',
-    'userId',
-  ] as const
+  static $columns = ['createdAt', 'id', 'orderId', 'payloadHash', 'payloadSizeBytes', 'rawPayload', 'redactedFields', 'sellerAccountId', 'syncJobId', 'userId'] as const
   $columns = OrderImportPayloadSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -856,15 +566,9 @@ export class OrderImportPayloadSchema extends BaseModel {
   declare payloadHash: string
   @column()
   declare payloadSizeBytes: number
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare rawPayload: any
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare redactedFields: any
   @column()
   declare sellerAccountId: string | null
@@ -875,34 +579,7 @@ export class OrderImportPayloadSchema extends BaseModel {
 }
 
 export class OrderLineItemSchema extends BaseModel {
-  static $columns = [
-    'asin',
-    'channelListingId',
-    'createdAt',
-    'currencyCode',
-    'discountAmount',
-    'externalOrderLineId',
-    'fulfillmentStatus',
-    'id',
-    'lineTotalAmount',
-    'marketplaceFeeAmount',
-    'orderId',
-    'productVariantId',
-    'quantityCancelled',
-    'quantityFulfilled',
-    'quantityOrdered',
-    'quantityReturned',
-    'refundedAmount',
-    'shippingAmount',
-    'sku',
-    'taxAmount',
-    'title',
-    'unitCostAmount',
-    'unitPrice',
-    'updatedAt',
-    'userId',
-    'variantTitle',
-  ] as const
+  static $columns = ['asin', 'channelListingId', 'createdAt', 'currencyCode', 'discountAmount', 'externalOrderLineId', 'fulfillmentStatus', 'id', 'lineTotalAmount', 'marketplaceFeeAmount', 'orderId', 'productVariantId', 'quantityCancelled', 'quantityFulfilled', 'quantityOrdered', 'quantityReturned', 'refundedAmount', 'shippingAmount', 'sku', 'taxAmount', 'title', 'unitCostAmount', 'unitPrice', 'updatedAt', 'userId', 'variantTitle'] as const
   $columns = OrderLineItemSchema.$columns
   @column()
   declare asin: string | null
@@ -959,53 +636,7 @@ export class OrderLineItemSchema extends BaseModel {
 }
 
 export class OrderSchema extends BaseModel {
-  static $columns = [
-    'billingAddressId',
-    'buyerNotes',
-    'cancelledAt',
-    'cogsAmount',
-    'confirmedAt',
-    'createdAt',
-    'currencyCode',
-    'customerId',
-    'deliveredAt',
-    'deliveryNotificationSentAt',
-    'discountAmount',
-    'exchangeRate',
-    'externalOrderId',
-    'fulfillmentStatus',
-    'grossProfitAmount',
-    'id',
-    'internalNotes',
-    'marketplaceCode',
-    'marketplaceFeesAmount',
-    'netProceedsAmount',
-    'netProfitAmount',
-    'orderNumber',
-    'orderedAt',
-    'paymentProcessingFeesAmount',
-    'paymentStatus',
-    'refundedAmount',
-    'reportingCurrencyCode',
-    'reportingTotalAmount',
-    'sellerAccountId',
-    'shippedAt',
-    'shippingAddressId',
-    'shippingAddressSnapshot',
-    'shippingChargedAmount',
-    'shippingCostAmount',
-    'sourceCreatedAt',
-    'sourceType',
-    'sourceUpdatedAt',
-    'status',
-    'subtotalAmount',
-    'syncJobId',
-    'syncStatus',
-    'taxAmount',
-    'totalAmount',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['billingAddressId', 'buyerNotes', 'cancelledAt', 'cogsAmount', 'confirmedAt', 'createdAt', 'currencyCode', 'customerId', 'deliveredAt', 'deliveryNotificationSentAt', 'discountAmount', 'exchangeRate', 'externalOrderId', 'fulfillmentStatus', 'grossProfitAmount', 'id', 'internalNotes', 'marketplaceCode', 'marketplaceFeesAmount', 'netProceedsAmount', 'netProfitAmount', 'orderNumber', 'orderedAt', 'paymentProcessingFeesAmount', 'paymentStatus', 'refundedAmount', 'reportingCurrencyCode', 'reportingTotalAmount', 'sellerAccountId', 'shippedAt', 'shippingAddressId', 'shippingAddressSnapshot', 'shippingChargedAmount', 'shippingCostAmount', 'sourceCreatedAt', 'sourceType', 'sourceUpdatedAt', 'status', 'subtotalAmount', 'syncJobId', 'syncStatus', 'taxAmount', 'totalAmount', 'updatedAt', 'userId'] as const
   $columns = OrderSchema.$columns
   @column()
   declare billingAddressId: string | null
@@ -1069,10 +700,7 @@ export class OrderSchema extends BaseModel {
   declare shippedAt: DateTime | null
   @column()
   declare shippingAddressId: string | null
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare shippingAddressSnapshot: any | null
   @column()
   declare shippingChargedAmount: string
@@ -1103,24 +731,7 @@ export class OrderSchema extends BaseModel {
 }
 
 export class OutboxEventSchema extends BaseModel {
-  static $columns = [
-    'aggregateId',
-    'aggregateType',
-    'correlationId',
-    'createdAt',
-    'eventType',
-    'id',
-    'idempotencyKey',
-    'lastError',
-    'maxRetries',
-    'nextRetryAt',
-    'payload',
-    'processedAt',
-    'retryCount',
-    'status',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['aggregateId', 'aggregateType', 'correlationId', 'createdAt', 'eventType', 'id', 'idempotencyKey', 'lastError', 'maxRetries', 'nextRetryAt', 'payload', 'processedAt', 'retryCount', 'status', 'updatedAt', 'userId'] as const
   $columns = OutboxEventSchema.$columns
   @column()
   declare aggregateId: string
@@ -1142,10 +753,7 @@ export class OutboxEventSchema extends BaseModel {
   declare maxRetries: number
   @column.dateTime()
   declare nextRetryAt: DateTime | null
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare payload: any
   @column.dateTime()
   declare processedAt: DateTime | null
@@ -1160,15 +768,7 @@ export class OutboxEventSchema extends BaseModel {
 }
 
 export class PasswordResetTokenSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'expiresAt',
-    'id',
-    'requestedIp',
-    'tokenHash',
-    'usedAt',
-    'userId',
-  ] as const
+  static $columns = ['createdAt', 'expiresAt', 'id', 'requestedIp', 'tokenHash', 'usedAt', 'userId'] as const
   $columns = PasswordResetTokenSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -1187,16 +787,7 @@ export class PasswordResetTokenSchema extends BaseModel {
 }
 
 export class PermissionSchema extends BaseModel {
-  static $columns = [
-    'action',
-    'createdAt',
-    'description',
-    'id',
-    'name',
-    'resource',
-    'slug',
-    'updatedAt',
-  ] as const
+  static $columns = ['action', 'createdAt', 'description', 'id', 'name', 'resource', 'slug', 'updatedAt'] as const
   $columns = PermissionSchema.$columns
   @column()
   declare action: string
@@ -1217,25 +808,9 @@ export class PermissionSchema extends BaseModel {
 }
 
 export class ProductCategorySchema extends BaseModel {
-  static $columns = [
-    'attributesSchema',
-    'createdAt',
-    'description',
-    'id',
-    'isActive',
-    'name',
-    'parentCategoryId',
-    'slug',
-    'sortOrder',
-    'taxonomyPath',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['attributesSchema', 'createdAt', 'description', 'id', 'isActive', 'name', 'parentCategoryId', 'slug', 'sortOrder', 'taxonomyPath', 'updatedAt', 'userId'] as const
   $columns = ProductCategorySchema.$columns
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare attributesSchema: any
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -1262,14 +837,7 @@ export class ProductCategorySchema extends BaseModel {
 }
 
 export class ProductVariantAttributeSchema extends BaseModel {
-  static $columns = [
-    'attributeName',
-    'attributeValue',
-    'createdAt',
-    'id',
-    'productVariantId',
-    'userId',
-  ] as const
+  static $columns = ['attributeName', 'attributeValue', 'createdAt', 'id', 'productVariantId', 'userId'] as const
   $columns = ProductVariantAttributeSchema.$columns
   @column()
   declare attributeName: string
@@ -1286,41 +854,11 @@ export class ProductVariantAttributeSchema extends BaseModel {
 }
 
 export class ProductVariantSchema extends BaseModel {
-  static $columns = [
-    'asin',
-    'attributes',
-    'barcodeUpcEan',
-    'compareAtPrice',
-    'costPrice',
-    'createdAt',
-    'currencyCode',
-    'dimensionsCm',
-    'id',
-    'images',
-    'isDefault',
-    'manufacturingCost',
-    'mpn',
-    'packagingCost',
-    'productId',
-    'reorderPoint',
-    'retailPrice',
-    'sku',
-    'status',
-    'stockAvailable',
-    'stockOnHand',
-    'stockReserved',
-    'title',
-    'updatedAt',
-    'userId',
-    'weightGrams',
-  ] as const
+  static $columns = ['asin', 'attributes', 'barcodeUpcEan', 'compareAtPrice', 'costPrice', 'createdAt', 'currencyCode', 'dimensionsCm', 'id', 'images', 'isDefault', 'manufacturingCost', 'mpn', 'packagingCost', 'productId', 'reorderPoint', 'retailPrice', 'sku', 'status', 'stockAvailable', 'stockOnHand', 'stockReserved', 'title', 'updatedAt', 'userId', 'weightGrams'] as const
   $columns = ProductVariantSchema.$columns
   @column()
   declare asin: string | null
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare attributes: any
   @column()
   declare barcodeUpcEan: string | null
@@ -1332,17 +870,11 @@ export class ProductVariantSchema extends BaseModel {
   declare createdAt: DateTime
   @column()
   declare currencyCode: string
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare dimensionsCm: any
   @column({ isPrimary: true })
   declare id: string
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare images: any
   @column()
   declare isDefault: boolean
@@ -1379,36 +911,7 @@ export class ProductVariantSchema extends BaseModel {
 }
 
 export class ProductSchema extends BaseModel {
-  static $columns = [
-    'brandId',
-    'categoryId',
-    'collectionName',
-    'createdAt',
-    'description',
-    'dimensionsCm',
-    'extendedDescription',
-    'hasVariants',
-    'id',
-    'images',
-    'listPrice',
-    'metadata',
-    'salePrice',
-    'shortDescription',
-    'skuPrefix',
-    'slug',
-    'status',
-    'subTitle',
-    'subTitle125',
-    'tags',
-    'title',
-    'title75',
-    'title80',
-    'type',
-    'updatedAt',
-    'userId',
-    'variationDimensions',
-    'weightGrams',
-  ] as const
+  static $columns = ['brandId', 'categoryId', 'collectionName', 'createdAt', 'description', 'dimensionsCm', 'extendedDescription', 'hasVariants', 'id', 'images', 'listPrice', 'metadata', 'salePrice', 'shortDescription', 'skuPrefix', 'slug', 'status', 'subTitle', 'subTitle125', 'tags', 'title', 'title75', 'title80', 'type', 'updatedAt', 'userId', 'variationDimensions', 'weightGrams'] as const
   $columns = ProductSchema.$columns
   @column()
   declare brandId: string | null
@@ -1420,10 +923,7 @@ export class ProductSchema extends BaseModel {
   declare createdAt: DateTime
   @column()
   declare description: string | null
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare dimensionsCm: any
   @column()
   declare extendedDescription: string | null
@@ -1431,25 +931,13 @@ export class ProductSchema extends BaseModel {
   declare hasVariants: boolean
   @column({ isPrimary: true })
   declare id: string
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare images: any
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare listPrice: any
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare metadata: any
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare salePrice: any
   @column()
   declare shortDescription: string | null
@@ -1463,10 +951,7 @@ export class ProductSchema extends BaseModel {
   declare subTitle: string | null
   @column()
   declare subTitle125: string | null
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare tags: any
   @column()
   declare title: string
@@ -1480,37 +965,78 @@ export class ProductSchema extends BaseModel {
   declare updatedAt: DateTime
   @column()
   declare userId: string
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare variationDimensions: any
   @column()
   declare weightGrams: string | null
 }
 
+export class QueueJobSchema extends BaseModel {
+  static $columns = ['acquiredAt', 'data', 'dedupAt', 'dedupId', 'dedupTtl', 'error', 'executeAt', 'finishedAt', 'id', 'queue', 'score', 'status', 'workerId'] as const
+  $columns = QueueJobSchema.$columns
+  @column()
+  declare acquiredAt: bigint | number | null
+  @column()
+  declare data: string
+  @column()
+  declare dedupAt: bigint | number | null
+  @column()
+  declare dedupId: string | null
+  @column()
+  declare dedupTtl: bigint | number | null
+  @column()
+  declare error: string | null
+  @column()
+  declare executeAt: bigint | number | null
+  @column()
+  declare finishedAt: bigint | number | null
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare queue: string
+  @column()
+  declare score: bigint | number | null
+  @column()
+  declare status: string
+  @column()
+  declare workerId: string | null
+}
+
+export class QueueScheduleSchema extends BaseModel {
+  static $columns = ['createdAt', 'cronExpression', 'everyMs', 'fromDate', 'id', 'lastRunAt', 'name', 'nextRunAt', 'payload', 'runCount', 'runLimit', 'status', 'timezone', 'toDate'] as const
+  $columns = QueueScheduleSchema.$columns
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare cronExpression: string | null
+  @column()
+  declare everyMs: bigint | number | null
+  @column.dateTime()
+  declare fromDate: DateTime | null
+  @column({ isPrimary: true })
+  declare id: string
+  @column.dateTime()
+  declare lastRunAt: DateTime | null
+  @column()
+  declare name: string
+  @column.dateTime()
+  declare nextRunAt: DateTime | null
+  @column()
+  declare payload: string
+  @column()
+  declare runCount: number
+  @column()
+  declare runLimit: number | null
+  @column()
+  declare status: string
+  @column()
+  declare timezone: string
+  @column.dateTime()
+  declare toDate: DateTime | null
+}
+
 export class RefundTransactionSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'currencyCode',
-    'externalRefundId',
-    'financialAccountId',
-    'id',
-    'itemsRefundAmount',
-    'orderId',
-    'orderLineItemId',
-    'processedAt',
-    'reason',
-    'refundNumber',
-    'restockingFeeDeducted',
-    'returnRequestId',
-    'shippingRefundAmount',
-    'status',
-    'taxRefundAmount',
-    'totalRefundAmount',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['createdAt', 'currencyCode', 'externalRefundId', 'financialAccountId', 'id', 'itemsRefundAmount', 'orderId', 'orderLineItemId', 'processedAt', 'reason', 'refundNumber', 'restockingFeeDeducted', 'returnRequestId', 'shippingRefundAmount', 'status', 'taxRefundAmount', 'totalRefundAmount', 'updatedAt', 'userId'] as const
   $columns = RefundTransactionSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -1553,47 +1079,9 @@ export class RefundTransactionSchema extends BaseModel {
 }
 
 export class ReturnRequestSchema extends BaseModel {
-  static $columns = [
-    'approvalHistory',
-    'authorizedAt',
-    'closedAt',
-    'createdAt',
-    'currencyCode',
-    'customerComments',
-    'customerId',
-    'evidenceImages',
-    'externalReturnId',
-    'id',
-    'internalNotes',
-    'itemCondition',
-    'orderId',
-    'orderLineItemId',
-    'quantityApproved',
-    'quantityReceived',
-    'quantityRequested',
-    'receivedAt',
-    'refundAmount',
-    'replacementOrderId',
-    'requestedAt',
-    'resolutionType',
-    'restockInventory',
-    'restockingFeeAmount',
-    'returnCarrier',
-    'returnLabelUrl',
-    'returnReason',
-    'returnShippingCost',
-    'returnTrackingNumber',
-    'reviewedByUserId',
-    'rmaNumber',
-    'status',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['approvalHistory', 'authorizedAt', 'closedAt', 'createdAt', 'currencyCode', 'customerComments', 'customerId', 'evidenceImages', 'externalReturnId', 'id', 'internalNotes', 'itemCondition', 'orderId', 'orderLineItemId', 'quantityApproved', 'quantityReceived', 'quantityRequested', 'receivedAt', 'refundAmount', 'replacementOrderId', 'requestedAt', 'resolutionType', 'restockInventory', 'restockingFeeAmount', 'returnCarrier', 'returnLabelUrl', 'returnReason', 'returnShippingCost', 'returnTrackingNumber', 'reviewedByUserId', 'rmaNumber', 'status', 'updatedAt', 'userId'] as const
   $columns = ReturnRequestSchema.$columns
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare approvalHistory: any
   @column.dateTime()
   declare authorizedAt: DateTime | null
@@ -1607,10 +1095,7 @@ export class ReturnRequestSchema extends BaseModel {
   declare customerComments: string | null
   @column()
   declare customerId: string
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare evidenceImages: any
   @column()
   declare externalReturnId: string | null
@@ -1682,15 +1167,7 @@ export class RolePermissionSchema extends BaseModel {
 }
 
 export class RoleSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'description',
-    'id',
-    'isSystem',
-    'name',
-    'slug',
-    'updatedAt',
-  ] as const
+  static $columns = ['createdAt', 'description', 'id', 'isSystem', 'name', 'slug', 'updatedAt'] as const
   $columns = RoleSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -1709,18 +1186,7 @@ export class RoleSchema extends BaseModel {
 }
 
 export class SalesChannelSchema extends BaseModel {
-  static $columns = [
-    'channelType',
-    'code',
-    'createdAt',
-    'defaultConfig',
-    'id',
-    'isActive',
-    'logoUrl',
-    'name',
-    'supportsOauth',
-    'updatedAt',
-  ] as const
+  static $columns = ['channelType', 'code', 'createdAt', 'defaultConfig', 'id', 'isActive', 'logoUrl', 'name', 'supportsOauth', 'updatedAt'] as const
   $columns = SalesChannelSchema.$columns
   @column()
   declare channelType: string
@@ -1728,10 +1194,7 @@ export class SalesChannelSchema extends BaseModel {
   declare code: string
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare defaultConfig: any
   @column({ isPrimary: true })
   declare id: string
@@ -1748,30 +1211,13 @@ export class SalesChannelSchema extends BaseModel {
 }
 
 export class SavedViewSchema extends BaseModel {
-  static $columns = [
-    'columnsConfig',
-    'createdAt',
-    'filters',
-    'id',
-    'isDefault',
-    'moduleKey',
-    'name',
-    'sortConfig',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['columnsConfig', 'createdAt', 'filters', 'id', 'isDefault', 'moduleKey', 'name', 'sortConfig', 'updatedAt', 'userId'] as const
   $columns = SavedViewSchema.$columns
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare columnsConfig: any
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare filters: any
   @column({ isPrimary: true })
   declare id: string
@@ -1781,10 +1227,7 @@ export class SavedViewSchema extends BaseModel {
   declare moduleKey: string
   @column()
   declare name: string
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare sortConfig: any
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
@@ -1793,32 +1236,7 @@ export class SavedViewSchema extends BaseModel {
 }
 
 export class SellerAccountSchema extends BaseModel {
-  static $columns = [
-    'accountCode',
-    'accountEmail',
-    'accountName',
-    'accountPhone',
-    'createdAt',
-    'credentialVaultRef',
-    'defaultCurrency',
-    'encryptedCredentials',
-    'externalSellerId',
-    'healthStatus',
-    'id',
-    'lastCredentialRotatedAt',
-    'lastSyncedAt',
-    'marketplaceRegion',
-    'oauthScopes',
-    'rateLimitRpm',
-    'retryPolicy',
-    'salesChannelId',
-    'status',
-    'syncCheckpoint',
-    'syncConfig',
-    'tokenExpiresAt',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['accountCode', 'accountEmail', 'accountName', 'accountPhone', 'createdAt', 'credentialVaultRef', 'defaultCurrency', 'encryptedCredentials', 'externalSellerId', 'healthStatus', 'id', 'lastCredentialRotatedAt', 'lastSyncedAt', 'marketplaceRegion', 'oauthScopes', 'rateLimitRpm', 'retryPolicy', 'salesChannelId', 'status', 'syncCheckpoint', 'syncConfig', 'tokenExpiresAt', 'updatedAt', 'userId'] as const
   $columns = SellerAccountSchema.$columns
   @column()
   declare accountCode: string | null
@@ -1852,24 +1270,15 @@ export class SellerAccountSchema extends BaseModel {
   declare oauthScopes: string | null
   @column()
   declare rateLimitRpm: number
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare retryPolicy: any
   @column()
   declare salesChannelId: string
   @column()
   declare status: string
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare syncCheckpoint: any
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare syncConfig: any
   @column.dateTime()
   declare tokenExpiresAt: DateTime | null
@@ -1880,16 +1289,7 @@ export class SellerAccountSchema extends BaseModel {
 }
 
 export class ShipmentItemSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'id',
-    'orderLineItemId',
-    'quantityShipped',
-    'serialNumbers',
-    'shipmentId',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['createdAt', 'id', 'orderLineItemId', 'quantityShipped', 'serialNumbers', 'shipmentId', 'updatedAt', 'userId'] as const
   $columns = ShipmentItemSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -1899,10 +1299,7 @@ export class ShipmentItemSchema extends BaseModel {
   declare orderLineItemId: string
   @column()
   declare quantityShipped: number
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare serialNumbers: any
   @column()
   declare shipmentId: string
@@ -1913,37 +1310,7 @@ export class ShipmentItemSchema extends BaseModel {
 }
 
 export class ShipmentSchema extends BaseModel {
-  static $columns = [
-    'actualInvoicedCost',
-    'billedWeightGrams',
-    'carrierCode',
-    'carrierName',
-    'createdAt',
-    'currencyCode',
-    'deadWeightGrams',
-    'deliveredAt',
-    'deliveryNotificationSent',
-    'estimatedDeliveryAt',
-    'estimatedShippingCost',
-    'heightCm',
-    'id',
-    'lengthCm',
-    'notes',
-    'orderId',
-    'packagingType',
-    'serviceLevel',
-    'shipmentNumber',
-    'shippedAt',
-    'status',
-    'thirdPartyTrackingNumber',
-    'thirdPartyTrackingUrl',
-    'trackingNumber',
-    'trackingUrl',
-    'updatedAt',
-    'userId',
-    'volumetricWeightGrams',
-    'widthCm',
-  ] as const
+  static $columns = ['actualInvoicedCost', 'billedWeightGrams', 'carrierCode', 'carrierName', 'createdAt', 'currencyCode', 'deadWeightGrams', 'deliveredAt', 'deliveryNotificationSent', 'estimatedDeliveryAt', 'estimatedShippingCost', 'heightCm', 'id', 'lengthCm', 'notes', 'orderId', 'packagingType', 'serviceLevel', 'shipmentNumber', 'shippedAt', 'status', 'thirdPartyTrackingNumber', 'thirdPartyTrackingUrl', 'trackingNumber', 'trackingUrl', 'updatedAt', 'userId', 'volumetricWeightGrams', 'widthCm'] as const
   $columns = ShipmentSchema.$columns
   @column()
   declare actualInvoicedCost: string
@@ -2006,23 +1373,7 @@ export class ShipmentSchema extends BaseModel {
 }
 
 export class ShippingInvoiceLineSchema extends BaseModel {
-  static $columns = [
-    'allowDuplicateCharge',
-    'billedAmount',
-    'chargeType',
-    'createdAt',
-    'currencyCode',
-    'description',
-    'expectedAmount',
-    'id',
-    'reconciliationNotes',
-    'shipmentId',
-    'shippingInvoiceId',
-    'trackingNumber',
-    'updatedAt',
-    'userId',
-    'varianceAmount',
-  ] as const
+  static $columns = ['allowDuplicateCharge', 'billedAmount', 'chargeType', 'createdAt', 'currencyCode', 'description', 'expectedAmount', 'id', 'reconciliationNotes', 'shipmentId', 'shippingInvoiceId', 'trackingNumber', 'updatedAt', 'userId', 'varianceAmount'] as const
   $columns = ShippingInvoiceLineSchema.$columns
   @column()
   declare allowDuplicateCharge: boolean
@@ -2057,29 +1408,7 @@ export class ShippingInvoiceLineSchema extends BaseModel {
 }
 
 export class ShippingInvoiceSchema extends BaseModel {
-  static $columns = [
-    'carrierCode',
-    'carrierName',
-    'createdAt',
-    'currencyCode',
-    'dueDate',
-    'financialAccountId',
-    'id',
-    'invoiceDate',
-    'invoiceNumber',
-    'notes',
-    'paidAmount',
-    'paidAt',
-    'paymentReference',
-    'paymentStatus',
-    'reconciliationStatus',
-    'subtotalAmount',
-    'taxAmount',
-    'totalAmount',
-    'updatedAt',
-    'userId',
-    'varianceAmount',
-  ] as const
+  static $columns = ['carrierCode', 'carrierName', 'createdAt', 'currencyCode', 'dueDate', 'financialAccountId', 'id', 'invoiceDate', 'invoiceNumber', 'notes', 'paidAmount', 'paidAt', 'paymentReference', 'paymentStatus', 'reconciliationStatus', 'subtotalAmount', 'taxAmount', 'totalAmount', 'updatedAt', 'userId', 'varianceAmount'] as const
   $columns = ShippingInvoiceSchema.$columns
   @column()
   declare carrierCode: string
@@ -2126,19 +1455,7 @@ export class ShippingInvoiceSchema extends BaseModel {
 }
 
 export class SyncJobErrorSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'errorCode',
-    'errorMessage',
-    'externalRecordId',
-    'fieldErrors',
-    'id',
-    'isResolved',
-    'rawExcerpt',
-    'recordIndex',
-    'syncJobId',
-    'userId',
-  ] as const
+  static $columns = ['createdAt', 'errorCode', 'errorMessage', 'externalRecordId', 'fieldErrors', 'id', 'isResolved', 'rawExcerpt', 'recordIndex', 'syncJobId', 'userId'] as const
   $columns = SyncJobErrorSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -2148,19 +1465,13 @@ export class SyncJobErrorSchema extends BaseModel {
   declare errorMessage: string
   @column()
   declare externalRecordId: string | null
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare fieldErrors: any
   @column({ isPrimary: true })
   declare id: string
   @column()
   declare isResolved: boolean
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare rawExcerpt: any | null
   @column()
   declare recordIndex: number
@@ -2171,26 +1482,7 @@ export class SyncJobErrorSchema extends BaseModel {
 }
 
 export class SyncJobSchema extends BaseModel {
-  static $columns = [
-    'checkpointCursor',
-    'completedAt',
-    'correlationId',
-    'createdAt',
-    'errorSummary',
-    'failedRecords',
-    'id',
-    'idempotencyKey',
-    'jobType',
-    'processedRecords',
-    'sellerAccountId',
-    'skippedDuplicates',
-    'startedAt',
-    'status',
-    'succeededRecords',
-    'totalRecords',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['checkpointCursor', 'completedAt', 'correlationId', 'createdAt', 'errorSummary', 'failedRecords', 'id', 'idempotencyKey', 'jobType', 'processedRecords', 'sellerAccountId', 'skippedDuplicates', 'startedAt', 'status', 'succeededRecords', 'totalRecords', 'updatedAt', 'userId'] as const
   $columns = SyncJobSchema.$columns
   @column()
   declare checkpointCursor: string | null
@@ -2200,10 +1492,7 @@ export class SyncJobSchema extends BaseModel {
   declare correlationId: string | null
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare errorSummary: any
   @column()
   declare failedRecords: number
@@ -2234,23 +1523,7 @@ export class SyncJobSchema extends BaseModel {
 }
 
 export class TasksReminderSchema extends BaseModel {
-  static $columns = [
-    'completedAt',
-    'createdAt',
-    'creditCardId',
-    'description',
-    'dueAt',
-    'id',
-    'priority',
-    'relatedEntityId',
-    'relatedEntityType',
-    'remindAt',
-    'status',
-    'taskType',
-    'title',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['completedAt', 'createdAt', 'creditCardId', 'description', 'dueAt', 'id', 'priority', 'relatedEntityId', 'relatedEntityType', 'remindAt', 'status', 'taskType', 'title', 'updatedAt', 'userId'] as const
   $columns = TasksReminderSchema.$columns
   @column.dateTime()
   declare completedAt: DateTime | null
@@ -2285,14 +1558,7 @@ export class TasksReminderSchema extends BaseModel {
 }
 
 export class UserRoleSchema extends BaseModel {
-  static $columns = [
-    'assignedByUserId',
-    'createdAt',
-    'expiresAt',
-    'id',
-    'roleId',
-    'userId',
-  ] as const
+  static $columns = ['assignedByUserId', 'createdAt', 'expiresAt', 'id', 'roleId', 'userId'] as const
   $columns = UserRoleSchema.$columns
   @column()
   declare assignedByUserId: string | null
@@ -2309,18 +1575,7 @@ export class UserRoleSchema extends BaseModel {
 }
 
 export class UserSessionSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'expiresAt',
-    'id',
-    'ipAddress',
-    'isRevoked',
-    'lastActiveAt',
-    'revokedAt',
-    'sessionTokenHash',
-    'userAgent',
-    'userId',
-  ] as const
+  static $columns = ['createdAt', 'expiresAt', 'id', 'ipAddress', 'isRevoked', 'lastActiveAt', 'revokedAt', 'sessionTokenHash', 'userAgent', 'userId'] as const
   $columns = UserSessionSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -2345,27 +1600,7 @@ export class UserSessionSchema extends BaseModel {
 }
 
 export class UserSchema extends BaseModel {
-  static $columns = [
-    'companyName',
-    'createdAt',
-    'createdByUserId',
-    'defaultCurrency',
-    'email',
-    'failedLoginAttempts',
-    'fullName',
-    'id',
-    'isSuperAdmin',
-    'lastLoginAt',
-    'lastLoginIp',
-    'lockedUntil',
-    'password',
-    'passwordChangedAt',
-    'phone',
-    'preferences',
-    'status',
-    'timezone',
-    'updatedAt',
-  ] as const
+  static $columns = ['companyName', 'createdAt', 'createdByUserId', 'defaultCurrency', 'email', 'failedLoginAttempts', 'fullName', 'id', 'isSuperAdmin', 'lastLoginAt', 'lastLoginIp', 'lockedUntil', 'password', 'passwordChangedAt', 'phone', 'preferences', 'status', 'timezone', 'updatedAt'] as const
   $columns = UserSchema.$columns
   @column()
   declare companyName: string | null
@@ -2397,10 +1632,7 @@ export class UserSchema extends BaseModel {
   declare passwordChangedAt: DateTime | null
   @column()
   declare phone: string | null
-  @column({
-    prepare: (v) =>
-      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
-  })
+  @column({ prepare: (v)=>v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v) })
   declare preferences: any
   @column()
   declare status: string

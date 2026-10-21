@@ -10,7 +10,6 @@ import { Divider } from '@astryxdesign/core/Divider'
 import { Banner } from '@astryxdesign/core/Banner'
 import { TabList, Tab } from '@astryxdesign/core/TabList'
 import { ProgressBar } from '@astryxdesign/core/ProgressBar'
-import AppLayout from '~/layouts/app'
 import {
   KpiCard,
   PageSection,
@@ -87,7 +86,6 @@ type Props = {
   savedViews: Row[]
 }
 
-Dashboard.layout = (page: React.ReactElement<Props>) => <AppLayout>{page}</AppLayout>
 
 /* ------------------------------------------------------------------ */
 /* SVG Chart components - token-styled with tooltips                   */
@@ -499,8 +497,8 @@ function CreditUtilizationBars({ cards, transactions }: { cards: Row[]; transact
             pct > 80 ? 'error' : pct > 50 ? 'warning' : 'success'
           const daysLeft = card.nextPaymentDueDate
             ? Math.ceil(
-                (new Date(String(card.nextPaymentDueDate)).getTime() - Date.now()) / 86400000
-              )
+              (new Date(String(card.nextPaymentDueDate)).getTime() - Date.now()) / 86400000
+            )
             : null
           return (
             <Stack key={String(card.id)} gap={1}>
@@ -619,10 +617,10 @@ export default function Dashboard(props: Props) {
     channelFilter === 'all'
       ? orders
       : orders.filter((o) =>
-          String(o.marketplaceCode ?? o.sellerAccountId ?? '')
-            .toLowerCase()
-            .includes(channelFilter.toLowerCase())
-        )
+        String(o.marketplaceCode ?? o.sellerAccountId ?? '')
+          .toLowerCase()
+          .includes(channelFilter.toLowerCase())
+      )
 
   const marketplaceSegments = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -674,235 +672,228 @@ export default function Dashboard(props: Props) {
     kpis.totalOrders > 0 ? ((kpis.deliveredOrders / kpis.totalOrders) * 100).toFixed(0) : '0'
 
   return (
-    <Stack gap={5}>
-      {/* Top filter bar */}
-      <Card padding={3} variant="muted">
-        <Stack direction="horizontal" gap={3} align="center" wrap="wrap">
-          <Text type="label" as="span" weight="semibold">
-            Filter:
-          </Text>
-          <Stack direction="horizontal" gap={2} wrap="wrap">
-            {['all', 'amazon', 'ebay', 'etsy', 'direct'].map((ch) => (
-              <button
-                key={ch}
-                onClick={() => setChannelFilter(ch)}
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: 999,
-                  border: '1px solid #d1d5db',
-                  background: channelFilter === ch ? '#0866ff' : 'white',
-                  color: channelFilter === ch ? 'white' : 'inherit',
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  textTransform: 'capitalize',
-                }}
-              >
-                {ch === 'all' ? 'All Channels' : ch}
-              </button>
-            ))}
-          </Stack>
-          <Link href="/orders">
-            <Button label="+ New Order" variant="primary" size="sm" />
-          </Link>
-          <Link href="/products">
-            <Button label="+ New Product" variant="secondary" size="sm" />
-          </Link>
+    <Stack gap={4}>
+      <PageSection
+        id="overview"
+        title="Business Overview"
+        description="Reporting-currency P&L (USD) computed from order-level multi-currency amounts."
+      >
+        <Grid columns={{ minWidth: 210, max: 6 }} gap={3}>
+          <KpiCard label="Total orders" value={String(kpis.totalOrders)} />
+          <KpiCard label="Gross sales" value={money('USD', kpis.grossSales)} />
+          <KpiCard label="Net sales" value={money('USD', kpis.netSales)} />
+          <KpiCard label="Refunded" value={money('USD', kpis.totalRefunded)} />
+          <KpiCard
+            label="Marketplace + payment fees"
+            value={money('USD', kpis.totalMarketplaceFees)}
+          />
+          <KpiCard label="COGS" value={money('USD', kpis.totalCogs)} />
+          <KpiCard label="Shipping cost" value={money('USD', kpis.totalShippingCost)} />
+          <KpiCard label="Orders net profit" value={money('USD', kpis.orderNetProfit)} />
+          <KpiCard label="Business opex" value={money('USD', kpis.businessOperatingExpenses)} />
+          <KpiCard label="Household spend" value={money('USD', kpis.householdExpenses)} />
+          <KpiCard label="Pending orders" value={String(kpis.pendingOrders)} />
+          <KpiCard label="Delivered orders" value={String(kpis.deliveredOrders)} />
+          <KpiCard label="Active shipments" value={String(kpis.activeShipments)} />
+          <KpiCard label="Open returns" value={String(kpis.openReturns)} />
+          <KpiCard label="Risk reviews pending" value={String(kpis.pendingRiskReviews)} />
+          <KpiCard label="Invoice variance" value={money('USD', kpis.invoiceVarianceTotal)} />
+        </Grid>
+      </PageSection>
+
+      <PageSection
+        title="Recent orders"
+        description="Latest orders across your seller accounts."
+        actions={
+          <>
+            <Link href="/orders">
+              <Button label="+ New Order" variant="primary" size="sm" />
+            </Link>
+            <Link href="/products">
+              <Button label="+ New Product" variant="secondary" size="sm" />
+            </Link>
+            <Link href="/shipments">
+              <Button label="+ Shipment" variant="secondary" size="sm" />
+            </Link>
+            <Link href="/finance">
+              <Button label="+ Transaction" variant="ghost" size="sm" />
+            </Link>
+            <Link href="/tasks">
+              <Button label="+ Task" variant="ghost" size="sm" />
+            </Link>
+          </>
+        }
+      >
+        <DataTable
+          rows={filteredOrders.slice(0, 8)}
+          empty="No orders yet."
+          columns={[
+            col.text('orderNumber', 'Order #', 130),
+            col.badge('status', 'Status', STATUS_TONES),
+            col.text('marketplaceCode', 'Channel', 100),
+            col.money('reportingTotalAmount', 'Total'),
+            col.date('orderedAt', 'Date'),
+          ]}
+        />
+      </PageSection>
+
+      <Grid columns={{ minWidth: 340, max: 3 }} gap={4}>
+      <PageSection
+        title="Active shipments"
+        actions={
           <Link href="/shipments">
-            <Button label="+ Shipment" variant="secondary" size="sm" />
+            <Button label="Open" variant="ghost" size="sm" />
           </Link>
-          <Link href="/finance">
-            <Button label="+ Transaction" variant="ghost" size="sm" />
-          </Link>
-          <Link href="/tasks">
-            <Button label="+ Task" variant="ghost" size="sm" />
-          </Link>
+        }
+      >
+        <DataTable
+          rows={shipments.slice(0, 6)}
+          empty="No shipments yet."
+          columns={[
+            col.text('shipmentNumber', 'Shipment #', 130),
+            col.badge('status', 'Status', STATUS_TONES),
+            col.text('carrierCode', 'Carrier', 90),
+          ]}
+        />
+      </PageSection>
+
+      <Card padding={4} variant="green" elevation="low">
+        <Stack gap={2}>
+          <Stack direction="horizontal" gap={2} align="center">
+            <span
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                background: '#dcfce7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <TrendingUp size={18} color="#22c55e" />
+            </span>
+            <Text type="label" as="div" weight="semibold">
+              Order Net Profit
+            </Text>
+          </Stack>
+          <Text type="display-2" as="div" weight="bold">
+            {money('USD', kpis.orderNetProfit)}
+          </Text>
+          <Text type="supporting" as="div">
+            Margin: {netMargin}% · COGS: {money('USD', kpis.totalCogs)}
+          </Text>
+          <Stack gap={1}>
+            <Stack direction="horizontal" gap={2} align="center">
+              <Text type="supporting" as="span">
+                Fees: {money('USD', kpis.totalMarketplaceFees)}
+              </Text>
+              <Text type="supporting" as="span">
+                Ship: {money('USD', kpis.totalShippingCost)}
+              </Text>
+            </Stack>
+            <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ flex: Number(kpis.totalCogs) || 1, background: '#f59e0b' }} />
+              <div
+                style={{ flex: Number(kpis.totalMarketplaceFees) || 1, background: '#e8790a' }}
+              />
+              <div style={{ flex: Number(kpis.totalShippingCost) || 1, background: '#a78bfa' }} />
+            </div>
+          </Stack>
         </Stack>
       </Card>
 
-      {/* 4 Hero KPI Scorecards */}
-      <Grid columns={{ minWidth: 260, max: 4 }} gap={4}>
-        <Card padding={4} variant="blue" elevation="low">
-          <Stack gap={2}>
-            <Stack direction="horizontal" gap={2} align="center">
-              <span
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  background: '#dbeafe',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <DollarSign size={18} color="#0866ff" />
-              </span>
-              <Text type="label" as="div" weight="semibold">
-                Gross & Net Revenue
-              </Text>
-            </Stack>
-            <Text type="display-2" as="div" weight="bold">
-              {money('USD', kpis.grossSales)}
+      <Card padding={4} variant="cyan" elevation="low">
+        <Stack gap={2}>
+          <Stack direction="horizontal" gap={2} align="center">
+            <span
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                background: '#cffafe',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Package size={18} color="#0891b2" />
+            </span>
+            <Text type="label" as="div" weight="semibold">
+              Fulfillment & SLA
             </Text>
-            <Text type="supporting" as="div">
-              Net: {money('USD', kpis.netSales)} · Refunded: {money('USD', kpis.totalRefunded)}
-            </Text>
-            <Stack gap={1}>
-              <Stack direction="horizontal" gap={2} align="center">
-                <Text type="supporting" as="span">
-                  Refund rate
-                </Text>
-                <Text type="label" as="span" weight="semibold">
-                  {refundRate}%
-                </Text>
-              </Stack>
-              <ProgressBar
-                label="Refund rate"
-                value={Number(refundRate)}
-                max={10}
-                variant={Number(refundRate) > 5 ? 'warning' : 'success'}
-              />
-            </Stack>
           </Stack>
-        </Card>
-
-        <Card padding={4} variant="green" elevation="low">
-          <Stack gap={2}>
+          <Text type="display-2" as="div" weight="bold">
+            {kpis.deliveredOrders} / {kpis.totalOrders}
+          </Text>
+          <Text type="supporting" as="div">
+            Delivered · {kpis.activeShipments} active shipments
+          </Text>
+          <Stack gap={1}>
             <Stack direction="horizontal" gap={2} align="center">
-              <span
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  background: '#dcfce7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <TrendingUp size={18} color="#22c55e" />
-              </span>
-              <Text type="label" as="div" weight="semibold">
-                Order Net Profit
+              <Text type="supporting" as="span">
+                Completion
+              </Text>
+              <Text type="label" as="span" weight="semibold">
+                {completionRate}%
               </Text>
             </Stack>
-            <Text type="display-2" as="div" weight="bold">
-              {money('USD', kpis.orderNetProfit)}
-            </Text>
+            <ProgressBar
+              label="Fulfillment completion"
+              value={Number(completionRate)}
+              variant="success"
+            />
             <Text type="supporting" as="div">
-              Margin: {netMargin}% · COGS: {money('USD', kpis.totalCogs)}
+              Invoice variance: {money('USD', kpis.invoiceVarianceTotal)}
             </Text>
-            <Stack gap={1}>
-              <Stack direction="horizontal" gap={2} align="center">
-                <Text type="supporting" as="span">
-                  Fees: {money('USD', kpis.totalMarketplaceFees)}
-                </Text>
-                <Text type="supporting" as="span">
-                  Ship: {money('USD', kpis.totalShippingCost)}
-                </Text>
-              </Stack>
-              <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ flex: Number(kpis.totalCogs) || 1, background: '#f59e0b' }} />
-                <div
-                  style={{ flex: Number(kpis.totalMarketplaceFees) || 1, background: '#e8790a' }}
-                />
-                <div style={{ flex: Number(kpis.totalShippingCost) || 1, background: '#a78bfa' }} />
-              </div>
-            </Stack>
           </Stack>
-        </Card>
+        </Stack>
+      </Card>
 
-        <Card padding={4} variant="cyan" elevation="low">
-          <Stack gap={2}>
-            <Stack direction="horizontal" gap={2} align="center">
-              <span
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  background: '#cffafe',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Package size={18} color="#0891b2" />
-              </span>
-              <Text type="label" as="div" weight="semibold">
-                Fulfillment & SLA
-              </Text>
-            </Stack>
-            <Text type="display-2" as="div" weight="bold">
-              {kpis.deliveredOrders} / {kpis.totalOrders}
+      <Card padding={4} variant="orange" elevation="low">
+        <Stack gap={2}>
+          <Stack direction="horizontal" gap={2} align="center">
+            <span
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                background: '#ffedd5',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <AlertTriangle size={18} color="#f59e0b" />
+            </span>
+            <Text type="label" as="div" weight="semibold">
+              Risk & Cashflow Alerts
             </Text>
-            <Text type="supporting" as="div">
-              Delivered · {kpis.activeShipments} active shipments
-            </Text>
+          </Stack>
+          <Stack direction="horizontal" gap={3}>
             <Stack gap={1}>
-              <Stack direction="horizontal" gap={2} align="center">
-                <Text type="supporting" as="span">
-                  Completion
-                </Text>
-                <Text type="label" as="span" weight="semibold">
-                  {completionRate}%
-                </Text>
-              </Stack>
-              <ProgressBar
-                label="Fulfillment completion"
-                value={Number(completionRate)}
-                variant="success"
-              />
+              <Text type="display-3" as="div" weight="bold">
+                {kpis.openReturns}
+              </Text>
               <Text type="supporting" as="div">
-                Invoice variance: {money('USD', kpis.invoiceVarianceTotal)}
+                Open RMAs
+              </Text>
+            </Stack>
+            <Stack gap={1}>
+              <Text type="display-3" as="div" weight="bold">
+                {kpis.pendingRiskReviews}
+              </Text>
+              <Text type="supporting" as="div">
+                Risk reviews
               </Text>
             </Stack>
           </Stack>
-        </Card>
-
-        <Card padding={4} variant="orange" elevation="low">
-          <Stack gap={2}>
-            <Stack direction="horizontal" gap={2} align="center">
-              <span
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  background: '#ffedd5',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <AlertTriangle size={18} color="#f59e0b" />
-              </span>
-              <Text type="label" as="div" weight="semibold">
-                Risk & Cashflow Alerts
-              </Text>
-            </Stack>
-            <Stack direction="horizontal" gap={3}>
-              <Stack gap={1}>
-                <Text type="display-3" as="div" weight="bold">
-                  {kpis.openReturns}
-                </Text>
-                <Text type="supporting" as="div">
-                  Open RMAs
-                </Text>
-              </Stack>
-              <Stack gap={1}>
-                <Text type="display-3" as="div" weight="bold">
-                  {kpis.pendingRiskReviews}
-                </Text>
-                <Text type="supporting" as="div">
-                  Risk reviews
-                </Text>
-              </Stack>
-            </Stack>
-            <Text type="supporting" as="div">
-              Business opex: {money('USD', kpis.businessOperatingExpenses)} · Household:{' '}
-              {money('USD', kpis.householdExpenses)}
-            </Text>
-          </Stack>
-        </Card>
+          <Text type="supporting" as="div">
+            Business opex: {money('USD', kpis.businessOperatingExpenses)} · Household:{' '}
+            {money('USD', kpis.householdExpenses)}
+          </Text>
+        </Stack>
+      </Card>
       </Grid>
 
       {/* Secondary compact health strip */}
@@ -928,208 +919,24 @@ export default function Dashboard(props: Props) {
         </Grid>
       </Card>
 
-      {/* 4 Interactive Charts */}
-      <Grid columns={{ minWidth: 340, max: 2 }} gap={4}>
-        <Card padding={4}>
-          <Stack gap={3}>
-            <Stack direction="horizontal" gap={2} align="center">
-              <BarChart3 size={18} color="#0866ff" />
-              <Heading level={3}>P&L Waterfall</Heading>
-            </Stack>
-            <Text type="supporting" as="div">
-              Gross → Refunds → COGS → Fees → Shipping → Net Profit → Opex
-            </Text>
-            <WaterfallChart kpis={kpis} />
-          </Stack>
-        </Card>
-
-        <Card padding={4}>
-          <Stack gap={3}>
-            <Stack direction="horizontal" gap={2} align="center">
-              <Activity size={18} color="#7c3aed" />
-              <Heading level={3}>Revenue & Profit Trend</Heading>
-            </Stack>
-            <Text type="supporting" as="div">
-              Chronological order revenue & net profit (toggle Revenue / Net Profit / Fees)
-            </Text>
-            <RevenueTrendChart orders={filteredOrders} />
-          </Stack>
-        </Card>
-
-        <Card padding={4}>
-          <Stack gap={3}>
-            <Stack direction="horizontal" gap={2} align="center">
-              <PieChart size={18} color="#22c55e" />
-              <Heading level={3}>Marketplace & Status Distribution</Heading>
-            </Stack>
-            <Grid columns={2} gap={4}>
-              <DonutChart
-                title="By Marketplace"
-                segments={
-                  marketplaceSegments.length
-                    ? marketplaceSegments
-                    : [{ label: 'No data', value: 1, color: '#e5e7eb' }]
-                }
-              />
-              <DonutChart
-                title="Order & Shipment Status"
-                segments={
-                  statusSegments.length
-                    ? statusSegments
-                    : [{ label: 'No data', value: 1, color: '#e5e7eb' }]
-                }
-              />
-            </Grid>
-          </Stack>
-        </Card>
-
-        <Card padding={4}>
-          <Stack gap={3}>
-            <Stack direction="horizontal" gap={2} align="center">
-              <CreditCard size={18} color="#f59e0b" />
-              <Heading level={3}>Credit Utilization & Cashflow</Heading>
-            </Stack>
-            <CreditUtilizationBars cards={creditCards} transactions={financialTransactions} />
-          </Stack>
-        </Card>
-      </Grid>
-
-      {/* Operational Queues — Tabbed */}
-      <Card padding={4}>
-        <Stack gap={4}>
-          <TabList value={activeTab} onChange={setActiveTab} hasDivider>
-            <Tab value="orders" label="Recent Orders" />
-            <Tab value="shipments" label="Fulfillment & Shipments" />
-            <Tab value="returns" label="Returns & Claims" />
-            <Tab value="cards" label="Credit Cards & Tasks" />
-            <Tab value="audit" label="Seller Health & Audit" />
-          </TabList>
-
-          {activeTab === 'orders' ? (
-            <DataTable
-              rows={orders.slice(0, 8)}
-              empty="No orders yet — create your first order in the Orders module."
-              columns={[
-                col.text('orderNumber', 'Order #', 140),
-                col.badge('status', 'Status', STATUS_TONES),
-                col.money('totalAmount', 'Total', 'currencyCode'),
-                col.money('netProfitAmount', 'Net profit', 'reportingCurrencyCode'),
-                col.date('orderedAt', 'Ordered'),
-              ]}
-            />
-          ) : null}
-
-          {activeTab === 'shipments' ? (
-            <Stack gap={3}>
-              <Text type="label" as="div" weight="semibold">
-                Active Shipments
-              </Text>
-              <DataTable
-                rows={shipments.slice(0, 6)}
-                empty="No shipments yet."
-                columns={[
-                  col.text('shipmentNumber', 'Shipment #', 130),
-                  col.badge('status', 'Status', STATUS_TONES),
-                  col.text('carrierCode', 'Carrier', 90),
-                ]}
-              />
-              <Text type="label" as="div" weight="semibold">
-                Seller Accounts
-              </Text>
-              <DataTable
-                rows={sellerAccounts.slice(0, 6)}
-                empty="No seller accounts connected."
-                columns={[
-                  col.text('accountName', 'Account', 150),
-                  col.badge('status', 'Status', STATUS_TONES),
-                  col.badge('healthStatus', 'Health', {
-                    healthy: 'success',
-                    warning: 'warning',
-                    critical: 'error',
-                    unknown: 'neutral',
-                  }),
-                ]}
-              />
-            </Stack>
-          ) : null}
-
-          {activeTab === 'returns' ? (
-            <Stack gap={3}>
-              <Text type="label" as="div" weight="semibold">
-                Open Returns
-              </Text>
-              <DataTable
-                rows={returnRequests.slice(0, 6)}
-                empty="No return requests."
-                columns={[
-                  col.text('rmaNumber', 'RMA #', 120),
-                  col.badge('status', 'Status', STATUS_TONES),
-                  col.text('returnReason', 'Reason', 120),
-                ]}
-              />
-              <Text type="label" as="div" weight="semibold">
-                Marketplace Claims
-              </Text>
-              <DataTable
-                rows={(props.marketplaceClaims ?? []).slice(0, 6)}
-                empty="No claims."
-                columns={[
-                  col.text('claimNumber', 'Claim #', 120),
-                  col.badge('status', 'Status', STATUS_TONES),
-                  col.money('disputedAmount', 'Disputed', 'currencyCode'),
-                ]}
-              />
-            </Stack>
-          ) : null}
-
-          {activeTab === 'cards' ? (
-            <Stack gap={3}>
-              <Text type="label" as="div" weight="semibold">
-                Credit Cards
-              </Text>
-              <DataTable
-                rows={creditCards.slice(0, 6)}
-                empty="No credit cards on file."
-                columns={[
-                  col.text('cardLabel', 'Card', 140),
-                  col.text('last4Digits', 'Last 4', 70),
-                  col.money('minimumPaymentDue', 'Min due', 'currencyCode'),
-                ]}
-              />
-              <Text type="label" as="div" weight="semibold">
-                Upcoming Tasks
-              </Text>
-              <DataTable
-                rows={tasksReminders.slice(0, 6)}
-                empty="Task queue is clear."
-                columns={[
-                  col.text('title', 'Task', 180),
-                  col.badge('priority', 'Priority', {
-                    urgent: 'error',
-                    high: 'warning',
-                    medium: 'info',
-                    low: 'neutral',
-                  }),
-                  col.date('dueAt', 'Due'),
-                ]}
-              />
-            </Stack>
-          ) : null}
-
-          {activeTab === 'audit' ? (
-            <DataTable
-              rows={auditLogs.slice(0, 8)}
-              empty="No audit events recorded."
-              columns={[
-                col.text('action', 'Action', 150),
-                col.text('entityType', 'Entity', 120),
-                col.text('user', 'Owner', 140),
-                col.date('createdAt', 'When'),
-              ]}
-            />
-          ) : null}
-        </Stack>
-      </Card>
+      <PageSection
+        title="Recent audit events"
+        actions={
+          <Link href="/audit">
+            <Button label="Open" variant="ghost" size="sm" />
+          </Link>
+        }
+      >
+        <DataTable
+          rows={auditLogs.slice(0, 6)}
+          empty="No audit events recorded."
+          columns={[
+            col.text('action', 'Action', 150),
+            col.text('entityType', 'Entity', 120),
+            col.date('createdAt', 'When'),
+          ]}
+        />
+      </PageSection>
 
       <Card padding={4} variant="muted">
         <Stack direction="horizontal" align="center" wrap="wrap" gap={3}>

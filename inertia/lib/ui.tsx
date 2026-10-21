@@ -5,8 +5,8 @@
  */
 import { type ReactNode, useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Form } from '@adonisjs/inertia/react'
-import { Stack } from '@astryxdesign/core/Stack'
-import { StackItem } from '@astryxdesign/core/Stack'
+import { Stack, StackItem } from '@astryxdesign/core/Stack'
+import { Heading } from '@astryxdesign/core/Heading'
 import { Text } from '@astryxdesign/core/Text'
 import { Heading } from '@astryxdesign/core/Heading'
 import { Card } from '@astryxdesign/core/Card'
@@ -18,53 +18,20 @@ import { TextInput } from '@astryxdesign/core/TextInput'
 import { TextArea } from '@astryxdesign/core/TextArea'
 import { Selector } from '@astryxdesign/core/Selector'
 import { Divider } from '@astryxdesign/core/Divider'
-import { Banner } from '@astryxdesign/core/Banner'
-import { Grid } from '@astryxdesign/core/Grid'
-import { EmptyState } from '@astryxdesign/core/EmptyState'
-import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
-import { ProgressBar } from '@astryxdesign/core/ProgressBar'
-import { IconButton } from '@astryxdesign/core/IconButton'
-import {
-  Search,
-  X,
-  Pencil,
-  Trash2,
-  Plus,
-  LayoutGrid,
-  Table2,
-  ChevronLeft,
-  ChevronRight,
-  AlertCircle,
-  Filter,
-  Eye,
-  Package,
-  Sparkles,
-} from 'lucide-react'
+import { formatMoney, formatDate, shortId } from '~/lib/utils'
 
 /* ------------------------------------------------------------------ */
-/* Formatting helpers                                                   */
+/* Formatting helpers — delegate to lib/utils.ts                        */
 /* ------------------------------------------------------------------ */
 
-export function money(currency: string | undefined, amount: unknown): string {
-  const n = Number(amount ?? 0)
-  const cur = (currency || 'USD').toUpperCase()
-  try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur }).format(n)
-  } catch {
-    return `${cur} ${n.toFixed(2)}`
-  }
-}
+/** @deprecated Use `formatMoney` from `~/lib/utils` directly. */
+export const money = formatMoney
 
-export function when(value: unknown): string {
-  if (!value) return '—'
-  const d = new Date(String(value))
-  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString()
-}
+/** @deprecated Use `formatDate` from `~/lib/utils` directly. */
+export const when = formatDate
 
-export function short(id: unknown): string {
-  const s = String(id ?? '')
-  return s.length > 14 ? `${s.slice(0, 6)}…${s.slice(-4)}` : s
-}
+/** @deprecated Use `shortId` from `~/lib/utils` directly. */
+export const short = shortId
 
 export const ID_RE = /^[a-z]{2,8}_[0-9A-HJKMNP-TV-Z]{26}$/
 
@@ -170,25 +137,29 @@ export function PageSection({
   children: ReactNode
 }) {
   return (
-    <section id={id}>
+    <Stack as="section" id={id} gap={0} className="page-section">
       <Card padding={5}>
         <Stack gap={4}>
           <Stack direction="horizontal" align="center" wrap="wrap" gap={3}>
-            <Stack gap={1}>
-              <Heading level={2}>{title}</Heading>
-              {description ? (
-                <Text type="supporting" as="div">
-                  {description}
-                </Text>
-              ) : null}
-            </Stack>
-            {actions ? <StackItem>{actions}</StackItem> : null}
+            <StackItem size="fill">
+              <Stack gap={1}>
+                <Heading level={2} type="display-3" weight="bold">
+                  {title}
+                </Heading>
+                {description ? (
+                  <Text type="supporting" as="div">
+                    {description}
+                  </Text>
+                ) : null}
+              </Stack>
+            </StackItem>
+            {actions ?? null}
           </Stack>
           <Divider />
           {children}
         </Stack>
       </Card>
-    </section>
+    </Stack>
   )
 }
 
@@ -383,8 +354,8 @@ export function SmartForm({
                 />
               )
             })}
-          </Grid>
-          <Stack direction="horizontal" gap={2}>
+          </Stack>
+          <Stack direction="horizontal">
             <Button
               label={submitLabel}
               type="submit"
@@ -394,8 +365,9 @@ export function SmartForm({
             />
           </Stack>
         </Stack>
-      )}
-    </Form>
+  )
+}
+    </Form >
   )
 }
 
@@ -418,7 +390,7 @@ export function RowAction({
   return (
     <Form action={action} method={method}>
       {({ processing }) => (
-        <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+        <Stack direction="horizontal" gap={1} align="center" as="span">
           {(fields ?? []).map((f) => (
             <input key={f.name} type="hidden" name={f.name} value={f.value} />
           ))}
@@ -432,7 +404,7 @@ export function RowAction({
               if (confirmText && !window.confirm(confirmText)) e.preventDefault?.()
             }}
           />
-        </span>
+        </Stack>
       )}
     </Form>
   )
@@ -689,7 +661,7 @@ export function DataTable({
     )
   }
   return (
-    <div style={{ overflowX: 'auto' }}>
+    <Stack isScrollable>
       <Table
         data={rows}
         columns={columns}
@@ -700,7 +672,7 @@ export function DataTable({
         hasHover
         textOverflow="truncate"
       />
-    </div>
+    </Stack>
   )
 }
 
@@ -709,26 +681,26 @@ export const col = {
     key,
     header,
     width: width ? pixel(width) : proportional(1),
-    renderCell: (row: Row) => <span>{displayValue(row[key])}</span>,
+    renderCell: (row: Row) => <Text type="body">{String(row[key] ?? '—')}</Text>,
   }),
   id: (key: string, header = 'ID'): TableColumn<Row> => ({
     key,
     header,
     width: pixel(130),
-    renderCell: (row: Row) => <Text type="code">{short(row[key])}</Text>,
+    renderCell: (row: Row) => <Text type="code">{shortId(row[key])}</Text>,
   }),
   money: (key: string, header: string, currencyKey = 'currencyCode'): TableColumn<Row> => ({
     key,
     header,
     width: pixel(120),
     align: 'end',
-    renderCell: (row: Row) => <span>{money(row[currencyKey] as string, row[key])}</span>,
+    renderCell: (row: Row) => <Text type="body">{money(row[currencyKey] as string, row[key])}</Text>,
   }),
   date: (key: string, header: string): TableColumn<Row> => ({
     key,
     header,
     width: pixel(150),
-    renderCell: (row: Row) => <span>{when(row[key])}</span>,
+    renderCell: (row: Row) => <Text type="body">{when(row[key])}</Text>,
   }),
   badge: (key: string, header: string, toneMap?: Record<string, string>): TableColumn<Row> => ({
     key,
@@ -1234,13 +1206,13 @@ export function ResponsiveDataView({
                   transition: 'box-shadow 140ms, transform 140ms',
                 }}
                 onMouseEnter={(e) => {
-                  ;(e.currentTarget as HTMLDivElement).style.boxShadow =
+                  ; (e.currentTarget as HTMLDivElement).style.boxShadow =
                     '0 8px 24px rgba(0,0,0,0.08)'
-                  ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'
+                    ; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'
                 }}
                 onMouseLeave={(e) => {
-                  ;(e.currentTarget as HTMLDivElement).style.boxShadow = 'none'
-                  ;(e.currentTarget as HTMLDivElement).style.transform = 'none'
+                  ; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'
+                    ; (e.currentTarget as HTMLDivElement).style.transform = 'none'
                 }}
               >
                 {/* Accent strip */}

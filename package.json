@@ -14,7 +14,12 @@
     "test": "node ace test",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "typecheck": "tsc --noEmit && tsc --noEmit --project inertia/tsconfig.json"
+    "typecheck": "tsc --noEmit && tsc --noEmit --project inertia/tsconfig.json",
+    "db:migrate": "node ace migration:run",
+    "db:rollback": "node ace migration:rollback",
+    "db:fresh": "node ace migration:fresh",
+    "db:refresh": "node ace migration:refresh",
+    "db:seed": "node ace db:seed"
   },
   "imports": {
     "#controllers/*": "./app/controllers/*.js",
@@ -114,7 +119,8 @@
   "allowScripts": {
     "@swc/core": true,
     "esbuild": true,
-    "fsevents": true
+    "fsevents": true,
+    "@embedded-postgres/windows-x64": true
   },
   "prettier": "@adonisjs/prettier-config"
 }
