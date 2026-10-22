@@ -3,6 +3,10 @@ import { Table, proportional, pixel } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Button } from '@astryxdesign/core/Button'
 import { EmptyState } from '@astryxdesign/core/EmptyState'
+import { Card } from '@astryxdesign/core/Card'
+import { VStack } from '@astryxdesign/core/Stack'
+import { Grid } from '@astryxdesign/core/Grid'
+import { Text } from '@astryxdesign/core/Text'
 import { Package, Filter } from 'lucide-react'
 import { formatMoney, formatDate, shortId } from '~/lib/utils'
 import { StatusBadge } from '../atoms/status-badge'
@@ -40,26 +44,26 @@ export function DataTable({
 }) {
   if (!rows || rows.length === 0) {
     return (
-      <div className="py-8 text-center text-sm text-muted-foreground border border-dashed border-border rounded-xl bg-muted/20">
-        {empty ?? 'No records yet.'}
-      </div>
+      <Card variant="muted" padding={5}>
+        <Text type="supporting" justify="center" display="block">
+          {empty ?? 'No records yet.'}
+        </Text>
+      </Card>
     )
   }
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-border bg-card">
-      <div className="min-w-[640px]">
-        <Table
-          data={rows}
-          columns={columns}
-          idKey={(row: Row) => String(row.id ?? JSON.stringify(row).slice(0, 40))}
-          density="compact"
-          dividers="rows"
-          isStriped
-          hasHover
-          textOverflow="truncate"
-        />
-      </div>
-    </div>
+    <Card padding={0}>
+      <Table
+        data={rows}
+        columns={columns}
+        idKey={(row: Row) => String(row.id ?? JSON.stringify(row).slice(0, 40))}
+        density="compact"
+        dividers="rows"
+        isStriped
+        hasHover
+        textOverflow="truncate"
+      />
+    </Card>
   )
 }
 
@@ -69,7 +73,7 @@ export const col = {
     header,
     width: width ? pixel(width) : proportional(1),
     renderCell: (row: Row) => (
-      <span className="text-xs sm:text-sm text-foreground truncate">{displayValue(row[key])}</span>
+      <Text type="body" size="sm" maxLines={1}>{displayValue(row[key])}</Text>
     ),
   }),
   id: (key: string, header = 'ID'): TableColumn<Row> => ({
@@ -84,9 +88,9 @@ export const col = {
     width: pixel(120),
     align: 'end',
     renderCell: (row: Row) => (
-      <span className="text-xs sm:text-sm font-semibold text-foreground tabular-nums">
+      <Text type="body" size="sm" weight="semibold" hasTabularNumbers>
         {formatMoney(row[currencyKey] as string, row[key])}
-      </span>
+      </Text>
     ),
   }),
   date: (key: string, header: string): TableColumn<Row> => ({
@@ -94,7 +98,7 @@ export const col = {
     header,
     width: pixel(150),
     renderCell: (row: Row) => (
-      <span className="text-xs text-muted-foreground">{formatDate(row[key])}</span>
+      <Text type="supporting" size="xsm">{formatDate(row[key])}</Text>
     ),
   }),
   badge: (key: string, header: string, toneMap?: Record<string, string>): TableColumn<Row> => ({
@@ -238,7 +242,7 @@ export function ResponsiveDataView({
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6">
+      <Card variant="muted" padding={5}>
         <EmptyState
           title={emptyTitle}
           description={emptyDescription ?? 'Get started by creating your first record.'}
@@ -250,7 +254,7 @@ export function ResponsiveDataView({
             ) : undefined)
           }
         />
-      </div>
+      </Card>
     )
   }
 
@@ -322,7 +326,7 @@ export function ResponsiveDataView({
 
       {/* Content */}
       {sorted.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6">
+        <Card variant="muted" padding={5}>
           <EmptyState
             title="No matching records"
             description="Try adjusting your search query or active filter pills."
@@ -338,39 +342,37 @@ export function ResponsiveDataView({
               />
             }
           />
-        </div>
+        </Card>
       ) : effectiveMode === 'cards' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <Grid columns={{ minWidth: 280, max: 3 }} gap={4}>
           {paginated.map((row) => (
             <RecordCard
               key={String(row.id ?? JSON.stringify(row).slice(0, 24))}
               card={toCard(row)}
             />
           ))}
-        </div>
+        </Grid>
       ) : (
-        <div className="space-y-2.5">
-          <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-2xs">
-            <div className="min-w-[720px]">
-              <Table
-                data={paginated}
-                columns={columns.map((c) => {
-                  if (c.key === '__action') return c
-                  const isSorted = sortKey === c.key
-                  return {
-                    ...c,
-                    header: `${c.header}${isSorted ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}`,
-                  }
-                })}
-                idKey={(row: Row) => String(row.id ?? JSON.stringify(row).slice(0, 40))}
-                density="compact"
-                dividers="rows"
-                isStriped
-                hasHover
-                textOverflow="truncate"
-              />
-            </div>
-          </div>
+        <VStack gap={3}>
+          <Card padding={0}>
+            <Table
+              data={paginated}
+              columns={columns.map((c) => {
+                if (c.key === '__action') return c
+                const isSorted = sortKey === c.key
+                return {
+                  ...c,
+                  header: `${c.header}${isSorted ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}`,
+                }
+              })}
+              idKey={(row: Row) => String(row.id ?? JSON.stringify(row).slice(0, 40))}
+              density="compact"
+              dividers="rows"
+              isStriped
+              hasHover
+              textOverflow="truncate"
+            />
+          </Card>
 
           <SortPillBar
             columns={columns.map((c) => ({ key: c.key, header: String(c.header) }))}
@@ -378,7 +380,7 @@ export function ResponsiveDataView({
             sortDir={sortDir}
             onSort={handleSort}
           />
-        </div>
+        </VStack>
       )}
 
       <PaginationBar
