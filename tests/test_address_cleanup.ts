@@ -168,7 +168,7 @@ try {
   checks.push({ label: 'A1: add1', pass: a1.add1 === '4422 Glenmore Ave' })
   checks.push({ label: 'A1: city', pass: a1.city === 'Baltimore' })
   checks.push({ label: 'A1: state', pass: a1.state === 'Maryland' })
-  checks.push({ label: 'A1: zip', pass: a1.rawZip === '21206' || a1.zipCode === '21206' })
+  checks.push({ label: 'A1: zip', pass: a1.zipCode === '21206' })
   checks.push({ label: 'A1: country US', pass: a1.country === 'United States' })
   checks.push({ label: 'A1: phone has ext', pass: a1.ext === '56535' })
   checks.push({ label: 'A1: ref', pass: a1.ref === '114-5610173-1564218-JCAM' })
@@ -199,7 +199,7 @@ try {
   checks.push({ label: 'A10: country Germany', pass: a10.country === 'Germany' })
   checks.push({ label: 'A10: countryCode DE', pass: a10.countryCode === 'DE' })
   checks.push({ label: 'A10: city Eichstatt', pass: a10.city.toLowerCase().includes('eichst') })
-  checks.push({ label: 'A10: zip 85072', pass: a10.zipCode === '85072' || a10.rawZip === '85072' })
+  checks.push({ label: 'A10: zip 85072', pass: a10.zipCode === '85072' })
 
   // #13 Abdi Abbajobir (double Germany, IOSS)
   const a13 = results[12]
