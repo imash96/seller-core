@@ -54,22 +54,22 @@ export function Modal({
         aria-modal="true"
         className={`relative z-10 flex flex-col w-full ${maxWidthClass} max-h-[90dvh] rounded-2xl bg-card text-card-foreground border border-border shadow-2xl overflow-hidden`}
       >
-        <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border bg-linear-to-r from-slate-900 to-indigo-950 text-white">
+        <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border bg-muted/50">
           <div className="flex items-center gap-3 min-w-0">
             {icon && (
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 {icon}
               </div>
             )}
             <div className="min-w-0">
-              <h3 className="text-base sm:text-lg font-bold truncate">{title}</h3>
-              {subtitle && <p className="text-xs text-slate-300 truncate mt-0.5">{subtitle}</p>}
+              <h3 className="text-base sm:text-lg font-bold truncate text-foreground">{title}</h3>
+              {subtitle && <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-white/75 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             aria-label="Close modal"
           >
             <X className="w-5 h-5" />

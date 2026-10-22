@@ -1,4 +1,4 @@
-import { client } from '~/client'
+import { client } from '~/app/client'
 import ReactDOMServer from 'react-dom/server'
 import { TuyauProvider } from '@adonisjs/inertia/react'
 import { resolvePageComponent } from '@adonisjs/inertia/helpers'
@@ -10,8 +10,8 @@ export default function render(page: any) {
     render: ReactDOMServer.renderToString,
     resolve: async (name) => {
       const resolvedPage = await resolvePageComponent(
-        `./pages/${name}.tsx`,
-        import.meta.glob<{ default: ResolvedComponent }>('./pages/**/*.tsx', { eager: true })
+        `../pages/${name}.tsx`,
+        import.meta.glob<{ default: ResolvedComponent }>('../pages/**/*.tsx', { eager: true })
       )
       return resolvedPage.default
     },

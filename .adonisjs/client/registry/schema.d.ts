@@ -7,22 +7,9 @@ import type { InferInput, SimpleError } from '@vinejs/vine/types'
 export type ParamValue = string | number | bigint | boolean
 
 export interface Registry {
-  'home': {
-    methods: ["GET","HEAD"]
-    pattern: '/'
-    types: {
-      body: {}
-      paramsTuple: []
-      params: {}
-      query: {}
-      response: unknown
-      errorResponse: unknown
-      rawResponse: ExtractRawResponse<unknown>
-    }
-  }
   'session.create': {
     methods: ["GET","HEAD"]
-    pattern: '/login'
+    pattern: '/'
     types: {
       body: {}
       paramsTuple: []
@@ -35,7 +22,7 @@ export interface Registry {
   }
   'session.store': {
     methods: ["POST"]
-    pattern: '/login'
+    pattern: '/'
     types: {
       body: ExtractBody<InferInput<(typeof import('#validators/user').loginValidator)>>
       paramsTuple: []

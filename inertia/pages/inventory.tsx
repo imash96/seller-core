@@ -1,7 +1,7 @@
 import { Head } from '@inertiajs/react'
 import { useState, useMemo } from 'react'
 import { Warehouse, AlertTriangle, PackageCheck, Plus } from 'lucide-react'
-import { ModulePageHeader, StatsCard } from '~/modules/common/page-header'
+import { ModulePageHeader, StatsCard } from '~/modules/common/module-page-header'
 import { FormModal, ResponsiveDataView, col, money, type Row } from '~/lib/ui'
 import { Button } from '@astryxdesign/core/Button'
 
@@ -96,9 +96,9 @@ export default function InventoryPage({ products }: Props) {
           initialValues={
             editStockRow
               ? {
-                  stockOnHand: String(editStockRow.stockOnHand ?? 0),
-                  retailPrice: String(editStockRow.retailPrice ?? 0),
-                }
+                stockOnHand: String(editStockRow.stockOnHand ?? 0),
+                retailPrice: String(editStockRow.retailPrice ?? 0),
+              }
               : undefined
           }
           fields={[

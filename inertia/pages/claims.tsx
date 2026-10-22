@@ -1,19 +1,16 @@
-import { Stack } from '@astryxdesign/core/Stack'
-import { Text } from '@astryxdesign/core/Text'
-import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-
 import {
+  PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
   SavedViewsBar,
   col,
-  STATUS_TONES,
   money,
   type Row,
 } from '~/lib/ui'
 import { useState } from 'react'
+import { Scale } from 'lucide-react'
 
 type Props = {
   claims: Row[]
@@ -26,8 +23,6 @@ type Props = {
   financeCategories: Row[]
   savedViews?: Row[]
 }
-
-
 
 const CLAIM_STATUS = [
   'opened',
@@ -54,23 +49,25 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
   const [editRow, setEditRow] = useState<Row | null>(null)
 
   return (
-    <Stack gap={4}>
-      <Card padding={4}>
-        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
+    <div className="space-y-6">
+      <PageHeader
+        title="Marketplace Claims & Chargebacks"
+        description="Track A-to-z Guarantee claims, INR disputes, and payment chargebacks with seller-liability exposure and response deadlines."
+        icon={Scale}
+        badge={`${claims.length} claims tracked`}
+        actions={
           <Button label="+ Open Claim" variant="primary" onClick={() => setCreateOpen(true)} />
-          <Text type="supporting" as="div">
-            {claims.length} claims tracked
-          </Text>
-        </Stack>
-      </Card>
-      {savedViews && savedViews.length > 0 ? <SavedViewsBar views={savedViews} /> : null}
+        }
+      />
+
+      {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
       <FormModal
         isOpen={createOpen}
         onOpenChange={setCreateOpen}
-        title="Open marketplace claim"
-        subtitle="A-to-Z, chargebacks and INR disputes with seller-liability and response deadlines."
-        submitLabel="Open claim"
+        title="Open Marketplace Claim"
+        subtitle="A-to-z, chargebacks, and INR disputes with seller-liability and response deadlines."
+        submitLabel="Open Claim"
         action="/claims"
         fields={[
           {
@@ -98,8 +95,8 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
             options: CLAIM_TYPES.map((c) => ({ value: c, label: c.replace(/_/g, ' ') })),
           },
           { name: 'disputedAmount', label: 'Disputed amount', kind: 'number' },
-          { name: 'sellerLiabilityAmount', label: 'Seller liability', kind: 'number' },
-          { name: 'respondByAt', label: 'Respond by (ISO date)', kind: 'date' },
+          { name: 'sellerLiabilityAmount', label: 'Seller liability amount', kind: 'number' },
+          { name: 'respondByAt', label: 'Respond by date', kind: 'date' },
           {
             name: 'status',
             label: 'Status',
@@ -107,7 +104,7 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
             default: 'under_review',
             options: CLAIM_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
           },
-          { name: 'reason', label: 'Reason', kind: 'textarea' },
+          { name: 'reason', label: 'Claim reason / evidence notes', kind: 'textarea', fullWidth: true },
         ]}
       />
 
@@ -116,9 +113,9 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
         onOpenChange={(o) => {
           if (!o) setEditRow(null)
         }}
-        title={`Update claim ${String(editRow?.claimNumber ?? '')}`}
-        subtitle="Edit liability, status and resolution notes."
-        submitLabel="Update claim"
+        title={`Update Claim ${String(editRow?.claimNumber ?? '')}`}
+        subtitle="Edit seller liability exposure, claim status, and resolution notes."
+        submitLabel="Update Claim"
         action={editRow ? `/claims/${editRow.id}/status` : '/claims/placeholder/status'}
         initialValues={
           editRow
@@ -133,20 +130,25 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
         fields={[
           {
             name: 'status',
-            label: 'Status',
+            label: 'Claim status',
             kind: 'select',
             required: true,
             options: CLAIM_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
           },
-          { name: 'sellerLiabilityAmount', label: 'Seller liability', kind: 'number' },
-          { name: 'respondByAt', label: 'Respond by', kind: 'date' },
-          { name: 'resolutionNotes', label: 'Resolution notes', kind: 'textarea' },
+          { name: 'sellerLiabilityAmount', label: 'Seller liability amount', kind: 'number' },
+          { name: 'respondByAt', label: 'Respond by date', kind: 'date' },
+          {
+            name: 'resolutionNotes',
+            label: 'Resolution notes',
+            kind: 'textarea',
+            fullWidth: true,
+          },
         ]}
       />
 
       <PageSection
-        title="Claims"
-        description="Work each claim through the marketplace lifecycle before the respond-by deadline."
+        title="Marketplace Claims"
+        description="Work each claim through the marketplace dispute lifecycle before the respond-by deadline."
       >
         <ResponsiveDataView
           rows={claims}
@@ -228,6 +230,6 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
           ]}
         />
       </PageSection>
-    </Stack>
+    </div>
   )
 }

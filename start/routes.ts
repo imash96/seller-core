@@ -15,20 +15,24 @@ const ToolsController = () => import('#controllers/tools_controller')
 const AddressCleanupController = () => import('#controllers/address_cleanup_controller')
 const AdminController = () => import('#controllers/admin_controller')
 
-router.on('/').renderInertia('home', {}).as('home')
-
 router.any('/signup', ({ response, session }) => {
   session.flash(
     'error',
     'Public registration is disabled. User accounts can only be provisioned by a System Super Administrator.'
   )
-  return response.redirect('/login')
+  return response.redirect('/')
+})
+
+router.any('/login', ({ request, response }) => {
+  const qs = request.qs()
+  const query = new URLSearchParams(qs as Record<string, string>).toString()
+  return response.redirect(query ? `/?${query}` : '/')
 })
 
 router
   .group(() => {
-    router.get('login', [SessionController, 'create']).as('session.create')
-    router.post('login', [SessionController, 'store']).as('session.store')
+    router.get('/', [SessionController, 'create']).as('session.create')
+    router.post('/', [SessionController, 'store']).as('session.store')
   })
   .use(middleware.guest())
 

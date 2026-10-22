@@ -1,28 +1,18 @@
-import { Stack } from '@astryxdesign/core/Stack'
-import { Text } from '@astryxdesign/core/Text'
-import { Heading } from '@astryxdesign/core/Heading'
-import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-import { Badge } from '@astryxdesign/core/Badge'
-import { Grid } from '@astryxdesign/core/Grid'
-import { Divider } from '@astryxdesign/core/Divider'
-
 import {
+  PageHeader,
   PageSection,
-  DataTable,
-  SmartForm,
   RowAction,
-  StatusForm,
   FormModal,
   ResponsiveDataView,
   SavedViewsBar,
   col,
   STATUS_TONES,
   money,
-  short,
   type Row,
 } from '~/lib/ui'
 import { useState, useMemo } from 'react'
+import { Box } from 'lucide-react'
 
 type Props = {
   products: Row[]
@@ -37,8 +27,6 @@ type Props = {
   savedViews?: Row[]
 }
 
-
-
 const PRODUCT_STATUS = ['draft', 'active', 'archived', 'discontinued']
 
 export default function Products({
@@ -52,6 +40,7 @@ export default function Products({
   const [createProductOpen, setCreateProductOpen] = useState(false)
   const [editProductRow, setEditProductRow] = useState<Row | null>(null)
   const [addVariantFor, setAddVariantFor] = useState<Row | null>(null)
+  const [globalAddVariantOpen, setGlobalAddVariantOpen] = useState(false)
   const [editStockRow, setEditStockRow] = useState<Row | null>(null)
   const [createBrandOpen, setCreateBrandOpen] = useState(false)
   const [editBrandRow, setEditBrandRow] = useState<Row | null>(null)
@@ -59,14 +48,16 @@ export default function Products({
   const [editCategoryRow, setEditCategoryRow] = useState<Row | null>(null)
   const [createListingOpen, setCreateListingOpen] = useState(false)
 
-  const variantRows: Row[] = []
-  for (const p of products) {
-    for (const v of (p.variants as Row[]) ?? []) {
-      variantRows.push({ ...v, productTitle: p.title, productId: p.id })
+  const variantRows: Row[] = useMemo(() => {
+    const out: Row[] = []
+    for (const p of products) {
+      for (const v of (p.variants as Row[]) ?? []) {
+        out.push({ ...v, productTitle: p.title, productId: p.id })
+      }
     }
-  }
+    return out
+  }, [products])
 
-  // Flatten channel listings from prop or from nested variants
   const flatListings: Row[] = useMemo(() => {
     if (channelListings && channelListings.length > 0) return channelListings
     const out: Row[] = []
@@ -80,45 +71,57 @@ export default function Products({
   }, [channelListings, products])
 
   return (
-    <Stack gap={4}>
-      <Card padding={4}>
-        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
-          <Button
-            label="+ Create Product"
-            variant="primary"
-            onClick={() => setCreateProductOpen(true)}
-          />
-          <Button label="+ Brand" variant="secondary" onClick={() => setCreateBrandOpen(true)} />
-          <Button
-            label="+ Category"
-            variant="secondary"
-            onClick={() => setCreateCategoryOpen(true)}
-          />
-          <Button
-            label="+ Channel Listing"
-            variant="ghost"
-            onClick={() => setCreateListingOpen(true)}
-          />
-          <Text type="supporting" as="div">
-            {products.length} products · {variantRows.length} variants · {flatListings.length}{' '}
-            listings
-          </Text>
-        </Stack>
-      </Card>
-      {savedViews && savedViews.length > 0 ? <SavedViewsBar views={savedViews} /> : null}
+    <div className="space-y-6">
+      <PageHeader
+        title="Products, Variants & Channel Catalog"
+        description="Manage parent products, multi-dimensional SKU variants, brands, categories, and marketplace channel listings."
+        icon={Box}
+        badge={`${products.length} products · ${variantRows.length} variants · ${flatListings.length} listings`}
+        actions={
+          <>
+            <Button label="+ Brand" variant="ghost" size="sm" onClick={() => setCreateBrandOpen(true)} />
+            <Button
+              label="+ Category"
+              variant="ghost"
+              size="sm"
+              onClick={() => setCreateCategoryOpen(true)}
+            />
+            <Button
+              label="+ Channel Listing"
+              variant="secondary"
+              size="sm"
+              onClick={() => setCreateListingOpen(true)}
+            />
+            <Button
+              label="+ Add Variant"
+              variant="secondary"
+              size="sm"
+              onClick={() => setGlobalAddVariantOpen(true)}
+            />
+            <Button
+              label="+ Create Product"
+              variant="primary"
+              size="sm"
+              onClick={() => setCreateProductOpen(true)}
+            />
+          </>
+        }
+      />
+
+      {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
       {/* Create Product Modal */}
       <FormModal
         isOpen={createProductOpen}
         onOpenChange={setCreateProductOpen}
-        title="Create product"
+        title="Create Product"
         subtitle="A product supports 0..N variants. Simple products work without variation dimensions."
-        submitLabel="Create product"
+        submitLabel="Create Product"
         action="/products"
         fields={[
-          { name: 'title', label: 'Title', required: true },
-          { name: 'sku', label: 'SKU prefix', required: true },
-          { name: 'skuPrefix', label: 'SKU Prefix (stock label)' },
+          { name: 'title', label: 'Product title', required: true },
+          { name: 'sku', label: 'Default variant SKU', required: true },
+          { name: 'skuPrefix', label: 'SKU Prefix (catalog label)' },
           {
             name: 'brandId',
             label: 'Brand',
@@ -133,24 +136,25 @@ export default function Products({
           },
           { name: 'retailPrice', label: 'Retail price', kind: 'number', required: true },
           { name: 'costPrice', label: 'Cost price', kind: 'number' },
-          { name: 'manufacturingCost', label: 'Mfg cost', kind: 'number' },
-          { name: 'packagingCost', label: 'Packaging', kind: 'number' },
-          { name: 'stockOnHand', label: 'Stock on hand', kind: 'number' },
+          { name: 'manufacturingCost', label: 'Manufacturing cost', kind: 'number' },
+          { name: 'packagingCost', label: 'Packaging cost', kind: 'number' },
+          { name: 'stockOnHand', label: 'Initial stock on hand', kind: 'number', default: '25' },
           {
             name: 'variationDimensions',
-            label: 'Variation dims (comma sep)',
+            label: 'Variation dimensions (comma-separated)',
             placeholder: 'size,color',
           },
           {
             name: 'hasVariants',
-            label: 'Has variants',
+            label: 'Has multiple variants',
             kind: 'select',
             default: 'false',
             options: [
-              { value: 'true', label: 'Yes' },
-              { value: 'false', label: 'No' },
+              { value: 'false', label: 'No (Simple Product)' },
+              { value: 'true', label: 'Yes (Multi-Variant)' },
             ],
           },
+          { name: 'description', label: 'Description', kind: 'textarea', fullWidth: true },
         ]}
       />
 
@@ -160,8 +164,8 @@ export default function Products({
         onOpenChange={(o) => {
           if (!o) setEditProductRow(null)
         }}
-        title={`Edit product: ${editProductRow?.title ?? ''}`}
-        submitLabel="Save product"
+        title={`Edit Product: ${editProductRow?.title ?? ''}`}
+        submitLabel="Save Product"
         action={editProductRow ? `/products/${editProductRow.id}` : '/products/placeholder'}
         initialValues={
           editProductRow
@@ -176,45 +180,39 @@ export default function Products({
             : undefined
         }
         fields={[
-          { name: 'title', label: 'Title' },
+          { name: 'title', label: 'Title', required: true },
           { name: 'skuPrefix', label: 'SKU Prefix' },
           {
             name: 'brandId',
             label: 'Brand',
             kind: 'select',
-            options: [
-              { value: '', label: '— unchanged —' },
-              ...brands.map((b) => ({ value: String(b.id), label: String(b.name) })),
-            ],
+            options: brands.map((b) => ({ value: String(b.id), label: String(b.name) })),
           },
           {
             name: 'categoryId',
             label: 'Category',
             kind: 'select',
-            options: [
-              { value: '', label: '— unchanged —' },
-              ...categories.map((c) => ({ value: String(c.id), label: String(c.name) })),
-            ],
+            options: categories.map((c) => ({ value: String(c.id), label: String(c.name) })),
           },
-          { name: 'description', label: 'Description', kind: 'textarea' },
           {
             name: 'status',
             label: 'Status',
             kind: 'select',
             options: PRODUCT_STATUS.map((s) => ({ value: s, label: s })),
           },
+          { name: 'description', label: 'Description', kind: 'textarea', fullWidth: true },
         ]}
       />
 
-      {/* Add Variant Modal */}
+      {/* Row-triggered Add Variant Modal */}
       <FormModal
-        isOpen={!!addVariantFor || (createProductOpen === false && !!addVariantFor)}
+        isOpen={!!addVariantFor}
         onOpenChange={(o) => {
           if (!o) setAddVariantFor(null)
         }}
-        title={addVariantFor ? `Add variant to ${addVariantFor.title}` : 'Add variant'}
-        subtitle="Multi-dimensional variants with normalized attributes."
-        submitLabel="Create variant"
+        title={addVariantFor ? `Add Variant to ${addVariantFor.title}` : 'Add Variant'}
+        subtitle="Multi-dimensional variants with normalized attribute key-value pairs."
+        submitLabel="Create Variant"
         action={
           addVariantFor
             ? `/products/${addVariantFor.id}/variants`
@@ -225,31 +223,49 @@ export default function Products({
           { name: 'title', label: 'Variant title', required: true },
           { name: 'retailPrice', label: 'Retail price', kind: 'number', required: true },
           { name: 'costPrice', label: 'Cost price', kind: 'number' },
-          { name: 'stockOnHand', label: 'Stock', kind: 'number' },
-          { name: 'attributeName', label: 'Attribute name', placeholder: 'color' },
-          { name: 'attributeValue', label: 'Attribute value', placeholder: 'navy' },
+          { name: 'stockOnHand', label: 'Stock on hand', kind: 'number', default: '20' },
+          { name: 'attributeName', label: 'Attribute dimension (e.g. color)', placeholder: 'color' },
+          { name: 'attributeValue', label: 'Attribute value (e.g. navy)', placeholder: 'navy' },
         ]}
       />
 
-      {/* Generic Add Variant (product selector) */}
+      {/* Global Add Variant Modal (with Parent Product selector) */}
       <FormModal
-        isOpen={false}
-        onOpenChange={() => {}}
-        title="Add variant"
-        submitLabel="Create variant"
+        isOpen={globalAddVariantOpen}
+        onOpenChange={setGlobalAddVariantOpen}
+        title="Add Variant SKU"
+        subtitle="Select a parent product and define the new sellable SKU variant."
+        submitLabel="Create Variant"
         action="/products/placeholder/variants"
-        fields={[]}
+        actionFor={(v) => `/products/${v.productId}/variants`}
+        fields={[
+          {
+            name: 'productId',
+            label: 'Parent Product',
+            kind: 'select',
+            required: true,
+            fullWidth: true,
+            options: products.map((p) => ({ value: String(p.id), label: String(p.title) })),
+          },
+          { name: 'sku', label: 'Variant SKU', required: true },
+          { name: 'title', label: 'Variant title', required: true },
+          { name: 'retailPrice', label: 'Retail price', kind: 'number', required: true },
+          { name: 'costPrice', label: 'Cost price', kind: 'number' },
+          { name: 'stockOnHand', label: 'Stock on hand', kind: 'number', default: '20' },
+          { name: 'attributeName', label: 'Attribute dimension', placeholder: 'size' },
+          { name: 'attributeValue', label: 'Attribute value', placeholder: 'Large' },
+        ]}
       />
 
-      {/* Adjust Stock Modal */}
+      {/* Adjust Stock & Price Modal */}
       <FormModal
         isOpen={!!editStockRow}
         onOpenChange={(o) => {
           if (!o) setEditStockRow(null)
         }}
-        title={`Adjust stock & price — ${editStockRow?.sku ?? ''}`}
+        title={`Adjust Stock & Price — ${editStockRow?.sku ?? ''}`}
         subtitle={`Current stock: ${editStockRow?.stockOnHand ?? 0} · Price: ${editStockRow?.retailPrice ?? 0}`}
-        submitLabel="Update"
+        submitLabel="Update Stock & Price"
         action={editStockRow ? `/variants/${editStockRow.id}/stock` : '/variants/placeholder/stock'}
         initialValues={
           editStockRow
@@ -269,13 +285,13 @@ export default function Products({
       <FormModal
         isOpen={createBrandOpen}
         onOpenChange={setCreateBrandOpen}
-        title="Create brand"
-        submitLabel="Create brand"
+        title="Create Brand"
+        submitLabel="Create Brand"
         action="/brands"
         fields={[
           { name: 'name', label: 'Brand name', required: true },
           { name: 'slug', label: 'Slug' },
-          { name: 'websiteUrl', label: 'Website URL' },
+          { name: 'websiteUrl', label: 'Website URL', fullWidth: true },
         ]}
       />
 
@@ -285,8 +301,8 @@ export default function Products({
         onOpenChange={(o) => {
           if (!o) setEditBrandRow(null)
         }}
-        title={`Edit brand: ${editBrandRow?.name ?? ''}`}
-        submitLabel="Save brand"
+        title={`Edit Brand: ${editBrandRow?.name ?? ''}`}
+        submitLabel="Save Brand"
         action={editBrandRow ? `/brands/${editBrandRow.id}` : '/brands/placeholder'}
         initialValues={
           editBrandRow
@@ -294,11 +310,12 @@ export default function Products({
                 name: String(editBrandRow.name ?? ''),
                 slug: String(editBrandRow.slug ?? ''),
                 websiteUrl: String(editBrandRow.websiteUrl ?? ''),
+                isActive: String(editBrandRow.isActive ?? 'true'),
               }
             : undefined
         }
         fields={[
-          { name: 'name', label: 'Brand name' },
+          { name: 'name', label: 'Brand name', required: true },
           { name: 'slug', label: 'Slug' },
           { name: 'websiteUrl', label: 'Website URL' },
           {
@@ -317,16 +334,17 @@ export default function Products({
       <FormModal
         isOpen={createCategoryOpen}
         onOpenChange={setCreateCategoryOpen}
-        title="Create category"
-        submitLabel="Create category"
+        title="Create Category"
+        submitLabel="Create Category"
         action="/categories"
         fields={[
           { name: 'name', label: 'Category name', required: true },
           { name: 'slug', label: 'Slug' },
           {
             name: 'parentCategoryId',
-            label: 'Parent',
+            label: 'Parent category',
             kind: 'select',
+            fullWidth: true,
             options: categories.map((c) => ({ value: String(c.id), label: String(c.name) })),
           },
         ]}
@@ -338,18 +356,21 @@ export default function Products({
         onOpenChange={(o) => {
           if (!o) setEditCategoryRow(null)
         }}
-        title={`Edit category: ${editCategoryRow?.name ?? ''}`}
-        submitLabel="Save category"
+        title={`Edit Category: ${editCategoryRow?.name ?? ''}`}
+        submitLabel="Save Category"
         action={editCategoryRow ? `/categories/${editCategoryRow.id}` : '/categories/placeholder'}
         initialValues={
           editCategoryRow
-            ? { name: String(editCategoryRow.name ?? ''), slug: String(editCategoryRow.slug ?? '') }
+            ? {
+                name: String(editCategoryRow.name ?? ''),
+                slug: String(editCategoryRow.slug ?? ''),
+                description: String(editCategoryRow.description ?? ''),
+              }
             : undefined
         }
         fields={[
-          { name: 'name', label: 'Category name' },
+          { name: 'name', label: 'Category name', required: true },
           { name: 'slug', label: 'Slug' },
-          { name: 'description', label: 'Description', kind: 'textarea' },
           {
             name: 'isActive',
             label: 'Active',
@@ -359,6 +380,7 @@ export default function Products({
               { value: 'false', label: 'No' },
             ],
           },
+          { name: 'description', label: 'Description', kind: 'textarea', fullWidth: true },
         ]}
       />
 
@@ -366,9 +388,9 @@ export default function Products({
       <FormModal
         isOpen={createListingOpen}
         onOpenChange={setCreateListingOpen}
-        title="Publish channel listing"
+        title="Publish Channel Listing"
         subtitle="Per-channel listing overrides with price and allocated quantity."
-        submitLabel="Create listing"
+        submitLabel="Publish Listing"
         action="/channel-listings"
         fields={[
           {
@@ -383,7 +405,7 @@ export default function Products({
           },
           {
             name: 'productVariantId',
-            label: 'Variant',
+            label: 'Variant SKU',
             kind: 'select',
             required: true,
             options: variantRows.map((v) => ({
@@ -391,10 +413,10 @@ export default function Products({
               label: `${v.productTitle} · ${v.sku}`,
             })),
           },
-          { name: 'externalListingId', label: 'External listing ID', required: true },
-          { name: 'channelSku', label: 'Channel SKU' },
+          { name: 'externalListingId', label: 'External listing ID / ASIN', required: true },
+          { name: 'channelSku', label: 'Channel SKU override' },
           { name: 'listedPrice', label: 'Listed price', kind: 'number' },
-          { name: 'allocatedQuantity', label: 'Allocated qty', kind: 'number', default: '0' },
+          { name: 'allocatedQuantity', label: 'Allocated quantity', kind: 'number', default: '25' },
         ]}
       />
 
@@ -412,6 +434,8 @@ export default function Products({
             { value: 'draft', label: 'Draft' },
             { value: 'archived', label: 'Archived' },
           ]}
+          createLabel="+ Create Product"
+          onCreateClick={() => setCreateProductOpen(true)}
           toCard={(row) => ({
             title: String(row.title),
             idBadge: String(row.skuPrefix ?? '—'),
@@ -426,7 +450,7 @@ export default function Products({
               { label: 'Created', value: new Date(String(row.createdAt)).toLocaleDateString() },
             ],
             actions: (
-              <Stack direction="horizontal" gap={2} wrap="wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   label="Edit"
                   variant="secondary"
@@ -445,17 +469,17 @@ export default function Products({
                   variant="ghost"
                   confirmText="Archive this product?"
                 />
-              </Stack>
+              </div>
             ),
           })}
           columns={[
             col.text('title', 'Title', 200),
-            col.text('skuPrefix', 'SKU Prefix', 100),
-            col.text('slug', 'Slug', 120),
+            col.text('skuPrefix', 'SKU Prefix', 110),
+            col.text('slug', 'Slug', 130),
             col.badge('status', 'Status', STATUS_TONES),
-            col.text('hasVariants', 'Variants', 80),
+            col.text('hasVariants', 'Has Variants', 100),
             col.action('Actions', (row) => (
-              <Stack direction="horizontal" gap={2} wrap="wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <Button
                   label="Edit"
                   variant="secondary"
@@ -474,19 +498,21 @@ export default function Products({
                   variant="ghost"
                   confirmText="Archive this product?"
                 />
-              </Stack>
+              </div>
             )),
           ]}
         />
       </PageSection>
 
       <PageSection
-        title="Variants & stock"
-        description="Adjust stock levels or remove a variant — supports any quantity, not just fixed presets."
+        title="Variants & Stock"
+        description="Adjust stock levels or retail price on any sellable SKU."
       >
         <ResponsiveDataView
           rows={variantRows}
           searchKeys={['sku', 'title', 'productTitle']}
+          createLabel="+ Add Variant"
+          onCreateClick={() => setGlobalAddVariantOpen(true)}
           toCard={(row) => ({
             title: `${row.productTitle} — ${row.sku}`,
             statusBadge: {
@@ -500,7 +526,7 @@ export default function Products({
               { label: 'Available', value: String(row.stockAvailable ?? row.stockOnHand) },
             ],
             actions: (
-              <Stack direction="horizontal" gap={2} wrap="wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   label="Adjust"
                   variant="secondary"
@@ -513,7 +539,7 @@ export default function Products({
                   variant="ghost"
                   confirmText="Delete this variant?"
                 />
-              </Stack>
+              </div>
             ),
           })}
           columns={[
@@ -525,7 +551,7 @@ export default function Products({
             col.text('stockOnHand', 'On hand', 80),
             col.text('stockAvailable', 'Available', 80),
             col.action('Actions', (row) => (
-              <Stack direction="horizontal" gap={2} wrap="wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <Button
                   label="Adjust"
                   variant="secondary"
@@ -538,204 +564,184 @@ export default function Products({
                   variant="ghost"
                   confirmText="Delete this variant?"
                 />
-              </Stack>
+              </div>
             )),
           ]}
         />
       </PageSection>
 
-      <Grid columns={{ minWidth: 360, max: 2 }} gap={4}>
-        <PageSection title="Brands" description="Create, edit, or remove brands.">
-          <Stack gap={3}>
-            <Button
-              label="+ Create Brand"
-              variant="primary"
-              size="sm"
-              onClick={() => setCreateBrandOpen(true)}
-            />
-            <ResponsiveDataView
-              rows={brands}
-              searchKeys={['name', 'slug']}
-              toCard={(row) => ({
-                title: String(row.name),
-                metrics: [
-                  { label: 'Slug', value: String(row.slug) },
-                  { label: 'Active', value: String(row.isActive ?? true) },
-                ],
-                actions: (
-                  <Stack direction="horizontal" gap={2}>
-                    <Button
-                      label="Edit"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setEditBrandRow(row)}
-                    />
-                    <RowAction
-                      action={`/brands/${row.id}/delete`}
-                      label="Delete"
-                      variant="ghost"
-                      confirmText="Delete brand?"
-                    />
-                  </Stack>
-                ),
-              })}
-              columns={[
-                col.text('name', 'Name', 130),
-                col.text('slug', 'Slug', 110),
-                col.action('Actions', (row) => (
-                  <Stack direction="horizontal" gap={2}>
-                    <Button
-                      label="Edit"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setEditBrandRow(row)}
-                    />
-                    <RowAction
-                      action={`/brands/${row.id}/delete`}
-                      label="Delete"
-                      variant="ghost"
-                      confirmText="Delete brand?"
-                    />
-                  </Stack>
-                )),
-              ]}
-            />
-          </Stack>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <PageSection title="Brands" description="Create, edit, or remove catalog brands.">
+          <ResponsiveDataView
+            rows={brands}
+            searchKeys={['name', 'slug']}
+            createLabel="+ Create Brand"
+            onCreateClick={() => setCreateBrandOpen(true)}
+            toCard={(row) => ({
+              title: String(row.name),
+              metrics: [
+                { label: 'Slug', value: String(row.slug) },
+                { label: 'Active', value: String(row.isActive ?? true) },
+              ],
+              actions: (
+                <div className="flex items-center gap-2">
+                  <Button
+                    label="Edit"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setEditBrandRow(row)}
+                  />
+                  <RowAction
+                    action={`/brands/${row.id}/delete`}
+                    label="Delete"
+                    variant="ghost"
+                    confirmText="Delete brand?"
+                  />
+                </div>
+              ),
+            })}
+            columns={[
+              col.text('name', 'Name', 130),
+              col.text('slug', 'Slug', 110),
+              col.action('Actions', (row) => (
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    label="Edit"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setEditBrandRow(row)}
+                  />
+                  <RowAction
+                    action={`/brands/${row.id}/delete`}
+                    label="Delete"
+                    variant="ghost"
+                    confirmText="Delete brand?"
+                  />
+                </div>
+              )),
+            ]}
+          />
         </PageSection>
 
         <PageSection
           title="Categories"
           description="Product taxonomy with optional parent categories."
         >
-          <Stack gap={3}>
-            <Button
-              label="+ Create Category"
-              variant="primary"
-              size="sm"
-              onClick={() => setCreateCategoryOpen(true)}
-            />
-            <ResponsiveDataView
-              rows={categories}
-              searchKeys={['name', 'slug']}
-              toCard={(row) => ({
-                title: String(row.name),
-                metrics: [{ label: 'Slug', value: String(row.slug) }],
-                actions: (
-                  <Stack direction="horizontal" gap={2}>
-                    <Button
-                      label="Edit"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setEditCategoryRow(row)}
-                    />
-                    <RowAction
-                      action={`/categories/${row.id}/delete`}
-                      label="Delete"
-                      variant="ghost"
-                      confirmText="Delete category?"
-                    />
-                  </Stack>
-                ),
-              })}
-              columns={[
-                col.text('name', 'Name', 130),
-                col.text('slug', 'Slug', 110),
-                col.action('Actions', (row) => (
-                  <Stack direction="horizontal" gap={2}>
-                    <Button
-                      label="Edit"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setEditCategoryRow(row)}
-                    />
-                    <RowAction
-                      action={`/categories/${row.id}/delete`}
-                      label="Delete"
-                      variant="ghost"
-                      confirmText="Delete category?"
-                    />
-                  </Stack>
-                )),
-              ]}
-            />
-          </Stack>
-        </PageSection>
-      </Grid>
-
-      <PageSection
-        title="Channel listings"
-        description="Per-channel listing overrides — publish variants to marketplace channels."
-      >
-        <Stack gap={3}>
-          <Button
-            label="+ Publish Listing"
-            variant="primary"
-            size="sm"
-            onClick={() => setCreateListingOpen(true)}
-          />
           <ResponsiveDataView
-            rows={flatListings}
-            searchKeys={['externalListingId', 'externalSku', 'listingStatus']}
-            filterKey="listingStatus"
-            filterPills={[
-              { value: 'all', label: 'All' },
-              { value: 'active', label: 'Active' },
-              { value: 'inactive', label: 'Inactive' },
-            ]}
-            emptyTitle="No channel listings yet"
-            emptyDescription="Publish a variant to a marketplace channel to see it here."
-            createLabel="+ Publish Listing"
-            onCreateClick={() => setCreateListingOpen(true)}
+            rows={categories}
+            searchKeys={['name', 'slug']}
+            createLabel="+ Create Category"
+            onCreateClick={() => setCreateCategoryOpen(true)}
             toCard={(row) => ({
-              title: String(row.externalListingId ?? row.externalSku ?? '—'),
-              statusBadge: {
-                label: String(row.listingStatus ?? 'active'),
-                variant: STATUS_TONES[String(row.listingStatus ?? 'active')] ?? 'neutral',
-              },
-              metrics: [
-                { label: 'Channel SKU', value: String(row.externalSku ?? '—') },
-                {
-                  label: 'Price',
-                  value: money(String(row.currencyCode ?? 'USD'), row.listedPrice),
-                },
-                { label: 'Qty', value: String(row.allocatedQuantity ?? '—') },
-                {
-                  label: 'Product',
-                  value: String((row.product as any)?.title ?? row.productTitle ?? '—'),
-                },
-              ],
+              title: String(row.name),
+              metrics: [{ label: 'Slug', value: String(row.slug) }],
               actions: (
-                <RowAction
-                  action={`/channel-listings/${row.id}/delete`}
-                  label="Remove"
-                  variant="ghost"
-                  confirmText="Remove this channel listing?"
-                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    label="Edit"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setEditCategoryRow(row)}
+                  />
+                  <RowAction
+                    action={`/categories/${row.id}/delete`}
+                    label="Delete"
+                    variant="ghost"
+                    confirmText="Delete category?"
+                  />
+                </div>
               ),
             })}
             columns={[
-              col.text('externalListingId', 'Listing ID', 160),
-              col.text('externalSku', 'Channel SKU', 130),
-              col.money('listedPrice', 'Price', 'currencyCode'),
-              col.text('allocatedQuantity', 'Qty', 70),
-              col.badge('listingStatus', 'Status', STATUS_TONES),
-              col.badge('syncStatus', 'Sync', {
-                synced: 'success',
-                pending: 'warning',
-                failed: 'error',
-              }),
+              col.text('name', 'Name', 130),
+              col.text('slug', 'Slug', 110),
               col.action('Actions', (row) => (
-                <RowAction
-                  action={`/channel-listings/${row.id}/delete`}
-                  label="Remove"
-                  variant="ghost"
-                  confirmText="Remove this channel listing?"
-                />
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    label="Edit"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setEditCategoryRow(row)}
+                  />
+                  <RowAction
+                    action={`/categories/${row.id}/delete`}
+                    label="Delete"
+                    variant="ghost"
+                    confirmText="Delete category?"
+                  />
+                </div>
               )),
             ]}
           />
-        </Stack>
+        </PageSection>
+      </div>
+
+      <PageSection
+        title="Channel Listings"
+        description="Per-channel listing overrides — publish variants to marketplace channels."
+      >
+        <ResponsiveDataView
+          rows={flatListings}
+          searchKeys={['externalListingId', 'externalSku', 'listingStatus']}
+          filterKey="listingStatus"
+          filterPills={[
+            { value: 'all', label: 'All' },
+            { value: 'active', label: 'Active' },
+            { value: 'inactive', label: 'Inactive' },
+          ]}
+          emptyTitle="No channel listings yet"
+          emptyDescription="Publish a variant to a marketplace channel to see it here."
+          createLabel="+ Publish Listing"
+          onCreateClick={() => setCreateListingOpen(true)}
+          toCard={(row) => ({
+            title: String(row.externalListingId ?? row.externalSku ?? '—'),
+            statusBadge: {
+              label: String(row.listingStatus ?? 'active'),
+              variant: STATUS_TONES[String(row.listingStatus ?? 'active')] ?? 'neutral',
+            },
+            metrics: [
+              { label: 'Channel SKU', value: String(row.externalSku ?? '—') },
+              {
+                label: 'Price',
+                value: money(String(row.currencyCode ?? 'USD'), row.listedPrice),
+              },
+              { label: 'Qty', value: String(row.allocatedQuantity ?? '—') },
+              {
+                label: 'Product',
+                value: String((row.product as any)?.title ?? row.productTitle ?? '—'),
+              },
+            ],
+            actions: (
+              <RowAction
+                action={`/channel-listings/${row.id}/delete`}
+                label="Remove"
+                variant="ghost"
+                confirmText="Remove this channel listing?"
+              />
+            ),
+          })}
+          columns={[
+            col.text('externalListingId', 'Listing ID', 160),
+            col.text('externalSku', 'Channel SKU', 130),
+            col.money('listedPrice', 'Price', 'currencyCode'),
+            col.text('allocatedQuantity', 'Qty', 70),
+            col.badge('listingStatus', 'Status', STATUS_TONES),
+            col.badge('syncStatus', 'Sync', {
+              synced: 'success',
+              pending: 'warning',
+              failed: 'error',
+            }),
+            col.action('Actions', (row) => (
+              <RowAction
+                action={`/channel-listings/${row.id}/delete`}
+                label="Remove"
+                variant="ghost"
+                confirmText="Remove this channel listing?"
+              />
+            )),
+          ]}
+        />
       </PageSection>
-    </Stack>
+    </div>
   )
 }

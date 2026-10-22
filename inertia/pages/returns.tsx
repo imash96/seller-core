@@ -1,9 +1,6 @@
-import { Stack } from '@astryxdesign/core/Stack'
-import { Text } from '@astryxdesign/core/Text'
-import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-
 import {
+  PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
@@ -14,6 +11,7 @@ import {
   type Row,
 } from '~/lib/ui'
 import { useState, useMemo } from 'react'
+import { RotateCcw } from 'lucide-react'
 
 type Props = {
   returnRequests: Row[]
@@ -27,8 +25,6 @@ type Props = {
   financeCategories: Row[]
   savedViews?: Row[]
 }
-
-
 
 const RETURN_STATUS = [
   'requested',
@@ -60,14 +56,8 @@ export default function Returns({
   savedViews,
 }: Props) {
   const [createRmaOpen, setCreateRmaOpen] = useState(false)
-  const [selectedOrderId, setSelectedOrderId] = useState('')
   const [updateRmaRow, setUpdateRmaRow] = useState<Row | null>(null)
   const [createRefundOpen, setCreateRefundOpen] = useState(false)
-
-  const filteredLineItems = useMemo(() => {
-    if (!selectedOrderId) return []
-    return orderLineItems.filter((li) => String((li as any).orderId) === selectedOrderId)
-  }, [selectedOrderId, orderLineItems])
 
   // Compute remaining refundable per order for refund modal helper
   const refundableByOrder = useMemo(() => {
@@ -81,29 +71,30 @@ export default function Returns({
   }, [orders])
 
   return (
-    <Stack gap={4}>
-      <Card padding={4}>
-        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
-          <Button label="+ Create RMA" variant="primary" onClick={() => setCreateRmaOpen(true)} />
-          <Button
-            label="+ Process Refund"
-            variant="secondary"
-            onClick={() => setCreateRefundOpen(true)}
-          />
-          <Text type="supporting" as="div">
-            {returnRequests.length} RMAs · {refundTransactions.length} refunds
-          </Text>
-        </Stack>
-      </Card>
-      {savedViews && savedViews.length > 0 ? <SavedViewsBar views={savedViews} /> : null}
+    <div className="space-y-6">
+      <PageHeader
+        title="Returns (RMA) & Refund Ledger"
+        description="Full RMA lifecycle with line-item quantity guards and over-refund protection."
+        icon={RotateCcw}
+        badge={`${returnRequests.length} RMAs · ${refundTransactions.length} refunds`}
+        actions={
+          <>
+            <Button
+              label="+ Process Refund"
+              variant="secondary"
+              onClick={() => setCreateRefundOpen(true)}
+            />
+            <Button label="+ Create RMA" variant="primary" onClick={() => setCreateRmaOpen(true)} />
+          </>
+        }
+      />
+
+      {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
       <FormModal
         isOpen={createRmaOpen}
-        onOpenChange={(o) => {
-          setCreateRmaOpen(o)
-          if (!o) setSelectedOrderId('')
-        }}
-        title="Create return (RMA)"
+        onOpenChange={setCreateRmaOpen}
+        title="Create Return (RMA)"
         subtitle="Quantity limits enforced: requested ≤ ordered − already returned."
         submitLabel="Create RMA"
         action="/returns"
@@ -117,80 +108,52 @@ export default function Returns({
           },
           {
             name: 'orderLineItemId',
-            label: 'Order line',
+            label: 'Order line item (filtered by Order)',
             kind: 'select',
             required: true,
             options: (vals) => {
-              const activeOrderId = vals.orderId || selectedOrderId
+              const activeOrderId = vals.orderId
               const matching = activeOrderId
                 ? orderLineItems.filter((li) => String((li as any).orderId) === activeOrderId)
                 : []
-              return matching.length > 0
-                ? matching.map((li) => ({
-                    value: String(li.id),
-                    label: `${li.sku} · qty ${li.quantityOrdered} · remaining ${Math.max(0, Number(li.quantityOrdered) - Number((li as any).quantityReturned ?? 0))}`,
-                  }))
-                : [
-                    {
-                      value: '',
-                      label: activeOrderId
-                        ? 'No line items for this order'
-                        : 'Select an order above first',
-                    },
-                  ]
+              return matching.map((li) => ({
+                value: String(li.id),
+                label: `${li.sku} · ${li.title ?? li.sku} (ordered: ${li.quantityOrdered}, returnable: ${Math.max(0, Number(li.quantityOrdered) - Number((li as any).quantityReturned ?? 0))})`,
+              }))
             },
+            placeholder: 'Select an order first…',
           },
           { name: 'rmaNumber', label: 'RMA number', required: true },
           {
             name: 'returnReason',
-            label: 'Reason',
+            label: 'Return reason',
             kind: 'select',
             required: true,
             options: RETURN_REASONS.map((r) => ({ value: r, label: r.replace(/_/g, ' ') })),
           },
           {
             name: 'resolutionType',
-            label: 'Resolution',
+            label: 'Resolution type',
             kind: 'select',
             default: 'refund',
             options: RESOLUTIONS.map((r) => ({ value: r, label: r.replace(/_/g, ' ') })),
           },
           {
             name: 'quantityRequested',
-            label: 'Qty requested',
+            label: 'Quantity requested',
             kind: 'number',
             required: true,
             default: '1',
           },
           { name: 'restockingFeeAmount', label: 'Restocking fee', kind: 'number' },
-          { name: 'customerComments', label: 'Customer comments' },
+          {
+            name: 'customerComments',
+            label: 'Customer comments',
+            kind: 'textarea',
+            fullWidth: true,
+          },
         ]}
-      >
-        <Stack gap={2}>
-          <label style={{ fontSize: 13, fontWeight: 600 }}>Filter line items by order</label>
-          <select
-            value={selectedOrderId}
-            onChange={(e) => setSelectedOrderId(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              borderRadius: 8,
-              border: '1px solid #d1d5db',
-              fontSize: 14,
-            }}
-          >
-            <option value="">— Select order —</option>
-            {orders.map((o) => (
-              <option key={String(o.id)} value={String(o.id)}>
-                {String(o.orderNumber)} —{' '}
-                {money(String((o as any).currencyCode ?? 'USD'), (o as any).totalAmount)}
-              </option>
-            ))}
-          </select>
-          <Text type="supporting" as="div">
-            {filteredLineItems.length} line items for selected order
-          </Text>
-        </Stack>
-      </FormModal>
+      />
 
       <FormModal
         isOpen={!!updateRmaRow}
@@ -207,17 +170,16 @@ export default function Returns({
         fields={[
           {
             name: 'status',
-            label: 'Status',
+            label: 'RMA status',
             kind: 'select',
             required: true,
             options: RETURN_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
           },
           {
             name: 'itemCondition',
-            label: 'Item condition',
+            label: 'Inspected item condition',
             kind: 'select',
             options: [
-              { value: '', label: '—' },
               { value: 'new', label: 'New' },
               { value: 'used', label: 'Used' },
               { value: 'damaged', label: 'Damaged' },
@@ -230,9 +192,9 @@ export default function Returns({
       <FormModal
         isOpen={createRefundOpen}
         onOpenChange={setCreateRefundOpen}
-        title="Process refund"
-        subtitle="Refunds capped at order total − already-refunded (over-refund guard)."
-        submitLabel="Process refund"
+        title="Process Refund"
+        subtitle="Refunds are capped at order total − already-refunded (over-refund guard)."
+        submitLabel="Process Refund"
         action="/refunds"
         fields={[
           {
@@ -240,9 +202,10 @@ export default function Returns({
             label: 'Order',
             kind: 'select',
             required: true,
+            fullWidth: true,
             options: orders.map((o) => ({
               value: String(o.id),
-              label: `${o.orderNumber} — ${money(String((o as any).currencyCode ?? 'USD'), (o as any).totalAmount)} (refundable: ${money(String((o as any).currencyCode ?? 'USD'), refundableByOrder[String(o.id)] ?? 0)})`,
+              label: `${o.orderNumber} — Total: ${money(String((o as any).currencyCode ?? 'USD'), (o as any).totalAmount)} (Remaining refundable: ${money(String((o as any).currencyCode ?? 'USD'), refundableByOrder[String(o.id)] ?? 0)})`,
             })),
           },
           {
@@ -255,16 +218,16 @@ export default function Returns({
             })),
           },
           { name: 'refundNumber', label: 'Refund number', required: true },
-          { name: 'itemsRefundAmount', label: 'Items refund', kind: 'number', required: true },
-          { name: 'shippingRefundAmount', label: 'Shipping refund', kind: 'number' },
-          { name: 'taxRefundAmount', label: 'Tax refund', kind: 'number' },
-          { name: 'restockingFeeDeducted', label: 'Restocking deducted', kind: 'number' },
-          { name: 'reason', label: 'Reason' },
+          { name: 'itemsRefundAmount', label: 'Items refund amount', kind: 'number', required: true },
+          { name: 'shippingRefundAmount', label: 'Shipping refund amount', kind: 'number' },
+          { name: 'taxRefundAmount', label: 'Tax refund amount', kind: 'number' },
+          { name: 'restockingFeeDeducted', label: 'Restocking fee deducted', kind: 'number' },
+          { name: 'reason', label: 'Refund reason / notes', kind: 'textarea', fullWidth: true },
         ]}
       />
 
       <PageSection
-        title="Return requests"
+        title="Return Requests (RMA)"
         description="Full RMA lifecycle: requested → authorized → received → inspected → refunded/closed."
       >
         <ResponsiveDataView
@@ -331,8 +294,8 @@ export default function Returns({
       </PageSection>
 
       <PageSection
-        title="Refund transactions"
-        description="Every refund records external IDs for idempotent reconciliation."
+        title="Refund Transactions"
+        description="Every refund records external IDs for idempotent ledger reconciliation."
       >
         <ResponsiveDataView
           rows={refundTransactions}
@@ -377,6 +340,6 @@ export default function Returns({
           ]}
         />
       </PageSection>
-    </Stack>
+    </div>
   )
 }

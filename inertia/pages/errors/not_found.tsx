@@ -1,36 +1,23 @@
 import { Link } from '@adonisjs/inertia/react'
-import { Stack } from '@astryxdesign/core/Stack'
-import { Text } from '@astryxdesign/core/Text'
-import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-import { Badge } from '@astryxdesign/core/Badge'
+import { StatusBadge } from '~/components/atoms/status-badge'
 
 export default function NotFound() {
   return (
-    <div
-      style={{
-        minHeight: '60vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-      }}
-    >
-      <Card padding={6} width={420}>
-        <Stack gap={3}>
-          <Badge variant="warning" label="Error 404" />
-          <Text type="display-2" as="h1" weight="bold">
-            Page not found
-          </Text>
-          <Text type="body" as="p">
-            The route you tried to reach doesn&apos;t exist. Check the URL or head back to the
-            dashboard.
-          </Text>
+    <div className="min-h-[65vh] flex items-center justify-center p-6">
+      <div className="w-full max-w-md bg-card text-card-foreground border border-border rounded-2xl p-6 sm:p-8 shadow-lg space-y-4">
+        <StatusBadge variant="warning" label="Error 404" />
+        <h1 className="text-2xl font-bold text-foreground tracking-tight">Page not found</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          The route you tried to reach doesn&apos;t exist. Check the URL or head back to the
+          dashboard.
+        </p>
+        <div className="pt-2">
           <Link href="/dashboard">
             <Button label="Go to dashboard" variant="primary" />
           </Link>
-        </Stack>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

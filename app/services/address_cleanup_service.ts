@@ -1,4 +1,4 @@
-import { CleanedAddress, LineAdd } from '../types/address_cleanup.ts'
+import type { CleanedAddress, LineAdd } from '../types/address_cleanup.ts'
 import { COUNTRY_ISO_MAP, COUNTRY_LIST } from '../utils/country_list.js'
 import stateCheck from '../utils/state_check.js'
 
@@ -74,7 +74,10 @@ function normalizePhone(raw: string): { number: string; ext?: string } {
   }
 
   // Replace dots and multiple spaces/dashes with a single dash
-  phone = phone.replace(/[.\s]+/g, '-').replace(/-{2,}/g, '-').replace(/^-|-$/g, '')
+  phone = phone
+    .replace(/[.\s]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-|-$/g, '')
 
   // If it's 10 raw digits, format as XXX-XXX-XXXX
   const digits = phone.replace(/\D/g, '')
@@ -180,7 +183,16 @@ export class CleanAdd {
       }
     }
 
-    return { name, coreLines, phone, buyerName, addressType, isSignatureRequired, vatOrIoss, buyerNationalId }
+    return {
+      name,
+      coreLines,
+      phone,
+      buyerName,
+      addressType,
+      isSignatureRequired,
+      vatOrIoss,
+      buyerNationalId,
+    }
   }
 
   /**
@@ -308,14 +320,11 @@ export class CleanAdd {
       .filter(Boolean)
     if (parts.length >= 2) {
       const city = parts[0]
-      const restTokens = parts
-        .slice(1)
-        .join(' ')
-        .split(/\s+/)
-        .filter(Boolean)
+      const restTokens = parts.slice(1).join(' ').split(/\s+/).filter(Boolean)
       const rawZip =
         restTokens.length > 1 ? restTokens[restTokens.length - 1].split('-')[0].toUpperCase() : ''
-      const rawState = restTokens.length > 1 ? restTokens.slice(0, -1).join(' ') : (restTokens[0] ?? '')
+      const rawState =
+        restTokens.length > 1 ? restTokens.slice(0, -1).join(' ') : (restTokens[0] ?? '')
       const state = stateCheck(rawState.toLowerCase(), countryLower)
       return { city, state, zipcode: rawZip ? `'${rawZip}` : "''", rawZip }
     }
@@ -374,8 +383,14 @@ export class CleanAdd {
     // Step 1: Classify all lines into metadata vs core address lines
     const classified = this.classifyLines(lines)
     let { name, coreLines } = classified
-    const { phone: rawPhone, buyerName, addressType, isSignatureRequired, vatOrIoss, buyerNationalId } =
-      classified
+    const {
+      phone: rawPhone,
+      buyerName,
+      addressType,
+      isSignatureRequired,
+      vatOrIoss,
+      buyerNationalId,
+    } = classified
 
     // Step 2: Handle name overflow / single name
     const isNameOverflow = name.length > 35
@@ -404,7 +419,13 @@ export class CleanAdd {
 
     // Edge case: if we only have one core line left, it's likely the city/state/zip
     // and there are no street lines (shouldn't happen with valid addresses, but be safe)
-    if (coreLines.length === 1 && !US_CSZ_REGEX.test(coreLines[0]) && !CA_CSZ_REGEX.test(coreLines[0]) && !GENERIC_CSZ_REGEX.test(coreLines[0]) && !EU_ZIP_CITY_REGEX.test(coreLines[0])) {
+    if (
+      coreLines.length === 1 &&
+      !US_CSZ_REGEX.test(coreLines[0]) &&
+      !CA_CSZ_REGEX.test(coreLines[0]) &&
+      !GENERIC_CSZ_REGEX.test(coreLines[0]) &&
+      !EU_ZIP_CITY_REGEX.test(coreLines[0])
+    ) {
       // The single remaining line is likely a street address with no CSZ — push to street
       // This is unlikely but defensive
     }
@@ -419,7 +440,7 @@ export class CleanAdd {
 
     // Step 7: Normalize phone
     const { number: phoneNumber, ext } = normalizePhone(rawPhone ?? '')
-    const phone = rawPhone ? ext ? `${phoneNumber} ext. ${ext}` : phoneNumber : '000-000-0000'
+    const phone = rawPhone ? (ext ? `${phoneNumber} ext. ${ext}` : phoneNumber) : '000-000-0000'
 
     // Step 8: Country code lookup
     const countryCode = COUNTRY_ISO_MAP[country.toLowerCase()] ?? 'US'
@@ -470,11 +491,11 @@ export class CleanAdd {
     const rawBlocks = Array.isArray(input)
       ? input
       : input
-        .trim()
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .replace(/\r\n/g, '\n')
-        .split(/\n{2,}/)
+          .trim()
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '')
+          .replace(/\r\n/g, '\n')
+          .split(/\n{2,}/)
 
     for (const block of rawBlocks) {
       if (!block || !block.trim()) continue

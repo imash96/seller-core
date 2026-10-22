@@ -6,7 +6,7 @@ import { NAVIGATION, type NavItem } from '~/lib/constants'
 import { useToggle } from '~/hooks/use_toggle'
 import { TopBar } from './top-bar'
 import MobileMenu from './mobile-menu'
-import { FlashMessages } from '~/components/flash-messages'
+import { FlashMessages } from '~/modules/common/flash-messages'
 import { router, usePage } from '@inertiajs/react'
 
 export function SidebarLink({
@@ -20,7 +20,7 @@ export function SidebarLink({
   const currentPath = (url || '/').split('?')[0]
   const isActive =
     href === '/dashboard'
-      ? currentPath === '/dashboard' || currentPath === '/'
+      ? currentPath === '/dashboard'
       : currentPath === href || currentPath.startsWith(href + '/')
 
   return (
@@ -29,15 +29,17 @@ export function SidebarLink({
       onClick={onClick}
       className={`group flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all unstyled-link ${
         isActive
-          ? 'bg-indigo-600 text-white font-semibold shadow-sm shadow-indigo-600/25'
-          : 'text-slate-300 hover:bg-white/8 hover:text-white'
+          ? 'bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-sm'
+          : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
       }`}
     >
       <div className="flex items-center gap-3 min-w-0">
         {Icon && (
           <Icon
             className={`w-4 h-4 shrink-0 ${
-              isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
+              isActive
+                ? 'text-sidebar-primary-foreground'
+                : 'text-sidebar-foreground/60 group-hover:text-sidebar-accent-foreground'
             }`}
           />
         )}
@@ -47,7 +49,9 @@ export function SidebarLink({
       {badge && (
         <span
           className={`px-2 py-0.5 text-[11px] font-semibold rounded-full ${
-            isActive ? 'bg-white/20 text-white' : 'bg-indigo-500/20 text-indigo-300'
+            isActive
+              ? 'bg-sidebar-primary-foreground/20 text-sidebar-primary-foreground'
+              : 'bg-sidebar-accent text-sidebar-accent-foreground'
           }`}
         >
           {badge}
@@ -71,19 +75,19 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <MobileMenu open={drawerOpen} close={closeDrawer} logout={handleLogout} />
       <FlashMessages />
 
-      {/* Desktop Sidebar (ported from inertia-old/layout/app-layout.tsx) */}
+      {/* Desktop Sidebar */}
       <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-slate-950 text-slate-100 border-r border-slate-800 px-5 pb-4">
-          <div className="h-16 border-b border-slate-800/80 flex items-center">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-sidebar text-sidebar-foreground border-r border-sidebar-border px-5 pb-4">
+          <div className="h-16 border-b border-sidebar-border flex items-center">
             <Link href="/dashboard" className="flex items-center gap-3 group unstyled-link">
-              <div className="w-9 h-9 bg-linear-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md shadow-indigo-500/20 transition-transform group-hover:scale-105">
-                <Box className="w-5 h-5 text-white" />
+              <div className="w-9 h-9 bg-sidebar-primary rounded-xl flex items-center justify-center shadow-sm transition-transform group-hover:scale-105">
+                <Box className="w-5 h-5 text-sidebar-primary-foreground" />
               </div>
               <div>
-                <span className="text-base font-bold text-white tracking-tight block leading-none">
+                <span className="text-base font-bold text-sidebar-foreground tracking-tight block leading-none">
                   Seller Core
                 </span>
-                <span className="text-[11px] text-slate-400 block mt-1">
+                <span className="text-[11px] text-sidebar-foreground/65 block mt-1">
                   Multi-Channel Operations
                 </span>
               </div>
@@ -94,7 +98,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <div className="space-y-6">
               {NAVIGATION.map((section) => (
                 <div key={section.title}>
-                  <div className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400/80">
+                  <div className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/55">
                     {section.title}
                   </div>
                   <div className="space-y-1">
@@ -106,7 +110,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               ))}
             </div>
 
-            <div className="pt-4 mt-6 border-t border-slate-800">
+            <div className="pt-4 mt-6 border-t border-sidebar-border">
               <button
                 type="button"
                 onClick={handleLogout}
@@ -122,7 +126,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       {/* Main Content Area */}
       <div className="lg:pl-72 flex flex-col min-h-screen">
         <TopBar onMenu={toggleDrawer} user={user} />
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 w-full mx-auto">{children}</main>
+        <main className="flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">{children}</main>
       </div>
     </div>
   )

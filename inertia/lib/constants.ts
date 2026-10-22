@@ -79,7 +79,6 @@ export const NAV_FLAT: NavItem[] = NAVIGATION.flatMap((section) => section.items
  * These render with their own layout (auth, marketing, or none).
  */
 export const PUBLIC_PAGES = [
-  'home',
   'auth/login',
   'auth/signup',
   'errors/not_found',

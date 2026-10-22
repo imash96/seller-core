@@ -44,7 +44,7 @@ export default defineConfig({
     tailwindcss(),
     stylexPlugin(),
     react(),
-    adonisjs({ entryPoints: ['inertia/app.tsx'], reload: ['resources/views/**/*.edge'] }),
+    adonisjs({ entryPoints: ['inertia/app/app.tsx'], reload: ['resources/views/**/*.edge'] }),
   ],
 
   resolve: {

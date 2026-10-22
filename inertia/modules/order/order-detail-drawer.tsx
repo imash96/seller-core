@@ -1,19 +1,22 @@
 import Drawer from '~/ui/drawer'
-import { StatusBadge } from '~/ui/badge'
+import { StatusBadge, STATUS_TONES } from '~/components/atoms/status-badge'
 import { Package, Calendar, DollarSign, Truck } from 'lucide-react'
 import { formatMoney, formatDate } from '~/lib/utils'
-import { STATUS_TONES, type Row } from '~/lib/ui'
+import type { Row } from '~/lib/ui'
 
 export function OrderDetailsDrawer({
   order,
+  open,
   onClose,
   onEditStatus,
 }: {
   order: Row | null
+  open?: boolean
   onClose: () => void
   onEditStatus?: (order: Row) => void
 }) {
-  if (!order) return null
+  const isOpen = open !== undefined ? open && !!order : !!order
+  if (!isOpen || !order) return null
 
   const lineItems = (order.lineItems as Row[]) ?? []
   const shipments = (order.shipments as Row[]) ?? []
@@ -23,7 +26,7 @@ export function OrderDetailsDrawer({
 
   return (
     <Drawer
-      open={!!order}
+      open={isOpen}
       onClose={onClose}
       direction="right"
       title={`Order ${String(order.orderNumber)}`}
@@ -53,7 +56,7 @@ export function OrderDetailsDrawer({
                 onClose()
                 onEditStatus(order)
               }}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary hover:opacity-90 text-primary-foreground transition-colors cursor-pointer"
             >
               Change Status
             </button>
@@ -63,25 +66,29 @@ export function OrderDetailsDrawer({
         {/* Customer & Dates */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <Calendar className="w-4 h-4 text-indigo-600" />
+            <Calendar className="w-4 h-4 text-primary" />
             <span>Customer & Timeline</span>
           </div>
           <div className="grid grid-cols-2 gap-3 p-4 rounded-xl border border-border bg-card text-sm">
             <div>
               <span className="text-xs text-muted-foreground block">Customer</span>
-              <span className="font-semibold">{String(customer.fullName || order.customerFullName || '—')}</span>
+              <span className="font-semibold text-foreground">
+                {String(customer.fullName || order.customerFullName || '—')}
+              </span>
             </div>
             <div>
               <span className="text-xs text-muted-foreground block">Email</span>
-              <span className="font-medium truncate block">{String(customer.email || '—')}</span>
+              <span className="font-medium text-foreground truncate block">
+                {String(customer.email || '—')}
+              </span>
             </div>
             <div>
               <span className="text-xs text-muted-foreground block">Ordered At</span>
-              <span className="font-medium">{formatDate(order.orderedAt)}</span>
+              <span className="font-medium text-foreground">{formatDate(order.orderedAt)}</span>
             </div>
             <div>
               <span className="text-xs text-muted-foreground block">Delivered At</span>
-              <span className="font-medium">{formatDate(order.deliveredAt)}</span>
+              <span className="font-medium text-foreground">{formatDate(order.deliveredAt)}</span>
             </div>
           </div>
         </div>
@@ -89,7 +96,7 @@ export function OrderDetailsDrawer({
         {/* Line Items */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <Package className="w-4 h-4 text-indigo-600" />
+            <Package className="w-4 h-4 text-primary" />
             <span>Order Line Items ({lineItems.length})</span>
           </div>
           <div className="space-y-2.5">
@@ -111,10 +118,13 @@ export function OrderDetailsDrawer({
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-foreground">
-                      {formatMoney(cur, Number(li.unitPrice ?? 0) * Number(li.quantityOrdered ?? 1))}
+                    <p className="text-sm font-bold text-foreground tabular-nums">
+                      {formatMoney(
+                        cur,
+                        Number(li.unitPrice ?? 0) * Number(li.quantityOrdered ?? 1)
+                      )}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground tabular-nums">
                       {formatMoney(cur, li.unitPrice)} / unit
                     </p>
                   </div>
@@ -127,7 +137,7 @@ export function OrderDetailsDrawer({
         {/* Shipments */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <Truck className="w-4 h-4 text-indigo-600" />
+            <Truck className="w-4 h-4 text-primary" />
             <span>Shipments ({shipments.length})</span>
           </div>
           {shipments.length === 0 ? (
@@ -142,7 +152,8 @@ export function OrderDetailsDrawer({
                   <div>
                     <p className="font-semibold text-foreground">{String(s.shipmentNumber)}</p>
                     <p className="text-xs text-muted-foreground font-mono">
-                      {String(s.carrierCode || '').toUpperCase()} · {String(s.trackingNumber || 'No tracking')}
+                      {String(s.carrierCode || '').toUpperCase()} ·{' '}
+                      {String(s.trackingNumber || 'No tracking')}
                     </p>
                   </div>
                   <StatusBadge
@@ -158,29 +169,35 @@ export function OrderDetailsDrawer({
         {/* Financial P&L Waterfall */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <DollarSign className="w-4 h-4 text-indigo-600" />
+            <DollarSign className="w-4 h-4 text-primary" />
             <span>Order P&L Waterfall</span>
           </div>
           <div className="p-4 rounded-xl border border-border bg-muted/25 space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium">{formatMoney(cur, order.subtotalAmount)}</span>
+              <span className="font-medium text-foreground tabular-nums">
+                {formatMoney(cur, order.subtotalAmount)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Shipping Charged</span>
-              <span className="font-medium">{formatMoney(cur, order.shippingChargedAmount)}</span>
+              <span className="font-medium text-foreground tabular-nums">
+                {formatMoney(cur, order.shippingChargedAmount)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tax</span>
-              <span className="font-medium">{formatMoney(cur, order.taxAmount)}</span>
+              <span className="font-medium text-foreground tabular-nums">
+                {formatMoney(cur, order.taxAmount)}
+              </span>
             </div>
-            <div className="flex justify-between pt-2 border-t border-border font-bold">
+            <div className="flex justify-between pt-2 border-t border-border font-bold text-foreground">
               <span>Order Total ({cur})</span>
-              <span>{formatMoney(cur, order.totalAmount)}</span>
+              <span className="tabular-nums">{formatMoney(cur, order.totalAmount)}</span>
             </div>
             <div className="flex justify-between text-xs text-rose-600 dark:text-rose-400">
               <span>− Marketplace & Payment Fees</span>
-              <span>
+              <span className="tabular-nums">
                 −
                 {formatMoney(
                   cur,
@@ -191,7 +208,7 @@ export function OrderDetailsDrawer({
             </div>
             <div className="flex justify-between text-xs text-amber-600 dark:text-amber-400">
               <span>− COGS & Shipping Cost</span>
-              <span>
+              <span className="tabular-nums">
                 −
                 {formatMoney(
                   cur,
@@ -200,14 +217,14 @@ export function OrderDetailsDrawer({
               </span>
             </div>
             {Number(order.refundedAmount ?? 0) > 0 && (
-              <div className="flex justify-between text-xs text-rose-600">
+              <div className="flex justify-between text-xs text-rose-600 dark:text-rose-400">
                 <span>− Refunded</span>
-                <span>−{formatMoney(cur, order.refundedAmount)}</span>
+                <span className="tabular-nums">−{formatMoney(cur, order.refundedAmount)}</span>
               </div>
             )}
             <div className="flex justify-between pt-2 border-t border-border text-base font-bold text-emerald-600 dark:text-emerald-400">
               <span>True Net Profit ({repCur})</span>
-              <span>{formatMoney(repCur, order.netProfitAmount)}</span>
+              <span className="tabular-nums">{formatMoney(repCur, order.netProfitAmount)}</span>
             </div>
           </div>
         </div>

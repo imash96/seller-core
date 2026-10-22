@@ -1,9 +1,6 @@
-import { Stack } from '@astryxdesign/core/Stack'
-import { Text } from '@astryxdesign/core/Text'
-import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-
 import {
+  PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
@@ -11,10 +8,11 @@ import {
   col,
   STATUS_TONES,
   money,
-  short,
   type Row,
 } from '~/lib/ui'
 import { useState } from 'react'
+import { router } from '@inertiajs/react'
+import { CreditCard } from 'lucide-react'
 
 type Props = {
   financialAccounts: Row[]
@@ -29,8 +27,6 @@ type Props = {
   orderLineItems: Row[]
   savedViews?: Row[]
 }
-
-
 
 const ACCOUNT_TYPES = [
   'bank_checking',
@@ -56,6 +52,7 @@ const CARD_USAGE = [
   'shipping_labels',
   'primary_billing',
 ]
+const COST_BUCKETS = ['cogs', 'shipping', 'marketing', 'operations', 'taxes', 'other']
 
 export default function Finance({
   financialAccounts,
@@ -70,48 +67,67 @@ export default function Finance({
   const [createCardOpen, setCreateCardOpen] = useState(false)
   const [editCardRow, setEditCardRow] = useState<Row | null>(null)
   const [createTxOpen, setCreateTxOpen] = useState(false)
+  const [createCatOpen, setCreateCatOpen] = useState(false)
+  const [editCatRow, setEditCatRow] = useState<Row | null>(null)
 
   return (
-    <Stack gap={4}>
-      <Card padding={4}>
-        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
-          <Button
-            label="+ Financial Account"
-            variant="primary"
-            onClick={() => setCreateAccountOpen(true)}
-          />
-          <Button
-            label="+ Credit Card"
-            variant="secondary"
-            onClick={() => setCreateCardOpen(true)}
-          />
-          <Button label="+ Transaction" variant="ghost" onClick={() => setCreateTxOpen(true)} />
-          <Text type="supporting" as="div">
-            {financialAccounts.length} accounts · {creditCards.length} cards ·{' '}
-            {financialTransactions.length} transactions
-          </Text>
-        </Stack>
-      </Card>
-      {savedViews && savedViews.length > 0 ? <SavedViewsBar views={savedViews} /> : null}
+    <div className="space-y-6">
+      <PageHeader
+        title="Finance, PCI-Safe Cards & Multi-Currency Ledger"
+        description="Manage bank/clearing accounts, tokenized credit cards (last 4 digits only), and Business vs. Household ledger entries."
+        icon={CreditCard}
+        badge={`${financialAccounts.length} accounts · ${creditCards.length} cards · ${financialTransactions.length} tx`}
+        actions={
+          <>
+            <Button
+              label="+ Category"
+              variant="ghost"
+              size="sm"
+              onClick={() => setCreateCatOpen(true)}
+            />
+            <Button
+              label="+ Credit Card"
+              variant="secondary"
+              size="sm"
+              onClick={() => setCreateCardOpen(true)}
+            />
+            <Button
+              label="+ Financial Account"
+              variant="secondary"
+              size="sm"
+              onClick={() => setCreateAccountOpen(true)}
+            />
+            <Button
+              label="+ Record Transaction"
+              variant="primary"
+              size="sm"
+              onClick={() => setCreateTxOpen(true)}
+            />
+          </>
+        }
+      />
 
+      {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
+
+      {/* Create Financial Account Modal */}
       <FormModal
         isOpen={createAccountOpen}
         onOpenChange={setCreateAccountOpen}
-        title="Create financial account"
-        subtitle="Bank, cash and marketplace clearing accounts."
-        submitLabel="Create account"
+        title="Create Financial Account"
+        subtitle="Bank checking, savings, cash, and marketplace clearing accounts."
+        submitLabel="Create Account"
         action="/financial-accounts"
         fields={[
           { name: 'accountName', label: 'Account name', required: true },
           {
             name: 'accountType',
-            label: 'Type',
+            label: 'Account type',
             kind: 'select',
             default: 'bank_checking',
             options: ACCOUNT_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
           },
-          { name: 'institutionName', label: 'Institution' },
-          { name: 'accountNumberLast4', label: 'Last 4 digits', placeholder: '0000' },
+          { name: 'institutionName', label: 'Institution name' },
+          { name: 'accountNumberLast4', label: 'Last 4 digits', placeholder: '4401' },
           {
             name: 'dataClassification',
             label: 'Classification',
@@ -127,13 +143,14 @@ export default function Finance({
         ]}
       />
 
+      {/* Edit Financial Account Modal */}
       <FormModal
         isOpen={!!editAccountRow}
         onOpenChange={(o) => {
           if (!o) setEditAccountRow(null)
         }}
-        title={`Edit account: ${String(editAccountRow?.accountName ?? '')}`}
-        submitLabel="Save account"
+        title={`Edit Account: ${String(editAccountRow?.accountName ?? '')}`}
+        submitLabel="Save Account"
         action={
           editAccountRow
             ? `/financial-accounts/${editAccountRow.id}`
@@ -144,11 +161,12 @@ export default function Finance({
             ? {
                 accountName: String(editAccountRow.accountName ?? ''),
                 currentBalance: String(editAccountRow.currentBalance ?? 0),
+                isActive: String(editAccountRow.isActive ?? 'true'),
               }
             : undefined
         }
         fields={[
-          { name: 'accountName', label: 'Account name' },
+          { name: 'accountName', label: 'Account name', required: true },
           { name: 'currentBalance', label: 'Balance', kind: 'number' },
           {
             name: 'isActive',
@@ -162,22 +180,23 @@ export default function Finance({
         ]}
       />
 
+      {/* Create Credit Card Modal */}
       <FormModal
         isOpen={createCardOpen}
         onOpenChange={setCreateCardOpen}
-        title="Add credit card (PCI-safe)"
-        subtitle="Last four digits only — no PAN, no CVV."
-        submitLabel="Add card"
+        title="Add Credit Card (PCI-Safe)"
+        subtitle="Stores last 4 digits and vault token reference only — never full PAN or CVV."
+        submitLabel="Add Card"
         action="/credit-cards"
         fields={[
           { name: 'cardLabel', label: 'Card label', required: true },
-          { name: 'brandName', label: 'Brand', required: true, placeholder: 'Visa' },
-          { name: 'cardholderName', label: 'Cardholder', required: true },
-          { name: 'last4Digits', label: 'Last 4', required: true, placeholder: '4242' },
-          { name: 'expMonth', label: 'Exp month', kind: 'number', required: true },
-          { name: 'expYear', label: 'Exp year', kind: 'number', required: true },
+          { name: 'brandName', label: 'Brand (e.g. Visa, Amex)', required: true, placeholder: 'Visa' },
+          { name: 'cardholderName', label: 'Cardholder name', required: true },
+          { name: 'last4Digits', label: 'Last 4 digits', required: true, placeholder: '4242' },
+          { name: 'expMonth', label: 'Exp month (1–12)', kind: 'number', required: true },
+          { name: 'expYear', label: 'Exp year (e.g. 2028)', kind: 'number', required: true },
           { name: 'creditLimit', label: 'Credit limit', kind: 'number' },
-          { name: 'minimumPaymentDue', label: 'Min payment', kind: 'number' },
+          { name: 'minimumPaymentDue', label: 'Minimum payment due', kind: 'number' },
           { name: 'nextPaymentDueDate', label: 'Next due date', kind: 'date' },
           {
             name: 'dataClassification',
@@ -191,7 +210,7 @@ export default function Finance({
           },
           {
             name: 'sellerAccountId',
-            label: 'Link seller account',
+            label: 'Linked seller account',
             kind: 'select',
             options: sellerAccounts.map((s) => ({
               value: String(s.id),
@@ -200,7 +219,7 @@ export default function Finance({
           },
           {
             name: 'usagePurpose',
-            label: 'Usage',
+            label: 'Usage purpose',
             kind: 'select',
             default: 'primary_billing',
             options: CARD_USAGE.map((u) => ({ value: u, label: u.replace(/_/g, ' ') })),
@@ -208,13 +227,14 @@ export default function Finance({
         ]}
       />
 
+      {/* Edit Credit Card Modal */}
       <FormModal
         isOpen={!!editCardRow}
         onOpenChange={(o) => {
           if (!o) setEditCardRow(null)
         }}
-        title={`Edit card: ${String(editCardRow?.cardLabel ?? '')}`}
-        submitLabel="Save card"
+        title={`Edit Card: ${String(editCardRow?.cardLabel ?? '')}`}
+        submitLabel="Save Card"
         action={editCardRow ? `/credit-cards/${editCardRow.id}` : '/credit-cards/placeholder'}
         initialValues={
           editCardRow
@@ -230,9 +250,9 @@ export default function Finance({
             : undefined
         }
         fields={[
-          { name: 'cardLabel', label: 'Card label' },
+          { name: 'cardLabel', label: 'Card label', required: true },
           { name: 'creditLimit', label: 'Credit limit', kind: 'number' },
-          { name: 'minimumPaymentDue', label: 'Min payment', kind: 'number' },
+          { name: 'minimumPaymentDue', label: 'Minimum payment due', kind: 'number' },
           { name: 'nextPaymentDueDate', label: 'Next due date', kind: 'date' },
           {
             name: 'status',
@@ -243,18 +263,19 @@ export default function Finance({
         ]}
       />
 
+      {/* Record Financial Transaction Modal */}
       <FormModal
         isOpen={createTxOpen}
         onOpenChange={setCreateTxOpen}
-        title="Record financial transaction"
-        subtitle="Multi-currency ledger — never floats, always numeric(14,2)."
-        submitLabel="Record transaction"
+        title="Record Financial Transaction"
+        subtitle="Multi-currency ledger entry with Business vs. Household segregation."
+        submitLabel="Record Transaction"
         action="/financial-transactions"
         fields={[
           { name: 'referenceNumber', label: 'Reference number', required: true },
           {
             name: 'transactionType',
-            label: 'Type',
+            label: 'Transaction type',
             kind: 'select',
             required: true,
             options: TX_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
@@ -269,12 +290,11 @@ export default function Finance({
               { value: 'household_personal', label: 'Household / personal' },
             ],
           },
-          { name: 'description', label: 'Description', required: true },
-          { name: 'vendorOrPayer', label: 'Vendor / payer' },
+          { name: 'vendorOrPayer', label: 'Vendor / Payer' },
           { name: 'originalCurrencyCode', label: 'Currency', default: 'USD' },
           { name: 'originalAmount', label: 'Amount', kind: 'number', required: true },
-          { name: 'exchangeRate', label: 'Exchange rate', kind: 'number', default: '1' },
-          { name: 'taxAmount', label: 'Tax', kind: 'number' },
+          { name: 'exchangeRate', label: 'Exchange rate to USD', kind: 'number', default: '1' },
+          { name: 'taxAmount', label: 'Tax amount', kind: 'number' },
           { name: 'transactionDate', label: 'Transaction date', kind: 'date', required: true },
           {
             name: 'financialAccountId',
@@ -303,12 +323,126 @@ export default function Finance({
               label: String(s.accountName ?? s.id),
             })),
           },
+          {
+            name: 'description',
+            label: 'Description',
+            required: true,
+            fullWidth: true,
+          },
+        ]}
+      />
+
+      {/* Create Finance Category Modal */}
+      <FormModal
+        isOpen={createCatOpen}
+        onOpenChange={setCreateCatOpen}
+        title="Create Finance Category"
+        subtitle="Classify income and expense cost buckets for P&L and tax reporting."
+        submitLabel="Save Category"
+        action="/finance-categories"
+        fields={[
+          { name: 'name', label: 'Category name', required: true },
+          {
+            name: 'categoryType',
+            label: 'Category type',
+            kind: 'select',
+            default: 'expense',
+            options: [
+              { value: 'income', label: 'Income' },
+              { value: 'expense', label: 'Expense' },
+            ],
+          },
+          {
+            name: 'costBucket',
+            label: 'Cost bucket',
+            kind: 'select',
+            default: 'operations',
+            options: COST_BUCKETS.map((b) => ({ value: b, label: b.replace(/_/g, ' ') })),
+          },
+          {
+            name: 'dataClassification',
+            label: 'Classification',
+            kind: 'select',
+            default: 'business',
+            options: [
+              { value: 'business', label: 'Business' },
+              { value: 'household_personal', label: 'Household / personal' },
+            ],
+          },
+          {
+            name: 'isTaxDeductible',
+            label: 'Tax deductible',
+            kind: 'select',
+            default: 'true',
+            options: [
+              { value: 'true', label: 'Yes' },
+              { value: 'false', label: 'No' },
+            ],
+          },
+        ]}
+      />
+
+      {/* Edit Finance Category Modal */}
+      <FormModal
+        isOpen={!!editCatRow}
+        onOpenChange={(o) => {
+          if (!o) setEditCatRow(null)
+        }}
+        title={`Edit Finance Category: ${String(editCatRow?.name ?? '')}`}
+        submitLabel="Update Category"
+        action={editCatRow ? `/finance-categories/${editCatRow.id}` : '/finance-categories/placeholder'}
+        initialValues={
+          editCatRow
+            ? {
+                name: String(editCatRow.name ?? ''),
+                categoryType: String(editCatRow.categoryType ?? 'expense'),
+                costBucket: String(editCatRow.costBucket ?? 'operations'),
+                dataClassification: String(editCatRow.dataClassification ?? 'business'),
+                isTaxDeductible: String(editCatRow.isTaxDeductible ?? 'true'),
+              }
+            : undefined
+        }
+        fields={[
+          { name: 'name', label: 'Category name', required: true },
+          {
+            name: 'categoryType',
+            label: 'Category type',
+            kind: 'select',
+            options: [
+              { value: 'income', label: 'Income' },
+              { value: 'expense', label: 'Expense' },
+            ],
+          },
+          {
+            name: 'costBucket',
+            label: 'Cost bucket',
+            kind: 'select',
+            options: COST_BUCKETS.map((b) => ({ value: b, label: b.replace(/_/g, ' ') })),
+          },
+          {
+            name: 'dataClassification',
+            label: 'Classification',
+            kind: 'select',
+            options: [
+              { value: 'business', label: 'Business' },
+              { value: 'household_personal', label: 'Household / personal' },
+            ],
+          },
+          {
+            name: 'isTaxDeductible',
+            label: 'Tax deductible',
+            kind: 'select',
+            options: [
+              { value: 'true', label: 'Yes' },
+              { value: 'false', label: 'No' },
+            ],
+          },
         ]}
       />
 
       <PageSection
-        title="Financial accounts"
-        description="Bank, cash and marketplace clearing accounts."
+        title="Financial Accounts"
+        description="Bank, cash, and marketplace clearing accounts."
       >
         <ResponsiveDataView
           rows={financialAccounts}
@@ -336,7 +470,7 @@ export default function Finance({
               { label: 'Institution', value: String(row.institutionName ?? '—') },
             ],
             actions: (
-              <Stack direction="horizontal" gap={2}>
+              <div className="flex items-center gap-2">
                 <Button
                   label="Edit"
                   variant="secondary"
@@ -348,20 +482,20 @@ export default function Finance({
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Delete this financial account?')) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/financial-accounts/${row.id}/delete`
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm(`Delete financial account "${row.accountName}"?`)) {
+                      router.post(
+                        `/financial-accounts/${row.id}/delete`,
+                        {},
+                        { preserveScroll: true }
+                      )
                     }
                   }}
                 />
-              </Stack>
+              </div>
             ),
           })}
           columns={[
-            col.text('accountName', 'Name', 130),
+            col.text('accountName', 'Name', 150),
             col.badge('accountType', 'Type', {
               credit_card: 'info',
               bank_checking: 'neutral',
@@ -370,10 +504,10 @@ export default function Finance({
             col.money('currentBalance', 'Balance', 'currencyCode'),
             col.badge('dataClassification', 'Class', {
               business: 'info',
-              household_personal: 'teal',
+              household_personal: 'purple',
             }),
             col.action('Actions', (row) => (
-              <Stack direction="horizontal" gap={2}>
+              <div className="flex items-center gap-1.5">
                 <Button
                   label="Edit"
                   variant="secondary"
@@ -385,23 +519,23 @@ export default function Finance({
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Delete this financial account?')) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/financial-accounts/${row.id}/delete`
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm(`Delete financial account "${row.accountName}"?`)) {
+                      router.post(
+                        `/financial-accounts/${row.id}/delete`,
+                        {},
+                        { preserveScroll: true }
+                      )
                     }
                   }}
                 />
-              </Stack>
+              </div>
             )),
           ]}
         />
       </PageSection>
 
       <PageSection
-        title="Credit cards (PCI-safe)"
+        title="Credit Cards (PCI-Safe)"
         description="Last four digits only — no PAN, no CVV."
       >
         <ResponsiveDataView
@@ -441,7 +575,7 @@ export default function Finance({
               },
             ],
             actions: (
-              <Stack direction="horizontal" gap={2}>
+              <div className="flex items-center gap-2">
                 <Button
                   label="Edit"
                   variant="secondary"
@@ -449,26 +583,22 @@ export default function Finance({
                   onClick={() => setEditCardRow(row)}
                 />
                 <Button
-                  label="Remove"
+                  label="Cancel Card"
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Remove this card?')) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/credit-cards/${row.id}/delete`
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm(`Cancel credit card "${row.cardLabel}"?`)) {
+                      router.post(`/credit-cards/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
                 />
-              </Stack>
+              </div>
             ),
           })}
           columns={[
-            col.text('cardLabel', 'Label', 130),
-            col.text('brandName', 'Brand', 80),
-            col.text('last4Digits', 'Last 4', 65),
+            col.text('cardLabel', 'Label', 150),
+            col.text('brandName', 'Brand', 90),
+            col.text('last4Digits', 'Last 4', 70),
             col.money('creditLimit', 'Limit', 'currencyCode'),
             col.money('minimumPaymentDue', 'Min due', 'currencyCode'),
             col.badge('status', 'Status', {
@@ -478,7 +608,7 @@ export default function Finance({
               cancelled: 'error',
             }),
             col.action('Actions', (row) => (
-              <Stack direction="horizontal" gap={2}>
+              <div className="flex items-center gap-1.5">
                 <Button
                   label="Edit"
                   variant="secondary"
@@ -486,28 +616,24 @@ export default function Finance({
                   onClick={() => setEditCardRow(row)}
                 />
                 <Button
-                  label="Remove"
+                  label="Cancel"
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Remove this card?')) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/credit-cards/${row.id}/delete`
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm(`Cancel credit card "${row.cardLabel}"?`)) {
+                      router.post(`/credit-cards/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
                 />
-              </Stack>
+              </div>
             )),
           ]}
         />
       </PageSection>
 
       <PageSection
-        title="Financial ledger"
-        description="Void incorrect entries — history stays intact."
+        title="Financial Ledger"
+        description="Void incorrect entries — historical audit trail stays intact."
       >
         <ResponsiveDataView
           rows={financialTransactions}
@@ -555,19 +681,17 @@ export default function Finance({
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Void this transaction?')) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/financial-transactions/${row.id}/void`
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm(`Void transaction ${row.referenceNumber}?`)) {
+                      router.post(
+                        `/financial-transactions/${row.id}/void`,
+                        {},
+                        { preserveScroll: true }
+                      )
                     }
                   }}
                 />
               ) : (
-                <Text type="supporting" as="span">
-                  Voided
-                </Text>
+                <span className="text-xs text-muted-foreground">Voided</span>
               ),
           })}
           columns={[
@@ -579,7 +703,7 @@ export default function Finance({
             }),
             col.badge('dataClassification', 'Class', {
               business: 'info',
-              household_personal: 'teal',
+              household_personal: 'purple',
             }),
             col.badge('status', 'Status', STATUS_TONES),
             col.money('originalAmount', 'Amount', 'originalCurrencyCode'),
@@ -588,21 +712,19 @@ export default function Finance({
             col.date('transactionDate', 'Date'),
             col.action('Action', (row) =>
               String(row.status) === 'voided' ? (
-                <Text type="supporting" as="span">
-                  Voided
-                </Text>
+                <span className="text-xs text-muted-foreground">Voided</span>
               ) : (
                 <Button
                   label="Void"
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Void this transaction?')) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/financial-transactions/${row.id}/void`
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm(`Void transaction ${row.referenceNumber}?`)) {
+                      router.post(
+                        `/financial-transactions/${row.id}/void`,
+                        {},
+                        { preserveScroll: true }
+                      )
                     }
                   }}
                 />
@@ -613,18 +735,20 @@ export default function Finance({
       </PageSection>
 
       <PageSection
-        title="Finance categories"
-        description="Income/expense categories with cost buckets."
+        title="Finance Categories"
+        description="Income and expense categories with cost buckets and tax deductibility."
       >
         <ResponsiveDataView
           rows={financeCategories}
-          searchKeys={['name']}
+          searchKeys={['name', 'costBucket']}
           filterKey="categoryType"
           filterPills={[
             { value: 'all', label: 'All' },
             { value: 'income', label: 'Income' },
             { value: 'expense', label: 'Expense' },
           ]}
+          createLabel="+ Category"
+          onCreateClick={() => setCreateCatOpen(true)}
           toCard={(row) => ({
             title: String(row.name),
             statusBadge: {
@@ -635,24 +759,72 @@ export default function Finance({
               { label: 'Cost bucket', value: String(row.costBucket ?? '—').replace(/_/g, ' ') },
               { label: 'Class', value: String(row.dataClassification ?? '—').replace(/_/g, ' ') },
             ],
+            actions: (
+              <div className="flex items-center gap-2">
+                <Button
+                  label="Edit"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setEditCatRow(row)}
+                />
+                <Button
+                  label="Delete"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (window.confirm(`Delete finance category "${row.name}"?`)) {
+                      router.post(
+                        `/finance-categories/${row.id}/delete`,
+                        {},
+                        { preserveScroll: true }
+                      )
+                    }
+                  }}
+                />
+              </div>
+            ),
           })}
           columns={[
-            col.text('name', 'Name', 150),
+            col.text('name', 'Name', 160),
             col.badge('categoryType', 'Type', { income: 'success', expense: 'warning' }),
             col.badge('costBucket', 'Cost bucket', {
               cogs: 'error',
               shipping: 'info',
-              marketing: 'teal',
+              marketing: 'purple',
               operations: 'neutral',
             }),
             col.badge('dataClassification', 'Class', {
               business: 'info',
-              household_personal: 'teal',
+              household_personal: 'purple',
             }),
             col.text('isTaxDeductible', 'Tax deductible', 110),
+            col.action('Actions', (row) => (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  label="Edit"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setEditCatRow(row)}
+                />
+                <Button
+                  label="Delete"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (window.confirm(`Delete finance category "${row.name}"?`)) {
+                      router.post(
+                        `/finance-categories/${row.id}/delete`,
+                        {},
+                        { preserveScroll: true }
+                      )
+                    }
+                  }}
+                />
+              </div>
+            )),
           ]}
         />
       </PageSection>
-    </Stack>
+    </div>
   )
 }

@@ -1,11 +1,6 @@
-import { Stack } from '@astryxdesign/core/Stack'
-import { Text } from '@astryxdesign/core/Text'
-import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-import { Badge } from '@astryxdesign/core/Badge'
-import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
-
 import {
+  PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
@@ -16,10 +11,9 @@ import {
 } from '~/lib/ui'
 import { useState } from 'react'
 import { router } from '@inertiajs/react'
+import { Users } from 'lucide-react'
 
 type Props = { customers: Row[]; riskSignals: Row[]; savedViews?: Row[] }
-
-
 
 const RISK_LEVELS = ['low', 'medium', 'high', 'under_review', 'cleared']
 
@@ -30,36 +24,48 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
   const [reviewRow, setReviewRow] = useState<Row | null>(null)
 
   return (
-    <Stack gap={4}>
-      <Card padding={4}>
-        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
-          <Button label="+ Create Customer" variant="primary" onClick={() => setCreateOpen(true)} />
-          <Button label="Merge Duplicates" variant="secondary" onClick={() => setMergeOpen(true)} />
-          <Text type="supporting" as="div">
-            {customers.length} customers · {riskSignals.length} risk signals
-          </Text>
-        </Stack>
-      </Card>
-      {savedViews && savedViews.length > 0 ? <SavedViewsBar views={savedViews} /> : null}
+    <div className="space-y-6">
+      <PageHeader
+        title="Customers & Fraud Risk Signals"
+        description="Per-user buyer directory, non-destructive duplicate merging, and explainable risk signal reviews."
+        icon={Users}
+        badge={`${customers.length} customers · ${riskSignals.length} risk signals`}
+        actions={
+          <>
+            <Button
+              label="Merge Duplicates"
+              variant="secondary"
+              onClick={() => setMergeOpen(true)}
+            />
+            <Button
+              label="+ Create Customer"
+              variant="primary"
+              onClick={() => setCreateOpen(true)}
+            />
+          </>
+        }
+      />
+
+      {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
       <FormModal
         isOpen={createOpen}
         onOpenChange={setCreateOpen}
-        title="Create customer"
-        subtitle="Customers are per-user. Shared addresses never auto-flag fraud — they raise explainable risk signals."
-        submitLabel="Create customer"
+        title="Create Customer"
+        subtitle="Customers are scoped per-user. Shared addresses raise explainable risk signals rather than auto-blocking."
+        submitLabel="Create Customer"
         action="/customers"
         fields={[
           { name: 'fullName', label: 'Full name', required: true },
           { name: 'email', label: 'Email', kind: 'email' },
-          { name: 'proxyEmail', label: 'Proxy email', kind: 'email' },
+          { name: 'proxyEmail', label: 'Marketplace proxy email', kind: 'email' },
           { name: 'phone', label: 'Phone' },
           {
             name: 'preferredCurrency',
-            label: 'Currency',
+            label: 'Preferred currency',
             kind: 'select',
             default: 'USD',
-            options: ['USD', 'EUR', 'GBP', 'JPY', 'INR', 'AED'].map((c) => ({
+            options: ['USD', 'EUR', 'GBP', 'CAD', 'JPY', 'INR', 'AED'].map((c) => ({
               value: c,
               label: c,
             })),
@@ -73,9 +79,9 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
           },
           { name: 'line1', label: 'Address line 1' },
           { name: 'city', label: 'City' },
-          { name: 'stateProvince', label: 'State' },
+          { name: 'stateProvince', label: 'State / Province' },
           { name: 'postalCode', label: 'Postal code' },
-          { name: 'countryCode', label: 'Country', default: 'US' },
+          { name: 'countryCode', label: 'Country code (ISO-2)', default: 'US' },
         ]}
       />
 
@@ -84,8 +90,8 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
         onOpenChange={(o) => {
           if (!o) setEditRow(null)
         }}
-        title={`Edit customer: ${String(editRow?.fullName ?? '')}`}
-        submitLabel="Save customer"
+        title={`Edit Customer: ${String(editRow?.fullName ?? '')}`}
+        submitLabel="Save Customer"
         action={editRow ? `/customers/${editRow.id}` : '/customers/placeholder'}
         initialValues={
           editRow
@@ -101,7 +107,7 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             : undefined
         }
         fields={[
-          { name: 'fullName', label: 'Full name' },
+          { name: 'fullName', label: 'Full name', required: true },
           { name: 'email', label: 'Email', kind: 'email' },
           { name: 'proxyEmail', label: 'Proxy email', kind: 'email' },
           { name: 'phone', label: 'Phone' },
@@ -109,7 +115,7 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             name: 'preferredCurrency',
             label: 'Currency',
             kind: 'select',
-            options: ['USD', 'EUR', 'GBP', 'JPY', 'INR', 'AED'].map((c) => ({
+            options: ['USD', 'EUR', 'GBP', 'CAD', 'JPY', 'INR', 'AED'].map((c) => ({
               value: c,
               label: c,
             })),
@@ -120,23 +126,24 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             kind: 'select',
             options: RISK_LEVELS.map((r) => ({ value: r, label: r.replace(/_/g, ' ') })),
           },
-          { name: 'notes', label: 'Notes', kind: 'textarea' },
+          { name: 'notes', label: 'Notes', kind: 'textarea', fullWidth: true },
         ]}
       />
 
       <FormModal
         isOpen={mergeOpen}
         onOpenChange={setMergeOpen}
-        title="Merge duplicate customers"
-        subtitle="Non-destructive: source is linked via merged_into_customer_id."
-        submitLabel="Merge customers"
+        title="Merge Duplicate Customers"
+        subtitle="Non-destructive merge: orders, addresses, risk signals, and RMAs are transferred to the surviving customer."
+        submitLabel="Merge Customers"
         action="/customers/merge"
         fields={[
           {
             name: 'sourceCustomerId',
-            label: 'Source (absorbed)',
+            label: 'Source customer (absorbed)',
             kind: 'select',
             required: true,
+            fullWidth: true,
             options: customers.map((c) => ({
               value: String(c.id),
               label: `${c.fullName} (${c.email ?? 'no email'})`,
@@ -144,9 +151,10 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
           },
           {
             name: 'targetCustomerId',
-            label: 'Target (survives)',
+            label: 'Target customer (survives)',
             kind: 'select',
             required: true,
+            fullWidth: true,
             options: customers.map((c) => ({
               value: String(c.id),
               label: `${c.fullName} (${c.email ?? 'no email'})`,
@@ -160,10 +168,18 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
         onOpenChange={(o) => {
           if (!o) setReviewRow(null)
         }}
-        title={`Review risk signal: ${String((reviewRow as any)?.signalType ?? reviewRow?.signalCode ?? '—')}`}
-        submitLabel="Submit review"
+        title={`Review Risk Signal: ${String((reviewRow as any)?.signalType ?? reviewRow?.signalCode ?? '—')}`}
+        submitLabel="Submit Review"
         action={
           reviewRow ? `/risk-signals/${reviewRow.id}/review` : '/risk-signals/placeholder/review'
+        }
+        initialValues={
+          reviewRow
+            ? {
+                reviewStatus: String(reviewRow.reviewStatus ?? 'resolved'),
+                reviewNotes: String(reviewRow.reviewNotes ?? ''),
+              }
+            : undefined
         }
         fields={[
           {
@@ -171,21 +187,22 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             label: 'Review status',
             kind: 'select',
             required: true,
+            fullWidth: true,
             options: [
-              { value: 'pending_review', label: 'Pending' },
+              { value: 'pending_review', label: 'Pending review' },
               { value: 'investigating', label: 'Investigating' },
               { value: 'confirmed_risk', label: 'Confirmed risk' },
               { value: 'false_positive', label: 'False positive' },
               { value: 'resolved', label: 'Resolved' },
             ],
           },
-          { name: 'reviewNotes', label: 'Review notes', kind: 'textarea' },
+          { name: 'reviewNotes', label: 'Review notes', kind: 'textarea', fullWidth: true },
         ]}
       />
 
       <PageSection
         title="Customers"
-        description="Risk level, lifetime spend and repeat-buyer status per customer."
+        description="Risk level, lifetime spend, and repeat-buyer status per customer."
       >
         <ResponsiveDataView
           rows={customers}
@@ -226,7 +243,7 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
               { label: 'Repeat buyer', value: row.isRepeatCustomer ? 'Yes' : 'No' },
             ],
             actions: (
-              <Stack direction="horizontal" gap={2}>
+              <div className="flex items-center gap-2">
                 <Button
                   label="Edit"
                   variant="secondary"
@@ -243,7 +260,7 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
                     }
                   }}
                 />
-              </Stack>
+              </div>
             ),
           })}
           columns={[
@@ -262,7 +279,7 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             col.money('totalSpent', 'Lifetime spend', 'preferredCurrency'),
             col.text('isRepeatCustomer', 'Repeat', 80),
             col.action('Actions', (row) => (
-              <Stack direction="horizontal" gap={2} wrap="wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <Button
                   label="Edit"
                   variant="secondary"
@@ -279,19 +296,19 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
                     }
                   }}
                 />
-              </Stack>
+              </div>
             )),
           ]}
         />
       </PageSection>
 
       <PageSection
-        title="Customer risk signals"
-        description="Explainable signals — reviewed manually, never auto-flagged as fraud."
+        title="Customer Risk Signals"
+        description="Explainable signals — reviewed manually by operators, never auto-flagged as fraud."
       >
         <ResponsiveDataView
           rows={riskSignals}
-          searchKeys={['signalType', 'reason', 'severity']}
+          searchKeys={['signalType', 'signalCode', 'reason', 'explanation', 'severity']}
           filterKey="reviewStatus"
           filterPills={[
             { value: 'all', label: 'All' },
@@ -301,7 +318,7 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
           ]}
           toCard={(row) => ({
             title: String(row.signalType ?? row.signalCode ?? 'Risk signal'),
-            subtitle: String(row.reason ?? '').slice(0, 38),
+            subtitle: String(row.reason ?? row.explanation ?? '').slice(0, 38),
             statusBadge: {
               label: String(row.severity ?? ''),
               variant:
@@ -332,7 +349,7 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             ),
           })}
           columns={[
-            col.text('signalType', 'Signal', 170),
+            col.text('signalCode', 'Signal', 160),
             col.badge('severity', 'Severity', {
               critical: 'error',
               high: 'error',
@@ -347,7 +364,7 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
               false_positive: 'success',
               resolved: 'neutral',
             }),
-            col.text('reason', 'Reason', 260),
+            col.text('explanation', 'Explanation', 260),
             col.action('Actions', (row) => (
               <Button
                 label="Review"
@@ -359,6 +376,6 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
           ]}
         />
       </PageSection>
-    </Stack>
+    </div>
   )
 }

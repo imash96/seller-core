@@ -114,6 +114,6 @@ export default class SessionController {
 
     await auth.use('web').logout()
     session.flash('success', 'Signed out securely.')
-    return response.redirect().toRoute('session.create')
+    return response.redirect('/')
   }
 }

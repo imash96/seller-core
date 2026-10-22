@@ -3,14 +3,22 @@ import { type ComponentProps } from 'react'
 export function Card({
   className = '',
   rounded = true,
+  padding = 'default',
+  hoverable = false,
   ...props
-}: ComponentProps<'div'> & { rounded?: boolean }) {
+}: ComponentProps<'div'> & {
+  rounded?: boolean
+  padding?: 'default' | 'none' | 'sm'
+  hoverable?: boolean
+}) {
+  const padCls = padding === 'none' ? 'py-0' : padding === 'sm' ? 'py-3' : 'py-5'
+  const hoverCls = hoverable ? 'hover:shadow-md hover:border-primary/35' : ''
   return (
     <div
       data-slot="card"
-      className={`bg-card text-card-foreground flex flex-col gap-5 border border-border py-5 shadow-xs transition-all duration-200 ${
+      className={`bg-card text-card-foreground flex flex-col gap-5 border border-border ${padCls} shadow-xs transition-all duration-200 ${
         rounded ? 'rounded-xl' : ''
-      } ${className}`}
+      } ${hoverCls} ${className}`}
       {...props}
     />
   )

@@ -1,9 +1,6 @@
-import { Stack } from '@astryxdesign/core/Stack'
-import { Text } from '@astryxdesign/core/Text'
-import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-
 import {
+  PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
@@ -13,6 +10,8 @@ import {
   type Row,
 } from '~/lib/ui'
 import { useState } from 'react'
+import { router } from '@inertiajs/react'
+import { Building2 } from 'lucide-react'
 
 type Props = {
   sellerAccounts: Row[]
@@ -24,8 +23,6 @@ type Props = {
   financeCategories: Row[]
   savedViews?: Row[]
 }
-
-
 
 const ACCOUNT_STATUS = [
   'pending_setup',
@@ -42,27 +39,29 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
   const [editRow, setEditRow] = useState<Row | null>(null)
 
   return (
-    <Stack gap={4}>
-      <Card padding={4}>
-        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
+    <div className="space-y-6">
+      <PageHeader
+        title="Marketplace Seller Accounts"
+        description="Connect Amazon SP-API, eBay, Etsy, and Shopify stores with AES-256-GCM encrypted API credentials."
+        icon={Building2}
+        badge={`${sellerAccounts.length} connected accounts`}
+        actions={
           <Button
             label="+ Connect Seller Account"
             variant="primary"
             onClick={() => setCreateOpen(true)}
           />
-          <Text type="supporting" as="div">
-            {sellerAccounts.length} connected accounts
-          </Text>
-        </Stack>
-      </Card>
-      {savedViews && savedViews.length > 0 ? <SavedViewsBar views={savedViews} /> : null}
+        }
+      />
+
+      {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
       <FormModal
         isOpen={createOpen}
         onOpenChange={setCreateOpen}
-        title="Connect seller account"
+        title="Connect Seller Account"
         subtitle="Credentials are AES-256-GCM encrypted at rest — plaintext API keys are never persisted."
-        submitLabel="Connect account"
+        submitLabel="Connect Account"
         action="/seller-accounts"
         fields={[
           {
@@ -77,17 +76,17 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
           { name: 'marketplaceRegion', label: 'Region', default: 'US' },
           {
             name: 'defaultCurrency',
-            label: 'Currency',
+            label: 'Default currency',
             kind: 'select',
             default: 'USD',
-            options: ['USD', 'EUR', 'GBP', 'JPY', 'INR', 'AED'].map((c) => ({
+            options: ['USD', 'EUR', 'GBP', 'CAD', 'JPY', 'INR', 'AED'].map((c) => ({
               value: c,
               label: c,
             })),
           },
           { name: 'rateLimitRpm', label: 'Rate limit / min', kind: 'number', default: '60' },
-          { name: 'apiKey', label: 'API key (encrypted)', kind: 'password' },
-          { name: 'apiSecret', label: 'API secret (encrypted)', kind: 'password' },
+          { name: 'apiKey', label: 'API key (encrypted at rest)', kind: 'password' },
+          { name: 'apiSecret', label: 'API secret (encrypted at rest)', kind: 'password' },
         ]}
       />
 
@@ -96,8 +95,8 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
         onOpenChange={(o) => {
           if (!o) setEditRow(null)
         }}
-        title={`Edit seller account: ${String(editRow?.accountName ?? '')}`}
-        submitLabel="Save account"
+        title={`Edit Seller Account: ${String(editRow?.accountName ?? '')}`}
+        submitLabel="Save Account"
         action={editRow ? `/seller-accounts/${editRow.id}` : '/seller-accounts/placeholder'}
         initialValues={
           editRow
@@ -110,7 +109,7 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
             : undefined
         }
         fields={[
-          { name: 'accountName', label: 'Account name' },
+          { name: 'accountName', label: 'Account name', required: true },
           {
             name: 'status',
             label: 'Status',
@@ -119,7 +118,7 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
           },
           {
             name: 'healthStatus',
-            label: 'Health',
+            label: 'Health status',
             kind: 'select',
             options: HEALTH.map((s) => ({ value: s, label: s })),
           },
@@ -128,8 +127,8 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
       />
 
       <PageSection
-        title="Seller accounts"
-        description="Health, sync status and credential rotation per connected account."
+        title="Connected Seller Accounts"
+        description="Health, sync status, on-demand sync queue, and credential rotation per connected account."
       >
         <ResponsiveDataView
           rows={sellerAccounts}
@@ -157,7 +156,19 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
               { label: 'Credentials', value: String(row.encryptedCredentials ?? '—').slice(0, 20) },
             ],
             actions: (
-              <Stack direction="horizontal" gap={2} wrap="wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  label="Sync Now"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    router.post(
+                      '/import/sync-accounts',
+                      { sellerAccountId: String(row.id) },
+                      { preserveScroll: true }
+                    )
+                  }
+                />
                 <Button
                   label="Edit"
                   variant="secondary"
@@ -169,41 +180,37 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Disconnect this seller account?')) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/seller-accounts/${row.id}/delete`
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm(`Disconnect seller account "${row.accountName}"?`)) {
+                      router.post(`/seller-accounts/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
                 />
-              </Stack>
+              </div>
             ),
           })}
           columns={[
             col.text('accountName', 'Account', 170),
             col.text('externalSellerId', 'Seller ID', 130),
             col.text('marketplaceRegion', 'Region', 80),
-            col.badge('status', 'Status', {
-              active: 'success',
-              pending_setup: 'warning',
-              auth_expired: 'error',
-              rate_limited: 'warning',
-              suspended: 'error',
-              disconnected: 'neutral',
-            }),
-            col.badge('healthStatus', 'Health', {
-              healthy: 'success',
-              warning: 'warning',
-              critical: 'error',
-              unknown: 'neutral',
-            }),
+            col.badge('status', 'Status', STATUS_TONES),
+            col.badge('healthStatus', 'Health', STATUS_TONES),
             col.text('rateLimitRpm', 'RPM', 70),
             col.text('encryptedCredentials', 'Credentials', 170),
             col.date('lastSyncedAt', 'Last sync'),
             col.action('Actions', (row) => (
-              <Stack direction="horizontal" gap={2} wrap="wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Button
+                  label="Sync"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    router.post(
+                      '/import/sync-accounts',
+                      { sellerAccountId: String(row.id) },
+                      { preserveScroll: true }
+                    )
+                  }
+                />
                 <Button
                   label="Edit"
                   variant="secondary"
@@ -215,20 +222,16 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Disconnect this seller account?')) {
-                      const f = document.createElement('form')
-                      f.method = 'POST'
-                      f.action = `/seller-accounts/${row.id}/delete`
-                      document.body.appendChild(f)
-                      f.submit()
+                    if (window.confirm(`Disconnect seller account "${row.accountName}"?`)) {
+                      router.post(`/seller-accounts/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
                 />
-              </Stack>
+              </div>
             )),
           ]}
         />
       </PageSection>
-    </Stack>
+    </div>
   )
 }

@@ -4,7 +4,6 @@ type ParamValue = string | number | bigint | boolean
 
 export type ScannedRoutes = {
   ALL: {
-    'home': { paramsTuple?: []; params?: {} }
     'session.create': { paramsTuple?: []; params?: {} }
     'session.store': { paramsTuple?: []; params?: {} }
     'dashboard': { paramsTuple?: []; params?: {} }
@@ -92,29 +91,7 @@ export type ScannedRoutes = {
     'admin.entitlements.toggle': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.queue.overview': { paramsTuple?: []; params?: {} }
   }
-  GET: {
-    'home': { paramsTuple?: []; params?: {} }
-    'session.create': { paramsTuple?: []; params?: {} }
-    'dashboard': { paramsTuple?: []; params?: {} }
-    'pages.orders': { paramsTuple?: []; params?: {} }
-    'pages.customers': { paramsTuple?: []; params?: {} }
-    'pages.products': { paramsTuple?: []; params?: {} }
-    'pages.inventory': { paramsTuple?: []; params?: {} }
-    'pages.catalogs': { paramsTuple?: []; params?: {} }
-    'pages.accounts': { paramsTuple?: []; params?: {} }
-    'pages.shipments': { paramsTuple?: []; params?: {} }
-    'pages.returns': { paramsTuple?: []; params?: {} }
-    'pages.claims': { paramsTuple?: []; params?: {} }
-    'pages.finance': { paramsTuple?: []; params?: {} }
-    'pages.tasks': { paramsTuple?: []; params?: {} }
-    'pages.import': { paramsTuple?: []; params?: {} }
-    'pages.audit': { paramsTuple?: []; params?: {} }
-    'pages.address_cleanup': { paramsTuple?: []; params?: {} }
-    'pages.admin': { paramsTuple?: []; params?: {} }
-    'admin.queue.overview': { paramsTuple?: []; params?: {} }
-  }
   HEAD: {
-    'home': { paramsTuple?: []; params?: {} }
     'session.create': { paramsTuple?: []; params?: {} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'pages.orders': { paramsTuple?: []; params?: {} }
@@ -135,6 +112,26 @@ export type ScannedRoutes = {
     'admin.queue.overview': { paramsTuple?: []; params?: {} }
   }
   OPTIONS: {
+  }
+  GET: {
+    'session.create': { paramsTuple?: []; params?: {} }
+    'dashboard': { paramsTuple?: []; params?: {} }
+    'pages.orders': { paramsTuple?: []; params?: {} }
+    'pages.customers': { paramsTuple?: []; params?: {} }
+    'pages.products': { paramsTuple?: []; params?: {} }
+    'pages.inventory': { paramsTuple?: []; params?: {} }
+    'pages.catalogs': { paramsTuple?: []; params?: {} }
+    'pages.accounts': { paramsTuple?: []; params?: {} }
+    'pages.shipments': { paramsTuple?: []; params?: {} }
+    'pages.returns': { paramsTuple?: []; params?: {} }
+    'pages.claims': { paramsTuple?: []; params?: {} }
+    'pages.finance': { paramsTuple?: []; params?: {} }
+    'pages.tasks': { paramsTuple?: []; params?: {} }
+    'pages.import': { paramsTuple?: []; params?: {} }
+    'pages.audit': { paramsTuple?: []; params?: {} }
+    'pages.address_cleanup': { paramsTuple?: []; params?: {} }
+    'pages.admin': { paramsTuple?: []; params?: {} }
+    'admin.queue.overview': { paramsTuple?: []; params?: {} }
   }
   POST: {
     'session.store': { paramsTuple?: []; params?: {} }

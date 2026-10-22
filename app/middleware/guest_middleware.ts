@@ -3,17 +3,14 @@ import type { NextFn } from '@adonisjs/core/types/http'
 import type { Authenticators } from '@adonisjs/auth/types'
 
 /**
- * Guest middleware is used to deny access to routes that should
- * be accessed by unauthenticated users.
- *
- * For example, the login page should not be accessible if the user
- * is already logged-in
+ * Guest middleware denies access to guest-only routes (like `/`)
+ * when a user is already authenticated, redirecting to `/dashboard`.
  */
 export default class GuestMiddleware {
   /**
-   * The URL to redirect to when user is logged-in
+   * The URL to redirect to when user is already logged in
    */
-  redirectTo = '/'
+  redirectTo = '/dashboard'
 
   async handle(
     ctx: HttpContext,

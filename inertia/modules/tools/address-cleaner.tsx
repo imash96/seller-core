@@ -47,7 +47,9 @@ export interface CleanedAddressItem {
 
 export function AddressCleanerModule() {
   const [rawText, setRawText] = useState('')
-  const [result, setResult] = useState<{ addresses: CleanedAddressItem[]; csv: string } | null>(null)
+  const [result, setResult] = useState<{ addresses: CleanedAddressItem[]; csv: string } | null>(
+    null
+  )
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
@@ -145,13 +147,13 @@ export function AddressCleanerModule() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-      {/* Left Input Column */}
-      <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-4 lg:self-start">
+      {/* Left Input Column — sticky offset clears the h-16 TopBar */}
+      <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-20 lg:self-start">
         <Card rounded>
           <CardHeader>
             <div>
               <CardTitle className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-indigo-600" />
+                <MapPin className="w-4 h-4 text-primary" />
                 Raw Marketplace Addresses
               </CardTitle>
               <CardDescription className="mt-1">
@@ -177,8 +179,8 @@ export function AddressCleanerModule() {
                 <textarea
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
-                  rows={15}
-                  className="w-full px-3.5 py-3 border border-border bg-background rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono text-xs leading-relaxed"
+                  rows={14}
+                  className="w-full px-3.5 py-3 border border-border bg-background text-foreground rounded-xl focus:ring-2 focus:ring-ring focus:outline-none font-mono text-xs leading-relaxed"
                   placeholder="John Doe&#10;123 Main Street&#10;New York, NY 10001&#10;United States&#10;Phone: +1 212-555-0199&#10;ORD-1001"
                 />
               </div>
@@ -187,7 +189,7 @@ export function AddressCleanerModule() {
                 <button
                   type="submit"
                   disabled={loading || !rawText.trim()}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition disabled:opacity-50 cursor-pointer shadow-sm"
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-primary hover:opacity-90 text-primary-foreground text-sm font-semibold rounded-xl transition disabled:opacity-50 cursor-pointer shadow-xs"
                 >
                   <Sparkles className="w-4 h-4" />
                   {loading ? 'Cleaning & Validating…' : 'Clean & Normalize Addresses'}
@@ -198,7 +200,7 @@ export function AddressCleanerModule() {
                     setRawText('')
                     setResult(null)
                   }}
-                  className="px-4 py-2.5 border border-border rounded-xl text-xs font-semibold hover:bg-muted transition cursor-pointer"
+                  className="px-4 py-2.5 border border-border bg-card text-foreground rounded-xl text-xs font-semibold hover:bg-muted transition cursor-pointer"
                 >
                   Clear
                 </button>
@@ -208,8 +210,8 @@ export function AddressCleanerModule() {
         </Card>
       </div>
 
-      {/* Right Output Column */}
-      <div className="lg:col-span-7 space-y-4 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-14rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-2">
+      {/* Right Output Column — natural scroll without nested scroll trapping */}
+      <div className="lg:col-span-7 space-y-4">
         <Card rounded>
           <CardHeader>
             <div>
@@ -217,7 +219,8 @@ export function AddressCleanerModule() {
                 Cleaned Carrier-Ready Output ({result?.addresses?.length ?? 0})
               </CardTitle>
               <CardDescription className="mt-1">
-                35-character line-wrapped fields (`add1`, `add2`, `add3`), 2-letter state codes, and compliance flags.
+                35-character line-wrapped fields (`add1`, `add2`, `add3`), 2-letter state codes,
+                and compliance flags.
               </CardDescription>
             </div>
             {result && result.addresses.length > 0 && (
@@ -242,23 +245,23 @@ export function AddressCleanerModule() {
 
           <CardContent>
             {!result || result.addresses.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-sm">
+              <div className="py-12 text-center text-muted-foreground text-sm border border-dashed border-border rounded-xl bg-muted/20">
                 Paste one or more raw addresses on the left and click{' '}
-                <strong>Clean & Normalize Addresses</strong>.
+                <strong className="text-foreground">Clean & Normalize Addresses</strong>.
               </div>
             ) : (
               <div className="space-y-4">
                 {result.addresses.map((addr, index) => (
                   <div
                     key={index}
-                    className="rounded-xl border border-border bg-muted/20 p-4 space-y-3 hover:border-indigo-500/40 transition-colors"
+                    className="rounded-xl border border-border bg-muted/20 p-4 space-y-3 hover:border-primary/40 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="text-sm font-bold text-foreground">{addr.name}</h4>
                           {addr.ref && (
-                            <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 font-mono text-[11px] font-semibold">
+                            <span className="px-2 py-0.5 rounded bg-primary/12 text-primary font-mono text-[11px] font-semibold">
                               Ref: {addr.ref}
                             </span>
                           )}
@@ -281,7 +284,10 @@ export function AddressCleanerModule() {
                           <StatusBadge label="Signature Req" variant="info" />
                         )}
                         {addr.isVATorIOSS && (
-                          <StatusBadge label={`Tax/IOSS: ${addr.vatOrIoss || 'Yes'}`} variant="purple" />
+                          <StatusBadge
+                            label={`Tax/IOSS: ${addr.vatOrIoss || 'Yes'}`}
+                            variant="purple"
+                          />
                         )}
                       </div>
                     </div>
@@ -342,7 +348,7 @@ export function AddressCleanerModule() {
                       <button
                         type="button"
                         onClick={() => copyFormatted(addr, index)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-medium cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-medium cursor-pointer"
                       >
                         {copiedIdx === index ? (
                           <>
@@ -357,7 +363,7 @@ export function AddressCleanerModule() {
                       <button
                         type="button"
                         onClick={() => handleSaveToCustomer(addr)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-xs font-semibold cursor-pointer"
                       >
                         <UserPlus className="w-3.5 h-3.5" /> Save to Customer Addresses
                       </button>

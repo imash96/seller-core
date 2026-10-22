@@ -4,6 +4,9 @@
 @import './light.css';
 @import './dark.css';
 
+/* Tell Tailwind v4 that `dark:` maps to the `.dark` class on :root */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --font-sans: 'Inter', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
@@ -34,7 +37,7 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: var(--radius);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -43,6 +46,28 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* Bridge legacy and Astryx CSS variables to unified semantic tokens */
+:root,
+.dark,
+[data-theme='light'],
+[data-theme='dark'] {
+  --bg-surface: var(--card);
+  --bg-subtle: var(--muted);
+  --bg-muted: var(--muted);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--secondary-foreground);
+  --text-muted: var(--muted-foreground);
+  --border-default: var(--border);
+  --border-subtle: var(--border);
+  --accent-primary: var(--primary);
+  --astryx-color-background-surface: var(--card);
+  --astryx-color-background-wash: var(--background);
+  --astryx-color-background-muted: var(--muted);
+  --astryx-color-border-default: var(--border);
+  --astryx-color-text-primary: var(--foreground);
+  --astryx-color-text-secondary: var(--muted-foreground);
 }
 
 html,
@@ -58,4 +83,183 @@ body,
 .unstyled-link {
   text-decoration: none;
   color: inherit;
+}
+
+/* ------------------------------------------------------------------ */
+/* Interactive elements — cursor + focus ring                          */
+/* ------------------------------------------------------------------ */
+button,
+[role='button'],
+a[href],
+select,
+input[type='checkbox'],
+input[type='radio'] {
+  cursor: pointer;
+}
+
+/* Ensure form inputs & selects always inherit readable foreground/background */
+input,
+textarea,
+select {
+  color: var(--foreground);
+}
+
+/* ------------------------------------------------------------------ */
+/* Login page: demo credential cards                                   */
+/* ------------------------------------------------------------------ */
+.demo-card {
+  flex: 1 1 200px;
+  text-align: left;
+  padding: 0.875rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background-color: var(--card);
+  color: var(--card-foreground);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.demo-card:hover {
+  border-color: var(--primary);
+  background-color: var(--accent);
+  box-shadow: 0 0 0 3px oklch(from var(--primary) l c h / 0.12);
+}
+
+.demo-card--active {
+  border-color: var(--primary);
+  background-color: oklch(from var(--primary) l c h / 0.08);
+  box-shadow: 0 0 0 3px oklch(from var(--primary) l c h / 0.18);
+}
+
+.demo-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  flex-shrink: 0;
+}
+
+.demo-card__icon--admin {
+  background: linear-gradient(135deg, var(--primary), oklch(0.55 0.22 270));
+}
+
+.demo-card__icon--ops {
+  background: linear-gradient(135deg, oklch(0.6 0.18 160), oklch(0.55 0.2 150));
+}
+
+/* ------------------------------------------------------------------ */
+/* Password field input wrapper & toggle button                        */
+/* ------------------------------------------------------------------ */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.625rem;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0.25rem;
+  border-radius: 0.375rem;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.password-toggle-btn:hover {
+  color: var(--foreground);
+  background-color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ */
+/* Login page: demo prefill link                                       */
+/* ------------------------------------------------------------------ */
+.demo-prefill-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--primary);
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.demo-prefill-link:hover {
+  opacity: 0.85;
+  text-decoration: underline;
+}
+
+/* ------------------------------------------------------------------ */
+/* List page header: search form                                       */
+/* ------------------------------------------------------------------ */
+.search-form {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Floating Bulk Actions Bar                                           */
+/* ------------------------------------------------------------------ */
+.bulk-bar-fixed {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  width: calc(100% - 2rem);
+  max-width: 42rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Meta label (compact metadata grids)                                 */
+/* ------------------------------------------------------------------ */
+.meta-label {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ------------------------------------------------------------------ */
+/* Focus rings — consistent across inputs & interactive elements       */
+/* ------------------------------------------------------------------ */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Scrollbar polish (Webkit only)                                      */
+/* ------------------------------------------------------------------ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
+}
+
+/* ------------------------------------------------------------------ */
+/* Selection color                                                     */
+/* ------------------------------------------------------------------ */
+::selection {
+  background-color: oklch(from var(--primary) l c h / 0.2);
+  color: var(--foreground);
 }

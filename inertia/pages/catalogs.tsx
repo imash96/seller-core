@@ -1,7 +1,7 @@
 import { Head, router } from '@inertiajs/react'
 import { useState, useMemo } from 'react'
 import { Tags, Globe, Layers } from 'lucide-react'
-import { ModulePageHeader } from '~/modules/common/page-header'
+import { ModulePageHeader } from '~/modules/common/module-page-header'
 import { FormModal, ResponsiveDataView, PageSection, col, money, type Row } from '~/lib/ui'
 import { Button } from '@astryxdesign/core/Button'
 import { Stack } from '@astryxdesign/core/Stack'
@@ -79,10 +79,10 @@ export default function CatalogsPage({
           initialValues={
             editBrandRow
               ? {
-                  name: String(editBrandRow.name ?? ''),
-                  slug: String(editBrandRow.slug ?? ''),
-                  websiteUrl: String(editBrandRow.websiteUrl ?? ''),
-                }
+                name: String(editBrandRow.name ?? ''),
+                slug: String(editBrandRow.slug ?? ''),
+                websiteUrl: String(editBrandRow.websiteUrl ?? ''),
+              }
               : undefined
           }
           fields={[
@@ -121,9 +121,9 @@ export default function CatalogsPage({
           initialValues={
             editCategoryRow
               ? {
-                  name: String(editCategoryRow.name ?? ''),
-                  slug: String(editCategoryRow.slug ?? ''),
-                }
+                name: String(editCategoryRow.name ?? ''),
+                slug: String(editCategoryRow.slug ?? ''),
+              }
               : undefined
           }
           fields={[

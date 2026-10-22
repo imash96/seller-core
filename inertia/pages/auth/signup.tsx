@@ -1,42 +1,26 @@
 import { Link } from '@adonisjs/inertia/react'
-import { Stack } from '@astryxdesign/core/Stack'
-import { Text } from '@astryxdesign/core/Text'
-import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-import { Badge } from '@astryxdesign/core/Badge'
-import { Theme } from '@astryxdesign/core'
-import { themes, defaultThemeSlug } from '~/astryx_themes'
+import { StatusBadge } from '~/components/atoms/status-badge'
 
 export default function SignupDisabled() {
   return (
-    <Theme theme={themes[defaultThemeSlug]}>
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'var(--astryx-color-background-wash, #f0f2f5)',
-          padding: 24,
-        }}
-      >
-        <Card padding={6} width={440}>
-          <Stack gap={4}>
-            <Badge variant="error" label="Registration disabled" />
-            <Text type="display-2" as="h1" weight="bold">
-              Public sign-up is disabled
-            </Text>
-            <Text type="body" as="p">
-              For security, Seller Core has no public registration. User accounts can only be
-              provisioned by a system super administrator. If you need access, contact your
-              administrator.
-            </Text>
-            <Link href="/login">
-              <Button label="Go to sign in" variant="primary" />
-            </Link>
-          </Stack>
-        </Card>
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6">
+      <div className="w-full max-w-md bg-card text-card-foreground border border-border rounded-2xl p-6 sm:p-8 shadow-lg space-y-4">
+        <StatusBadge variant="error" label="Registration disabled" />
+        <h1 className="text-2xl font-bold text-foreground tracking-tight">
+          Public sign-up is disabled
+        </h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          For security, Seller Core has no public registration. User accounts can only be
+          provisioned by a System Super Administrator. If you need access, contact your
+          administrator.
+        </p>
+        <div className="pt-2">
+          <Link href="/">
+            <Button label="Go to sign in" variant="primary" />
+          </Link>
+        </div>
       </div>
-    </Theme>
+    </div>
   )
 }

@@ -1,5 +1,5 @@
 import { Card } from '~/ui/card'
-import { Badge, statusBadgeVariant } from '~/ui/badge'
+import { StatusBadge, statusBadgeVariant } from '~/components/atoms/status-badge'
 import { formatMoney, formatDate } from '~/lib/utils'
 import { Truck, ExternalLink, Edit3 } from 'lucide-react'
 import type { Row } from '~/lib/ui'
@@ -19,44 +19,45 @@ export function ShipmentCard({
   return (
     <Card padding="none" hoverable className="overflow-hidden flex flex-col justify-between">
       <div>
-        <div className="px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] flex items-center justify-between gap-2">
+        <div className="px-4 py-3 border-b border-border bg-muted/40 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             {onSelect ? (
               <input
                 type="checkbox"
                 checked={!!selected}
                 onChange={(e) => onSelect(String(shipment.id), e.target.checked)}
-                className="w-4 h-4 rounded border-[var(--border-default)] text-blue-600"
+                className="w-4 h-4 rounded border-border accent-primary"
               />
             ) : null}
-            <Truck className="w-4 h-4 text-[var(--accent-primary)] shrink-0" />
-            <span className="font-mono text-sm font-bold text-[var(--text-primary)] truncate">
+            <Truck className="w-4 h-4 text-primary shrink-0" />
+            <span className="font-mono text-sm font-bold text-foreground truncate">
               {String(shipment.shipmentNumber)}
             </span>
           </div>
-          <Badge variant={statusBadgeVariant(String(shipment.status))} dot>
-            {String(shipment.status).replace(/_/g, ' ')}
-          </Badge>
+          <StatusBadge
+            variant={statusBadgeVariant(String(shipment.status))}
+            label={String(shipment.status).replace(/_/g, ' ')}
+          />
         </div>
 
         <div className="p-4 grid grid-cols-2 gap-3 text-xs">
           <div>
-            <div className="text-[var(--text-muted)] uppercase font-semibold">Carrier & Service</div>
-            <div className="font-semibold text-[var(--text-primary)] mt-0.5">
+            <div className="text-muted-foreground uppercase font-semibold">Carrier & Service</div>
+            <div className="font-semibold text-foreground mt-0.5">
               {String(shipment.carrierName ?? shipment.carrierCode ?? '—')}
               {shipment.serviceLevel ? ` · ${String(shipment.serviceLevel)}` : ''}
             </div>
           </div>
           <div>
-            <div className="text-[var(--text-muted)] uppercase font-semibold">Tracking</div>
-            <div className="font-mono text-[var(--text-primary)] mt-0.5 truncate flex items-center gap-1">
+            <div className="text-muted-foreground uppercase font-semibold">Tracking</div>
+            <div className="font-mono text-foreground mt-0.5 truncate flex items-center gap-1">
               {String(shipment.trackingNumber ?? '—')}
               {shipment.trackingUrl ? (
                 <a
                   href={String(shipment.trackingUrl)}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[var(--accent-primary)]"
+                  className="text-primary"
                 >
                   <ExternalLink className="w-3 h-3" />
                 </a>
@@ -64,29 +65,30 @@ export function ShipmentCard({
             </div>
           </div>
           <div>
-            <div className="text-[var(--text-muted)] uppercase font-semibold">Est. / Actual Cost</div>
-            <div className="font-mono font-semibold text-[var(--text-primary)] mt-0.5">
+            <div className="text-muted-foreground uppercase font-semibold">Est. / Actual Cost</div>
+            <div className="font-mono font-semibold text-foreground mt-0.5 tabular-nums">
               {formatMoney(currency, shipment.estimatedShippingCost)} /{' '}
               {formatMoney(currency, shipment.actualInvoicedCost ?? shipment.actualShippingCost ?? 0)}
             </div>
           </div>
           <div>
-            <div className="text-[var(--text-muted)] uppercase font-semibold">Shipped / Delivered</div>
-            <div className="text-[var(--text-secondary)] mt-0.5">
+            <div className="text-muted-foreground uppercase font-semibold">Shipped / Delivered</div>
+            <div className="text-muted-foreground mt-0.5">
               {formatDate(shipment.shippedAt)} · {formatDate(shipment.deliveredAt)}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="px-4 py-2.5 border-t border-[var(--border-subtle)] bg-[var(--bg-subtle)]/50 flex items-center justify-between">
-        <span className="text-xs text-[var(--text-muted)]">
-          Qty: <strong className="text-[var(--text-primary)]">{String(shipment.quantityShipped ?? 1)}</strong>
+      <div className="px-4 py-2.5 border-t border-border bg-muted/30 flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">
+          Qty:{' '}
+          <strong className="text-foreground">{String(shipment.quantityShipped ?? 1)}</strong>
         </span>
         <button
           type="button"
           onClick={() => onEdit(shipment)}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-[var(--bg-surface)] border border-[var(--border-default)] text-[var(--text-primary)] hover:bg-[var(--bg-muted)] transition"
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-card border border-border text-foreground hover:bg-muted transition-colors"
         >
           <Edit3 className="w-3.5 h-3.5" />
           Update Status

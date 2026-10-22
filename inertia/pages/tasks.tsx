@@ -1,24 +1,18 @@
-import { Stack } from '@astryxdesign/core/Stack'
-import { Text } from '@astryxdesign/core/Text'
-import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-import { Badge } from '@astryxdesign/core/Badge'
-
 import {
+  PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
   SavedViewsBar,
   col,
-  STATUS_TONES,
   type Row,
 } from '~/lib/ui'
 import { useState } from 'react'
 import { router } from '@inertiajs/react'
+import { ListChecks } from 'lucide-react'
 
 type Props = { tasksReminders: Row[]; savedViews?: Row[] }
-
-
 
 const TASK_TYPES = [
   'credit_card_due',
@@ -37,36 +31,45 @@ const STATUSES = ['pending', 'in_progress', 'completed', 'snoozed', 'dismissed']
 export default function Tasks({ tasksReminders, savedViews }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editRow, setEditRow] = useState<Row | null>(null)
+  const [createViewOpen, setCreateViewOpen] = useState(false)
+
+  const activeCount = tasksReminders.filter(
+    (t) => t.status === 'pending' || t.status === 'in_progress'
+  ).length
 
   return (
-    <Stack gap={4}>
-      <Card padding={4}>
-        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
-          <Button label="+ Create Task" variant="primary" onClick={() => setCreateOpen(true)} />
-          <Text type="supporting" as="div">
-            {tasksReminders.length} tasks ·{' '}
-            {
-              tasksReminders.filter((t) => t.status === 'pending' || t.status === 'in_progress')
-                .length
-            }{' '}
-            active
-          </Text>
-        </Stack>
-      </Card>
-      {savedViews && savedViews.length > 0 ? <SavedViewsBar views={savedViews} /> : null}
+    <div className="space-y-6">
+      <PageHeader
+        title="Tasks, Reminders & Saved Views"
+        description="Operational SLA reminders, credit card payment alerts, and saved filter views across modules."
+        icon={ListChecks}
+        badge={`${tasksReminders.length} tasks · ${activeCount} active`}
+        actions={
+          <>
+            <Button
+              label="+ Save Filter View"
+              variant="secondary"
+              onClick={() => setCreateViewOpen(true)}
+            />
+            <Button label="+ Create Task" variant="primary" onClick={() => setCreateOpen(true)} />
+          </>
+        }
+      />
+
+      {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
       <FormModal
         isOpen={createOpen}
         onOpenChange={setCreateOpen}
-        title="Create task / reminder"
-        subtitle="Operational to-dos with due dates and priorities."
-        submitLabel="Create task"
+        title="Create Task / Reminder"
+        subtitle="Operational to-dos with due dates and priority levels."
+        submitLabel="Create Task"
         action="/tasks"
         fields={[
-          { name: 'title', label: 'Title', required: true },
+          { name: 'title', label: 'Task title', required: true },
           {
             name: 'taskType',
-            label: 'Type',
+            label: 'Task type',
             kind: 'select',
             default: 'general',
             options: TASK_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
@@ -78,8 +81,8 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
             default: 'medium',
             options: PRIORITIES.map((p) => ({ value: p, label: p })),
           },
-          { name: 'dueAt', label: 'Due at', kind: 'date' },
-          { name: 'description', label: 'Description', kind: 'textarea' },
+          { name: 'dueAt', label: 'Due date', kind: 'date' },
+          { name: 'description', label: 'Description', kind: 'textarea', fullWidth: true },
         ]}
       />
 
@@ -88,8 +91,8 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
         onOpenChange={(o) => {
           if (!o) setEditRow(null)
         }}
-        title={`Edit task: ${String(editRow?.title ?? '')}`}
-        submitLabel="Save task"
+        title={`Edit Task: ${String(editRow?.title ?? '')}`}
+        submitLabel="Save Task"
         action={editRow ? `/tasks/${editRow.id}` : '/tasks/placeholder'}
         initialValues={
           editRow
@@ -104,10 +107,10 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
             : undefined
         }
         fields={[
-          { name: 'title', label: 'Title' },
+          { name: 'title', label: 'Task title', required: true },
           {
             name: 'taskType',
-            label: 'Type',
+            label: 'Task type',
             kind: 'select',
             options: TASK_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
           },
@@ -123,12 +126,47 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
             kind: 'select',
             options: STATUSES.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
           },
-          { name: 'dueAt', label: 'Due at', kind: 'date' },
-          { name: 'description', label: 'Description', kind: 'textarea' },
+          { name: 'dueAt', label: 'Due date', kind: 'date' },
+          { name: 'description', label: 'Description', kind: 'textarea', fullWidth: true },
         ]}
       />
 
-      <PageSection title="Task queue" description="Complete, re-prioritize, or dismiss tasks.">
+      {/* Create Saved View Modal (replaces raw HTML form) */}
+      <FormModal
+        isOpen={createViewOpen}
+        onOpenChange={setCreateViewOpen}
+        title="Create Saved View"
+        subtitle="Persist a named filter preset for any operational module."
+        submitLabel="Save View"
+        action="/saved-views"
+        fields={[
+          { name: 'name', label: 'View name', required: true, placeholder: 'High Priority Orders' },
+          {
+            name: 'moduleKey',
+            label: 'Module',
+            kind: 'select',
+            default: 'orders',
+            options: [
+              { value: 'orders', label: 'Orders' },
+              { value: 'customers', label: 'Customers' },
+              { value: 'products', label: 'Products' },
+              { value: 'shipments', label: 'Shipments' },
+              { value: 'returns', label: 'Returns' },
+              { value: 'claims', label: 'Claims' },
+              { value: 'finance', label: 'Finance' },
+              { value: 'tasks', label: 'Tasks' },
+            ],
+          },
+          {
+            name: 'filterStatus',
+            label: 'Default status filter',
+            default: 'all',
+            placeholder: 'all, pending, delivered…',
+          },
+        ]}
+      />
+
+      <PageSection title="Task Queue" description="Complete, re-prioritize, or dismiss tasks.">
         <ResponsiveDataView
           rows={tasksReminders}
           searchKeys={['title', 'description', 'taskType']}
@@ -162,14 +200,14 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
               },
             ],
             actions: (
-              <Stack direction="horizontal" gap={2} wrap="wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   label="Edit"
                   variant="secondary"
                   size="sm"
                   onClick={() => setEditRow(row)}
                 />
-                {String(row.status) !== 'completed' ? (
+                {String(row.status) !== 'completed' && (
                   <Button
                     label="Complete"
                     variant="ghost"
@@ -178,7 +216,7 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                       router.post(`/tasks/${row.id}/complete`, {}, { preserveScroll: true })
                     }}
                   />
-                ) : null}
+                )}
                 <Button
                   label="Delete"
                   variant="ghost"
@@ -189,7 +227,7 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                     }
                   }}
                 />
-              </Stack>
+              </div>
             ),
           })}
           columns={[
@@ -210,14 +248,14 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
             }),
             col.date('dueAt', 'Due'),
             col.action('Actions', (row) => (
-              <Stack direction="horizontal" gap={2} wrap="wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <Button
                   label="Edit"
                   variant="secondary"
                   size="sm"
                   onClick={() => setEditRow(row)}
                 />
-                {String(row.status) !== 'completed' ? (
+                {String(row.status) !== 'completed' && (
                   <Button
                     label="Complete"
                     variant="ghost"
@@ -226,7 +264,7 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                       router.post(`/tasks/${row.id}/complete`, {}, { preserveScroll: true })
                     }}
                   />
-                ) : null}
+                )}
                 <Button
                   label="Delete"
                   variant="ghost"
@@ -237,119 +275,64 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                     }
                   }}
                 />
-              </Stack>
+              </div>
             )),
           ]}
         />
       </PageSection>
 
       <PageSection
-        title="Saved views"
-        description="Filters and column presets saved for quick recall."
+        title="Saved Views"
+        description="Filters and column presets saved across modules for quick recall."
       >
-        <Stack gap={3}>
-          <ResponsiveDataView
-            rows={savedViews ?? []}
-            searchKeys={['name', 'moduleKey']}
-            toCard={(row) => ({
-              title: String(row.name),
-              metrics: [
-                { label: 'Module', value: String(row.moduleKey) },
-                {
-                  label: 'Created',
-                  value: row.createdAt ? new Date(String(row.createdAt)).toLocaleDateString() : '—',
-                },
-              ],
-              actions: (
-                <Button
-                  label="Delete"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    if (window.confirm('Delete saved view?')) {
-                      router.post(`/saved-views/${row.id}/delete`, {}, { preserveScroll: true })
-                    }
-                  }}
-                />
-              ),
-            })}
-            columns={[
-              col.text('name', 'Name', 180),
-              col.text('moduleKey', 'Module', 120),
-              col.date('createdAt', 'Created'),
-              col.action('Actions', (row) => (
-                <Button
-                  label="Delete"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    if (window.confirm('Delete saved view?')) {
-                      router.post(`/saved-views/${row.id}/delete`, {}, { preserveScroll: true })
-                    }
-                  }}
-                />
-              )),
-            ]}
-            emptyTitle="No saved views"
-            emptyDescription="Create a saved view from any module's filter controls."
-          />
-          {/* Inline create saved view */}
-          <Card padding={3} variant="muted">
-            <Stack gap={2}>
-              <Text type="label" as="div" weight="semibold">
-                Create saved view
-              </Text>
-              <form method="POST" action="/saved-views">
-                <input
-                  type="hidden"
-                  name="_csrf"
-                  value={
-                    (typeof document !== 'undefined'
-                      ? (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
-                          ?.content
-                      : '') ?? ''
+        <ResponsiveDataView
+          rows={savedViews ?? []}
+          searchKeys={['name', 'moduleKey']}
+          createLabel="+ Save View"
+          onCreateClick={() => setCreateViewOpen(true)}
+          toCard={(row) => ({
+            title: String(row.name),
+            metrics: [
+              { label: 'Module', value: String(row.moduleKey) },
+              {
+                label: 'Created',
+                value: row.createdAt ? new Date(String(row.createdAt)).toLocaleDateString() : '—',
+              },
+            ],
+            actions: (
+              <Button
+                label="Delete"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (window.confirm('Delete saved view?')) {
+                    router.post(`/saved-views/${row.id}/delete`, {}, { preserveScroll: true })
                   }
-                />
-                <Stack direction="horizontal" gap={2} wrap="wrap" align="end">
-                  <div style={{ flex: '1 1 180px' }}>
-                    <label style={{ fontSize: 12, fontWeight: 600 }}>View name</label>
-                    <input
-                      name="name"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        border: '1px solid #d1d5db',
-                        fontSize: 14,
-                      }}
-                    />
-                  </div>
-                  <div style={{ flex: '1 1 140px' }}>
-                    <label style={{ fontSize: 12, fontWeight: 600 }}>Module</label>
-                    <select
-                      name="moduleKey"
-                      style={{
-                        width: '100%',
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        border: '1px solid #d1d5db',
-                        fontSize: 14,
-                      }}
-                    >
-                      <option value="orders">Orders</option>
-                      <option value="customers">Customers</option>
-                      <option value="products">Products</option>
-                      <option value="tasks">Tasks</option>
-                    </select>
-                  </div>
-                  <Button label="Save view" type="submit" variant="primary" size="sm" />
-                </Stack>
-              </form>
-            </Stack>
-          </Card>
-        </Stack>
+                }}
+              />
+            ),
+          })}
+          columns={[
+            col.text('name', 'Name', 180),
+            col.text('moduleKey', 'Module', 120),
+            col.date('createdAt', 'Created'),
+            col.action('Actions', (row) => (
+              <Button
+                label="Delete"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (window.confirm('Delete saved view?')) {
+                    router.post(`/saved-views/${row.id}/delete`, {}, { preserveScroll: true })
+                  }
+                }}
+              />
+            )),
+          ]}
+          emptyTitle="No saved views"
+          emptyDescription="Create a saved view to store filter presets for any module."
+        />
       </PageSection>
-    </Stack>
+    </div>
   )
 }

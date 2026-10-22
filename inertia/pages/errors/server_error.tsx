@@ -1,36 +1,23 @@
 import { Link } from '@adonisjs/inertia/react'
-import { Stack } from '@astryxdesign/core/Stack'
-import { Text } from '@astryxdesign/core/Text'
-import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-import { Badge } from '@astryxdesign/core/Badge'
+import { StatusBadge } from '~/components/atoms/status-badge'
 
 export default function ServerError() {
   return (
-    <div
-      style={{
-        minHeight: '60vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-      }}
-    >
-      <Card padding={6} width={420}>
-        <Stack gap={3}>
-          <Badge variant="error" label="Error 500" />
-          <Text type="display-2" as="h1" weight="bold">
-            Something broke
-          </Text>
-          <Text type="body" as="p">
-            The server hit an unexpected error. Try again in a moment — if it persists, check the
-            server logs for the underlying exception.
-          </Text>
+    <div className="min-h-[65vh] flex items-center justify-center p-6">
+      <div className="w-full max-w-md bg-card text-card-foreground border border-border rounded-2xl p-6 sm:p-8 shadow-lg space-y-4">
+        <StatusBadge variant="error" label="Error 500" />
+        <h1 className="text-2xl font-bold text-foreground tracking-tight">Something broke</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          The server hit an unexpected error. Try again in a moment — if it persists, check the
+          server logs for the underlying exception.
+        </p>
+        <div className="pt-2">
           <Link href="/dashboard">
             <Button label="Back to dashboard" variant="primary" />
           </Link>
-        </Stack>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

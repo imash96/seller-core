@@ -1,9 +1,6 @@
-import { Stack } from '@astryxdesign/core/Stack'
-import { Text } from '@astryxdesign/core/Text'
-import { Card } from '@astryxdesign/core/Card'
 import { Button } from '@astryxdesign/core/Button'
-
 import {
+  PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
@@ -11,10 +8,10 @@ import {
   col,
   STATUS_TONES,
   money,
-  short,
   type Row,
 } from '~/lib/ui'
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
+import { Truck } from 'lucide-react'
 
 type Props = {
   shipments: Row[]
@@ -28,8 +25,6 @@ type Props = {
   financeCategories: Row[]
   savedViews?: Row[]
 }
-
-
 
 const SHIPMENT_STATUS = [
   'pending',
@@ -65,48 +60,42 @@ export default function Shipments({
   savedViews,
 }: Props) {
   const [createShipmentOpen, setCreateShipmentOpen] = useState(false)
-  const [selectedOrderId, setSelectedOrderId] = useState('')
   const [updateShipmentRow, setUpdateShipmentRow] = useState<Row | null>(null)
   const [createInvoiceOpen, setCreateInvoiceOpen] = useState(false)
   const [updateInvoiceRow, setUpdateInvoiceRow] = useState<Row | null>(null)
 
-  // Filter line items by selected order — BUG FIX #8
-  const filteredLineItems = useMemo(() => {
-    if (!selectedOrderId) return []
-    return orderLineItems.filter((li) => String((li as any).orderId) === selectedOrderId)
-  }, [selectedOrderId, orderLineItems])
-
   return (
-    <Stack gap={4}>
-      <Card padding={4}>
-        <Stack direction="horizontal" gap={3} wrap="wrap" align="center">
-          <Button
-            label="+ Create Shipment"
-            variant="primary"
-            onClick={() => setCreateShipmentOpen(true)}
-          />
-          <Button
-            label="+ Carrier Invoice"
-            variant="secondary"
-            onClick={() => setCreateInvoiceOpen(true)}
-          />
-          <Text type="supporting" as="div">
-            {shipments.length} shipments · {shippingInvoices.length} invoices
-          </Text>
-        </Stack>
-      </Card>
-      {savedViews && savedViews.length > 0 ? <SavedViewsBar views={savedViews} /> : null}
+    <div className="space-y-6">
+      <PageHeader
+        title="Shipments & Carrier Invoices"
+        description="Split parcel fulfillment, volumetric weight tracking, and duplicate-guarded carrier invoice reconciliation."
+        icon={Truck}
+        badge={`${shipments.length} shipments · ${shippingInvoices.length} invoices`}
+        actions={
+          <>
+            <Button
+              label="+ Carrier Invoice"
+              variant="secondary"
+              onClick={() => setCreateInvoiceOpen(true)}
+            />
+            <Button
+              label="+ Create Shipment"
+              variant="primary"
+              onClick={() => setCreateShipmentOpen(true)}
+            />
+          </>
+        }
+      />
 
-      {/* Create Shipment — filtered line items */}
+      {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
+
+      {/* Create Shipment — dynamically filters orderLineItemId by selected orderId */}
       <FormModal
         isOpen={createShipmentOpen}
-        onOpenChange={(o) => {
-          setCreateShipmentOpen(o)
-          if (!o) setSelectedOrderId('')
-        }}
-        title="Create shipment"
-        subtitle="Select an order first — only its line items will be shown."
-        submitLabel="Create shipment"
+        onOpenChange={setCreateShipmentOpen}
+        title="Create Shipment"
+        subtitle="Select an order first — only line items belonging to that order are shown."
+        submitLabel="Create Shipment"
         action="/shipments"
         fields={[
           {
@@ -118,31 +107,23 @@ export default function Shipments({
           },
           {
             name: 'orderLineItemId',
-            label: 'Order line item',
+            label: 'Order line item (filtered by Order)',
             kind: 'select',
             required: true,
             options: (vals) => {
-              const activeOrderId = vals.orderId || selectedOrderId
+              const activeOrderId = vals.orderId
               const matching = activeOrderId
                 ? orderLineItems.filter((li) => String((li as any).orderId) === activeOrderId)
                 : []
-              return matching.length > 0
-                ? matching.map((li) => ({
-                    value: String(li.id),
-                    label: `${li.sku} · ${li.title ?? li.sku} · ordered ${li.quantityOrdered} · remaining ${Math.max(0, Number(li.quantityOrdered) - Number((li as any).quantityFulfilled ?? 0))}`,
-                  }))
-                : [
-                    {
-                      value: '',
-                      label: activeOrderId
-                        ? 'No line items for this order'
-                        : 'Select an order above first',
-                    },
-                  ]
+              return matching.map((li) => ({
+                value: String(li.id),
+                label: `${li.sku} · ${li.title ?? li.sku} (ordered: ${li.quantityOrdered}, rem: ${Math.max(0, Number(li.quantityOrdered) - Number((li as any).quantityFulfilled ?? 0))})`,
+              }))
             },
+            placeholder: 'Select an order first…',
           },
           { name: 'shipmentNumber', label: 'Shipment number', required: true },
-          { name: 'carrierCode', label: 'Carrier code', required: true },
+          { name: 'carrierCode', label: 'Carrier code (e.g. ups, fedex)', required: true },
           { name: 'carrierName', label: 'Carrier name', required: true },
           { name: 'serviceLevel', label: 'Service level' },
           { name: 'trackingNumber', label: 'Tracking number' },
@@ -153,7 +134,7 @@ export default function Shipments({
             required: true,
             default: '1',
           },
-          { name: 'estimatedShippingCost', label: 'Est. cost', kind: 'number' },
+          { name: 'estimatedShippingCost', label: 'Estimated cost', kind: 'number' },
           {
             name: 'status',
             label: 'Status',
@@ -162,40 +143,15 @@ export default function Shipments({
             options: SHIPMENT_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
           },
         ]}
-      >
-        <Stack gap={2}>
-          <label style={{ fontSize: 13, fontWeight: 600 }}>Quick order filter</label>
-          <select
-            value={selectedOrderId}
-            onChange={(e) => setSelectedOrderId(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              borderRadius: 8,
-              border: '1px solid #d1d5db',
-              fontSize: 14,
-            }}
-          >
-            <option value="">— Select order to filter line items —</option>
-            {orders.map((o) => (
-              <option key={String(o.id)} value={String(o.id)}>
-                {String(o.orderNumber)}
-              </option>
-            ))}
-          </select>
-          <Text type="supporting" as="div">
-            {filteredLineItems.length} line items for selected order · {orderLineItems.length} total
-            across all orders
-          </Text>
-        </Stack>
-      </FormModal>
+      />
 
       <FormModal
         isOpen={!!updateShipmentRow}
         onOpenChange={(o) => {
           if (!o) setUpdateShipmentRow(null)
         }}
-        title={`Update shipment ${String(updateShipmentRow?.shipmentNumber ?? '')}`}
-        submitLabel="Update status"
+        title={`Update Shipment ${String(updateShipmentRow?.shipmentNumber ?? '')}`}
+        submitLabel="Update Status"
         action={
           updateShipmentRow
             ? `/shipments/${updateShipmentRow.id}/status`
@@ -208,6 +164,7 @@ export default function Shipments({
             label: 'Shipment status',
             kind: 'select',
             required: true,
+            fullWidth: true,
             options: SHIPMENT_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
           },
         ]}
@@ -216,9 +173,9 @@ export default function Shipments({
       <FormModal
         isOpen={createInvoiceOpen}
         onOpenChange={setCreateInvoiceOpen}
-        title="Reconcile carrier invoice"
-        subtitle="Each shipment/charge-type pair is protected from duplicate billing."
-        submitLabel="Create invoice"
+        title="Reconcile Carrier Invoice"
+        subtitle="Each shipment and charge-type pair is protected from duplicate carrier billing."
+        submitLabel="Create Invoice"
         action="/shipping-invoices"
         fields={[
           { name: 'carrierCode', label: 'Carrier code', required: true },
@@ -242,8 +199,8 @@ export default function Shipments({
             default: 'base_freight',
             options: CHARGE_TYPES.map((c) => ({ value: c, label: c.replace(/_/g, ' ') })),
           },
-          { name: 'expectedAmount', label: 'Expected', kind: 'number' },
-          { name: 'billedAmount', label: 'Billed', kind: 'number', required: true },
+          { name: 'expectedAmount', label: 'Expected amount', kind: 'number' },
+          { name: 'billedAmount', label: 'Billed amount', kind: 'number', required: true },
         ]}
       />
 
@@ -252,8 +209,8 @@ export default function Shipments({
         onOpenChange={(o) => {
           if (!o) setUpdateInvoiceRow(null)
         }}
-        title={`Update invoice ${String(updateInvoiceRow?.invoiceNumber ?? '')}`}
-        submitLabel="Update invoice"
+        title={`Update Invoice ${String(updateInvoiceRow?.invoiceNumber ?? '')}`}
+        submitLabel="Update Invoice"
         action={
           updateInvoiceRow
             ? `/shipping-invoices/${updateInvoiceRow.id}/status`
@@ -273,7 +230,7 @@ export default function Shipments({
           },
           {
             name: 'reconciliationStatus',
-            label: 'Reconciliation',
+            label: 'Reconciliation status',
             kind: 'select',
             options: [
               { value: 'matched', label: 'Matched' },
@@ -287,7 +244,7 @@ export default function Shipments({
 
       <PageSection
         title="Shipments"
-        description="Split fulfillment with volumetric weight — delivered shipments notify customers."
+        description="Split fulfillment with volumetric weight — delivered shipments automatically notify customers."
       >
         <ResponsiveDataView
           rows={shipments}
@@ -323,14 +280,12 @@ export default function Shipments({
               },
             ],
             actions: (
-              <Stack direction="horizontal" gap={2}>
-                <Button
-                  label="Update status"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setUpdateShipmentRow(row)}
-                />
-              </Stack>
+              <Button
+                label="Update status"
+                variant="secondary"
+                size="sm"
+                onClick={() => setUpdateShipmentRow(row)}
+              />
             ),
           })}
           columns={[
@@ -354,8 +309,8 @@ export default function Shipments({
       </PageSection>
 
       <PageSection
-        title="Carrier invoices"
-        description="Payment and reconciliation state per invoice."
+        title="Carrier Invoices"
+        description="Payment and reconciliation state per carrier invoice."
       >
         <ResponsiveDataView
           rows={shippingInvoices}
@@ -417,6 +372,6 @@ export default function Shipments({
           ]}
         />
       </PageSection>
-    </Stack>
+    </div>
   )
 }

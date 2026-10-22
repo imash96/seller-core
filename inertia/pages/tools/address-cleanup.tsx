@@ -1,6 +1,6 @@
 import { Head } from '@inertiajs/react'
 import { MapPin } from 'lucide-react'
-import { ModulePageHeader } from '~/modules/common/page-header'
+import { ModulePageHeader } from '~/modules/common/module-page-header'
 import { AddressCleanerModule } from '~/modules/tools/address-cleaner'
 import { StatusBadge } from '~/ui/badge'
 
