@@ -4,6 +4,7 @@ import TasksReminder from '#models/tasks_reminder'
 import SavedView from '#models/saved_view'
 import SyncJob from '#models/sync_job'
 import AuditLog from '#models/audit_log'
+import SellerAccountsController from './seller_accounts_controller.js'
 import { RbacService } from '../services/rbac_service.js'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createTaskValidator, updateTaskValidator } from '#validators/operations'
@@ -34,7 +35,7 @@ export default class ToolsController {
       userId: user.id,
       taskType: payload.taskType ?? TaskType.GENERAL,
       priority: payload.priority ?? TaskPriority.MEDIUM,
-      status: TaskStatus.PENDING,
+      status: (request.input('status') as any) || TaskStatus.PENDING,
       title: payload.title,
       description: payload.description || null,
       dueAt: payload.dueAt ? DateTime.fromISO(payload.dueAt) : DateTime.now().plus({ days: 3 }),
@@ -63,6 +64,10 @@ export default class ToolsController {
     await task.save()
     session.flash('success', 'Task updated.')
     return response.redirect().back()
+  }
+
+  async updateTaskStatus(ctx: HttpContext) {
+    return this.updateTask(ctx)
   }
 
   async completeTask({ auth, params, response, session }: HttpContext) {
@@ -106,7 +111,8 @@ export default class ToolsController {
         userId: user.id,
         moduleKey,
         name,
-        isDefault: Boolean(request.input('isDefault', false)),
+        isDefault:
+          request.input('isDefault') === 'true' || request.input('isDefault') === true,
         filters: { status: request.input('filterStatus', 'all') },
         sortConfig: { field: 'created_at', direction: 'desc' },
         columnsConfig: ['order_number', 'status', 'total_amount', 'net_profit_amount'],
@@ -188,6 +194,14 @@ export default class ToolsController {
       )
     }
     return response.redirect().back()
+  }
+
+  async uploadCatalogImport(ctx: HttpContext) {
+    return this.uploadCatalogFile(ctx)
+  }
+
+  async triggerAccountSync(ctx: HttpContext) {
+    return new SellerAccountsController().queueSellerSync(ctx)
   }
 
   async auditPage({ auth, inertia }: HttpContext) {

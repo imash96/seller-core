@@ -3,6 +3,7 @@ import { formatMoney } from '~/lib/utils'
 import { StatusBadge } from '../atoms/status-badge'
 import { ProgressMeter } from '../atoms/progress-meter'
 import type { Row } from './responsive-data-view'
+import { VStack } from '@astryxdesign/core'
 
 export type DashboardKpis = {
   totalOrders: number
@@ -66,7 +67,7 @@ export function WaterfallChart({
 
   return (
     <div className="space-y-3">
-      <div className="space-y-2.5">
+      <VStack gap={3}>
         {steps.map((step) => {
           const barW = Math.max(4, (Math.abs(step.value) / maxAbs) * 100)
           return (
@@ -77,9 +78,8 @@ export function WaterfallChart({
               className="flex items-center gap-3 group cursor-default"
             >
               <span
-                className={`w-32 text-xs truncate ${
-                  step.isTotal ? 'font-bold text-foreground' : 'text-muted-foreground'
-                }`}
+                className={`w-32 text-xs truncate ${step.isTotal ? 'font-bold text-foreground' : 'text-muted-foreground'
+                  }`}
               >
                 {step.label}
               </span>
@@ -93,13 +93,12 @@ export function WaterfallChart({
                 />
               </div>
               <span
-                className={`w-24 text-right text-xs font-semibold tabular-nums ${
-                  step.value < 0
-                    ? 'text-rose-600 dark:text-rose-400'
-                    : step.isTotal
-                      ? 'text-emerald-600 dark:text-emerald-400 font-bold'
-                      : 'text-foreground'
-                }`}
+                className={`w-24 text-right text-xs font-semibold tabular-nums ${step.value < 0
+                  ? 'text-rose-600 dark:text-rose-400'
+                  : step.isTotal
+                    ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                    : 'text-foreground'
+                  }`}
               >
                 {step.value > 0 ? '+' : ''}
                 {formatMoney(currencyCode, step.value)}
@@ -107,7 +106,7 @@ export function WaterfallChart({
             </div>
           )
         })}
-      </div>
+      </VStack>
 
       <div className="h-7 flex items-center justify-between px-3 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground">
         {hovered ? (
@@ -122,7 +121,7 @@ export function WaterfallChart({
           <span>Hover any bar to inspect exact P&L share of gross revenue</span>
         )}
       </div>
-    </div>
+    </div >
   )
 }
 
@@ -185,11 +184,10 @@ export function RevenueTrendChart({
               key={m}
               type="button"
               onClick={() => setMode(m)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold capitalize transition-colors ${
-                mode === m
-                  ? 'bg-card text-foreground shadow-2xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold capitalize transition-colors ${mode === m
+                ? 'bg-card text-foreground shadow-2xs'
+                : 'text-muted-foreground hover:text-foreground'
+                }`}
             >
               {m === 'fees' ? 'Fee Burden' : m === 'profit' ? 'Net Profit' : 'Revenue'}
             </button>
@@ -362,7 +360,7 @@ export function CreditUtilizationBars({
   const totalSpend = businessSpend + householdSpend || 1
 
   return (
-    <div className="space-y-4">
+    <VStack gap={4}>
       <div className="space-y-3">
         <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Credit Card Utilization & Payment Due Alerts
@@ -378,8 +376,8 @@ export function CreditUtilizationBars({
               pct > 80 ? 'error' : pct > 50 ? 'warning' : 'success'
             const daysLeft = card.nextPaymentDueDate
               ? Math.ceil(
-                  (new Date(String(card.nextPaymentDueDate)).getTime() - Date.now()) / 86400000
-                )
+                (new Date(String(card.nextPaymentDueDate)).getTime() - Date.now()) / 86400000
+              )
               : null
             return (
               <div key={String(card.id)} className="space-y-1.5">
@@ -409,7 +407,7 @@ export function CreditUtilizationBars({
 
       <div className="h-px bg-border" />
 
-      <div className="space-y-2.5">
+      <VStack gap={3}>
         <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Business vs. Household Ledger Segregation
         </div>
@@ -439,7 +437,7 @@ export function CreditUtilizationBars({
             </span>
           </div>
         </div>
-      </div>
-    </div>
+      </VStack>
+    </VStack>
   )
 }

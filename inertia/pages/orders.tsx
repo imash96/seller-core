@@ -1,22 +1,33 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { router } from '@inertiajs/react'
-import { Button } from '@astryxdesign/core/Button'
 import {
   PageHeader,
   PageSection,
-  RowAction,
+  TopStatusBar,
+  AppButton,
+  AppInput,
+  AppSelect,
   FormModal,
-  ResponsiveDataView,
   SavedViewsBar,
-  col,
+  PaginationBar,
   STATUS_TONES,
   money,
-  short,
   type Row,
 } from '~/lib/ui'
 import { OrderCard } from '~/modules/order/order-card'
 import { OrderDetailsDrawer } from '~/modules/order/order-detail-drawer'
-import { Package, Download, CheckSquare } from 'lucide-react'
+import {
+  Package,
+  Download,
+  CheckSquare,
+  DollarSign,
+  TrendingUp,
+  Clock,
+  ShieldAlert,
+  Upload,
+  Plus,
+  Search,
+} from 'lucide-react'
 
 type Props = {
   orders: Row[]
@@ -50,6 +61,16 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [bulkStatus, setBulkStatus] = useState('confirmed')
 
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [channelFilter, setChannelFilter] = useState<string>('all')
+  const [customerSegmentFilter, setCustomerSegmentFilter] = useState<
+    'all' | 'repeat' | 'fraud_risk'
+  >('all')
+  const [page, setPage] = useState(1)
+  const pageSize = 10
+
   const sampleJson = JSON.stringify(
     [
       {
@@ -57,12 +78,83 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
         externalOrderId: 'EXT-901',
         customerFullName: 'Jane Doe',
         currencyCode: 'USD',
-        lines: [{ sku: 'SKU-001', title: 'Wireless Mouse', quantityOrdered: 2, unitPrice: 29.99 }],
+        lines: [
+          { sku: 'MCTDC01-BLK-NP-RG-M', title: 'Leather Duster Coat', quantityOrdered: 1, unitPrice: 239.99 },
+          { sku: 'MJKBK03-BLK-NP-SL-L', title: 'Moto Biker Jacket', quantityOrdered: 1, unitPrice: 259.99 },
+        ],
       },
     ],
     null,
     2
   )
+
+  // KPI Metrics for TopStatusBar
+  const stats = useMemo(() => {
+    let grossRevenue = 0
+    let netProfit = 0
+    let unfulfilled = 0
+    let flaggedOrRepeat = 0
+
+    for (const o of orders) {
+      grossRevenue += Number(o.totalAmount ?? 0)
+      netProfit += Number(o.netProfitAmount ?? 0)
+      if (['pending', 'confirmed', 'processing', 'partially_fulfilled'].includes(String(o.status))) {
+        unfulfilled++
+      }
+      const cust = (o.customer as Row) ?? {}
+      const risk = String(cust.riskLevel ?? 'low').toLowerCase()
+      if (risk === 'high' || risk === 'critical' || Number(cust.riskScore ?? 0) >= 60) {
+        flaggedOrRepeat++
+      }
+    }
+    return { grossRevenue, netProfit, unfulfilled, flaggedOrRepeat }
+  }, [orders])
+
+  // Filtered Orders
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      if (statusFilter !== 'all' && String(o.status) !== statusFilter) return false
+      if (channelFilter !== 'all' && String(o.marketplaceCode) !== channelFilter) return false
+
+      const cust = (o.customer as Row) ?? {}
+      if (customerSegmentFilter === 'repeat') {
+        const isRep = Boolean(cust.isRepeatCustomer) || Number(cust.ordersCount ?? 1) > 1
+        if (!isRep) return false
+      } else if (customerSegmentFilter === 'fraud_risk') {
+        const risk = String(cust.riskLevel ?? 'low').toLowerCase()
+        const highRisk =
+          risk === 'high' ||
+          risk === 'critical' ||
+          Number(cust.riskScore ?? 0) >= 60 ||
+          ((cust.riskSignals as Row[]) ?? []).length > 0
+        if (!highRisk) return false
+      }
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase()
+        const hay = [
+          o.orderNumber,
+          o.externalOrderId,
+          o.marketplaceCode,
+          cust.fullName,
+          cust.email,
+          ...(((o.lineItems as Row[]) ?? []).map((li) => `${li.sku} ${li.title}`)),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+  }, [orders, statusFilter, channelFilter, customerSegmentFilter, searchQuery])
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return filteredOrders.slice(start, start + pageSize)
+  }, [filteredOrders, currentPage])
 
   const toggleSelect = (id: string, checked: boolean) => {
     setSelectedIds((prev) =>
@@ -87,32 +179,88 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
     <div className="space-y-6">
       <PageHeader
         title="Orders & Multi-Currency P&L"
-        description="Multi-channel order management with real-time COGS, marketplace fee waterfall, and multi-currency net profit."
+        description="3-section order cards featuring stacked product thumbnails, transparent P&L waterfall economics, and customer repeat/fraud intelligence."
         icon={Package}
         badge={`${orders.length} orders`}
         actions={
-          <>
-            <button
-              type="button"
+          <div className="flex items-center gap-2 flex-wrap">
+            <AppButton
+              label="Export CSV"
+              variant="outline"
+              size="sm"
+              icon={Download}
               onClick={handleBulkExport}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border border-border bg-card text-foreground hover:bg-muted transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export CSV
-            </button>
-            <Button
+            />
+            <AppButton
               label="Bulk Import JSON"
               variant="secondary"
+              size="sm"
+              icon={Upload}
               onClick={() => setBulkOpen(true)}
             />
-            <Button label="+ Create Order" variant="primary" onClick={() => setCreateOpen(true)} />
-          </>
+            <AppButton
+              label="+ Create Order"
+              variant="primary"
+              size="sm"
+              icon={Plus}
+              onClick={() => setCreateOpen(true)}
+            />
+          </div>
         }
       />
 
+      {/* Top Interactive Status Bar */}
+      <TopStatusBar
+        columns={4}
+        items={[
+          {
+            label: 'Total Orders',
+            value: String(orders.length),
+            sublabel: `Gross Revenue: ${money('USD', stats.grossRevenue)}`,
+            icon: DollarSign,
+            tone: 'primary',
+            active: statusFilter === 'all' && customerSegmentFilter === 'all',
+            onClick: () => {
+              setStatusFilter('all')
+              setCustomerSegmentFilter('all')
+            },
+          },
+          {
+            label: 'True Net Profit',
+            value: money('USD', stats.netProfit),
+            sublabel: 'After COGS, Fees & Shipping',
+            icon: TrendingUp,
+            tone: 'success',
+          },
+          {
+            label: 'Pending / Processing',
+            value: String(stats.unfulfilled),
+            sublabel: 'Click to filter unfulfilled queue',
+            icon: Clock,
+            tone: 'warning',
+            active: statusFilter === 'pending',
+            onClick: () =>
+              setStatusFilter((prev) => (prev === 'pending' ? 'all' : 'pending')),
+          },
+          {
+            label: 'Fraud / Risk Alerts',
+            value: String(stats.flaggedOrRepeat),
+            sublabel: 'Click to filter high-risk buyers',
+            icon: ShieldAlert,
+            tone: 'error',
+            active: customerSegmentFilter === 'fraud_risk',
+            onClick: () =>
+              setCustomerSegmentFilter((prev) =>
+                prev === 'fraud_risk' ? 'all' : 'fraud_risk'
+              ),
+          },
+        ]}
+      />
+
+      {/* Bulk Selection Floating/Inline Bar */}
       {selectedIds.length > 0 && (
-        <div className="px-4 py-3 rounded-xl border border-primary/30 bg-primary/10 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <div className="px-4 py-3 rounded-2xl border border-primary/35 bg-primary-subtle flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm font-bold text-foreground">
             <CheckSquare className="w-4 h-4 text-primary" />
             <span>{selectedIds.length} order(s) selected</span>
           </div>
@@ -120,7 +268,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
             <select
               value={bulkStatus}
               onChange={(e) => setBulkStatus(e.target.value)}
-              className="h-8 px-2.5 rounded-lg text-xs border border-border bg-card text-foreground font-medium"
+              className="h-8 px-2.5 rounded-lg text-xs border border-input-border bg-card text-foreground font-medium"
             >
               {ORDER_STATUS.map((s) => (
                 <option key={s} value={s}>
@@ -128,16 +276,16 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
                 </option>
               ))}
             </select>
-            <Button
+            <AppButton
               label="Apply Bulk Status"
               variant="primary"
-              size="sm"
+              size="xs"
               onClick={handleBulkStatus}
             />
-            <Button
-              label="Clear"
+            <AppButton
+              label="Clear Selection"
               variant="ghost"
-              size="sm"
+              size="xs"
               onClick={() => setSelectedIds([])}
             />
           </div>
@@ -146,33 +294,132 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
-      {/* Featured Order Cards */}
-      {orders.length > 0 && (
-        <div className="grid grid-cols-1 gap-4">
-          {orders.slice(0, 4).map((order) => (
-            <OrderCard
-              key={String(order.id)}
-              order={order}
-              selected={selectedIds.includes(String(order.id))}
-              onSelect={toggleSelect}
-              onOpenDetail={(o) => setDetailRow(o)}
-              onEditStatus={(o) => setEditRow(o)}
-              onDelete={(o) => {
-                if (window.confirm(`Delete order ${o.orderNumber}?`)) {
-                  router.post(`/orders/${o.id}/delete`, {}, { preserveScroll: true })
-                }
+      {/* Unified Filter Bar + 3-Section Order Cards List */}
+      <PageSection
+        title="Order Operations Queue (3-Section Cards)"
+        description="Left: Product thumbnail stack (tilted layered images when multi-item). Center: Order & P&L breakdown. Right: Customer address & Repeat/Fraud intelligence."
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 rounded-2xl border border-card-border bg-muted/25 p-3.5">
+            <AppInput
+              label="Search Order / SKU / Customer"
+              icon={Search}
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setPage(1)
               }}
+              onClear={() => setSearchQuery('')}
+              placeholder="Order #, SKU, buyer name or email..."
             />
-          ))}
-        </div>
-      )}
 
-      {/* Create Order Modal — Grouped into 3 Logical Sections */}
+            <AppSelect
+              label="Order Status"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value)
+                setPage(1)
+              }}
+              options={[
+                { value: 'all', label: 'All Order Statuses' },
+                ...ORDER_STATUS.map((s) => ({
+                  value: s,
+                  label: s.replace(/_/g, ' ').toUpperCase(),
+                })),
+              ]}
+            />
+
+            <AppSelect
+              label="Marketplace Channel"
+              value={channelFilter}
+              onChange={(e) => {
+                setChannelFilter(e.target.value)
+                setPage(1)
+              }}
+              options={[
+                { value: 'all', label: 'All Channels' },
+                { value: 'amazon', label: 'Amazon' },
+                { value: 'ebay', label: 'eBay' },
+                { value: 'etsy', label: 'Etsy' },
+                { value: 'direct', label: 'Direct / Medusa Website' },
+              ]}
+            />
+
+            <AppSelect
+              label="Customer Intelligence Segment"
+              value={customerSegmentFilter}
+              onChange={(e) => {
+                setCustomerSegmentFilter(e.target.value as any)
+                setPage(1)
+              }}
+              options={[
+                { value: 'all', label: 'All Buyers' },
+                { value: 'repeat', label: 'Repeat Buyers Only' },
+                { value: 'fraud_risk', label: 'Fraud / High-Risk Buyers' },
+              ]}
+            />
+          </div>
+
+          {paginatedOrders.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border p-10 text-center space-y-3">
+              <p className="text-sm font-bold text-foreground">
+                No orders match your active filters.
+              </p>
+              <div className="flex items-center justify-center gap-2">
+                <AppButton
+                  label="Reset Filters"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery('')
+                    setStatusFilter('all')
+                    setChannelFilter('all')
+                    setCustomerSegmentFilter('all')
+                  }}
+                />
+                <AppButton
+                  label="+ Create Order"
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setCreateOpen(true)}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {paginatedOrders.map((order) => (
+                <OrderCard
+                  key={String(order.id)}
+                  order={order}
+                  selected={selectedIds.includes(String(order.id))}
+                  onSelect={toggleSelect}
+                  onOpenDetail={(o) => setDetailRow(o)}
+                  onEditStatus={(o) => setEditRow(o)}
+                  onDelete={(o) => {
+                    if (window.confirm(`Cancel order ${o.orderNumber}?`)) {
+                      router.post(`/orders/${o.id}/delete`, {}, { preserveScroll: true })
+                    }
+                  }}
+                />
+              ))}
+
+              <PaginationBar
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalRecords={filteredOrders.length}
+                onPageChange={setPage}
+              />
+            </div>
+          )}
+        </div>
+      </PageSection>
+
+      {/* Create Order Modal */}
       <FormModal
         isOpen={createOpen}
         onOpenChange={setCreateOpen}
         title="Create Order"
-        subtitle="Manual order entry with automatic P&L waterfall calculation (numeric(14,2) precision)."
+        subtitle="Manual order entry with automatic P&L waterfall calculation."
         submitLabel="Create Order"
         action="/orders"
         fields={[
@@ -203,8 +450,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
               { value: 'direct', label: 'Direct' },
               { value: 'amazon', label: 'Amazon' },
               { value: 'ebay', label: 'eBay' },
-              { value: 'shopify', label: 'Shopify' },
-              { value: 'walmart', label: 'Walmart' },
+              { value: 'etsy', label: 'Etsy' },
             ],
           },
           {
@@ -249,13 +495,13 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
           },
           {
             name: 'shippingCountryCode',
-            label: 'Country code (ISO-2)',
+            label: 'Country ISO-2',
             default: 'US',
             section: '2. Customer & Shipping Address',
           },
           {
             name: 'sku',
-            label: 'Line Item SKU',
+            label: 'Line SKU',
             required: true,
             section: '3. Line Item & P&L Economics',
           },
@@ -267,10 +513,10 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
           },
           {
             name: 'quantityOrdered',
-            label: 'Quantity ordered',
+            label: 'Quantity',
             kind: 'number',
-            required: true,
             default: '1',
+            required: true,
             section: '3. Line Item & P&L Economics',
           },
           {
@@ -282,32 +528,37 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
           },
           {
             name: 'unitCostAmount',
-            label: 'Unit COGS cost',
+            label: 'Unit COGS',
             kind: 'number',
+            default: '0',
             section: '3. Line Item & P&L Economics',
           },
           {
             name: 'taxAmount',
-            label: 'Tax amount',
+            label: 'Tax',
             kind: 'number',
+            default: '0',
             section: '3. Line Item & P&L Economics',
           },
           {
             name: 'discountAmount',
-            label: 'Discount amount',
+            label: 'Discount',
             kind: 'number',
+            default: '0',
             section: '3. Line Item & P&L Economics',
           },
           {
             name: 'shippingChargedAmount',
             label: 'Shipping charged to buyer',
             kind: 'number',
+            default: '0',
             section: '3. Line Item & P&L Economics',
           },
           {
             name: 'shippingCostAmount',
             label: 'Actual shipping cost',
             kind: 'number',
+            default: '0',
             section: '3. Line Item & P&L Economics',
           },
         ]}
@@ -317,21 +568,30 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
       <FormModal
         isOpen={bulkOpen}
         onOpenChange={setBulkOpen}
-        title="Bulk Marketplace Order Import"
-        subtitle="Idempotent JSON import — duplicates are skipped and raw payloads are stored with secret redaction."
-        submitLabel="Import Orders"
+        title="Idempotent Bulk Order Import (JSON)"
+        subtitle="Deduplicates on (seller_account_id, external_order_id) and creates a SyncJob audit trail."
+        submitLabel="Run Import Batch"
         action="/orders/bulk-import"
         presetActions={[
           {
-            label: 'Load Sample JSON Payload',
-            values: {
-              idempotencyKey: `batch-${Date.now()}`,
-              ordersJson: sampleJson,
-            },
+            label: 'Load Sample Multi-Item JSON',
+            values: { marketplaceCode: 'amazon', jsonPayload: sampleJson },
           },
         ]}
         fields={[
-          { name: 'idempotencyKey', label: 'Import idempotency key', required: true },
+          {
+            name: 'marketplaceCode',
+            label: 'Marketplace code',
+            kind: 'select',
+            default: 'amazon',
+            required: true,
+            options: [
+              { value: 'amazon', label: 'Amazon' },
+              { value: 'ebay', label: 'eBay' },
+              { value: 'etsy', label: 'Etsy' },
+              { value: 'direct', label: 'Direct' },
+            ],
+          },
           {
             name: 'sellerAccountId',
             label: 'Seller account',
@@ -342,32 +602,31 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
             })),
           },
           {
-            name: 'ordersJson',
-            label: 'Orders JSON array',
+            name: 'jsonPayload',
+            label: 'JSON orders array',
             kind: 'textarea',
             required: true,
+            default: sampleJson,
             fullWidth: true,
-            placeholder:
-              '[{"orderNumber":"AMZ-1","externalOrderId":"X1","customerFullName":"Jane","lines":[{"sku":"A","title":"Item","quantityOrdered":1,"unitPrice":10}]}]',
           },
         ]}
       />
 
-      {/* Update Order Status Modal */}
+      {/* Update Status Modal */}
       <FormModal
         isOpen={!!editRow}
-        onOpenChange={(open) => {
-          if (!open) setEditRow(null)
+        onOpenChange={(o) => {
+          if (!o) setEditRow(null)
         }}
-        title={`Update Order ${editRow?.orderNumber ?? ''}`}
-        subtitle="Change order status — marking delivered queues a customer delivery notification."
+        title={editRow ? `Update Status — #${editRow.orderNumber}` : 'Update Status'}
+        subtitle="Automatically stamps delivered_at or cancelled_at and records a tamper-evident audit entry."
         submitLabel="Update Status"
         action={editRow ? `/orders/${editRow.id}/status` : '/orders/placeholder/status'}
-        initialValues={{ status: String(editRow?.status ?? 'confirmed') }}
+        initialValues={editRow ? { status: String(editRow.status ?? 'confirmed') } : undefined}
         fields={[
           {
             name: 'status',
-            label: 'Order status',
+            label: 'New order status',
             kind: 'select',
             required: true,
             fullWidth: true,
@@ -376,10 +635,10 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
         ]}
       />
 
-      {/* Slide-over Order Details & P&L Waterfall Drawer */}
+      {/* Order Detail Drawer */}
       <OrderDetailsDrawer
-        order={detailRow}
         open={!!detailRow}
+        order={detailRow}
         onClose={() => setDetailRow(null)}
         onEditStatus={(o) => {
           setDetailRow(null)

@@ -60,11 +60,18 @@ export default class FinanceController {
       accountNumberLast4: request.input('accountNumberLast4') || '4401',
       currencyCode: String(request.input('currencyCode', 'USD')).toUpperCase(),
       currentBalance: Number(request.input('currentBalance', 0)).toFixed(2),
-      isActive: true,
+      isActive:
+        request.input('isActive') !== undefined
+          ? request.input('isActive') === 'true' || request.input('isActive') === true
+          : true,
     })
 
     session.flash('success', `Financial account "${account.accountName}" created.`)
     return response.redirect().back()
+  }
+
+  async storeFinanceAccount(ctx: HttpContext) {
+    return this.storeFinancialAccount(ctx)
   }
 
   async updateFinancialAccount({ auth, params, request, response, session }: HttpContext) {
@@ -75,12 +82,29 @@ export default class FinanceController {
       .andWhere('userId', user.id)
       .firstOrFail()
     if (payload.accountName !== undefined) account.accountName = payload.accountName
+    if (request.input('accountType')) account.accountType = String(request.input('accountType'))
+    if (request.input('institutionName') !== undefined) {
+      account.institutionName = request.input('institutionName') || null
+    }
+    if (request.input('accountNumberLast4') !== undefined) {
+      account.accountNumberLast4 = request.input('accountNumberLast4') || null
+    }
+    if (request.input('dataClassification')) {
+      account.dataClassification = String(request.input('dataClassification'))
+    }
+    if (request.input('currencyCode')) {
+      account.currencyCode = String(request.input('currencyCode')).toUpperCase()
+    }
     if (payload.currentBalance !== undefined)
-      account.currentBalance = String(payload.currentBalance)
+      account.currentBalance = Number(payload.currentBalance).toFixed(2)
     if (payload.isActive !== undefined) account.isActive = payload.isActive
     await account.save()
     session.flash('success', `Financial account "${account.accountName}" updated.`)
     return response.redirect().back()
+  }
+
+  async updateFinanceAccount(ctx: HttpContext) {
+    return this.updateFinancialAccount(ctx)
   }
 
   async deleteFinancialAccount({ auth, params, response, session }: HttpContext) {
@@ -92,6 +116,10 @@ export default class FinanceController {
     await account.delete()
     session.flash('success', 'Financial account deleted.')
     return response.redirect().back()
+  }
+
+  async deleteFinanceAccount(ctx: HttpContext) {
+    return this.deleteFinancialAccount(ctx)
   }
 
   async storeCreditCard({ auth, request, response, session }: HttpContext) {
@@ -145,6 +173,9 @@ export default class FinanceController {
       .firstOrFail()
     if (payload.cardLabel !== undefined) card.cardLabel = payload.cardLabel
     if (payload.creditLimit !== undefined) card.creditLimit = String(payload.creditLimit)
+    if (request.input('currentBalance') !== undefined && request.input('currentBalance') !== '') {
+      card.currentBalance = Number(request.input('currentBalance')).toFixed(2)
+    }
     if (payload.minimumPaymentDue !== undefined) {
       card.minimumPaymentDue = String(payload.minimumPaymentDue)
     }
@@ -252,7 +283,7 @@ export default class FinanceController {
         name,
         slug,
         categoryType: String(request.input('categoryType', 'expense')),
-        costBucket: String(request.input('costBucket', 'operations')),
+        costBucket: (['cogs','shipping','marketplace_fee','marketing','software','operations','manufacturing','tax','personal','other_income','sales_revenue'].includes(String(request.input('costBucket', 'operations'))) ? String(request.input('costBucket', 'operations')) : (String(request.input('costBucket')) === 'taxes' ? 'tax' : 'operations')),
         dataClassification: String(request.input('dataClassification', 'business')),
         isTaxDeductible:
           request.input('isTaxDeductible') === 'true' || request.input('isTaxDeductible') === true,
@@ -272,7 +303,10 @@ export default class FinanceController {
 
     if (request.input('name')) category.name = String(request.input('name')).trim()
     if (request.input('categoryType')) category.categoryType = String(request.input('categoryType'))
-    if (request.input('costBucket')) category.costBucket = String(request.input('costBucket'))
+    if (request.input('costBucket')) {
+      const rawBucket = String(request.input('costBucket'))
+      category.costBucket = ['cogs','shipping','marketplace_fee','marketing','software','operations','manufacturing','tax','personal','other_income','sales_revenue'].includes(rawBucket) ? rawBucket : (rawBucket === 'taxes' ? 'tax' : 'operations')
+    }
     if (request.input('dataClassification'))
       category.dataClassification = String(request.input('dataClassification'))
     if (request.input('isTaxDeductible') !== undefined) {

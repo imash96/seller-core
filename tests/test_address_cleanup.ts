@@ -137,9 +137,9 @@ try {
     console.log(`--- Address #${idx + 1} ---`)
     console.log(`  Name:      "${r.name}"`)
     console.log(`  Company:   "${r.companyName}"`)
-    console.log(`  Add1:      "${r.add1}" (${r.add1 === '-' ? 0 : r.add1.length}/35)`)
-    console.log(`  Add2:      "${r.add2}" (${r.add2 === '-' ? 0 : r.add2.length}/35)`)
-    console.log(`  Add3:      "${r.add3}" (${r.add3 === '-' ? 0 : r.add3.length}/35)`)
+    console.log(`  Line1:      "${r.line1}" (${r.line1 === '-' ? 0 : r.line1.length}/35)`)
+    console.log(`  Line2:      "${r.line2}" (${r.line2 === '-' ? 0 : r.line2.length}/35)`)
+    console.log(`  Line3:      "${r.line3}" (${r.line3 === '-' ? 0 : r.line3.length}/35)`)
     console.log(`  City:      "${r.city}"`)
     console.log(`  State:     "${r.state}"`)
     console.log(`  Zip:       "${r.zipcode}" (raw: "${r.zipCode}")`)
@@ -165,7 +165,7 @@ try {
   // #1 John Belcastro
   const a1 = results[0]
   checks.push({ label: 'A1: name correct', pass: a1.name === 'John Belcastro' })
-  checks.push({ label: 'A1: add1', pass: a1.add1 === '4422 Glenmore Ave' })
+  checks.push({ label: 'A1: line1', pass: a1.line1 === '4422 Glenmore Ave' })
   checks.push({ label: 'A1: city', pass: a1.city === 'Baltimore' })
   checks.push({ label: 'A1: state', pass: a1.state === 'Maryland' })
   checks.push({ label: 'A1: zip', pass: a1.zipCode === '21206' })
@@ -208,8 +208,8 @@ try {
   checks.push({ label: 'A13: country Germany', pass: a13.country === 'Germany' })
   checks.push({ label: 'A13: countryCode DE', pass: a13.countryCode === 'DE' })
 
-  // #13 Abdi: Germany should NOT appear as add2 (mid-address country stripped)
-  checks.push({ label: 'A13: add2 not Germany', pass: a13.add2 !== 'Germany' })
+  // #13 Abdi: Germany should NOT appear as line2 (mid-address country stripped)
+  checks.push({ label: 'A13: line2 not Germany', pass: a13.line2 !== 'Germany' })
   checks.push({ label: 'A13: city Freising', pass: a13.city.toLowerCase().includes('freising') })
 
   // #14 Jorge (Chile, RUT ID → buyerNationalId, not vatOrIoss)

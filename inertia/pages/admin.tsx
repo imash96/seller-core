@@ -1,17 +1,28 @@
-import { Button } from '@astryxdesign/core/Button'
 import {
   PageHeader,
   PageSection,
-  StatStrip,
   StatusBadge,
   ResponsiveDataView,
   FormModal,
+  TopStatusBar,
+  SlideOverDrawer,
+  AppButton,
   col,
   type Row,
 } from '~/lib/ui'
 import { useState } from 'react'
 import { router } from '@inertiajs/react'
-import { Shield, Users, KeyRound, Layers, X } from 'lucide-react'
+import {
+  Shield,
+  Users,
+  KeyRound,
+  Layers,
+  UserPlus,
+  Edit3,
+  Trash2,
+  Eye,
+  CheckCircle2,
+} from 'lucide-react'
 
 type Props = {
   allUsers: Row[]
@@ -51,29 +62,62 @@ export default function Admin({
           </div>
         }
         actions={
-          <>
-            <Button
-              label="Assign / Revoke Role"
+          <div className="flex items-center gap-2 flex-wrap">
+            <AppButton
               variant="secondary"
+              size="sm"
+              icon={KeyRound}
               onClick={() => setAssignRoleOpen(true)}
-            />
-            <Button
-              label="+ Provision User"
+            >
+              Assign / Revoke Role
+            </AppButton>
+            <AppButton
               variant="primary"
+              size="sm"
+              icon={UserPlus}
               onClick={() => setProvisionOpen(true)}
-            />
-          </>
+            >
+              Provision User
+            </AppButton>
+          </div>
         }
       />
 
-      <StatStrip
+      <TopStatusBar
+        columns={4}
         items={[
-          { label: 'Total Users', value: String(allUsers.length) },
-          { label: 'Active Users', value: String(activeCount), hint: `${suspendedCount} suspended` },
-          { label: 'System Roles', value: String(allRoles.length) },
-          { label: 'Permissions', value: String(allPermissions.length) },
-          { label: 'Entitlements', value: String(moduleEntitlements.length) },
-          { label: 'Authz Engine', value: 'Bouncer v3', hint: 'deny-overrides-allow' },
+          {
+            id: 'total-users',
+            label: 'Provisioned Users',
+            value: allUsers.length,
+            hint: `${activeCount} active · ${suspendedCount} suspended`,
+            icon: Users,
+            tone: 'primary',
+          },
+          {
+            id: 'system-roles',
+            label: 'System Roles',
+            value: allRoles.length,
+            hint: 'Deny-overrides-allow RBAC',
+            icon: KeyRound,
+            tone: 'info',
+          },
+          {
+            id: 'permissions-count',
+            label: 'Granular Permissions',
+            value: allPermissions.length,
+            hint: 'Enforced by Bouncer v3',
+            icon: Shield,
+            tone: 'success',
+          },
+          {
+            id: 'module-entitlements',
+            label: 'Module Entitlements',
+            value: moduleEntitlements.length,
+            hint: 'Per-module feature gates',
+            icon: Layers,
+            tone: 'warning',
+          },
         ]}
       />
 
@@ -207,71 +251,49 @@ export default function Admin({
         ]}
       />
 
-      {/* Inspect Role Permissions Modal */}
-      {inspectRoleRow && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
-            onClick={() => setInspectRoleRow(null)}
-            aria-hidden="true"
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="relative z-10 w-full max-w-xl max-h-[85dvh] flex flex-col rounded-2xl bg-card text-card-foreground border border-border shadow-2xl overflow-hidden"
-          >
-            <div className="px-6 py-4 border-b border-border bg-muted/40 flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-base font-bold text-foreground">
-                  Role Permissions: {String(inspectRoleRow.name)}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5 font-mono">
-                  Slug: {String(inspectRoleRow.slug)} ·{' '}
-                  {((inspectRoleRow.permissions as Row[]) ?? []).length} permissions attached
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setInspectRoleRow(null)}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
-                aria-label="Close modal"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-2.5">
-              {((inspectRoleRow.permissions as Row[]) ?? []).length === 0 ? (
-                <p className="text-xs text-muted-foreground">No permissions attached to this role.</p>
-              ) : (
-                ((inspectRoleRow.permissions as Row[]) ?? []).map((perm: Row) => (
-                  <div
-                    key={String(perm.id ?? perm.slug)}
-                    className="p-3 rounded-xl border border-border bg-muted/20 flex items-center justify-between gap-3 text-xs"
-                  >
-                    <div>
-                      <span className="font-mono font-bold text-foreground">
-                        {String(perm.slug)}
-                      </span>
-                      {perm.description && (
-                        <p className="text-muted-foreground mt-0.5">{String(perm.description)}</p>
-                      )}
-                    </div>
-                    <StatusBadge
-                      variant="success"
-                      label={`${String(perm.resource ?? '*')}:${String(perm.action ?? '*')}`}
-                    />
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-border bg-muted/30 flex justify-end">
-              <Button label="Close" variant="secondary" onClick={() => setInspectRoleRow(null)} />
-            </div>
+      {/* SlideOverDrawer for Role Permissions */}
+      <SlideOverDrawer
+        open={!!inspectRoleRow}
+        onClose={() => setInspectRoleRow(null)}
+        title={`Role Permissions: ${String(inspectRoleRow?.name ?? '')}`}
+        subtitle={`Slug: ${String(inspectRoleRow?.slug ?? '')} · ${(((inspectRoleRow?.permissions as Row[]) ?? [])).length} permissions attached`}
+        width="lg"
+        footer={
+          <div className="flex justify-end">
+            <AppButton variant="secondary" size="sm" onClick={() => setInspectRoleRow(null)}>
+              Close
+            </AppButton>
           </div>
-        </div>
-      )}
+        }
+      >
+        {inspectRoleRow && (
+          <div className="space-y-2.5">
+            {((inspectRoleRow.permissions as Row[]) ?? []).length === 0 ? (
+              <p className="text-xs text-muted-foreground">No permissions attached to this role.</p>
+            ) : (
+              ((inspectRoleRow.permissions as Row[]) ?? []).map((perm: Row) => (
+                <div
+                  key={String(perm.id ?? perm.slug)}
+                  className="p-3 rounded-xl border border-border bg-muted/20 flex items-center justify-between gap-3 text-xs"
+                >
+                  <div>
+                    <span className="font-mono font-bold text-foreground">
+                      {String(perm.slug)}
+                    </span>
+                    {perm.description && (
+                      <p className="text-muted-foreground mt-0.5">{String(perm.description)}</p>
+                    )}
+                  </div>
+                  <StatusBadge
+                    variant="success"
+                    label={`${String(perm.resource ?? '*')}:${String(perm.action ?? '*')}`}
+                  />
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </SlideOverDrawer>
 
       <PageSection
         title="Provisioned Users"
@@ -322,16 +344,18 @@ export default function Admin({
             ],
             actions: (
               <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  label="Edit Status"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditUserRow(row)}
-                />
-                <Button
-                  label="Delete"
+                >
+                  Edit Status
+                </AppButton>
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Trash2}
                   onClick={() => {
                     if (
                       window.confirm(
@@ -341,7 +365,9 @@ export default function Admin({
                       router.post(`/admin/users/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
-                />
+                >
+                  Delete
+                </AppButton>
               </div>
             ),
           })}
@@ -358,16 +384,18 @@ export default function Admin({
             col.text('isSuperAdmin', 'Super Admin', 110),
             col.action('Actions', (row) => (
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Button
-                  label="Edit"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditUserRow(row)}
-                />
-                <Button
-                  label="Delete"
+                >
+                  Edit
+                </AppButton>
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Trash2}
                   onClick={() => {
                     if (
                       window.confirm(
@@ -377,7 +405,9 @@ export default function Admin({
                       router.post(`/admin/users/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
-                />
+                >
+                  Delete
+                </AppButton>
               </div>
             )),
           ]}
@@ -399,12 +429,14 @@ export default function Admin({
               { label: 'Permissions', value: String(((row.permissions as Row[]) ?? []).length) },
             ],
             actions: (
-              <Button
-                label="Inspect Permissions"
+              <AppButton
                 variant="secondary"
-                size="sm"
+                size="xs"
+                icon={Eye}
                 onClick={() => setInspectRoleRow(row)}
-              />
+              >
+                Inspect Permissions
+              </AppButton>
             ),
           })}
           columns={[
@@ -416,12 +448,14 @@ export default function Admin({
                 <span className="text-xs text-muted-foreground">
                   {((row.permissions as Row[]) ?? []).length} granted
                 </span>
-                <Button
-                  label="Inspect"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Eye}
                   onClick={() => setInspectRoleRow(row)}
-                />
+                >
+                  Inspect
+                </AppButton>
               </div>
             )),
           ]}
@@ -445,16 +479,16 @@ export default function Admin({
             },
             metrics: [{ label: 'Plan tier', value: String(row.planTier ?? '—') }],
             actions: (
-              <Button
-                label={
-                  String(row.isEnabled) === 'true' || row.isEnabled === true ? 'Disable' : 'Enable'
-                }
+              <AppButton
                 variant="secondary"
-                size="sm"
+                size="xs"
+                icon={CheckCircle2}
                 onClick={() => {
                   router.post(`/admin/entitlements/${row.id}/toggle`, {}, { preserveScroll: true })
                 }}
-              />
+              >
+                {String(row.isEnabled) === 'true' || row.isEnabled === true ? 'Disable' : 'Enable'}
+              </AppButton>
             ),
           })}
           columns={[
@@ -462,14 +496,16 @@ export default function Admin({
             col.badge('isEnabled', 'Enabled', { true: 'success', false: 'error' }),
             col.text('planTier', 'Plan tier', 120),
             col.action('Toggle', (row) => (
-              <Button
-                label={row.isEnabled ? 'Disable' : 'Enable'}
+              <AppButton
                 variant="secondary"
-                size="sm"
+                size="xs"
+                icon={CheckCircle2}
                 onClick={() => {
                   router.post(`/admin/entitlements/${row.id}/toggle`, {}, { preserveScroll: true })
                 }}
-              />
+              >
+                {row.isEnabled ? 'Disable' : 'Enable'}
+              </AppButton>
             )),
           ]}
         />

@@ -1,17 +1,32 @@
-import { Button } from '@astryxdesign/core/Button'
 import {
   PageHeader,
   PageSection,
+  TopStatusBar,
+  AppButton,
+  AppInput,
+  AppSelect,
+  StatusBadge,
+  MonoBadge,
+  RowAction,
   FormModal,
-  ResponsiveDataView,
   SavedViewsBar,
-  col,
   STATUS_TONES,
   money,
+  when,
   type Row,
 } from '~/lib/ui'
-import { useState } from 'react'
-import { Truck } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import {
+  Truck,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  FileSpreadsheet,
+  Plus,
+  Edit3,
+  Search,
+  Package,
+} from 'lucide-react'
 
 type Props = {
   shipments: Row[]
@@ -64,32 +79,465 @@ export default function Shipments({
   const [createInvoiceOpen, setCreateInvoiceOpen] = useState(false)
   const [updateInvoiceRow, setUpdateInvoiceRow] = useState<Row | null>(null)
 
+  // Shipment Filters
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusGroupFilter, setStatusGroupFilter] = useState<
+    'all' | 'delivered' | 'in_transit' | 'waiting' | 'exception'
+  >('all')
+
+  // Status Bar Counts
+  const stats = useMemo(() => {
+    let delivered = 0
+    let inTransit = 0
+    let waitingForPickup = 0
+    let exceptions = 0
+
+    for (const s of shipments) {
+      const st = String(s.status ?? 'pending')
+      if (st === 'delivered') delivered++
+      else if (st === 'in_transit' || st === 'out_for_delivery') inTransit++
+      else if (st === 'pending' || st === 'label_created') waitingForPickup++
+      else exceptions++
+    }
+
+    const totalVariance = shippingInvoices.reduce(
+      (sum, inv) => sum + Number(inv.varianceAmount ?? 0),
+      0
+    )
+
+    return { delivered, inTransit, waitingForPickup, exceptions, totalVariance }
+  }, [shipments, shippingInvoices])
+
+  const filteredShipments = useMemo(() => {
+    return shipments.filter((s) => {
+      const st = String(s.status ?? 'pending')
+      if (statusGroupFilter === 'delivered' && st !== 'delivered') return false
+      if (
+        statusGroupFilter === 'in_transit' &&
+        st !== 'in_transit' &&
+        st !== 'out_for_delivery'
+      ) {
+        return false
+      }
+      if (statusGroupFilter === 'waiting' && st !== 'pending' && st !== 'label_created') {
+        return false
+      }
+      if (
+        statusGroupFilter === 'exception' &&
+        !['delayed', 'exception', 'failed', 'returned_to_sender'].includes(st)
+      ) {
+        return false
+      }
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase()
+        const hay = [
+          s.shipmentNumber,
+          s.carrierCode,
+          s.carrierName,
+          s.trackingNumber,
+          (s.order as any)?.orderNumber,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+  }, [shipments, statusGroupFilter, searchQuery])
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Shipments & Carrier Invoices"
-        description="Split parcel fulfillment, volumetric weight tracking, and duplicate-guarded carrier invoice reconciliation."
+        title="Shipments & Carrier Invoices (/shipments)"
+        description="Interactive parcel fulfillment status bar, card-based shipment tracking, and carrier invoice variance reconciliation."
         icon={Truck}
         badge={`${shipments.length} shipments · ${shippingInvoices.length} invoices`}
         actions={
-          <>
-            <Button
-              label="+ Carrier Invoice"
+          <div className="flex items-center gap-2 flex-wrap">
+            <AppButton
+              label="+ Record Carrier Invoice"
               variant="secondary"
+              size="sm"
+              icon={FileSpreadsheet}
               onClick={() => setCreateInvoiceOpen(true)}
             />
-            <Button
+            <AppButton
               label="+ Create Shipment"
               variant="primary"
+              size="sm"
+              icon={Plus}
               onClick={() => setCreateShipmentOpen(true)}
             />
-          </>
+          </div>
         }
+      />
+
+      {/* =====================================================================
+          TOP STATUS BAR: DELIVERED, IN TRANSIT, WAITING FOR PICKUP, EXCEPTIONS
+         ===================================================================== */}
+      <TopStatusBar
+        columns={5}
+        items={[
+          {
+            label: 'Delivered Parcels',
+            value: String(stats.delivered),
+            sublabel: 'Click to filter delivered',
+            icon: CheckCircle2,
+            tone: 'success',
+            active: statusGroupFilter === 'delivered',
+            onClick: () =>
+              setStatusGroupFilter((p) => (p === 'delivered' ? 'all' : 'delivered')),
+          },
+          {
+            label: 'In Transit / Out for Delivery',
+            value: String(stats.inTransit),
+            sublabel: 'Active carrier movement',
+            icon: Truck,
+            tone: 'info',
+            active: statusGroupFilter === 'in_transit',
+            onClick: () =>
+              setStatusGroupFilter((p) => (p === 'in_transit' ? 'all' : 'in_transit')),
+          },
+          {
+            label: 'Waiting for Pickup',
+            value: String(stats.waitingForPickup),
+            sublabel: 'Pending & Label Created',
+            icon: Clock,
+            tone: 'warning',
+            active: statusGroupFilter === 'waiting',
+            onClick: () =>
+              setStatusGroupFilter((p) => (p === 'waiting' ? 'all' : 'waiting')),
+          },
+          {
+            label: 'Exceptions & Delayed',
+            value: String(stats.exceptions),
+            sublabel: 'Delayed, Exception or Returned',
+            icon: AlertTriangle,
+            tone: stats.exceptions > 0 ? 'error' : 'neutral',
+            active: statusGroupFilter === 'exception',
+            onClick: () =>
+              setStatusGroupFilter((p) => (p === 'exception' ? 'all' : 'exception')),
+          },
+          {
+            label: 'Invoice Variance Total',
+            value: money('USD', stats.totalVariance),
+            sublabel: `${shippingInvoices.length} carrier invoices audited`,
+            icon: FileSpreadsheet,
+            tone: stats.totalVariance > 0 ? 'error' : 'primary',
+          },
+        ]}
       />
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
-      {/* Create Shipment — dynamically filters orderLineItemId by selected orderId */}
+      {/* =====================================================================
+          UPPER SECTION: CARD-BASED SHIPMENT LISTING
+         ===================================================================== */}
+      <PageSection
+        title="Fulfillment Shipments (Card-Based Dispatch Queue)"
+        description="Track parcel carrier status, volumetric vs actual weight, and shipping cost estimates."
+        actions={
+          <div className="flex items-center gap-2">
+            {statusGroupFilter !== 'all' && (
+              <AppButton
+                label="Show All Shipments"
+                variant="ghost"
+                size="xs"
+                onClick={() => setStatusGroupFilter('all')}
+              />
+            )}
+            <AppButton
+              label="+ Create Shipment"
+              variant="primary"
+              size="xs"
+              icon={Plus}
+              onClick={() => setCreateShipmentOpen(true)}
+            />
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-card-border bg-muted/25 p-3.5">
+            <div className="md:col-span-2">
+              <AppInput
+                label="Search Shipments"
+                icon={Search}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onClear={() => setSearchQuery('')}
+                placeholder="Shipment #, tracking number, carrier, order #..."
+              />
+            </div>
+            <AppSelect
+              label="Fulfillment Stage"
+              value={statusGroupFilter}
+              onChange={(e) => setStatusGroupFilter(e.target.value as any)}
+              options={[
+                { value: 'all', label: `All Shipments (${shipments.length})` },
+                { value: 'waiting', label: `Waiting for Pickup (${stats.waitingForPickup})` },
+                { value: 'in_transit', label: `In Transit (${stats.inTransit})` },
+                { value: 'delivered', label: `Delivered (${stats.delivered})` },
+                { value: 'exception', label: `Exceptions / Delayed (${stats.exceptions})` },
+              ]}
+            />
+          </div>
+
+          {filteredShipments.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border p-10 text-center space-y-3">
+              <p className="text-sm font-bold text-foreground">
+                No shipments match your active filter.
+              </p>
+              <AppButton
+                label="+ Create Shipment"
+                variant="primary"
+                size="sm"
+                onClick={() => setCreateShipmentOpen(true)}
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {filteredShipments.map((shipment) => {
+                const currency = String(shipment.currencyCode ?? 'USD')
+                const estCost = Number(shipment.estimatedShippingCost ?? 0)
+                const actCost = Number(
+                  shipment.actualInvoicedCost ?? shipment.actualShippingCost ?? 0
+                )
+                const orderNum =
+                  (shipment.order as any)?.orderNumber ?? shipment.orderId ?? '—'
+                const items = (shipment.shipmentItems as Row[]) ?? []
+
+                return (
+                  <div
+                    key={String(shipment.id)}
+                    className="rounded-2xl border border-card-border bg-card text-card-foreground hover:border-primary/40 shadow-xs hover:shadow-md transition-all flex flex-col justify-between overflow-hidden"
+                  >
+                    <div className="p-5 space-y-3.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-extrabold text-foreground font-mono">
+                              {String(shipment.shipmentNumber)}
+                            </span>
+                            <StatusBadge
+                              label={String(
+                                shipment.carrierName || shipment.carrierCode || 'Carrier'
+                              ).toUpperCase()}
+                              variant="info"
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Order: <strong className="text-foreground">#{String(orderNum)}</strong>
+                            {shipment.serviceLevel ? ` · ${String(shipment.serviceLevel)}` : ''}
+                          </p>
+                        </div>
+                        <StatusBadge
+                          label={String(shipment.status ?? 'pending').replace(/_/g, ' ')}
+                          variant={STATUS_TONES[String(shipment.status)] ?? 'neutral'}
+                        />
+                      </div>
+
+                      <div className="rounded-xl border border-border-subtle bg-muted/25 p-2.5 flex items-center justify-between gap-2 text-xs">
+                        <span className="text-muted-foreground font-medium">Tracking #:</span>
+                        <MonoBadge text={String(shipment.trackingNumber || 'AWAITING_LABEL')} />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-divider text-xs">
+                        <div>
+                          <span className="block text-[10px] font-bold uppercase text-muted-foreground">
+                            Est. Freight
+                          </span>
+                          <span className="font-bold text-foreground tabular-nums">
+                            {money(currency, estCost)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-bold uppercase text-muted-foreground">
+                            Actual Billed
+                          </span>
+                          <span
+                            className={`font-extrabold tabular-nums ${
+                              actCost > estCost && estCost > 0
+                                ? 'text-error'
+                                : 'text-price-current'
+                            }`}
+                          >
+                            {money(currency, actCost)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-bold uppercase text-muted-foreground">
+                            Dispatched
+                          </span>
+                          <span className="font-medium text-foreground-secondary">
+                            {when(shipment.shippedAt || shipment.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {items.length > 0 && (
+                        <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-1">
+                          <Package className="w-3.5 h-3.5 text-primary shrink-0" />
+                          <span className="truncate">
+                            {items.length} parcel line(s) fulfilled
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="px-5 py-3 bg-muted/30 border-t border-divider flex items-center justify-between gap-2">
+                      <AppButton
+                        label="Update Status"
+                        variant="primary"
+                        size="xs"
+                        icon={Edit3}
+                        onClick={() => setUpdateShipmentRow(shipment)}
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <AppButton
+                          label="+ Invoice"
+                          variant="secondary"
+                          size="xs"
+                          onClick={() => setCreateInvoiceOpen(true)}
+                        />
+                        <RowAction
+                          action={`/shipments/${shipment.id}/delete`}
+                          label="Delete"
+                          variant="ghost"
+                          confirmText={`Delete shipment ${shipment.shipmentNumber}?`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </PageSection>
+
+      {/* =====================================================================
+          LOWER SECTION: CARRIER INVOICES & VARIANCE RECONCILIATION
+         ===================================================================== */}
+      <PageSection
+        title="Carrier Invoices & Freight Variance Reconciliation"
+        description="Audit carrier billing against estimated shipping costs and flag dimensional-weight or surcharge discrepancies."
+        actions={
+          <AppButton
+            label="+ Record Carrier Invoice"
+            variant="primary"
+            size="xs"
+            icon={Plus}
+            onClick={() => setCreateInvoiceOpen(true)}
+          />
+        }
+      >
+        {shippingInvoices.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center space-y-2">
+            <p className="text-sm font-bold text-foreground">No carrier invoices recorded yet.</p>
+            <AppButton
+              label="+ Record Carrier Invoice"
+              variant="primary"
+              size="sm"
+              onClick={() => setCreateInvoiceOpen(true)}
+            />
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-card-border bg-card shadow-xs">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-divider bg-muted/40 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <th className="py-3.5 px-4">Invoice #</th>
+                  <th className="py-3.5 px-4">Carrier</th>
+                  <th className="py-3.5 px-4">Invoice Date</th>
+                  <th className="py-3.5 px-4 text-right">Expected</th>
+                  <th className="py-3.5 px-4 text-right">Billed Total</th>
+                  <th className="py-3.5 px-4 text-right">Variance</th>
+                  <th className="py-3.5 px-4">Audit Status</th>
+                  <th className="py-3.5 px-4">Payment</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-divider">
+                {shippingInvoices.map((inv) => {
+                  const cur = String(inv.currencyCode ?? 'USD')
+                  const variance = Number(inv.varianceAmount ?? 0)
+                  const expected =
+                    Number(inv.totalAmount ?? inv.totalBilledAmount ?? 0) - variance
+
+                  return (
+                    <tr key={String(inv.id)} className="hover:bg-muted/20 transition-colors">
+                      <td className="py-3.5 px-4 font-mono font-bold text-foreground">
+                        {String(inv.invoiceNumber)}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <StatusBadge
+                          label={String(inv.carrierName || inv.carrierCode || 'UPS').toUpperCase()}
+                          variant="info"
+                        />
+                      </td>
+                      <td className="py-3.5 px-4 text-muted-foreground">
+                        {when(inv.invoiceDate || inv.createdAt)}
+                      </td>
+                      <td className="py-3.5 px-4 text-right text-muted-foreground tabular-nums">
+                        {money(cur, Math.max(0, expected))}
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-extrabold text-price-current tabular-nums">
+                        {money(cur, inv.totalAmount ?? inv.totalBilledAmount ?? 0)}
+                      </td>
+                      <td
+                        className={`py-3.5 px-4 text-right font-extrabold tabular-nums ${
+                          variance > 0 ? 'text-error' : 'text-success'
+                        }`}
+                      >
+                        {variance > 0 ? `+${money(cur, variance)}` : money(cur, variance)}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <StatusBadge
+                          label={String(
+                            inv.reconciliationStatus ?? inv.auditStatus ?? 'matched'
+                          ).replace(/_/g, ' ')}
+                          variant={
+                            STATUS_TONES[
+                              String(inv.reconciliationStatus ?? inv.auditStatus ?? 'matched')
+                            ] ?? 'info'
+                          }
+                        />
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <StatusBadge
+                          label={String(inv.paymentStatus ?? 'unpaid')}
+                          variant={STATUS_TONES[String(inv.paymentStatus)] ?? 'warning'}
+                        />
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <AppButton
+                            label="Reconcile"
+                            variant="secondary"
+                            size="xs"
+                            icon={Edit3}
+                            onClick={() => setUpdateInvoiceRow(inv)}
+                          />
+                          <RowAction
+                            action={`/carrier-invoices/${inv.id}/delete`}
+                            label="Delete"
+                            variant="ghost"
+                            confirmText={`Delete invoice ${inv.invoiceNumber}?`}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </PageSection>
+
+      {/* Modals */}
       <FormModal
         isOpen={createShipmentOpen}
         onOpenChange={setCreateShipmentOpen}
@@ -173,10 +621,10 @@ export default function Shipments({
       <FormModal
         isOpen={createInvoiceOpen}
         onOpenChange={setCreateInvoiceOpen}
-        title="Reconcile Carrier Invoice"
+        title="Record & Reconcile Carrier Invoice"
         subtitle="Each shipment and charge-type pair is protected from duplicate carrier billing."
         submitLabel="Create Invoice"
-        action="/shipping-invoices"
+        action="/carrier-invoices"
         fields={[
           { name: 'carrierCode', label: 'Carrier code', required: true },
           { name: 'carrierName', label: 'Carrier name', required: true },
@@ -209,16 +657,18 @@ export default function Shipments({
         onOpenChange={(o) => {
           if (!o) setUpdateInvoiceRow(null)
         }}
-        title={`Update Invoice ${String(updateInvoiceRow?.invoiceNumber ?? '')}`}
+        title={`Reconcile Invoice ${String(updateInvoiceRow?.invoiceNumber ?? '')}`}
         submitLabel="Update Invoice"
         action={
           updateInvoiceRow
-            ? `/shipping-invoices/${updateInvoiceRow.id}/status`
-            : '/shipping-invoices/placeholder/status'
+            ? `/carrier-invoices/${updateInvoiceRow.id}`
+            : '/carrier-invoices/placeholder'
         }
         initialValues={{
           paymentStatus: String(updateInvoiceRow?.paymentStatus ?? 'paid'),
-          reconciliationStatus: String(updateInvoiceRow?.reconciliationStatus ?? 'resolved'),
+          reconciliationStatus: String(
+            updateInvoiceRow?.reconciliationStatus ?? 'resolved'
+          ),
         }}
         fields={[
           {
@@ -241,137 +691,6 @@ export default function Shipments({
           },
         ]}
       />
-
-      <PageSection
-        title="Shipments"
-        description="Split fulfillment with volumetric weight — delivered shipments automatically notify customers."
-      >
-        <ResponsiveDataView
-          rows={shipments}
-          searchKeys={['shipmentNumber', 'carrierCode', 'trackingNumber']}
-          filterKey="status"
-          filterPills={[
-            { value: 'all', label: 'All' },
-            { value: 'in_transit', label: 'In transit' },
-            { value: 'delivered', label: 'Delivered' },
-            { value: 'pending', label: 'Pending' },
-          ]}
-          createLabel="+ Create Shipment"
-          onCreateClick={() => setCreateShipmentOpen(true)}
-          toCard={(row) => ({
-            title: String(row.shipmentNumber),
-            statusBadge: {
-              label: String(row.status).replace(/_/g, ' '),
-              variant: STATUS_TONES[String(row.status)] ?? 'neutral',
-            },
-            metrics: [
-              { label: 'Carrier', value: String(row.carrierCode ?? '—') },
-              { label: 'Tracking', value: String(row.trackingNumber ?? '—').slice(0, 20) },
-              {
-                label: 'Est. cost',
-                value: money(String(row.currencyCode ?? 'USD'), row.estimatedShippingCost),
-              },
-              {
-                label: 'Actual',
-                value: money(
-                  String(row.currencyCode ?? 'USD'),
-                  row.actualInvoicedCost ?? row.actualShippingCost ?? 0
-                ),
-              },
-            ],
-            actions: (
-              <Button
-                label="Update status"
-                variant="secondary"
-                size="sm"
-                onClick={() => setUpdateShipmentRow(row)}
-              />
-            ),
-          })}
-          columns={[
-            col.text('shipmentNumber', 'Shipment #', 130),
-            col.badge('status', 'Status', STATUS_TONES),
-            col.text('carrierCode', 'Carrier', 90),
-            col.money('estimatedShippingCost', 'Est. cost', 'currencyCode'),
-            col.money('actualInvoicedCost', 'Invoiced', 'currencyCode'),
-            col.date('shippedAt', 'Shipped'),
-            col.date('deliveredAt', 'Delivered'),
-            col.action('Actions', (row) => (
-              <Button
-                label="Update"
-                variant="secondary"
-                size="sm"
-                onClick={() => setUpdateShipmentRow(row)}
-              />
-            )),
-          ]}
-        />
-      </PageSection>
-
-      <PageSection
-        title="Carrier Invoices"
-        description="Payment and reconciliation state per carrier invoice."
-      >
-        <ResponsiveDataView
-          rows={shippingInvoices}
-          searchKeys={['invoiceNumber', 'carrierCode']}
-          filterKey="paymentStatus"
-          filterPills={[
-            { value: 'all', label: 'All' },
-            { value: 'paid', label: 'Paid' },
-            { value: 'unpaid', label: 'Unpaid' },
-            { value: 'disputed', label: 'Disputed' },
-          ]}
-          createLabel="+ Carrier Invoice"
-          onCreateClick={() => setCreateInvoiceOpen(true)}
-          toCard={(row) => ({
-            title: String(row.invoiceNumber),
-            statusBadge: {
-              label: String(row.paymentStatus),
-              variant: STATUS_TONES[String(row.paymentStatus)] ?? 'neutral',
-            },
-            metrics: [
-              { label: 'Carrier', value: String(row.carrierCode) },
-              { label: 'Total', value: money(String(row.currencyCode), row.totalAmount) },
-              { label: 'Variance', value: money(String(row.currencyCode), row.varianceAmount) },
-              {
-                label: 'Reconciliation',
-                value: String(row.reconciliationStatus ?? '—').replace(/_/g, ' '),
-              },
-            ],
-            actions: (
-              <Button
-                label="Update status"
-                variant="secondary"
-                size="sm"
-                onClick={() => setUpdateInvoiceRow(row)}
-              />
-            ),
-          })}
-          columns={[
-            col.text('invoiceNumber', 'Invoice #', 140),
-            col.text('carrierCode', 'Carrier', 90),
-            col.money('totalAmount', 'Total', 'currencyCode'),
-            col.money('paidAmount', 'Paid', 'currencyCode'),
-            col.money('varianceAmount', 'Variance', 'currencyCode'),
-            col.badge('paymentStatus', 'Payment', STATUS_TONES),
-            col.badge('reconciliationStatus', 'Reconciliation', {
-              matched: 'success',
-              variance_detected: 'warning',
-              resolved: 'info',
-              unreconciled: 'neutral',
-            }),
-            col.action('Actions', (row) => (
-              <Button
-                label="Update status"
-                variant="secondary"
-                size="sm"
-                onClick={() => setUpdateInvoiceRow(row)}
-              />
-            )),
-          ]}
-        />
-      </PageSection>
     </div>
   )
 }

@@ -1,18 +1,28 @@
-import { Button } from '@astryxdesign/core/Button'
 import {
   PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
   SavedViewsBar,
+  TopStatusBar,
+  AppButton,
   col,
   STATUS_TONES,
   money,
   type Row,
 } from '~/lib/ui'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { router } from '@inertiajs/react'
-import { CreditCard } from 'lucide-react'
+import {
+  CreditCard,
+  Landmark,
+  DollarSign,
+  FolderKanban,
+  Plus,
+  Edit3,
+  Trash2,
+  Ban,
+} from 'lucide-react'
 
 type Props = {
   financialAccounts: Row[]
@@ -52,7 +62,19 @@ const CARD_USAGE = [
   'shipping_labels',
   'primary_billing',
 ]
-const COST_BUCKETS = ['cogs', 'shipping', 'marketing', 'operations', 'taxes', 'other']
+const COST_BUCKETS = [
+  'cogs',
+  'shipping',
+  'marketplace_fee',
+  'marketing',
+  'software',
+  'operations',
+  'manufacturing',
+  'tax',
+  'personal',
+  'other_income',
+  'sales_revenue',
+]
 
 export default function Finance({
   financialAccounts,
@@ -60,6 +82,7 @@ export default function Finance({
   financialTransactions,
   financeCategories,
   sellerAccounts,
+  orders,
   savedViews,
 }: Props) {
   const [createAccountOpen, setCreateAccountOpen] = useState(false)
@@ -70,6 +93,18 @@ export default function Finance({
   const [createCatOpen, setCreateCatOpen] = useState(false)
   const [editCatRow, setEditCatRow] = useState<Row | null>(null)
 
+  const stats = useMemo(() => {
+    const totalBalances = financialAccounts.reduce(
+      (acc, a) => acc + Number(a.currentBalance ?? 0),
+      0
+    )
+    const totalCardLimit = creditCards.reduce((acc, c) => acc + Number(c.creditLimit ?? 0), 0)
+    const businessTxTotal = financialTransactions
+      .filter((t) => t.dataClassification === 'business' && t.status !== 'voided')
+      .reduce((acc, t) => acc + Number(t.reportingAmount ?? t.originalAmount ?? 0), 0)
+    return { totalBalances, totalCardLimit, businessTxTotal }
+  }, [financialAccounts, creditCards, financialTransactions])
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -78,33 +113,79 @@ export default function Finance({
         icon={CreditCard}
         badge={`${financialAccounts.length} accounts · ${creditCards.length} cards · ${financialTransactions.length} tx`}
         actions={
-          <>
-            <Button
-              label="+ Category"
-              variant="ghost"
+          <div className="flex items-center gap-2 flex-wrap">
+            <AppButton
+              variant="outline"
               size="sm"
+              icon={FolderKanban}
               onClick={() => setCreateCatOpen(true)}
-            />
-            <Button
-              label="+ Credit Card"
+            >
+              Category
+            </AppButton>
+            <AppButton
               variant="secondary"
               size="sm"
+              icon={CreditCard}
               onClick={() => setCreateCardOpen(true)}
-            />
-            <Button
-              label="+ Financial Account"
+            >
+              Credit Card
+            </AppButton>
+            <AppButton
               variant="secondary"
               size="sm"
+              icon={Landmark}
               onClick={() => setCreateAccountOpen(true)}
-            />
-            <Button
-              label="+ Record Transaction"
+            >
+              Financial Account
+            </AppButton>
+            <AppButton
               variant="primary"
               size="sm"
+              icon={Plus}
               onClick={() => setCreateTxOpen(true)}
-            />
-          </>
+            >
+              Record Transaction
+            </AppButton>
+          </div>
         }
+      />
+
+      <TopStatusBar
+        columns={4}
+        items={[
+          {
+            id: 'account-balances',
+            label: 'Financial Account Balances',
+            value: money('USD', stats.totalBalances),
+            hint: `${financialAccounts.length} checking / clearing accounts`,
+            icon: Landmark,
+            tone: 'primary',
+          },
+          {
+            id: 'pci-cards',
+            label: 'Registered Credit Cards',
+            value: creditCards.length,
+            hint: `Combined limit: ${money('USD', stats.totalCardLimit)}`,
+            icon: CreditCard,
+            tone: 'info',
+          },
+          {
+            id: 'business-ledger',
+            label: 'Business Ledger Volume',
+            value: money('USD', stats.businessTxTotal),
+            hint: `${financialTransactions.length} ledger entries`,
+            icon: DollarSign,
+            tone: 'success',
+          },
+          {
+            id: 'finance-categories',
+            label: 'Finance Cost Buckets',
+            value: financeCategories.length,
+            hint: 'Tax-deductible P&L categories',
+            icon: FolderKanban,
+            tone: 'warning',
+          },
+        ]}
       />
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
@@ -118,16 +199,16 @@ export default function Finance({
         submitLabel="Create Account"
         action="/financial-accounts"
         fields={[
-          { name: 'accountName', label: 'Account name', required: true },
+          { name: 'accountName', label: 'Account Name', required: true },
           {
             name: 'accountType',
-            label: 'Account type',
+            label: 'Account Type',
             kind: 'select',
             default: 'bank_checking',
             options: ACCOUNT_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
           },
-          { name: 'institutionName', label: 'Institution name' },
-          { name: 'accountNumberLast4', label: 'Last 4 digits', placeholder: '4401' },
+          { name: 'institutionName', label: 'Institution Name' },
+          { name: 'accountNumberLast4', label: 'Last 4 Digits', placeholder: '4401' },
           {
             name: 'dataClassification',
             label: 'Classification',
@@ -138,8 +219,18 @@ export default function Finance({
               { value: 'household_personal', label: 'Household / personal' },
             ],
           },
-          { name: 'currentBalance', label: 'Opening balance', kind: 'number', default: '0' },
+          { name: 'currentBalance', label: 'Opening Balance', kind: 'number', default: '0' },
           { name: 'currencyCode', label: 'Currency', default: 'USD' },
+          {
+            name: 'isActive',
+            label: 'Active Status',
+            kind: 'select',
+            default: 'true',
+            options: [
+              { value: 'true', label: 'Active' },
+              { value: 'false', label: 'Inactive' },
+            ],
+          },
         ]}
       />
 
@@ -160,14 +251,37 @@ export default function Finance({
           editAccountRow
             ? {
                 accountName: String(editAccountRow.accountName ?? ''),
+                accountType: String(editAccountRow.accountType ?? 'bank_checking'),
+                institutionName: String(editAccountRow.institutionName ?? ''),
+                accountNumberLast4: String(editAccountRow.accountNumberLast4 ?? ''),
+                dataClassification: String(editAccountRow.dataClassification ?? 'business'),
                 currentBalance: String(editAccountRow.currentBalance ?? 0),
+                currencyCode: String(editAccountRow.currencyCode ?? 'USD'),
                 isActive: String(editAccountRow.isActive ?? 'true'),
               }
             : undefined
         }
         fields={[
-          { name: 'accountName', label: 'Account name', required: true },
+          { name: 'accountName', label: 'Account Name', required: true },
+          {
+            name: 'accountType',
+            label: 'Account Type',
+            kind: 'select',
+            options: ACCOUNT_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
+          },
+          { name: 'institutionName', label: 'Institution Name' },
+          { name: 'accountNumberLast4', label: 'Last 4 Digits' },
+          {
+            name: 'dataClassification',
+            label: 'Classification',
+            kind: 'select',
+            options: [
+              { value: 'business', label: 'Business' },
+              { value: 'household_personal', label: 'Household / personal' },
+            ],
+          },
           { name: 'currentBalance', label: 'Balance', kind: 'number' },
+          { name: 'currencyCode', label: 'Currency' },
           {
             name: 'isActive',
             label: 'Active',
@@ -189,15 +303,19 @@ export default function Finance({
         submitLabel="Add Card"
         action="/credit-cards"
         fields={[
-          { name: 'cardLabel', label: 'Card label', required: true },
+          { name: 'cardLabel', label: 'Card Label', required: true },
           { name: 'brandName', label: 'Brand (e.g. Visa, Amex)', required: true, placeholder: 'Visa' },
-          { name: 'cardholderName', label: 'Cardholder name', required: true },
-          { name: 'last4Digits', label: 'Last 4 digits', required: true, placeholder: '4242' },
-          { name: 'expMonth', label: 'Exp month (1–12)', kind: 'number', required: true },
-          { name: 'expYear', label: 'Exp year (e.g. 2028)', kind: 'number', required: true },
-          { name: 'creditLimit', label: 'Credit limit', kind: 'number' },
-          { name: 'minimumPaymentDue', label: 'Minimum payment due', kind: 'number' },
-          { name: 'nextPaymentDueDate', label: 'Next due date', kind: 'date' },
+          { name: 'cardholderName', label: 'Cardholder Name', required: true },
+          { name: 'last4Digits', label: 'Last 4 Digits', required: true, placeholder: '4242' },
+          { name: 'expMonth', label: 'Exp Month (1–12)', kind: 'number', required: true },
+          { name: 'expYear', label: 'Exp Year (e.g. 2028)', kind: 'number', required: true },
+          { name: 'currencyCode', label: 'Currency Code', default: 'USD' },
+          { name: 'creditLimit', label: 'Credit Limit', kind: 'number' },
+          { name: 'currentBalance', label: 'Current Balance', kind: 'number', default: '0' },
+          { name: 'minimumPaymentDue', label: 'Minimum Payment Due', kind: 'number' },
+          { name: 'statementClosingDay', label: 'Statement Closing Day (1–31)', kind: 'number' },
+          { name: 'paymentDueDay', label: 'Payment Due Day (1–31)', kind: 'number' },
+          { name: 'nextPaymentDueDate', label: 'Next Due Date', kind: 'date' },
           {
             name: 'dataClassification',
             label: 'Classification',
@@ -210,7 +328,7 @@ export default function Finance({
           },
           {
             name: 'sellerAccountId',
-            label: 'Linked seller account',
+            label: 'Linked Seller Account',
             kind: 'select',
             options: sellerAccounts.map((s) => ({
               value: String(s.id),
@@ -219,7 +337,7 @@ export default function Finance({
           },
           {
             name: 'usagePurpose',
-            label: 'Usage purpose',
+            label: 'Usage Purpose',
             kind: 'select',
             default: 'primary_billing',
             options: CARD_USAGE.map((u) => ({ value: u, label: u.replace(/_/g, ' ') })),
@@ -241,6 +359,7 @@ export default function Finance({
             ? {
                 cardLabel: String(editCardRow.cardLabel ?? ''),
                 creditLimit: String(editCardRow.creditLimit ?? 0),
+                currentBalance: String(editCardRow.currentBalance ?? 0),
                 minimumPaymentDue: String(editCardRow.minimumPaymentDue ?? 0),
                 nextPaymentDueDate: editCardRow.nextPaymentDueDate
                   ? String(editCardRow.nextPaymentDueDate).slice(0, 10)
@@ -250,10 +369,11 @@ export default function Finance({
             : undefined
         }
         fields={[
-          { name: 'cardLabel', label: 'Card label', required: true },
-          { name: 'creditLimit', label: 'Credit limit', kind: 'number' },
-          { name: 'minimumPaymentDue', label: 'Minimum payment due', kind: 'number' },
-          { name: 'nextPaymentDueDate', label: 'Next due date', kind: 'date' },
+          { name: 'cardLabel', label: 'Card Label', required: true },
+          { name: 'creditLimit', label: 'Credit Limit', kind: 'number' },
+          { name: 'currentBalance', label: 'Current Balance', kind: 'number' },
+          { name: 'minimumPaymentDue', label: 'Minimum Payment Due', kind: 'number' },
+          { name: 'nextPaymentDueDate', label: 'Next Due Date', kind: 'date' },
           {
             name: 'status',
             label: 'Status',
@@ -272,10 +392,10 @@ export default function Finance({
         submitLabel="Record Transaction"
         action="/financial-transactions"
         fields={[
-          { name: 'referenceNumber', label: 'Reference number', required: true },
+          { name: 'referenceNumber', label: 'Reference Number', required: true },
           {
             name: 'transactionType',
-            label: 'Transaction type',
+            label: 'Transaction Type',
             kind: 'select',
             required: true,
             options: TX_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
@@ -293,12 +413,12 @@ export default function Finance({
           { name: 'vendorOrPayer', label: 'Vendor / Payer' },
           { name: 'originalCurrencyCode', label: 'Currency', default: 'USD' },
           { name: 'originalAmount', label: 'Amount', kind: 'number', required: true },
-          { name: 'exchangeRate', label: 'Exchange rate to USD', kind: 'number', default: '1' },
-          { name: 'taxAmount', label: 'Tax amount', kind: 'number' },
-          { name: 'transactionDate', label: 'Transaction date', kind: 'date', required: true },
+          { name: 'exchangeRate', label: 'Exchange Rate to USD', kind: 'number', default: '1' },
+          { name: 'taxAmount', label: 'Tax Amount', kind: 'number' },
+          { name: 'transactionDate', label: 'Transaction Date', kind: 'date', required: true },
           {
             name: 'financialAccountId',
-            label: 'Financial account',
+            label: 'Financial Account',
             kind: 'select',
             options: financialAccounts.map((a) => ({
               value: String(a.id),
@@ -307,7 +427,7 @@ export default function Finance({
           },
           {
             name: 'creditCardId',
-            label: 'Credit card',
+            label: 'Credit Card',
             kind: 'select',
             options: creditCards.map((c) => ({
               value: String(c.id),
@@ -315,12 +435,30 @@ export default function Finance({
             })),
           },
           {
+            name: 'financeCategoryId',
+            label: 'Finance Category',
+            kind: 'select',
+            options: financeCategories.map((fc) => ({
+              value: String(fc.id),
+              label: `${fc.name} (${fc.costBucket ?? fc.categoryType})`,
+            })),
+          },
+          {
             name: 'sellerAccountId',
-            label: 'Seller account',
+            label: 'Seller Account',
             kind: 'select',
             options: sellerAccounts.map((s) => ({
               value: String(s.id),
               label: String(s.accountName ?? s.id),
+            })),
+          },
+          {
+            name: 'orderId',
+            label: 'Linked Order (optional)',
+            kind: 'select',
+            options: orders.map((o) => ({
+              value: String(o.id),
+              label: String(o.orderNumber),
             })),
           },
           {
@@ -329,6 +467,7 @@ export default function Finance({
             required: true,
             fullWidth: true,
           },
+          { name: 'notes', label: 'Internal Notes', kind: 'textarea', fullWidth: true },
         ]}
       />
 
@@ -471,16 +610,18 @@ export default function Finance({
             ],
             actions: (
               <div className="flex items-center gap-2">
-                <Button
-                  label="Edit"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditAccountRow(row)}
-                />
-                <Button
-                  label="Delete"
+                >
+                  Edit
+                </AppButton>
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Trash2}
                   onClick={() => {
                     if (window.confirm(`Delete financial account "${row.accountName}"?`)) {
                       router.post(
@@ -490,7 +631,9 @@ export default function Finance({
                       )
                     }
                   }}
-                />
+                >
+                  Delete
+                </AppButton>
               </div>
             ),
           })}
@@ -508,16 +651,18 @@ export default function Finance({
             }),
             col.action('Actions', (row) => (
               <div className="flex items-center gap-1.5">
-                <Button
-                  label="Edit"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditAccountRow(row)}
-                />
-                <Button
-                  label="Delete"
+                >
+                  Edit
+                </AppButton>
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Trash2}
                   onClick={() => {
                     if (window.confirm(`Delete financial account "${row.accountName}"?`)) {
                       router.post(
@@ -527,7 +672,9 @@ export default function Finance({
                       )
                     }
                   }}
-                />
+                >
+                  Delete
+                </AppButton>
               </div>
             )),
           ]}
@@ -576,22 +723,26 @@ export default function Finance({
             ],
             actions: (
               <div className="flex items-center gap-2">
-                <Button
-                  label="Edit"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditCardRow(row)}
-                />
-                <Button
-                  label="Cancel Card"
+                >
+                  Edit
+                </AppButton>
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Ban}
                   onClick={() => {
                     if (window.confirm(`Cancel credit card "${row.cardLabel}"?`)) {
                       router.post(`/credit-cards/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
-                />
+                >
+                  Cancel Card
+                </AppButton>
               </div>
             ),
           })}
@@ -609,22 +760,26 @@ export default function Finance({
             }),
             col.action('Actions', (row) => (
               <div className="flex items-center gap-1.5">
-                <Button
-                  label="Edit"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditCardRow(row)}
-                />
-                <Button
-                  label="Cancel"
+                >
+                  Edit
+                </AppButton>
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Ban}
                   onClick={() => {
                     if (window.confirm(`Cancel credit card "${row.cardLabel}"?`)) {
                       router.post(`/credit-cards/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
-                />
+                >
+                  Cancel
+                </AppButton>
               </div>
             )),
           ]}
@@ -676,10 +831,10 @@ export default function Finance({
             ],
             actions:
               String(row.status) !== 'voided' ? (
-                <Button
-                  label="Void"
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Ban}
                   onClick={() => {
                     if (window.confirm(`Void transaction ${row.referenceNumber}?`)) {
                       router.post(
@@ -689,7 +844,9 @@ export default function Finance({
                       )
                     }
                   }}
-                />
+                >
+                  Void
+                </AppButton>
               ) : (
                 <span className="text-xs text-muted-foreground">Voided</span>
               ),
@@ -714,10 +871,10 @@ export default function Finance({
               String(row.status) === 'voided' ? (
                 <span className="text-xs text-muted-foreground">Voided</span>
               ) : (
-                <Button
-                  label="Void"
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Ban}
                   onClick={() => {
                     if (window.confirm(`Void transaction ${row.referenceNumber}?`)) {
                       router.post(
@@ -727,7 +884,9 @@ export default function Finance({
                       )
                     }
                   }}
-                />
+                >
+                  Void
+                </AppButton>
               )
             ),
           ]}
@@ -761,16 +920,18 @@ export default function Finance({
             ],
             actions: (
               <div className="flex items-center gap-2">
-                <Button
-                  label="Edit"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditCatRow(row)}
-                />
-                <Button
-                  label="Delete"
+                >
+                  Edit
+                </AppButton>
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Trash2}
                   onClick={() => {
                     if (window.confirm(`Delete finance category "${row.name}"?`)) {
                       router.post(
@@ -780,7 +941,9 @@ export default function Finance({
                       )
                     }
                   }}
-                />
+                >
+                  Delete
+                </AppButton>
               </div>
             ),
           })}
@@ -800,16 +963,18 @@ export default function Finance({
             col.text('isTaxDeductible', 'Tax deductible', 110),
             col.action('Actions', (row) => (
               <div className="flex items-center gap-1.5">
-                <Button
-                  label="Edit"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditCatRow(row)}
-                />
-                <Button
-                  label="Delete"
+                >
+                  Edit
+                </AppButton>
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Trash2}
                   onClick={() => {
                     if (window.confirm(`Delete finance category "${row.name}"?`)) {
                       router.post(
@@ -819,7 +984,9 @@ export default function Finance({
                       )
                     }
                   }}
-                />
+                >
+                  Delete
+                </AppButton>
               </div>
             )),
           ]}

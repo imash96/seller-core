@@ -71,7 +71,7 @@
 
 ### 3.4 Marketplace Seller Accounts & Sync Jobs (`010`–`013`)
 
-- `sales_channels` (`010`): Global catalog of supported channels (`amazon`, `ebay`, `etsy`, `google_shopping`, `shopify`, `direct_website`).
+- `sales_channels` (`010`): Global catalog of supported channels (`amazon`, `ebay`, `etsy`, `google_shopping`, `direct_website`).
 - `seller_accounts` (`011`): Per-user marketplace stores (`user_id`, `sales_channel_id`, `external_seller_id`, `marketplace_region`). Credentials are encrypted at rest using AES-256-GCM derived from `APP_KEY` (`SellerAccount.setPlainCredentials()` / `getDecryptedCredentials()`).
 - `sync_jobs` (`012`) & `sync_job_errors` (`013`): Tracks idempotent import batches (`idempotency_key`), counters (`total_records`, `succeeded_records`, `skipped_duplicates`, `failed_records`), and per-record error diagnostics.
 

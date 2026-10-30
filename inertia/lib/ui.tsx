@@ -18,11 +18,31 @@ export {
   type BadgeVariant,
 } from '~/components/atoms/status-badge'
 export { MonoBadge } from '~/components/atoms/mono-badge'
-export { IconAvatar, type AvatarTone } from '~/components/atoms/icon-avatar'
+export { IconAvatar, renderIconOrNode, type AvatarTone } from '~/components/atoms/icon-avatar'
 export { CurrencyText } from '~/components/atoms/currency-text'
 export { MetricCell } from '~/components/atoms/metric-cell'
 export { ProgressMeter } from '~/components/atoms/progress-meter'
 export { ThemeToggleButton } from '~/components/atoms/theme-toggle-button'
+export {
+  AppButton,
+  ActionButton,
+  type AppButtonProps,
+  type AppButtonVariant,
+  type AppButtonSize,
+} from '~/components/atoms/button'
+export {
+  AppInput,
+  AppTextarea,
+  AppSelect,
+  type AppInputProps,
+  type AppTextareaProps,
+  type AppSelectProps,
+} from '~/components/atoms/input'
+export {
+  ThumbnailStack,
+  type ThumbnailStackItem,
+  type ThumbnailStackProps,
+} from '~/components/atoms/thumbnail-stack'
 
 /* Molecules */
 export { PasswordField, type PasswordFieldProps } from '~/components/molecules/password-field'
@@ -33,6 +53,8 @@ export { ViewModeSwitcher, type ViewModeOption } from '~/components/molecules/vi
 export { SortPillBar } from '~/components/molecules/sort-pill-bar'
 export { PaginationBar } from '~/components/molecules/pagination-bar'
 export { KpiScorecard, KpiCard, StatStrip } from '~/components/molecules/kpi-scorecard'
+export { TopStatusBar, type StatusBarItem } from '~/components/molecules/top-status-bar'
+export { Accordion, AccordionItem, type AccordionItemProps } from '~/components/molecules/accordion'
 export { RecordCard, type CardData } from '~/components/molecules/record-card'
 export { RowAction, StatusForm } from '~/components/molecules/row-action-group'
 export { SavedViewsBar } from '~/components/molecules/saved-views-bar'
@@ -40,6 +62,11 @@ export { DemoCredentialCard } from '~/components/molecules/demo-credential-card'
 
 /* Organisms */
 export { FormModal, ConfirmDialog, SmartForm } from '~/components/organisms/form-modal'
+export {
+  SlideOverDrawer,
+  AppDrawer,
+  type SlideOverDrawerProps,
+} from '~/components/organisms/slide-over-drawer'
 export {
   ResponsiveDataView,
   DataTable,

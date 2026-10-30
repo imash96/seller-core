@@ -7,7 +7,7 @@ import { Text } from '@astryxdesign/core/Text'
 import { Card } from '@astryxdesign/core/Card'
 import { Banner } from '@astryxdesign/core/Banner'
 import { Button } from '@astryxdesign/core/Button'
-import { AlertTriangle, Home, RefreshCw } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 
 interface Props {
   children: ReactNode
@@ -22,10 +22,11 @@ interface State {
 
 /**
  * React error boundary that catches rendering errors and shows
- * a recovery UI. In development, includes the full stack trace
- * and React component stack.
+ * a recovery UI. Automatically resets when navigating to another Inertia page.
  */
 export class ErrorBoundary extends Component<Props, State> {
+  private removeNavigateListener?: () => void
+
   constructor(props: Props) {
     super(props)
     this.state = {
@@ -37,6 +38,20 @@ export class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error }
+  }
+
+  componentDidMount() {
+    this.removeNavigateListener = router.on('navigate', () => {
+      if (this.state.hasError) {
+        this.setState({ hasError: false, error: null, errorInfo: null })
+      }
+    })
+  }
+
+  componentWillUnmount() {
+    if (this.removeNavigateListener) {
+      this.removeNavigateListener()
+    }
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -108,18 +123,8 @@ function ErrorFallback({
 
         {/* Actions */}
         <Stack gap={3} align="center" justify="center">
-          <Button
-            label="Go to Dashboard"
-            variant="secondary"
-            icon={<Home className="w-4 h-4" />}
-            onClick={onGoHome}
-          />
-          <Button
-            label="Refresh Page"
-            variant="primary"
-            icon={<RefreshCw className="w-4 h-4" />}
-            onClick={onReset}
-          />
+          <Button label="Go to Dashboard" variant="secondary" onClick={onGoHome} />
+          <Button label="Refresh Page" variant="primary" onClick={onReset} />
         </Stack>
 
         {/* Dev-only error details */}

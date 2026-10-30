@@ -108,6 +108,17 @@ export default class ShipmentsController {
     return response.redirect().back()
   }
 
+  async deleteShipment({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const shipment = await Shipment.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+    await shipment.delete()
+    session.flash('success', `Shipment ${shipment.shipmentNumber} deleted.`)
+    return response.redirect().back()
+  }
+
   async bulkUpdateStatus({ auth, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     const ids = (request.input('ids') ?? []) as string[]
@@ -130,6 +141,10 @@ export default class ShipmentsController {
 
     session.flash('success', `Updated ${shipments.length} shipment(s) to "${status}".`)
     return response.redirect().back()
+  }
+
+  async bulkUpdateShipmentStatus(ctx: HttpContext) {
+    return this.bulkUpdateStatus(ctx)
   }
 
   async bulkExport({ auth, request, response, session }: HttpContext) {
@@ -176,6 +191,10 @@ export default class ShipmentsController {
     return response.redirect().back()
   }
 
+  async storeCarrierInvoice(ctx: HttpContext) {
+    return this.storeShippingInvoice(ctx)
+  }
+
   async updateInvoiceStatus({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     const invoice = await ShippingInvoice.query()
@@ -197,6 +216,21 @@ export default class ShipmentsController {
       'success',
       `Invoice ${invoice.invoiceNumber} marked ${status} (${reconciliationStatus}).`
     )
+    return response.redirect().back()
+  }
+
+  async updateCarrierInvoice(ctx: HttpContext) {
+    return this.updateInvoiceStatus(ctx)
+  }
+
+  async deleteCarrierInvoice({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const invoice = await ShippingInvoice.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+    await invoice.delete()
+    session.flash('success', `Carrier Invoice ${invoice.invoiceNumber} deleted.`)
     return response.redirect().back()
   }
 }

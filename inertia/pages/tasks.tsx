@@ -1,16 +1,26 @@
-import { Button } from '@astryxdesign/core/Button'
 import {
   PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
   SavedViewsBar,
+  TopStatusBar,
+  AppButton,
   col,
   type Row,
 } from '~/lib/ui'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { router } from '@inertiajs/react'
-import { ListChecks } from 'lucide-react'
+import {
+  ListChecks,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  Bookmark,
+  Plus,
+  Edit3,
+  Trash2,
+} from 'lucide-react'
 
 type Props = { tasksReminders: Row[]; savedViews?: Row[] }
 
@@ -33,9 +43,19 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
   const [editRow, setEditRow] = useState<Row | null>(null)
   const [createViewOpen, setCreateViewOpen] = useState(false)
 
-  const activeCount = tasksReminders.filter(
-    (t) => t.status === 'pending' || t.status === 'in_progress'
-  ).length
+  const stats = useMemo(() => {
+    const activeCount = tasksReminders.filter(
+      (t) => t.status === 'pending' || t.status === 'in_progress'
+    ).length
+    const urgentCount = tasksReminders.filter(
+      (t) =>
+        (t.priority === 'urgent' || t.priority === 'high') &&
+        t.status !== 'completed' &&
+        t.status !== 'dismissed'
+    ).length
+    const completedCount = tasksReminders.filter((t) => t.status === 'completed').length
+    return { activeCount, urgentCount, completedCount }
+  }, [tasksReminders])
 
   return (
     <div className="space-y-6">
@@ -43,33 +63,82 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
         title="Tasks, Reminders & Saved Views"
         description="Operational SLA reminders, credit card payment alerts, and saved filter views across modules."
         icon={ListChecks}
-        badge={`${tasksReminders.length} tasks · ${activeCount} active`}
+        badge={`${tasksReminders.length} tasks · ${stats.activeCount} active`}
         actions={
-          <>
-            <Button
-              label="+ Save Filter View"
+          <div className="flex items-center gap-2 flex-wrap">
+            <AppButton
               variant="secondary"
+              size="sm"
+              icon={Bookmark}
               onClick={() => setCreateViewOpen(true)}
-            />
-            <Button label="+ Create Task" variant="primary" onClick={() => setCreateOpen(true)} />
-          </>
+            >
+              Save Filter View
+            </AppButton>
+            <AppButton
+              variant="primary"
+              size="sm"
+              icon={Plus}
+              onClick={() => setCreateOpen(true)}
+            >
+              Create Task
+            </AppButton>
+          </div>
         }
+      />
+
+      <TopStatusBar
+        columns={4}
+        items={[
+          {
+            id: 'active-tasks',
+            label: 'Active Tasks',
+            value: stats.activeCount,
+            hint: `${tasksReminders.length} total tasks`,
+            icon: Clock,
+            tone: stats.activeCount > 0 ? 'info' : 'success',
+          },
+          {
+            id: 'urgent-tasks',
+            label: 'High / Urgent SLA',
+            value: stats.urgentCount,
+            hint: 'Priority attention required',
+            icon: AlertTriangle,
+            tone: stats.urgentCount > 0 ? 'warning' : 'success',
+          },
+          {
+            id: 'completed-tasks',
+            label: 'Completed Tasks',
+            value: stats.completedCount,
+            hint: 'Resolved operational items',
+            icon: CheckCircle2,
+            tone: 'success',
+          },
+          {
+            id: 'saved-views',
+            label: 'Saved Filter Views',
+            value: (savedViews ?? []).length,
+            hint: 'Persisted across modules',
+            icon: Bookmark,
+            tone: 'primary',
+          },
+        ]}
       />
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
+      {/* Complete Create Task / Reminder Modal exposing all tasks_reminders fields */}
       <FormModal
         isOpen={createOpen}
         onOpenChange={setCreateOpen}
         title="Create Task / Reminder"
-        subtitle="Operational to-dos with due dates and priority levels."
+        subtitle="Operational to-dos with due dates, linked entities, and priority levels."
         submitLabel="Create Task"
         action="/tasks"
         fields={[
-          { name: 'title', label: 'Task title', required: true },
+          { name: 'title', label: 'Task Title', required: true },
           {
             name: 'taskType',
-            label: 'Task type',
+            label: 'Task Type',
             kind: 'select',
             default: 'general',
             options: TASK_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
@@ -81,7 +150,25 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
             default: 'medium',
             options: PRIORITIES.map((p) => ({ value: p, label: p })),
           },
-          { name: 'dueAt', label: 'Due date', kind: 'date' },
+          {
+            name: 'status',
+            label: 'Initial Status',
+            kind: 'select',
+            default: 'pending',
+            options: STATUSES.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
+          },
+          { name: 'dueAt', label: 'Due Date', kind: 'date' },
+          { name: 'snoozedUntil', label: 'Snooze Until Date', kind: 'date' },
+          {
+            name: 'relatedEntityType',
+            label: 'Related Entity Type (optional)',
+            placeholder: 'order, credit_card, shipment, claim',
+          },
+          {
+            name: 'relatedEntityId',
+            label: 'Related Entity ID (optional)',
+            placeholder: 'ord_01...',
+          },
           { name: 'description', label: 'Description', kind: 'textarea', fullWidth: true },
         ]}
       />
@@ -103,14 +190,17 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                 status: String(editRow.status ?? 'pending'),
                 description: String(editRow.description ?? ''),
                 dueAt: editRow.dueAt ? String(editRow.dueAt).slice(0, 10) : '',
+                snoozedUntil: editRow.snoozedUntil ? String(editRow.snoozedUntil).slice(0, 10) : '',
+                relatedEntityType: String(editRow.relatedEntityType ?? ''),
+                relatedEntityId: String(editRow.relatedEntityId ?? ''),
               }
             : undefined
         }
         fields={[
-          { name: 'title', label: 'Task title', required: true },
+          { name: 'title', label: 'Task Title', required: true },
           {
             name: 'taskType',
-            label: 'Task type',
+            label: 'Task Type',
             kind: 'select',
             options: TASK_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
           },
@@ -126,12 +216,15 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
             kind: 'select',
             options: STATUSES.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
           },
-          { name: 'dueAt', label: 'Due date', kind: 'date' },
+          { name: 'dueAt', label: 'Due Date', kind: 'date' },
+          { name: 'snoozedUntil', label: 'Snooze Until Date', kind: 'date' },
+          { name: 'relatedEntityType', label: 'Related Entity Type' },
+          { name: 'relatedEntityId', label: 'Related Entity ID' },
           { name: 'description', label: 'Description', kind: 'textarea', fullWidth: true },
         ]}
       />
 
-      {/* Create Saved View Modal (replaces raw HTML form) */}
+      {/* Create Saved View Modal */}
       <FormModal
         isOpen={createViewOpen}
         onOpenChange={setCreateViewOpen}
@@ -140,7 +233,7 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
         submitLabel="Save View"
         action="/saved-views"
         fields={[
-          { name: 'name', label: 'View name', required: true, placeholder: 'High Priority Orders' },
+          { name: 'name', label: 'View Name', required: true, placeholder: 'High Priority Orders' },
           {
             name: 'moduleKey',
             label: 'Module',
@@ -159,9 +252,19 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
           },
           {
             name: 'filterStatus',
-            label: 'Default status filter',
+            label: 'Default Status Filter',
             default: 'all',
             placeholder: 'all, pending, delivered…',
+          },
+          {
+            name: 'isDefault',
+            label: 'Set as Default View for Module',
+            kind: 'select',
+            default: 'false',
+            options: [
+              { value: 'false', label: 'No' },
+              { value: 'true', label: 'Yes (Default)' },
+            ],
           },
         ]}
       />
@@ -201,32 +304,38 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
             ],
             actions: (
               <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  label="Edit"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditRow(row)}
-                />
+                >
+                  Edit
+                </AppButton>
                 {String(row.status) !== 'completed' && (
-                  <Button
-                    label="Complete"
-                    variant="ghost"
-                    size="sm"
+                  <AppButton
+                    variant="outline"
+                    size="xs"
+                    icon={CheckCircle2}
                     onClick={() => {
                       router.post(`/tasks/${row.id}/complete`, {}, { preserveScroll: true })
                     }}
-                  />
+                  >
+                    Complete
+                  </AppButton>
                 )}
-                <Button
-                  label="Delete"
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Trash2}
                   onClick={() => {
                     if (window.confirm('Delete task?')) {
                       router.post(`/tasks/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
-                />
+                >
+                  Delete
+                </AppButton>
               </div>
             ),
           })}
@@ -249,32 +358,38 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
             col.date('dueAt', 'Due'),
             col.action('Actions', (row) => (
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Button
-                  label="Edit"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditRow(row)}
-                />
+                >
+                  Edit
+                </AppButton>
                 {String(row.status) !== 'completed' && (
-                  <Button
-                    label="Complete"
-                    variant="ghost"
-                    size="sm"
+                  <AppButton
+                    variant="outline"
+                    size="xs"
+                    icon={CheckCircle2}
                     onClick={() => {
                       router.post(`/tasks/${row.id}/complete`, {}, { preserveScroll: true })
                     }}
-                  />
+                  >
+                    Complete
+                  </AppButton>
                 )}
-                <Button
-                  label="Delete"
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Trash2}
                   onClick={() => {
                     if (window.confirm('Delete task?')) {
                       router.post(`/tasks/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
-                />
+                >
+                  Delete
+                </AppButton>
               </div>
             )),
           ]}
@@ -300,16 +415,18 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
               },
             ],
             actions: (
-              <Button
-                label="Delete"
+              <AppButton
                 variant="ghost"
-                size="sm"
+                size="xs"
+                icon={Trash2}
                 onClick={() => {
                   if (window.confirm('Delete saved view?')) {
                     router.post(`/saved-views/${row.id}/delete`, {}, { preserveScroll: true })
                   }
                 }}
-              />
+              >
+                Delete
+              </AppButton>
             ),
           })}
           columns={[
@@ -317,16 +434,18 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
             col.text('moduleKey', 'Module', 120),
             col.date('createdAt', 'Created'),
             col.action('Actions', (row) => (
-              <Button
-                label="Delete"
+              <AppButton
                 variant="ghost"
-                size="sm"
+                size="xs"
+                icon={Trash2}
                 onClick={() => {
                   if (window.confirm('Delete saved view?')) {
                     router.post(`/saved-views/${row.id}/delete`, {}, { preserveScroll: true })
                   }
                 }}
-              />
+              >
+                Delete
+              </AppButton>
             )),
           ]}
           emptyTitle="No saved views"

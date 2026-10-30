@@ -68,7 +68,8 @@ export default class AdminController {
     return response.redirect().back()
   }
 
-  async toggleUserStatus({ auth, bouncer, params, request, response, session }: HttpContext) {
+  async toggleUserStatus(ctx: HttpContext) {
+    const { auth, bouncer, params, request, response, session } = ctx
     const actor = auth.getUserOrFail()
     await bouncer.authorize('manageUsers')
     if (!actor.isSuperAdmin) {
@@ -108,6 +109,10 @@ export default class AdminController {
       session.flash('error', err.message)
     }
     return response.redirect().back()
+  }
+
+  async updateUser(ctx: HttpContext) {
+    return this.toggleUserStatus(ctx)
   }
 
   async deleteUser({ auth, bouncer, params, request, response, session }: HttpContext) {
@@ -227,5 +232,9 @@ export default class AdminController {
       `Module "${entitlement.moduleKey}" is now ${entitlement.isEnabled ? 'ENABLED' : 'DISABLED'}.`
     )
     return response.redirect().back()
+  }
+
+  async setModuleAccess(ctx: HttpContext) {
+    return this.toggleModuleEntitlement(ctx)
   }
 }

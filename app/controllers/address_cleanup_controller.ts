@@ -34,6 +34,8 @@ export default class AddressCleanupController {
       const cleaner = new CleanAdd()
       const addresses = cleaner.main(rawText)
       const csv = CleanAdd.toCsv(addresses)
+      const docxBuffer = CleanAdd.toDocxBuffer(addresses)
+      const docxBase64 = docxBuffer.toString('base64')
       const stats = {
         total: addresses.length,
         withWarnings: addresses.filter((a) => a.warnings.length > 0).length,
@@ -45,13 +47,16 @@ export default class AddressCleanupController {
         request.url().startsWith('/api/') ||
         request.header('accept')?.includes('application/json')
       ) {
-        return response.json({ addresses, csv, stats })
+        return response.json({ addresses, csv, docxBase64, stats })
       }
 
-      session.flash('success', `Cleaned ${addresses.length} address(es) with carrier compliance checks.`)
+      session.flash(
+        'success',
+        `Cleaned ${addresses.length} address(es) with carrier compliance checks.`
+      )
       return inertia.render('tools/address-cleanup', {
         sampleRawText: rawText,
-        initialResult: { addresses, csv, stats },
+        initialResult: { addresses, csv, docxBase64, stats },
         customers: [],
         recentAddresses: [],
       })
@@ -67,11 +72,54 @@ export default class AddressCleanupController {
     }
   }
 
+  async process(ctx: HttpContext) {
+    return this.clean(ctx)
+  }
+
+  /**
+   * Direct binary `.docx` download endpoint (`POST /api/tools/address-clean/docx`)
+   */
+  async downloadDocx({ auth, request, response }: HttpContext) {
+    auth.getUserOrFail()
+    const rawText = String(request.input('rawText', '')).trim()
+    const preCleaned = request.input('addresses')
+
+    try {
+      const cleaner = new CleanAdd()
+      const addresses =
+        Array.isArray(preCleaned) && preCleaned.length > 0
+          ? preCleaned
+          : cleaner.main(rawText)
+
+      if (!addresses || addresses.length === 0) {
+        return response.status(422).json({ error: 'No addresses provided for DOCX generation.' })
+      }
+
+      const docxBuffer = CleanAdd.toDocxBuffer(addresses)
+      response.header(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      )
+      response.header('Content-Disposition', 'attachment; filename="DTDC Label.docx"')
+      response.header('Content-Length', String(docxBuffer.length))
+      return response.send(docxBuffer)
+    } catch (err: any) {
+      return response
+        .status(400)
+        .json({ error: err.message || 'Failed to generate DTDC Label DOCX' })
+    }
+  }
+
+  async exportDocx(ctx: HttpContext) {
+    return this.downloadDocx(ctx)
+  }
+
   async saveToCustomer({ auth, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     const name = String(request.input('name', '')).trim()
-    const line1 = String(request.input('line1') || request.input('add1') || '').trim()
-    const line2 = String(request.input('line2') || request.input('add2') || '').trim()
+    const line1 = String(request.input('line1') || '').trim()
+    const line2 = String(request.input('line2') || '').trim()
+    const line3 = String(request.input('line3') || '').trim()
     const city = String(request.input('city', '')).trim()
     const stateProvince = String(request.input('state', '')).trim()
     const postalCode = String(request.input('zipCode') || request.input('zipcode') || '')
@@ -113,6 +161,7 @@ export default class AddressCleanupController {
       companyName: request.input('companyName') || null,
       line1,
       line2: line2 && line2 !== '-' ? line2 : null,
+      line3: line3 && line3 !== '-' ? line3 : null,
       city,
       stateProvince: stateProvince || null,
       postalCode,
@@ -130,9 +179,12 @@ export default class AddressCleanupController {
       entityId: customer.id,
       requestId: request.id(),
       afterState: { name, line1, city, stateProvince, postalCode, countryCode },
-    }).catch(() => { })
+    }).catch(() => {})
 
-    session.flash('success', `Saved cleaned address for "${customer.fullName}" to Customer Addresses.`)
+    session.flash(
+      'success',
+      `Saved cleaned address for "${customer.fullName}" to Customer Addresses.`
+    )
     return response.redirect().back()
   }
 }

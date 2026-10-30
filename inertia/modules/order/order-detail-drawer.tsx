@@ -3,6 +3,7 @@ import { StatusBadge, STATUS_TONES } from '~/components/atoms/status-badge'
 import { Package, Calendar, DollarSign, Truck } from 'lucide-react'
 import { formatMoney, formatDate } from '~/lib/utils'
 import type { Row } from '~/lib/ui'
+import { VStack } from '@astryxdesign/core'
 
 export function OrderDetailsDrawer({
   order,
@@ -99,7 +100,7 @@ export function OrderDetailsDrawer({
             <Package className="w-4 h-4 text-primary" />
             <span>Order Line Items ({lineItems.length})</span>
           </div>
-          <div className="space-y-2.5">
+          <VStack gap={3}>
             {lineItems.length === 0 ? (
               <p className="text-xs text-muted-foreground italic">No line items recorded.</p>
             ) : (
@@ -131,7 +132,7 @@ export function OrderDetailsDrawer({
                 </div>
               ))
             )}
-          </div>
+          </VStack>
         </div>
 
         {/* Shipments */}
@@ -202,7 +203,7 @@ export function OrderDetailsDrawer({
                 {formatMoney(
                   cur,
                   Number(order.marketplaceFeesAmount ?? 0) +
-                    Number(order.paymentProcessingFeesAmount ?? 0)
+                  Number(order.paymentProcessingFeesAmount ?? 0)
                 )}
               </span>
             </div>
@@ -229,6 +230,6 @@ export function OrderDetailsDrawer({
           </div>
         </div>
       </div>
-    </Drawer>
+    </Drawer >
   )
 }

@@ -2,6 +2,9 @@
 import type { routes } from './index.ts'
 
 export interface ApiDefinition {
+  store: {
+    productCategories: typeof routes['store.product_categories']
+  }
   session: {
     create: typeof routes['session.create']
     store: typeof routes['session.store']
@@ -11,9 +14,12 @@ export interface ApiDefinition {
   pages: {
     orders: typeof routes['pages.orders']
     customers: typeof routes['pages.customers']
-    products: typeof routes['pages.products']
-    inventory: typeof routes['pages.inventory']
+    catalog: typeof routes['pages.catalog']
     catalogs: typeof routes['pages.catalogs']
+    products: typeof routes['pages.products']
+    listing: typeof routes['pages.listing']
+    listings: typeof routes['pages.listings']
+    inventory: typeof routes['pages.inventory']
     accounts: typeof routes['pages.accounts']
     shipments: typeof routes['pages.shipments']
     returns: typeof routes['pages.returns']
@@ -23,6 +29,7 @@ export interface ApiDefinition {
     import: typeof routes['pages.import']
     audit: typeof routes['pages.audit']
     addressCleanup: typeof routes['pages.address_cleanup']
+    toolsAddressCleanup: typeof routes['pages.tools_address_cleanup']
     admin: typeof routes['pages.admin']
   }
   orders: {
@@ -42,6 +49,19 @@ export interface ApiDefinition {
   riskSignals: {
     review: typeof routes['risk_signals.review']
   }
+  catalogs: {
+    syncCategories: typeof routes['catalogs.sync_categories']
+    import: typeof routes['catalogs.import']
+    importJson: typeof routes['catalogs.import_json']
+    generateListings: typeof routes['catalogs.generate_listings']
+  }
+  catalogItems: {
+    store: typeof routes['catalog_items.store']
+    update: typeof routes['catalog_items.update']
+    delete: typeof routes['catalog_items.delete']
+    preview: typeof routes['catalog_items.preview']
+    convert: typeof routes['catalog_items.convert']
+  }
   brands: {
     store: typeof routes['brands.store']
     update: typeof routes['brands.update']
@@ -59,12 +79,15 @@ export interface ApiDefinition {
   }
   variants: {
     store: typeof routes['variants.store']
-    delete: typeof routes['variants.delete']
     updateStock: typeof routes['variants.update_stock']
+    delete: typeof routes['variants.delete']
   }
-  channelListings: {
-    store: typeof routes['channel_listings.store']
-    delete: typeof routes['channel_listings.delete']
+  listings: {
+    store: typeof routes['listings.store']
+    publishSku: typeof routes['listings.publish_sku']
+    update: typeof routes['listings.update']
+    publish: typeof routes['listings.publish']
+    delete: typeof routes['listings.delete']
   }
   sellerAccounts: {
     store: typeof routes['seller_accounts.store']
@@ -76,6 +99,13 @@ export interface ApiDefinition {
     bulkStatus: typeof routes['shipments.bulk_status']
     bulkExport: typeof routes['shipments.bulk_export']
     updateStatus: typeof routes['shipments.update_status']
+    delete: typeof routes['shipments.delete']
+  }
+  carrierInvoices: {
+    store: typeof routes['carrier_invoices.store']
+    update: typeof routes['carrier_invoices.update']
+    updateStatus: typeof routes['carrier_invoices.update_status']
+    delete: typeof routes['carrier_invoices.delete']
   }
   shippingInvoices: {
     store: typeof routes['shipping_invoices.store']
@@ -84,36 +114,45 @@ export interface ApiDefinition {
   returns: {
     store: typeof routes['returns.store']
     updateStatus: typeof routes['returns.update_status']
+    delete: typeof routes['returns.delete']
   }
   refunds: {
     store: typeof routes['refunds.store']
   }
   claims: {
     store: typeof routes['claims.store']
+    update: typeof routes['claims.update']
     updateStatus: typeof routes['claims.update_status']
+    delete: typeof routes['claims.delete']
   }
   financialAccounts: {
     store: typeof routes['financial_accounts.store']
     update: typeof routes['financial_accounts.update']
     delete: typeof routes['financial_accounts.delete']
   }
+  financeAccounts: {
+    store: typeof routes['finance_accounts.store']
+    update: typeof routes['finance_accounts.update']
+    delete: typeof routes['finance_accounts.delete']
+  }
   creditCards: {
     store: typeof routes['credit_cards.store']
     update: typeof routes['credit_cards.update']
     delete: typeof routes['credit_cards.delete']
-  }
-  financialTransactions: {
-    store: typeof routes['financial_transactions.store']
-    void: typeof routes['financial_transactions.void']
   }
   financeCategories: {
     store: typeof routes['finance_categories.store']
     update: typeof routes['finance_categories.update']
     delete: typeof routes['finance_categories.delete']
   }
+  financialTransactions: {
+    store: typeof routes['financial_transactions.store']
+    void: typeof routes['financial_transactions.void']
+  }
   tasks: {
     store: typeof routes['tasks.store']
     update: typeof routes['tasks.update']
+    status: typeof routes['tasks.status']
     complete: typeof routes['tasks.complete']
     delete: typeof routes['tasks.delete']
   }
@@ -123,29 +162,30 @@ export interface ApiDefinition {
   }
   import: {
     uploadCatalog: typeof routes['import.upload_catalog']
-    queueSync: typeof routes['import.queue_sync']
-  }
-  addressCleanup: {
-    clean: typeof routes['address_cleanup.clean']
-    saveCustomer: typeof routes['address_cleanup.save_customer']
+    syncAccounts: typeof routes['import.sync_accounts']
   }
   api: {
     tools: {
       addressClean: typeof routes['api.tools.address_clean']
+      addressCleanDocx: typeof routes['api.tools.address_clean_docx']
     }
+  }
+  addressCleanup: {
+    saveCustomer: typeof routes['address_cleanup.save_customer']
+    process: typeof routes['address_cleanup.process']
+    exportDocx: typeof routes['address_cleanup.export_docx']
   }
   admin: {
     users: {
       store: typeof routes['admin.users.store']
+      status: typeof routes['admin.users.status']
+      update: typeof routes['admin.users.update']
       delete: typeof routes['admin.users.delete']
-      toggleStatus: typeof routes['admin.users.toggle_status']
       assignRole: typeof routes['admin.users.assign_role']
+      moduleAccess: typeof routes['admin.users.module_access']
     }
     entitlements: {
       toggle: typeof routes['admin.entitlements.toggle']
-    }
-    queue: {
-      overview: typeof routes['admin.queue.overview']
     }
   }
 }

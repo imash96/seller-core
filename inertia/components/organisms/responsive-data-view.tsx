@@ -2,9 +2,8 @@ import { type ReactNode, useState, useEffect, useMemo } from 'react'
 import { Table, proportional, pixel } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Button } from '@astryxdesign/core/Button'
-import { EmptyState } from '@astryxdesign/core/EmptyState'
 import { Card } from '@astryxdesign/core/Card'
-import { VStack } from '@astryxdesign/core/Stack'
+import { Stack, VStack } from '@astryxdesign/core/Stack'
 import { Grid } from '@astryxdesign/core/Grid'
 import { Text } from '@astryxdesign/core/Text'
 import { Package, Filter } from 'lucide-react'
@@ -73,7 +72,9 @@ export const col = {
     header,
     width: width ? pixel(width) : proportional(1),
     renderCell: (row: Row) => (
-      <Text type="body" size="sm" maxLines={1}>{displayValue(row[key])}</Text>
+      <Text type="body" size="sm" maxLines={1}>
+        {displayValue(row[key])}
+      </Text>
     ),
   }),
   id: (key: string, header = 'ID'): TableColumn<Row> => ({
@@ -98,7 +99,9 @@ export const col = {
     header,
     width: pixel(150),
     renderCell: (row: Row) => (
-      <Text type="supporting" size="xsm">{formatDate(row[key])}</Text>
+      <Text type="supporting" size="xsm">
+        {formatDate(row[key])}
+      </Text>
     ),
   }),
   badge: (key: string, header: string, toneMap?: Record<string, string>): TableColumn<Row> => ({
@@ -242,27 +245,33 @@ export function ResponsiveDataView({
 
   if (rows.length === 0) {
     return (
-      <Card variant="muted" padding={5}>
-        <EmptyState
-          title={emptyTitle}
-          description={emptyDescription ?? 'Get started by creating your first record.'}
-          icon={<Package size={32} />}
-          actions={
-            emptyAction ??
-            (onCreateClick && createLabel ? (
-              <Button label={createLabel} variant="primary" onClick={onCreateClick} />
-            ) : undefined)
-          }
-        />
-      </Card>
+      <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center space-y-3">
+        <div className="mx-auto w-12 h-12 rounded-2xl bg-muted border border-border flex items-center justify-center text-muted-foreground">
+          <Package className="w-6 h-6" />
+        </div>
+        <div className="space-y-1 max-w-md mx-auto">
+          <h3 className="text-base font-bold text-foreground">{emptyTitle}</h3>
+          <p className="text-xs text-muted-foreground">
+            {emptyDescription ?? 'Get started by creating your first record.'}
+          </p>
+        </div>
+        {(emptyAction || (onCreateClick && createLabel)) && (
+          <div className="pt-1 flex items-center justify-center">
+            {emptyAction ??
+              (onCreateClick && createLabel ? (
+                <Button label={createLabel} variant="primary" size="sm" onClick={onCreateClick} />
+              ) : null)}
+          </div>
+        )}
+      </div>
     )
   }
 
   return (
-    <div className="space-y-4">
+    <VStack gap={4}>
       {/* Toolbar */}
-      <div className="bg-muted/35 border border-border rounded-xl p-3.5 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <Card variant="muted" padding={3}>
+        <VStack gap={3}>
           {searchKeys.length > 0 ? (
             <SearchInputBar value={search} onChange={setSearch} />
           ) : (
@@ -275,7 +284,7 @@ export function ResponsiveDataView({
               <Button label={createLabel} variant="primary" size="sm" onClick={onCreateClick} />
             )}
           </div>
-        </div>
+        </VStack>
 
         {filterPills && filterKey && (
           <FilterPillGroup
@@ -290,14 +299,12 @@ export function ResponsiveDataView({
           />
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground pt-0.5">
+        <Stack gap={3} wrap="wrap" vAlign="center" hAlign="between">
           <div>
             Showing <strong className="text-foreground font-semibold">{paginated.length}</strong> of{' '}
             <strong className="text-foreground font-semibold">{sorted.length}</strong>{' '}
             {sorted.length === 1 ? 'record' : 'records'}
-            {(search || activeFilter !== 'all') && (
-              <span> · filtered from {rows.length}</span>
-            )}
+            {(search || activeFilter !== 'all') && <span> · filtered from {rows.length}</span>}
             {sortKey && (
               <span>
                 {' '}
@@ -321,28 +328,33 @@ export function ResponsiveDataView({
               ))}
             </select>
           )}
-        </div>
-      </div>
+        </Stack>
+      </Card>
 
       {/* Content */}
       {sorted.length === 0 ? (
-        <Card variant="muted" padding={5}>
-          <EmptyState
-            title="No matching records"
-            description="Try adjusting your search query or active filter pills."
-            icon={<Filter size={28} />}
-            actions={
-              <Button
-                label="Clear filters"
-                variant="secondary"
-                onClick={() => {
-                  setSearch('')
-                  setActiveFilter('all')
-                }}
-              />
-            }
-          />
-        </Card>
+        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center space-y-3">
+          <div className="mx-auto w-11 h-11 rounded-2xl bg-muted border border-border flex items-center justify-center text-muted-foreground">
+            <Filter className="w-5 h-5" />
+          </div>
+          <div className="space-y-1 max-w-md mx-auto">
+            <h3 className="text-sm font-bold text-foreground">No matching records</h3>
+            <p className="text-xs text-muted-foreground">
+              Try adjusting your search query or active filter pills.
+            </p>
+          </div>
+          <div className="pt-1 flex items-center justify-center">
+            <Button
+              label="Clear filters"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setSearch('')
+                setActiveFilter('all')
+              }}
+            />
+          </div>
+        </div>
       ) : effectiveMode === 'cards' ? (
         <Grid columns={{ minWidth: 280, max: 3 }} gap={4}>
           {paginated.map((row) => (
@@ -389,6 +401,6 @@ export function ResponsiveDataView({
         totalRecords={sorted.length}
         onPageChange={setPage}
       />
-    </div>
+    </VStack>
   )
 }

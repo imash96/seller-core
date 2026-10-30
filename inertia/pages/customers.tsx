@@ -1,17 +1,28 @@
-import { Button } from '@astryxdesign/core/Button'
 import {
   PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
   SavedViewsBar,
+  TopStatusBar,
+  AppButton,
   col,
   type Row,
   money,
 } from '~/lib/ui'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { router } from '@inertiajs/react'
-import { Users } from 'lucide-react'
+import {
+  Users,
+  UserCheck,
+  ShieldAlert,
+  DollarSign,
+  GitMerge,
+  Plus,
+  Edit3,
+  Trash2,
+  CheckCircle2,
+} from 'lucide-react'
 
 type Props = { customers: Row[]; riskSignals: Row[]; savedViews?: Row[] }
 
@@ -23,6 +34,20 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [reviewRow, setReviewRow] = useState<Row | null>(null)
 
+  const stats = useMemo(() => {
+    const repeatCount = customers.filter(
+      (c) => Boolean(c.isRepeatCustomer) || Number(c.ordersCount ?? 0) > 1
+    ).length
+    const highRiskCount = customers.filter((c) =>
+      ['high', 'under_review'].includes(String(c.riskLevel))
+    ).length
+    const pendingSignals = riskSignals.filter(
+      (s) => String(s.reviewStatus) === 'pending_review'
+    ).length
+    const totalLtv = customers.reduce((acc, c) => acc + Number(c.totalSpent ?? 0), 0)
+    return { repeatCount, highRiskCount, pendingSignals, totalLtv }
+  }, [customers, riskSignals])
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -31,38 +56,88 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
         icon={Users}
         badge={`${customers.length} customers · ${riskSignals.length} risk signals`}
         actions={
-          <>
-            <Button
-              label="Merge Duplicates"
+          <div className="flex items-center gap-2 flex-wrap">
+            <AppButton
               variant="secondary"
+              size="sm"
+              icon={GitMerge}
               onClick={() => setMergeOpen(true)}
-            />
-            <Button
-              label="+ Create Customer"
+            >
+              Merge Duplicates
+            </AppButton>
+            <AppButton
               variant="primary"
+              size="sm"
+              icon={Plus}
               onClick={() => setCreateOpen(true)}
-            />
-          </>
+            >
+              Create Customer
+            </AppButton>
+          </div>
         }
+      />
+
+      <TopStatusBar
+        columns={4}
+        items={[
+          {
+            id: 'total-customers',
+            label: 'Total Customers',
+            value: customers.length,
+            hint: `${stats.repeatCount} repeat buyers`,
+            icon: Users,
+            tone: 'primary',
+          },
+          {
+            id: 'repeat-buyers',
+            label: 'Repeat Buyers',
+            value: stats.repeatCount,
+            hint: '2+ historical orders',
+            icon: UserCheck,
+            tone: 'success',
+          },
+          {
+            id: 'lifetime-spend',
+            label: 'Total Customer LTV',
+            value: money('USD', stats.totalLtv),
+            hint: 'Cumulative buyer spend',
+            icon: DollarSign,
+            tone: 'info',
+          },
+          {
+            id: 'risk-reviews',
+            label: 'Risk Signals / High Risk',
+            value: `${stats.pendingSignals} / ${stats.highRiskCount}`,
+            hint: 'Pending manual operator review',
+            icon: ShieldAlert,
+            tone: stats.pendingSignals > 0 || stats.highRiskCount > 0 ? 'warning' : 'success',
+          },
+        ]}
       />
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
+      {/* Complete Create Customer Modal exposing all customers + customer_addresses fields */}
       <FormModal
         isOpen={createOpen}
         onOpenChange={setCreateOpen}
-        title="Create Customer"
+        title="Create Customer & Primary Address"
         subtitle="Customers are scoped per-user. Shared addresses raise explainable risk signals rather than auto-blocking."
         submitLabel="Create Customer"
         action="/customers"
         fields={[
-          { name: 'fullName', label: 'Full name', required: true },
-          { name: 'email', label: 'Email', kind: 'email' },
-          { name: 'proxyEmail', label: 'Marketplace proxy email', kind: 'email' },
-          { name: 'phone', label: 'Phone' },
+          { name: 'fullName', label: 'Full Name', required: true },
+          {
+            name: 'externalCustomerRef',
+            label: 'External Marketplace Customer ID',
+            placeholder: 'AMZ-CUST-9912',
+          },
+          { name: 'email', label: 'Email Address', kind: 'email' },
+          { name: 'proxyEmail', label: 'Marketplace Proxy Email', kind: 'email' },
+          { name: 'phone', label: 'Phone Number' },
           {
             name: 'preferredCurrency',
-            label: 'Preferred currency',
+            label: 'Preferred Currency',
             kind: 'select',
             default: 'USD',
             options: ['USD', 'EUR', 'GBP', 'CAD', 'JPY', 'INR', 'AED'].map((c) => ({
@@ -72,44 +147,75 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
           },
           {
             name: 'riskLevel',
-            label: 'Risk level',
+            label: 'Risk Level',
             kind: 'select',
             default: 'low',
             options: RISK_LEVELS.map((r) => ({ value: r, label: r.replace(/_/g, ' ') })),
           },
-          { name: 'line1', label: 'Address line 1' },
+          { name: 'riskScore', label: 'Initial Risk Score (0–100)', kind: 'number', default: '0' },
+          {
+            name: 'addressType',
+            label: 'Address Type',
+            kind: 'select',
+            default: 'shipping',
+            options: [
+              { value: 'shipping', label: 'Shipping' },
+              { value: 'billing', label: 'Billing' },
+              { value: 'both', label: 'Shipping & Billing' },
+            ],
+          },
+          { name: 'recipientName', label: 'Recipient Name (if different)' },
+          { name: 'companyName', label: 'Company Name' },
+          { name: 'line1', label: 'Address Line 1' },
+          { name: 'line2', label: 'Address Line 2 (Apt / Suite)' },
           { name: 'city', label: 'City' },
           { name: 'stateProvince', label: 'State / Province' },
-          { name: 'postalCode', label: 'Postal code' },
-          { name: 'countryCode', label: 'Country code (ISO-2)', default: 'US' },
+          { name: 'postalCode', label: 'Postal Code' },
+          { name: 'countryCode', label: 'Country Code (ISO-2)', default: 'US' },
+          {
+            name: 'isResidential',
+            label: 'Address Classification',
+            kind: 'select',
+            default: 'true',
+            options: [
+              { value: 'true', label: 'Residential' },
+              { value: 'false', label: 'Commercial / Business' },
+            ],
+          },
+          { name: 'notes', label: 'Customer Notes', kind: 'textarea', fullWidth: true },
         ]}
       />
 
+      {/* Complete Edit Customer Modal */}
       <FormModal
         isOpen={!!editRow}
         onOpenChange={(o) => {
           if (!o) setEditRow(null)
         }}
         title={`Edit Customer: ${String(editRow?.fullName ?? '')}`}
+        subtitle="Update buyer profile, marketplace proxy email, risk score, and operator notes."
         submitLabel="Save Customer"
         action={editRow ? `/customers/${editRow.id}` : '/customers/placeholder'}
         initialValues={
           editRow
             ? {
                 fullName: String(editRow.fullName ?? ''),
+                externalCustomerRef: String(editRow.externalCustomerRef ?? ''),
                 email: String(editRow.email ?? ''),
                 proxyEmail: String(editRow.proxyEmail ?? ''),
                 phone: String(editRow.phone ?? ''),
                 preferredCurrency: String(editRow.preferredCurrency ?? 'USD'),
-                notes: String(editRow.notes ?? ''),
                 riskLevel: String(editRow.riskLevel ?? 'low'),
+                riskScore: String(editRow.riskScore ?? 0),
+                notes: String(editRow.notes ?? ''),
               }
             : undefined
         }
         fields={[
-          { name: 'fullName', label: 'Full name', required: true },
+          { name: 'fullName', label: 'Full Name', required: true },
+          { name: 'externalCustomerRef', label: 'External Customer Ref' },
           { name: 'email', label: 'Email', kind: 'email' },
-          { name: 'proxyEmail', label: 'Proxy email', kind: 'email' },
+          { name: 'proxyEmail', label: 'Proxy Email', kind: 'email' },
           { name: 'phone', label: 'Phone' },
           {
             name: 'preferredCurrency',
@@ -122,10 +228,11 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
           },
           {
             name: 'riskLevel',
-            label: 'Risk level',
+            label: 'Risk Level',
             kind: 'select',
             options: RISK_LEVELS.map((r) => ({ value: r, label: r.replace(/_/g, ' ') })),
           },
+          { name: 'riskScore', label: 'Risk Score (0–100)', kind: 'number' },
           { name: 'notes', label: 'Notes', kind: 'textarea', fullWidth: true },
         ]}
       />
@@ -244,22 +351,26 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             ],
             actions: (
               <div className="flex items-center gap-2">
-                <Button
-                  label="Edit"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditRow(row)}
-                />
-                <Button
-                  label="Delete"
+                >
+                  Edit
+                </AppButton>
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Trash2}
                   onClick={() => {
                     if (window.confirm(`Delete ${row.fullName}?`)) {
                       router.post(`/customers/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
-                />
+                >
+                  Delete
+                </AppButton>
               </div>
             ),
           })}
@@ -280,22 +391,26 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             col.text('isRepeatCustomer', 'Repeat', 80),
             col.action('Actions', (row) => (
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Button
-                  label="Edit"
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditRow(row)}
-                />
-                <Button
-                  label="Delete"
+                >
+                  Edit
+                </AppButton>
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Trash2}
                   onClick={() => {
                     if (window.confirm(`Delete ${row.fullName}?`)) {
                       router.post(`/customers/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
-                />
+                >
+                  Delete
+                </AppButton>
               </div>
             )),
           ]}
@@ -340,12 +455,14 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
               { label: 'Review status', value: String(row.reviewStatus).replace(/_/g, ' ') },
             ],
             actions: (
-              <Button
-                label="Review"
+              <AppButton
                 variant="secondary"
-                size="sm"
+                size="xs"
+                icon={CheckCircle2}
                 onClick={() => setReviewRow(row)}
-              />
+              >
+                Review
+              </AppButton>
             ),
           })}
           columns={[
@@ -366,12 +483,14 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             }),
             col.text('explanation', 'Explanation', 260),
             col.action('Actions', (row) => (
-              <Button
-                label="Review"
+              <AppButton
                 variant="secondary"
-                size="sm"
+                size="xs"
+                icon={CheckCircle2}
                 onClick={() => setReviewRow(row)}
-              />
+              >
+                Review
+              </AppButton>
             )),
           ]}
         />

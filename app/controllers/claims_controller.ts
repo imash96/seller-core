@@ -45,15 +45,20 @@ export default class ClaimsController {
       externalClaimId: request.input('externalClaimId') || claimNumber,
       claimType,
       status,
-      currencyCode: order.currencyCode,
+      currencyCode: request.input('currencyCode') || order.currencyCode,
       disputedAmount: disputedAmount.toFixed(2),
       sellerLiabilityAmount: sellerLiabilityAmount.toFixed(2),
       reason: request.input('reason') || 'Customer marketplace claim opened',
+      resolutionNotes: request.input('resolutionNotes') || null,
       respondByAt: respondByAt ? DateTime.fromISO(String(respondByAt)) : null,
     })
 
     session.flash('success', `Marketplace Claim ${claim.claimNumber} logged.`)
     return response.redirect().back()
+  }
+
+  async storeClaim(ctx: HttpContext) {
+    return this.storeMarketplaceClaim(ctx)
   }
 
   async updateClaimStatus({ auth, params, request, response, session }: HttpContext) {
@@ -65,12 +70,27 @@ export default class ClaimsController {
 
     const status = String(request.input('status', 'won'))
     claim.status = status
+    if (request.input('claimType')) {
+      claim.claimType = String(request.input('claimType'))
+    }
+    if (request.input('externalClaimId')) {
+      claim.externalClaimId = String(request.input('externalClaimId'))
+    }
+    const disputed = request.input('disputedAmount')
+    if (disputed !== undefined && disputed !== null && disputed !== '') {
+      claim.disputedAmount = Number(disputed).toFixed(2)
+    }
     const liability = request.input('sellerLiabilityAmount')
     if (liability !== undefined && liability !== null && liability !== '') {
       claim.sellerLiabilityAmount = Number(liability).toFixed(2)
     }
-    const notes = request.input('resolutionNotes') ?? request.input('reason')
-    if (notes) claim.reason = String(notes)
+    if (request.input('reason')) {
+      claim.reason = String(request.input('reason'))
+    }
+    const notes = request.input('resolutionNotes')
+    if (notes !== undefined && notes !== null && notes !== '') {
+      claim.resolutionNotes = String(notes)
+    }
     const respondByAt = request.input('respondByAt')
     if (respondByAt) claim.respondByAt = DateTime.fromISO(String(respondByAt))
     if (['won', 'lost', 'closed'].includes(status)) {
@@ -79,6 +99,21 @@ export default class ClaimsController {
     await claim.save()
 
     session.flash('success', `Claim ${claim.claimNumber} status updated to ${status}.`)
+    return response.redirect().back()
+  }
+
+  async updateClaim(ctx: HttpContext) {
+    return this.updateClaimStatus(ctx)
+  }
+
+  async deleteClaim({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const claim = await MarketplaceClaim.query()
+      .where('userId', user.id)
+      .andWhere('id', params.id)
+      .firstOrFail()
+    await claim.delete()
+    session.flash('success', `Claim ${claim.claimNumber} deleted.`)
     return response.redirect().back()
   }
 }

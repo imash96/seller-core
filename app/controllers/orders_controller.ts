@@ -16,19 +16,45 @@ export default class OrdersController {
     const [orders, customers, savedViews, sharedLookups] = await Promise.all([
       Order.query()
         .where('userId', user.id)
-        .preload('customer')
+        .preload('customer', (cq) => cq.preload('riskSignals').preload('addresses'))
+        .preload('shippingAddress')
         .preload('sellerAccount')
-        .preload('lineItems')
+        .preload('lineItems', (lq) =>
+          lq.preload('productVariant', (vq) => vq.preload('product'))
+        )
         .preload('shipments')
         .orderBy('orderedAt', 'desc')
         .limit(100),
-      Customer.query().where('userId', user.id).orderBy('fullName'),
+      Customer.query()
+        .where('userId', user.id)
+        .preload('riskSignals')
+        .preload('addresses')
+        .orderBy('fullName'),
       WorkspaceLookupService.savedViewsFor(user.id, 'orders'),
       WorkspaceLookupService.lookups(user.id),
     ])
+
+    const enrichedOrders = orders.map((o) => {
+      const raw = o.serialize()
+      const lineItems = (o.lineItems ?? []).map((li) => {
+        const liRaw = li.serialize()
+        const prodImages = li.productVariant?.product?.images
+        const firstImage =
+          Array.isArray(prodImages) && prodImages.length > 0 ? String(prodImages[0]) : null
+        return {
+          ...liRaw,
+          imageUrl: firstImage,
+        }
+      })
+      return {
+        ...raw,
+        lineItems,
+      }
+    })
+
     return inertia.render('orders', {
       ...sharedLookups,
-      orders: orders.map((o) => o.serialize()),
+      orders: enrichedOrders,
       customers: customers.map((c) => c.serialize()),
       savedViews,
     })
@@ -118,62 +144,51 @@ export default class OrdersController {
       actorUserId: user.id,
       userId: user.id,
       action: 'order.status_updated',
-      entityType: 'orders',
+      entityType: 'order',
       entityId: order.id,
-      requestId: request.id(),
       beforeState: { status: prevStatus },
-      afterState: { status: order.status },
+      afterState: { status },
+      ipAddress: request.ip(),
     })
 
     await OrderStatusChanged.dispatch({
       orderId: order.id,
       orderNumber: order.orderNumber,
       userId: user.id,
-      fromStatus: String(prevStatus),
-      toStatus: String(status),
-      actorUserId: user.id,
+      previousStatus: prevStatus,
+      newStatus: status,
+      changedByUserId: user.id,
       requestId: request.id(),
     })
 
-    session.flash(
-      'success',
-      status === OrderStatus.DELIVERED
-        ? `Order ${order.orderNumber} marked delivered and customer delivery notification queued.`
-        : `Order ${order.orderNumber} status updated to ${status}.`
-    )
+    session.flash('success', `Order ${order.orderNumber} updated to ${status}.`)
     return response.redirect().back()
   }
 
-  async deleteOrder({ auth, bouncer, params, request, response, session }: HttpContext) {
+  async deleteOrder({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    if (await bouncer.denies('deleteOrders')) {
-      session.flash('error', 'Bouncer: not authorized to delete orders.')
-      return response.redirect().back()
-    }
-    const allowed = await RbacService.hasPermission(user, 'orders.delete', 'orders')
-    if (!allowed) {
-      session.flash('error', 'RBAC Denied: You do not have permission orders.delete')
-      return response.redirect().back()
-    }
-
     const order = await Order.query()
       .where('userId', user.id)
       .andWhere('id', params.id)
       .firstOrFail()
-    const orderNum = order.orderNumber
-    await order.delete()
+
+    const snapshot = order.serialize()
+    order.status = OrderStatus.CANCELLED
+    order.cancelledAt = DateTime.now()
+    await order.save()
 
     await RbacService.recordAudit({
       actorUserId: user.id,
       userId: user.id,
-      action: 'order.deleted',
-      entityType: 'orders',
-      entityId: params.id,
-      requestId: request.id(),
-      beforeState: { orderNumber: orderNum },
+      action: 'order.cancelled',
+      entityType: 'order',
+      entityId: order.id,
+      beforeState: snapshot,
+      afterState: { status: OrderStatus.CANCELLED },
+      ipAddress: request.ip(),
     })
 
-    session.flash('success', `Order ${orderNum} deleted.`)
+    session.flash('success', `Order ${order.orderNumber} cancelled.`)
     return response.redirect().back()
   }
 
@@ -182,60 +197,44 @@ export default class OrdersController {
     const payload = await request.validateUsing(bulkOrderImportValidator)
 
     try {
-      const parsedOrders = JSON.parse(payload.ordersJson)
-      if (!Array.isArray(parsedOrders)) {
-        throw new Error('ordersJson must be a JSON array of order objects.')
-      }
-
-      try {
-        const importMod = await import('#jobs/process_marketplace_import')
-        const ProcessMarketplaceImport = importMod.default
-        await (ProcessMarketplaceImport as any).dispatch({
-          userId: user.id,
-          sellerAccountId: payload.sellerAccountId ?? null,
-          idempotencyKey: payload.idempotencyKey,
-          orders: parsedOrders,
-          requestId: request.id(),
-        })
-        session.flash(
-          'success',
-          `Import queued (${payload.idempotencyKey}): ${parsedOrders.length} orders will be processed in background.`
-        )
-        return response.redirect().back()
-      } catch {
-        // Fallback to inline processing if queue table/worker not active
-      }
-
-      const result = await OrderService.importBulkOrders({
+      const parsed = JSON.parse(payload.jsonPayload)
+      const items = Array.isArray(parsed) ? parsed : [parsed]
+      const { syncJob, created, skipped } = await OrderService.importMarketplaceBatch({
         userId: user.id,
-        actorUserId: user.id,
         sellerAccountId: payload.sellerAccountId ?? null,
-        idempotencyKey: payload.idempotencyKey,
-        orders: parsedOrders,
+        marketplaceCode: payload.marketplaceCode,
+        defaultReportingCurrency: user.defaultCurrency || 'USD',
+        items,
       })
-
       session.flash(
         'success',
-        `Bulk Import Batch (${result.job.idempotencyKey}): ${result.job.succeededRecords} created, ${result.job.skippedDuplicates} duplicates skipped, ${result.job.failedRecords} errors.`
+        `Sync job ${syncJob.id}: imported ${created} new orders (${skipped} idempotent duplicates skipped).`
       )
     } catch (err: any) {
-      session.flash('error', `Bulk import error: ${err.message}`)
+      session.flash('error', `Bulk import failed: ${err.message}`)
     }
     return response.redirect().back()
   }
 
   async bulkUpdateStatus({ auth, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const ids = (request.input('ids') ?? []) as string[]
+    const rawIds = request.input('ids', [])
+    const ids: string[] = Array.isArray(rawIds)
+      ? rawIds.map(String)
+      : String(rawIds)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
     const status = String(request.input('status', '')).trim()
 
-    if (!Array.isArray(ids) || ids.length === 0 || !status) {
-      session.flash('error', 'Select at least one order and a valid status.')
+    if (!ids.length || !status) {
+      session.flash('error', 'Select at least one order and a target status.')
       return response.redirect().back()
     }
 
     const orders = await Order.query().where('userId', user.id).whereIn('id', ids)
     for (const order of orders) {
+      const prevStatus = order.status
       order.status = status
       if (status === OrderStatus.DELIVERED) {
         order.deliveredAt = DateTime.now()
@@ -244,21 +243,81 @@ export default class OrdersController {
         order.cancelledAt = DateTime.now()
       }
       await order.save()
+      await RbacService.recordAudit({
+        actorUserId: user.id,
+        userId: user.id,
+        action: 'order.bulk_status_updated',
+        entityType: 'order',
+        entityId: order.id,
+        beforeState: { status: prevStatus },
+        afterState: { status },
+        ipAddress: request.ip(),
+      })
     }
 
     session.flash('success', `Updated ${orders.length} order(s) to "${status}".`)
     return response.redirect().back()
   }
 
-  async bulkExport({ auth, request, response, session }: HttpContext) {
+  async bulkExport({ auth, request, response }: HttpContext) {
     const user = auth.getUserOrFail()
-    const ids = (request.input('ids') ?? []) as string[]
-    const q = Order.query().where('userId', user.id).orderBy('orderedAt', 'desc')
-    if (Array.isArray(ids) && ids.length > 0) {
-      q.whereIn('id', ids)
-    }
-    const orders = await q.limit(500)
-    session.flash('success', `Prepared export for ${orders.length} order(s).`)
-    return response.redirect().back()
+    const rawIds = request.input('ids', [])
+    const ids: string[] = Array.isArray(rawIds)
+      ? rawIds.map(String)
+      : String(rawIds || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+
+    const query = Order.query().where('userId', user.id).preload('customer').orderBy('orderedAt', 'desc')
+    if (ids.length > 0) query.whereIn('id', ids)
+    const orders = await query.limit(500)
+
+    const headers = [
+      'order_number',
+      'external_order_id',
+      'marketplace_code',
+      'status',
+      'payment_status',
+      'fulfillment_status',
+      'customer_name',
+      'customer_email',
+      'currency_code',
+      'total_amount',
+      'cogs_amount',
+      'marketplace_fees_amount',
+      'shipping_cost_amount',
+      'net_profit_amount',
+      'ordered_at',
+    ]
+    const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const lines = [
+      headers.join(','),
+      ...orders.map((o) =>
+        [
+          o.orderNumber,
+          o.externalOrderId,
+          o.marketplaceCode,
+          o.status,
+          o.paymentStatus,
+          o.fulfillmentStatus,
+          o.customer?.fullName,
+          o.customer?.email,
+          o.currencyCode,
+          o.totalAmount,
+          o.cogsAmount,
+          o.marketplaceFeesAmount,
+          o.shippingCostAmount,
+          o.netProfitAmount,
+          o.orderedAt?.toISO(),
+        ]
+          .map(escape)
+          .join(',')
+      ),
+    ]
+
+    response.header('Content-Type', 'text/csv; charset=utf-8')
+    response.header('Content-Disposition', `attachment; filename="orders-export-${Date.now()}.csv"`)
+    return response.send(lines.join('\n'))
   }
 }

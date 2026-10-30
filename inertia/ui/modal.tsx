@@ -1,12 +1,13 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, type ComponentType, type ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { renderIconOrNode } from '~/components/atoms/icon-avatar'
 
 export interface ModalProps {
   open: boolean
   onClose: () => void
   title: string
   subtitle?: string
-  icon?: ReactNode
+  icon?: ReactNode | ComponentType<{ className?: string }> | unknown
   maxWidthClass?: string
   footer?: ReactNode
   children: ReactNode
@@ -42,6 +43,8 @@ export function Modal({
 
   if (!open) return null
 
+  const renderedIcon = renderIconOrNode(icon, 'w-5 h-5 text-primary')
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
@@ -56,14 +59,16 @@ export function Modal({
       >
         <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border bg-muted/50">
           <div className="flex items-center gap-3 min-w-0">
-            {icon && (
+            {renderedIcon && (
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                {icon}
+                {renderedIcon}
               </div>
             )}
             <div className="min-w-0">
               <h3 className="text-base sm:text-lg font-bold truncate text-foreground">{title}</h3>
-              {subtitle && <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>}
+              {subtitle && (
+                <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>
+              )}
             </div>
           </div>
           <button

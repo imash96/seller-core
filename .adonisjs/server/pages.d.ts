@@ -26,6 +26,7 @@ declare module '@adonisjs/inertia/types' {
     'finance': ExtractProps<(typeof import('../../inertia/pages/finance.tsx'))['default']>
     'import': ExtractProps<(typeof import('../../inertia/pages/import.tsx'))['default']>
     'inventory': ExtractProps<(typeof import('../../inertia/pages/inventory.tsx'))['default']>
+    'listings': ExtractProps<(typeof import('../../inertia/pages/listings.tsx'))['default']>
     'orders': ExtractProps<(typeof import('../../inertia/pages/orders.tsx'))['default']>
     'products': ExtractProps<(typeof import('../../inertia/pages/products.tsx'))['default']>
     'returns': ExtractProps<(typeof import('../../inertia/pages/returns.tsx'))['default']>

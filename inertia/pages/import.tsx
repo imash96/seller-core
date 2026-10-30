@@ -1,4 +1,3 @@
-import { Button } from '@astryxdesign/core/Button'
 import {
   PageHeader,
   PageSection,
@@ -6,11 +5,21 @@ import {
   StatusBadge,
   ResponsiveDataView,
   SavedViewsBar,
+  TopStatusBar,
+  SlideOverDrawer,
+  AppButton,
   col,
   type Row,
 } from '~/lib/ui'
-import { useState } from 'react'
-import { Upload, X } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import {
+  Upload,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  Database,
+  Eye,
+} from 'lucide-react'
 
 type Props = {
   syncJobs: Row[]
@@ -29,6 +38,13 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
   const [importOpen, setImportOpen] = useState(false)
   const [syncOpen, setSyncOpen] = useState(false)
   const [inspectJob, setInspectJob] = useState<Row | null>(null)
+
+  const stats = useMemo(() => {
+    const completedCount = syncJobs.filter((j) => String(j.status) === 'completed').length
+    const totalSucceeded = syncJobs.reduce((acc, j) => acc + Number(j.succeededRecords ?? 0), 0)
+    const totalFailed = syncJobs.reduce((acc, j) => acc + Number(j.failedRecords ?? 0), 0)
+    return { completedCount, totalSucceeded, totalFailed }
+  }, [syncJobs])
 
   const sampleJson = JSON.stringify(
     [
@@ -62,24 +78,68 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
         icon={Upload}
         badge={`${syncJobs.length} sync jobs`}
         actions={
-          <>
-            <Button
-              label="Queue Account Sync"
+          <div className="flex items-center gap-2 flex-wrap">
+            <AppButton
               variant="secondary"
+              size="sm"
+              icon={RefreshCw}
               onClick={() => setSyncOpen(true)}
-            />
-            <Button
-              label="Run Bulk JSON Import"
+            >
+              Queue Account Sync
+            </AppButton>
+            <AppButton
               variant="primary"
+              size="sm"
+              icon={Upload}
               onClick={() => setImportOpen(true)}
-            />
-          </>
+            >
+              Run Bulk JSON Import
+            </AppButton>
+          </div>
         }
+      />
+
+      <TopStatusBar
+        columns={4}
+        items={[
+          {
+            id: 'total-jobs',
+            label: 'Total Sync Jobs',
+            value: syncJobs.length,
+            hint: `${sellerAccounts.length} connected accounts`,
+            icon: Database,
+            tone: 'primary',
+          },
+          {
+            id: 'completed-jobs',
+            label: 'Completed Runs',
+            value: stats.completedCount,
+            hint: 'Idempotent key verification',
+            icon: CheckCircle2,
+            tone: 'success',
+          },
+          {
+            id: 'succeeded-records',
+            label: 'Records Imported',
+            value: stats.totalSucceeded,
+            hint: 'Orders & marketplace sync items',
+            icon: Upload,
+            tone: 'info',
+          },
+          {
+            id: 'failed-records',
+            label: 'Failed Records',
+            value: stats.totalFailed,
+            hint: 'Isolated per-record diagnostics',
+            icon: AlertTriangle,
+            tone: stats.totalFailed > 0 ? 'warning' : 'success',
+          },
+        ]}
       />
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
-      {/* Bulk JSON Import Modal (single clean preset button) */}
+      {/* Bulk JSON Import Modal */}
       <FormModal
         isOpen={importOpen}
         onOpenChange={setImportOpen}
@@ -147,75 +207,52 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
         ]}
       />
 
-      {/* Inspect Sync Job Errors Modal */}
-      {inspectJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
-            onClick={() => setInspectJob(null)}
-            aria-hidden="true"
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="relative z-10 w-full max-w-xl max-h-[85dvh] flex flex-col rounded-2xl bg-card text-card-foreground border border-border shadow-2xl overflow-hidden"
-          >
-            <div className="px-6 py-4 border-b border-border bg-muted/40 flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-base font-bold text-foreground">
-                  Sync Job: {String(inspectJob.idempotencyKey ?? inspectJob.jobType)}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Status: {String(inspectJob.status)} · {String(inspectJob.succeededRecords ?? 0)}{' '}
-                  succeeded · {String(inspectJob.failedRecords ?? 0)} failed ·{' '}
-                  {String(inspectJob.skippedDuplicates ?? 0)} skipped
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setInspectJob(null)}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
-                aria-label="Close modal"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-3">
-              {Array.isArray((inspectJob as any).errors) &&
-              (inspectJob as any).errors.length > 0 ? (
-                (inspectJob as any).errors.map((e: Row, i: number) => (
-                  <div
-                    key={i}
-                    className="p-3.5 rounded-xl border border-rose-500/25 bg-rose-500/10 space-y-1"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <StatusBadge
-                        variant="error"
-                        label={String(e.errorCode ?? e.error_code ?? 'ERROR')}
-                      />
-                      <span className="text-xs font-mono text-muted-foreground">
-                        Record #{String(e.recordIndex ?? e.record_index ?? i + 1)}
-                      </span>
-                    </div>
-                    <p className="text-xs font-semibold text-foreground">
-                      {String(e.message ?? e.errorMessage ?? 'Validation error')}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <div className="p-6 text-center text-sm text-muted-foreground rounded-xl border border-dashed border-border bg-muted/20">
-                  No per-record errors logged for this sync job — all records processed cleanly.
-                </div>
-              )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-border bg-muted/30 flex justify-end">
-              <Button label="Close" variant="secondary" onClick={() => setInspectJob(null)} />
-            </div>
+      {/* SlideOverDrawer for Sync Job Diagnostics */}
+      <SlideOverDrawer
+        open={!!inspectJob}
+        onClose={() => setInspectJob(null)}
+        title={`Sync Job: ${String(inspectJob?.idempotencyKey ?? inspectJob?.jobType ?? '')}`}
+        subtitle={`Status: ${String(inspectJob?.status ?? '')} · ${String(inspectJob?.succeededRecords ?? 0)} succeeded · ${String(inspectJob?.failedRecords ?? 0)} failed · ${String(inspectJob?.skippedDuplicates ?? 0)} skipped`}
+        width="lg"
+        footer={
+          <div className="flex justify-end">
+            <AppButton variant="secondary" size="sm" onClick={() => setInspectJob(null)}>
+              Close
+            </AppButton>
           </div>
-        </div>
-      )}
+        }
+      >
+        {inspectJob && (
+          <div className="space-y-3">
+            {Array.isArray((inspectJob as any).errors) &&
+            (inspectJob as any).errors.length > 0 ? (
+              (inspectJob as any).errors.map((e: Row, i: number) => (
+                <div
+                  key={i}
+                  className="p-3.5 rounded-xl border border-rose-500/25 bg-rose-500/10 space-y-1"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <StatusBadge
+                      variant="error"
+                      label={String(e.errorCode ?? e.error_code ?? 'ERROR')}
+                    />
+                    <span className="text-xs font-mono text-muted-foreground">
+                      Record #{String(e.recordIndex ?? e.record_index ?? i + 1)}
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold text-foreground">
+                    {String(e.message ?? e.errorMessage ?? 'Validation error')}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div className="p-6 text-center text-sm text-muted-foreground rounded-xl border border-dashed border-border bg-muted/20">
+                No per-record errors logged for this sync job — all records processed cleanly.
+              </div>
+            )}
+          </div>
+        )}
+      </SlideOverDrawer>
 
       <PageSection
         title="Sync Jobs"
@@ -259,12 +296,14 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
               },
             ],
             actions: (
-              <Button
-                label="Inspect errors"
+              <AppButton
                 variant="secondary"
-                size="sm"
+                size="xs"
+                icon={Eye}
                 onClick={() => setInspectJob(row)}
-              />
+              >
+                Inspect Errors
+              </AppButton>
             ),
           })}
           columns={[
@@ -283,12 +322,14 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
             col.text('skippedDuplicates', 'Skipped dup', 90),
             col.date('startedAt', 'Started'),
             col.action('Actions', (row) => (
-              <Button
-                label="Inspect"
+              <AppButton
                 variant="secondary"
-                size="sm"
+                size="xs"
+                icon={Eye}
                 onClick={() => setInspectJob(row)}
-              />
+              >
+                Inspect
+              </AppButton>
             )),
           ]}
         />

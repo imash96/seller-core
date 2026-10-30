@@ -1,5 +1,21 @@
-import { Calendar, MapPin, Package, Truck, ChevronRight, Pencil, Trash2, Eye } from 'lucide-react'
+import {
+  Calendar,
+  MapPin,
+  Truck,
+  Pencil,
+  Trash2,
+  Eye,
+  ShieldAlert,
+  ShieldCheck,
+  Repeat,
+  UserCheck,
+  Mail,
+  Phone,
+} from 'lucide-react'
 import { StatusBadge, STATUS_TONES } from '~/components/atoms/status-badge'
+import { MonoBadge } from '~/components/atoms/mono-badge'
+import { ThumbnailStack } from '~/components/atoms/thumbnail-stack'
+import { AppButton } from '~/components/atoms/button'
 import { formatMoney, formatDate } from '~/lib/utils'
 import type { Row } from '~/lib/ui'
 
@@ -26,234 +42,332 @@ export function OrderCard({
 }: OrderCardProps) {
   const handleDetail = onOpenDetail ?? onView ?? (() => {})
   const handleEdit = onEditStatus ?? onEdit ?? (() => {})
+
   const lineItems = (order.lineItems as Row[]) ?? []
   const customer = (order.customer as Row) ?? {}
   const shipments = (order.shipments as Row[]) ?? []
   const firstShipment = shipments[0]
 
+  // Build ThumbnailStack items from order line items
+  const thumbItems =
+    lineItems.length > 0
+      ? lineItems.map((li) => ({
+          imageUrl: String(
+            li.imageUrl ??
+              (li.productVariant as any)?.product?.images?.[0] ??
+              ''
+          ),
+          sku: String(li.sku ?? ''),
+          title: String(li.title ?? ''),
+          quantity: Number(li.quantityOrdered ?? 1),
+        }))
+      : [{ sku: String(order.orderNumber ?? 'ORD'), title: 'Order Item' }]
+
+  const totalUnits = lineItems.reduce((sum, li) => sum + Number(li.quantityOrdered ?? 1), 0)
+
+  // Resolve Shipping Address
+  const addrSnap =
+    (order.shippingAddressSnapshot as Record<string, any>) ??
+    (order.shippingAddress as Record<string, any>) ??
+    ((customer.addresses as any[])?.[0] as Record<string, any>) ??
+    {}
+  const addressString = [
+    addrSnap.line1 || addrSnap.street,
+    addrSnap.city,
+    addrSnap.stateCode || addrSnap.state,
+    addrSnap.postalCode || addrSnap.zip,
+    addrSnap.countryCode || addrSnap.country,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
+  // Customer Intelligence: Repeat vs First-Time, Fraud/Risk vs Verified
+  const ordersCount = Number(customer.ordersCount ?? 1)
+  const isRepeat = Boolean(customer.isRepeatCustomer) || ordersCount > 1
+  const riskLevel = String(customer.riskLevel ?? 'low').toLowerCase()
+  const riskScore = Number(customer.riskScore ?? 0)
+  const riskSignals = (customer.riskSignals as Row[]) ?? []
+  const isFraudOrHighRisk =
+    riskLevel === 'high' ||
+    riskLevel === 'critical' ||
+    riskLevel === 'fraud' ||
+    riskScore >= 60 ||
+    riskSignals.some((s) => s.status !== 'dismissed')
+
+  const currency = String(order.currencyCode || 'USD')
+  const netProfit = Number(order.netProfitAmount ?? 0)
+  const totalFees =
+    Number(order.marketplaceFeesAmount ?? 0) + Number(order.paymentProcessingFeesAmount ?? 0)
+
   return (
     <div
-      className={`group rounded-xl border bg-card text-card-foreground hover:border-primary/40 hover:shadow-md transition-all duration-200 overflow-hidden ${
-        selected ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+      className={`group rounded-2xl border bg-card text-card-foreground hover:border-primary/45 shadow-xs hover:shadow-md transition-all duration-200 overflow-hidden ${
+        selected ? 'border-primary ring-2 ring-primary/20' : 'border-card-border'
       }`}
     >
-      <div className="flex flex-col lg:flex-row">
-        {/* LEFT: SKU & Line Items Summary Stack */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-divider">
+        {/* ===================================================================
+            SECTION 1: PRODUCT THUMBNAIL STACK (Tilted Background on Multi-Item)
+           =================================================================== */}
         <div
           onClick={() => handleDetail(order)}
-          className="w-full lg:w-44 p-5 shrink-0 flex flex-col items-center justify-center border-b lg:border-b-0 lg:border-r border-border bg-muted/25 cursor-pointer relative"
+          className="lg:col-span-3 p-5 bg-surface-sunken/60 flex flex-row lg:flex-col items-center justify-between lg:justify-center gap-4 cursor-pointer"
         >
-          {onSelect && (
-            <input
-              type="checkbox"
-              checked={!!selected}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => onSelect(String(order.id), e.target.checked)}
-              aria-label={`Select order ${String(order.orderNumber)}`}
-              className="absolute top-3.5 left-3.5 w-4 h-4 rounded border-border accent-primary"
-            />
-          )}
-          <div className="w-12 h-12 rounded-2xl bg-primary/12 border border-primary/25 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
-            <Package className="w-6 h-6 text-primary" />
-          </div>
-          <span className="text-xs font-bold uppercase tracking-wider text-foreground text-center truncate max-w-full px-2">
-            {lineItems[0]?.sku || order.marketplaceCode || 'ORDER'}
-          </span>
-          <span className="text-[11px] text-muted-foreground mt-0.5">
-            {lineItems.length || 1} {lineItems.length === 1 ? 'line item' : 'line items'}
-          </span>
-        </div>
-
-        {/* MIDDLE: Order Timeline & P&L */}
-        <div className="flex-1 p-5 flex flex-col justify-between gap-4 min-w-0">
-          <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div className="min-w-0">
-              <button
-                type="button"
-                onClick={() => handleDetail(order)}
-                className="flex items-center gap-1.5 text-left group/btn cursor-pointer"
-              >
-                <h3 className="text-base sm:text-lg font-bold text-foreground group-hover/btn:text-primary transition-colors">
-                  {String(order.orderNumber)}
-                </h3>
-                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover/btn:text-primary transition-colors" />
-              </button>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 flex-wrap">
-                <span className="font-mono">
-                  {String(order.externalOrderId || order.id).slice(0, 18)}
-                </span>
-                <span>•</span>
-                <span className="uppercase font-semibold text-primary">
-                  {String(order.marketplaceCode || 'direct')}
-                </span>
-                <span>•</span>
-                <span className="truncate">
-                  {String(customer.fullName || order.customerFullName || 'Walk-in Buyer')}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <StatusBadge
-                label={String(order.status || 'pending')}
-                variant={STATUS_TONES[String(order.status)] || 'neutral'}
+          <div className="flex items-center gap-3 w-full lg:justify-between">
+            {onSelect && (
+              <input
+                type="checkbox"
+                checked={!!selected}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => onSelect(String(order.id), e.target.checked)}
+                className="w-4 h-4 rounded border-input-border text-primary focus:ring-ring cursor-pointer"
+                aria-label={`Select order ${order.orderNumber}`}
               />
-              {order.paymentStatus && (
-                <StatusBadge
-                  label={String(order.paymentStatus)}
-                  variant={order.paymentStatus === 'paid' ? 'success' : 'warning'}
-                />
-              )}
-            </div>
+            )}
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              {lineItems.length > 1
+                ? `${lineItems.length} Line Items (${totalUnits} Qty)`
+                : `${totalUnits || 1} Unit Ordered`}
+            </span>
           </div>
 
-          {/* 3-Stage Fulfillment Timeline */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 py-3 border-y border-border/70">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-primary/12 text-primary flex items-center justify-center shrink-0">
-                <Calendar className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Ordered
-                </p>
-                <p className="text-xs font-semibold text-foreground truncate">
-                  {formatDate(order.orderedAt)}
-                </p>
-              </div>
-            </div>
-
-            <div
-              className={`flex items-center gap-2.5 min-w-0 ${
-                firstShipment || order.fulfillmentStatus === 'fulfilled'
-                  ? 'opacity-100'
-                  : 'opacity-50'
-              }`}
-            >
-              <div className="w-8 h-8 rounded-lg bg-blue-500/12 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                <Truck className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Fulfillment
-                </p>
-                <p className="text-xs font-semibold text-foreground capitalize truncate">
-                  {String(order.fulfillmentStatus || 'unfulfilled').replace(/_/g, ' ')}
-                </p>
-              </div>
-            </div>
-
-            <div
-              className={`flex items-center gap-2.5 min-w-0 ${
-                order.deliveredAt || order.status === 'delivered' ? 'opacity-100' : 'opacity-50'
-              }`}
-            >
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                <MapPin className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Delivered
-                </p>
-                <p className="text-xs font-semibold text-foreground truncate">
-                  {order.deliveredAt ? formatDate(order.deliveredAt) : 'Pending'}
-                </p>
-              </div>
-            </div>
+          <div className="py-1">
+            <ThumbnailStack items={thumbItems} size="lg" />
           </div>
 
-          {/* Totals & Actions Bar */}
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-5 flex-wrap">
-              <div>
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground block">
-                  Order Total
-                </span>
-                <span className="text-base font-bold text-foreground tabular-nums">
-                  {formatMoney(String(order.currencyCode || 'USD'), order.totalAmount)}
-                </span>
-              </div>
-              <div>
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground block">
-                  Net Profit (USD)
-                </span>
-                <span
-                  className={`text-base font-bold tabular-nums ${
-                    Number(order.netProfitAmount ?? 0) >= 0
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-rose-600 dark:text-rose-400'
-                  }`}
-                >
-                  {formatMoney(String(order.reportingCurrencyCode || 'USD'), order.netProfitAmount)}
-                </span>
-              </div>
-              <div>
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground block">
-                  Fees / COGS
-                </span>
-                <span className="text-xs font-medium text-muted-foreground tabular-nums">
-                  {formatMoney(String(order.currencyCode || 'USD'), order.marketplaceFeesAmount)} /{' '}
-                  {formatMoney(String(order.currencyCode || 'USD'), order.cogsAmount)}
-                </span>
+          <div className="text-right lg:text-center min-w-0 max-w-full space-y-1">
+            <MonoBadge text={String(lineItems[0]?.sku ?? order.orderNumber)} />
+            <p className="text-xs font-medium text-foreground-secondary line-clamp-1">
+              {String(lineItems[0]?.title ?? 'Direct Order Item')}
+            </p>
+            {lineItems.length > 1 && (
+              <p className="text-[11px] font-semibold text-primary">
+                +{lineItems.length - 1} more item(s) stacked
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* ===================================================================
+            SECTION 2: ORDER METADATA, LINE ITEMS & P&L ECONOMICS
+           =================================================================== */}
+        <div className="lg:col-span-5 p-5 flex flex-col justify-between gap-4">
+          <div className="space-y-3">
+            {/* Order Header & Statuses */}
+            <div className="flex items-start justify-between gap-2 flex-wrap">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleDetail(order)}
+                    className="text-base font-extrabold text-foreground hover:text-primary transition-colors font-mono cursor-pointer"
+                  >
+                    #{String(order.orderNumber)}
+                  </button>
+                  <StatusBadge
+                    label={String(order.marketplaceCode || 'direct').toUpperCase()}
+                    variant="purple"
+                  />
+                  <StatusBadge
+                    label={String(order.status ?? 'pending').replace(/_/g, ' ')}
+                    variant={STATUS_TONES[String(order.status)] ?? 'neutral'}
+                  />
+                  <StatusBadge
+                    label={`Pay: ${String(order.paymentStatus ?? 'paid')}`}
+                    variant={STATUS_TONES[String(order.paymentStatus)] ?? 'info'}
+                  />
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {formatDate(order.orderedAt)}
+                  </span>
+                  {order.externalOrderId && (
+                    <span className="font-mono">Ext: {String(order.externalOrderId)}</span>
+                  )}
+                  {firstShipment?.trackingNumber && (
+                    <span className="inline-flex items-center gap-1 text-primary font-mono">
+                      <Truck className="w-3.5 h-3.5" />
+                      {String(firstShipment.carrierCode || 'CARRIER').toUpperCase()}:{' '}
+                      {String(firstShipment.trackingNumber)}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleDetail(order)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border bg-background hover:bg-muted text-foreground transition-colors cursor-pointer"
+            {/* Compact Line Items List */}
+            {lineItems.length > 0 && (
+              <div className="rounded-xl border border-border-subtle bg-muted/25 p-2.5 space-y-1.5 max-h-28 overflow-y-auto">
+                {lineItems.map((li, i) => (
+                  <div
+                    key={String(li.id ?? i)}
+                    className="flex items-center justify-between gap-2 text-xs"
+                  >
+                    <div className="min-w-0 flex items-center gap-1.5">
+                      <span className="font-bold text-primary tabular-nums">
+                        {String(li.quantityOrdered ?? 1)}×
+                      </span>
+                      <span className="font-mono text-[11px] font-semibold text-foreground">
+                        {String(li.sku)}
+                      </span>
+                      <span className="text-muted-foreground truncate">
+                        — {String(li.title)}
+                      </span>
+                    </div>
+                    <span className="font-semibold text-foreground tabular-nums shrink-0">
+                      {formatMoney(currency, li.lineTotalAmount ?? li.unitPrice)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Transparent 5-Column P&L Economics Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 border-t border-divider text-xs">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Total Paid
+              </span>
+              <span className="font-bold text-price-current tabular-nums">
+                {formatMoney(currency, order.totalAmount)}
+              </span>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                COGS
+              </span>
+              <span className="font-semibold text-foreground-secondary tabular-nums">
+                {formatMoney(currency, order.cogsAmount)}
+              </span>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Channel Fees
+              </span>
+              <span className="font-semibold text-foreground-secondary tabular-nums">
+                {formatMoney(currency, totalFees)}
+              </span>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Shipping
+              </span>
+              <span className="font-semibold text-foreground-secondary tabular-nums">
+                {formatMoney(currency, order.shippingCostAmount)}
+              </span>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Net Profit
+              </span>
+              <span
+                className={`font-extrabold tabular-nums ${
+                  netProfit >= 0 ? 'text-price-save' : 'text-error'
+                }`}
               >
-                <Eye className="w-3.5 h-3.5" /> Details
-              </button>
-              <button
-                type="button"
-                onClick={() => handleEdit(order)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary hover:opacity-90 text-primary-foreground transition-colors cursor-pointer"
-              >
-                <Pencil className="w-3.5 h-3.5" /> Status
-              </button>
-              <button
-                type="button"
-                onClick={() => onDelete(order)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                title="Delete order"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+                {formatMoney(currency, netProfit)}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* RIGHT: Customer & Shipment Summary */}
-        <div className="w-full lg:w-60 p-5 bg-muted/20 border-t lg:border-t-0 lg:border-l border-border flex flex-col justify-between shrink-0">
-          <div className="flex items-start gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/12 flex items-center justify-center shrink-0">
-              <MapPin className="w-4 h-4 text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                Buyer & Channel
-              </p>
-              <p className="text-sm font-semibold text-foreground truncate">
-                {String(customer.fullName || order.customerFullName || 'Customer')}
-              </p>
-              {customer.email && (
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                  {String(customer.email)}
-                </p>
+        {/* ===================================================================
+            SECTION 3: CUSTOMER DETAILS, ADDRESS & REPEAT / FRAUD INTELLIGENCE
+           =================================================================== */}
+        <div className="lg:col-span-4 p-5 flex flex-col justify-between gap-4 bg-surface/40">
+          <div className="space-y-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Customer & Destination
+                </span>
+                <div className="text-sm font-bold text-foreground mt-0.5">
+                  {String(customer.fullName ?? addrSnap.recipientName ?? 'Guest Buyer')}
+                </div>
+              </div>
+
+              {/* Repeat vs First-Time Customer Badge */}
+              {isRepeat ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-info-subtle text-info border border-info/25">
+                  <Repeat className="w-3 h-3" />
+                  Repeat ({ordersCount} orders)
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-muted text-muted-foreground border border-border">
+                  <UserCheck className="w-3 h-3" />
+                  1st Order
+                </span>
               )}
-              {firstShipment && (
-                <div className="mt-3 pt-2.5 border-t border-border/70">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Active Parcel
-                  </p>
-                  <p className="text-xs font-mono font-semibold text-foreground truncate mt-0.5">
-                    {String(firstShipment.carrierCode || '').toUpperCase()} ·{' '}
-                    {String(firstShipment.trackingNumber || firstShipment.shipmentNumber)}
-                  </p>
+            </div>
+
+            {/* Contact & Shipping Address */}
+            <div className="space-y-1 text-xs text-muted-foreground">
+              {customer.email && (
+                <div className="flex items-center gap-1.5 truncate">
+                  <Mail className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{String(customer.email)}</span>
                 </div>
               )}
+              {customer.phone && (
+                <div className="flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                  <span>{String(customer.phone)}</span>
+                </div>
+              )}
+              <div className="flex items-start gap-1.5 pt-0.5">
+                <MapPin className="w-3.5 h-3.5 shrink-0 text-primary mt-0.5" />
+                <span className="line-clamp-2 text-foreground-secondary">
+                  {addressString || 'Standard Marketplace Fulfillment Address'}
+                </span>
+              </div>
             </div>
+
+            {/* Fraud / Risk Intelligence Banner */}
+            <div className="pt-1 flex items-center gap-2 flex-wrap">
+              {isFraudOrHighRisk ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-error-subtle text-error border border-error/30">
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  Fraud / Risk Alert ({riskLevel.toUpperCase()} · Score {riskScore})
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-success-subtle text-success border border-success/25">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Verified Buyer (Risk Score: {riskScore})
+                </span>
+              )}
+              {customer.totalSpent && Number(customer.totalSpent) > 0 && (
+                <span className="text-[11px] text-muted-foreground">
+                  LTV: <strong className="text-foreground">{formatMoney(currency, customer.totalSpent)}</strong>
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Card Footer Action Buttons */}
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-divider flex-wrap">
+            <AppButton
+              label="Details"
+              variant="secondary"
+              size="xs"
+              icon={Eye}
+              onClick={() => handleDetail(order)}
+            />
+            <AppButton
+              label="Update Status"
+              variant="outline"
+              size="xs"
+              icon={Pencil}
+              onClick={() => handleEdit(order)}
+            />
+            <AppButton
+              label="Cancel"
+              variant="ghost"
+              size="xs"
+              icon={Trash2}
+              onClick={() => onDelete(order)}
+            />
           </div>
         </div>
       </div>

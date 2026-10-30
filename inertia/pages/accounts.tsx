@@ -1,17 +1,28 @@
-import { Button } from '@astryxdesign/core/Button'
 import {
   PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
   SavedViewsBar,
+  TopStatusBar,
+  AppButton,
   col,
   STATUS_TONES,
   type Row,
 } from '~/lib/ui'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { router } from '@inertiajs/react'
-import { Building2 } from 'lucide-react'
+import {
+  Building2,
+  CheckCircle2,
+  ShieldCheck,
+  AlertTriangle,
+  Activity,
+  Plus,
+  RefreshCw,
+  Edit3,
+  Trash2,
+} from 'lucide-react'
 
 type Props = {
   sellerAccounts: Row[]
@@ -38,24 +49,72 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
   const [createOpen, setCreateOpen] = useState(false)
   const [editRow, setEditRow] = useState<Row | null>(null)
 
+  const stats = useMemo(() => {
+    const activeCount = sellerAccounts.filter((a) => String(a.status) === 'active').length
+    const healthyCount = sellerAccounts.filter((a) => String(a.healthStatus) === 'healthy').length
+    const attentionCount = sellerAccounts.filter(
+      (a) =>
+        ['auth_expired', 'rate_limited', 'suspended'].includes(String(a.status)) ||
+        ['warning', 'critical'].includes(String(a.healthStatus))
+    ).length
+    return { activeCount, healthyCount, attentionCount }
+  }, [sellerAccounts])
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Marketplace Seller Accounts"
-        description="Connect Amazon SP-API, eBay, Etsy, and Shopify stores with AES-256-GCM encrypted API credentials."
+        description="Connect Amazon SP-API, eBay, Etsy, and Medusa stores with AES-256-GCM encrypted API credentials."
         icon={Building2}
         badge={`${sellerAccounts.length} connected accounts`}
         actions={
-          <Button
-            label="+ Connect Seller Account"
-            variant="primary"
-            onClick={() => setCreateOpen(true)}
-          />
+          <AppButton variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>
+            Connect Seller Account
+          </AppButton>
         }
+      />
+
+      <TopStatusBar
+        columns={4}
+        items={[
+          {
+            id: 'total-accounts',
+            label: 'Connected Stores',
+            value: sellerAccounts.length,
+            hint: `${salesChannels.length} sales channels`,
+            icon: Building2,
+            tone: 'primary',
+          },
+          {
+            id: 'active-accounts',
+            label: 'Active Sync',
+            value: stats.activeCount,
+            hint: 'Real-time order & inventory sync',
+            icon: CheckCircle2,
+            tone: 'success',
+          },
+          {
+            id: 'healthy-accounts',
+            label: 'Healthy Credentials',
+            value: stats.healthyCount,
+            hint: 'AES-256-GCM encrypted at rest',
+            icon: ShieldCheck,
+            tone: 'info',
+          },
+          {
+            id: 'attention-accounts',
+            label: 'Needs Attention',
+            value: stats.attentionCount,
+            hint: 'Expired tokens or rate-limited',
+            icon: AlertTriangle,
+            tone: stats.attentionCount > 0 ? 'warning' : 'success',
+          },
+        ]}
       />
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
+      {/* Complete Connect Seller Account Modal exposing all seller_accounts fields */}
       <FormModal
         isOpen={createOpen}
         onOpenChange={setCreateOpen}
@@ -66,17 +125,17 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
         fields={[
           {
             name: 'salesChannelId',
-            label: 'Sales channel',
+            label: 'Sales Channel',
             kind: 'select',
             required: true,
             options: salesChannels.map((c) => ({ value: String(c.id), label: String(c.name) })),
           },
-          { name: 'accountName', label: 'Account name', required: true },
-          { name: 'externalSellerId', label: 'External seller ID', required: true },
-          { name: 'marketplaceRegion', label: 'Region', default: 'US' },
+          { name: 'accountName', label: 'Account Name', required: true },
+          { name: 'externalSellerId', label: 'External Seller / Merchant ID', required: true },
+          { name: 'marketplaceRegion', label: 'Marketplace Region', default: 'US' },
           {
             name: 'defaultCurrency',
-            label: 'Default currency',
+            label: 'Default Currency',
             kind: 'select',
             default: 'USD',
             options: ['USD', 'EUR', 'GBP', 'CAD', 'JPY', 'INR', 'AED'].map((c) => ({
@@ -84,32 +143,70 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
               label: c,
             })),
           },
-          { name: 'rateLimitRpm', label: 'Rate limit / min', kind: 'number', default: '60' },
-          { name: 'apiKey', label: 'API key (encrypted at rest)', kind: 'password' },
-          { name: 'apiSecret', label: 'API secret (encrypted at rest)', kind: 'password' },
+          {
+            name: 'status',
+            label: 'Initial Account Status',
+            kind: 'select',
+            default: 'active',
+            options: ACCOUNT_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
+          },
+          {
+            name: 'healthStatus',
+            label: 'Health Status',
+            kind: 'select',
+            default: 'healthy',
+            options: HEALTH.map((s) => ({ value: s, label: s })),
+          },
+          { name: 'rateLimitRpm', label: 'Rate Limit (requests / min)', kind: 'number', default: '60' },
+          { name: 'tokenExpiresAt', label: 'OAuth Token Expiry Date', kind: 'date' },
+          { name: 'apiKey', label: 'API Key / Client ID (AES-256-GCM encrypted)', kind: 'password' },
+          {
+            name: 'apiSecret',
+            label: 'API Secret / Refresh Token (AES-256-GCM encrypted)',
+            kind: 'password',
+          },
         ]}
       />
 
+      {/* Complete Edit Seller Account Modal */}
       <FormModal
         isOpen={!!editRow}
         onOpenChange={(o) => {
           if (!o) setEditRow(null)
         }}
         title={`Edit Seller Account: ${String(editRow?.accountName ?? '')}`}
+        subtitle="Update account metadata, region, currency, rate limits, health status, or rotate encrypted API credentials."
         submitLabel="Save Account"
         action={editRow ? `/seller-accounts/${editRow.id}` : '/seller-accounts/placeholder'}
         initialValues={
           editRow
             ? {
                 accountName: String(editRow.accountName ?? ''),
+                externalSellerId: String(editRow.externalSellerId ?? ''),
+                marketplaceRegion: String(editRow.marketplaceRegion ?? 'US'),
+                defaultCurrency: String(editRow.defaultCurrency ?? 'USD'),
                 status: String(editRow.status ?? 'active'),
                 healthStatus: String(editRow.healthStatus ?? 'healthy'),
                 rateLimitRpm: String(editRow.rateLimitRpm ?? 60),
+                tokenExpiresAt: editRow.tokenExpiresAt
+                  ? String(editRow.tokenExpiresAt).slice(0, 10)
+                  : '',
               }
             : undefined
         }
         fields={[
-          { name: 'accountName', label: 'Account name', required: true },
+          { name: 'accountName', label: 'Account Name', required: true },
+          { name: 'externalSellerId', label: 'External Seller ID' },
+          { name: 'marketplaceRegion', label: 'Marketplace Region' },
+          {
+            name: 'defaultCurrency',
+            label: 'Default Currency',
+            kind: 'select',
+            options: ['USD', 'EUR', 'GBP', 'CAD', 'JPY', 'INR', 'AED'].map((c) => ({
+              value: c,
+              label: c,
+            })),
+          },
           {
             name: 'status',
             label: 'Status',
@@ -118,11 +215,18 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
           },
           {
             name: 'healthStatus',
-            label: 'Health status',
+            label: 'Health Status',
             kind: 'select',
             options: HEALTH.map((s) => ({ value: s, label: s })),
           },
-          { name: 'rateLimitRpm', label: 'Rate limit / min', kind: 'number' },
+          { name: 'rateLimitRpm', label: 'Rate Limit / min', kind: 'number' },
+          { name: 'tokenExpiresAt', label: 'OAuth Token Expiry Date', kind: 'date' },
+          { name: 'apiKey', label: 'Rotate API Key (leave blank to keep current)', kind: 'password' },
+          {
+            name: 'apiSecret',
+            label: 'Rotate API Secret (leave blank to keep current)',
+            kind: 'password',
+          },
         ]}
       />
 
@@ -157,10 +261,10 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
             ],
             actions: (
               <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  label="Sync Now"
-                  variant="ghost"
-                  size="sm"
+                <AppButton
+                  variant="outline"
+                  size="xs"
+                  icon={RefreshCw}
                   onClick={() =>
                     router.post(
                       '/import/sync-accounts',
@@ -168,23 +272,29 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
                       { preserveScroll: true }
                     )
                   }
-                />
-                <Button
-                  label="Edit"
+                >
+                  Sync Now
+                </AppButton>
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditRow(row)}
-                />
-                <Button
-                  label="Disconnect"
+                >
+                  Edit
+                </AppButton>
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Trash2}
                   onClick={() => {
                     if (window.confirm(`Disconnect seller account "${row.accountName}"?`)) {
                       router.post(`/seller-accounts/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
-                />
+                >
+                  Disconnect
+                </AppButton>
               </div>
             ),
           })}
@@ -199,10 +309,10 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
             col.date('lastSyncedAt', 'Last sync'),
             col.action('Actions', (row) => (
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Button
-                  label="Sync"
-                  variant="ghost"
-                  size="sm"
+                <AppButton
+                  variant="outline"
+                  size="xs"
+                  icon={RefreshCw}
                   onClick={() =>
                     router.post(
                       '/import/sync-accounts',
@@ -210,23 +320,29 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
                       { preserveScroll: true }
                     )
                   }
-                />
-                <Button
-                  label="Edit"
+                >
+                  Sync
+                </AppButton>
+                <AppButton
                   variant="secondary"
-                  size="sm"
+                  size="xs"
+                  icon={Edit3}
                   onClick={() => setEditRow(row)}
-                />
-                <Button
-                  label="Disconnect"
+                >
+                  Edit
+                </AppButton>
+                <AppButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
+                  icon={Trash2}
                   onClick={() => {
                     if (window.confirm(`Disconnect seller account "${row.accountName}"?`)) {
                       router.post(`/seller-accounts/${row.id}/delete`, {}, { preserveScroll: true })
                     }
                   }}
-                />
+                >
+                  Disconnect
+                </AppButton>
               </div>
             )),
           ]}

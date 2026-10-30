@@ -1,17 +1,26 @@
-import { Button } from '@astryxdesign/core/Button'
 import {
   PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
   SavedViewsBar,
+  TopStatusBar,
+  AppButton,
   col,
   STATUS_TONES,
   money,
   type Row,
 } from '~/lib/ui'
 import { useState, useMemo } from 'react'
-import { RotateCcw } from 'lucide-react'
+import {
+  RotateCcw,
+  Clock,
+  PackageCheck,
+  DollarSign,
+  CheckCircle2,
+  Plus,
+  RefreshCw,
+} from 'lucide-react'
 
 type Props = {
   returnRequests: Row[]
@@ -48,6 +57,15 @@ const RETURN_REASONS = [
 ]
 const RESOLUTIONS = ['refund', 'partial_refund', 'replacement', 'store_credit', 'rejected']
 
+// Matches PostgreSQL enum `return_item_condition` 1:1
+const ITEM_CONDITIONS = [
+  { value: 'unopened', label: 'Unopened' },
+  { value: 'like_new', label: 'Like New' },
+  { value: 'used', label: 'Used' },
+  { value: 'damaged', label: 'Damaged' },
+  { value: 'unsellable', label: 'Unsellable / Defective' },
+]
+
 export default function Returns({
   returnRequests,
   refundTransactions,
@@ -70,32 +88,99 @@ export default function Returns({
     return map
   }, [orders])
 
+  const stats = useMemo(() => {
+    const openCount = returnRequests.filter((r) =>
+      ['requested', 'authorized', 'in_transit'].includes(String(r.status))
+    ).length
+    const inspectedCount = returnRequests.filter((r) =>
+      ['received', 'inspected'].includes(String(r.status))
+    ).length
+    const totalRefundedVal = refundTransactions.reduce(
+      (acc, r) => acc + Number(r.totalRefundAmount ?? 0),
+      0
+    )
+    const restockingFeesVal = returnRequests.reduce(
+      (acc, r) => acc + Number(r.restockingFeeAmount ?? 0),
+      0
+    )
+    return { openCount, inspectedCount, totalRefundedVal, restockingFeesVal }
+  }, [returnRequests, refundTransactions])
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Returns (RMA) & Refund Ledger"
-        description="Full RMA lifecycle with line-item quantity guards and over-refund protection."
+        description="Full RMA lifecycle with line-item quantity guards, carrier return tracking, and over-refund protection."
         icon={RotateCcw}
         badge={`${returnRequests.length} RMAs · ${refundTransactions.length} refunds`}
         actions={
-          <>
-            <Button
-              label="+ Process Refund"
+          <div className="flex items-center gap-2 flex-wrap">
+            <AppButton
               variant="secondary"
+              size="sm"
+              icon={DollarSign}
               onClick={() => setCreateRefundOpen(true)}
-            />
-            <Button label="+ Create RMA" variant="primary" onClick={() => setCreateRmaOpen(true)} />
-          </>
+            >
+              Process Refund
+            </AppButton>
+            <AppButton
+              variant="primary"
+              size="sm"
+              icon={Plus}
+              onClick={() => setCreateRmaOpen(true)}
+            >
+              Create RMA
+            </AppButton>
+          </div>
         }
+      />
+
+      <TopStatusBar
+        columns={4}
+        items={[
+          {
+            id: 'open-rmas',
+            label: 'Open RMAs',
+            value: stats.openCount,
+            hint: `${returnRequests.length} total return requests`,
+            icon: Clock,
+            tone: stats.openCount > 0 ? 'warning' : 'success',
+          },
+          {
+            id: 'awaiting-inspection',
+            label: 'Received / Inspected',
+            value: stats.inspectedCount,
+            hint: 'Warehouse condition grading',
+            icon: PackageCheck,
+            tone: 'info',
+          },
+          {
+            id: 'refunded-total',
+            label: 'Total Refunded',
+            value: money('USD', stats.totalRefundedVal),
+            hint: `${refundTransactions.length} ledger transactions`,
+            icon: DollarSign,
+            tone: 'primary',
+          },
+          {
+            id: 'restocking-fees',
+            label: 'Restocking Fees Retained',
+            value: money('USD', stats.restockingFeesVal),
+            hint: 'Deducted from return payouts',
+            icon: CheckCircle2,
+            tone: 'success',
+          },
+        ]}
       />
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
+      {/* Complete Create RMA Modal exposing all return_requests fields */}
       <FormModal
         isOpen={createRmaOpen}
         onOpenChange={setCreateRmaOpen}
-        title="Create Return (RMA)"
-        subtitle="Quantity limits enforced: requested ≤ ordered − already returned."
+        title="Create Return Request (RMA)"
+        subtitle="Quantity limits enforced: requested ≤ ordered − already returned. Includes return carrier tracking and condition fields."
         submitLabel="Create RMA"
         action="/returns"
         fields={[
@@ -123,76 +208,158 @@ export default function Returns({
             },
             placeholder: 'Select an order first…',
           },
-          { name: 'rmaNumber', label: 'RMA number', required: true },
+          { name: 'rmaNumber', label: 'RMA Number', required: true, placeholder: 'RMA-2026-001' },
+          {
+            name: 'externalReturnId',
+            label: 'External Marketplace Return ID',
+            placeholder: 'AMZ-RET-9910',
+          },
+          {
+            name: 'status',
+            label: 'Initial RMA Status',
+            kind: 'select',
+            default: 'requested',
+            options: RETURN_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
+          },
           {
             name: 'returnReason',
-            label: 'Return reason',
+            label: 'Return Reason',
             kind: 'select',
             required: true,
             options: RETURN_REASONS.map((r) => ({ value: r, label: r.replace(/_/g, ' ') })),
           },
           {
             name: 'resolutionType',
-            label: 'Resolution type',
+            label: 'Resolution Type',
             kind: 'select',
             default: 'refund',
             options: RESOLUTIONS.map((r) => ({ value: r, label: r.replace(/_/g, ' ') })),
           },
           {
+            name: 'itemCondition',
+            label: 'Item Condition',
+            kind: 'select',
+            default: 'unopened',
+            options: ITEM_CONDITIONS,
+          },
+          {
             name: 'quantityRequested',
-            label: 'Quantity requested',
+            label: 'Quantity Requested',
             kind: 'number',
             required: true,
             default: '1',
           },
-          { name: 'restockingFeeAmount', label: 'Restocking fee', kind: 'number' },
+          {
+            name: 'quantityApproved',
+            label: 'Quantity Approved',
+            kind: 'number',
+            default: '1',
+          },
+          {
+            name: 'quantityReceived',
+            label: 'Quantity Received',
+            kind: 'number',
+            default: '0',
+          },
+          {
+            name: 'currencyCode',
+            label: 'Currency Code',
+            kind: 'select',
+            default: 'USD',
+            options: ['USD', 'EUR', 'GBP', 'CAD', 'INR', 'AED'].map((c) => ({
+              value: c,
+              label: c,
+            })),
+          },
+          { name: 'refundAmount', label: 'Estimated Refund Amount', kind: 'number', default: '0' },
+          { name: 'restockingFeeAmount', label: 'Restocking Fee', kind: 'number', default: '0' },
+          {
+            name: 'returnShippingCost',
+            label: 'Return Shipping Cost',
+            kind: 'number',
+            default: '0',
+          },
+          { name: 'returnCarrier', label: 'Return Carrier (UPS / FedEx / USPS)' },
+          { name: 'returnTrackingNumber', label: 'Return Tracking Number' },
           {
             name: 'customerComments',
-            label: 'Customer comments',
+            label: 'Customer Comments',
+            kind: 'textarea',
+            fullWidth: true,
+          },
+          {
+            name: 'internalNotes',
+            label: 'Internal Warehouse / Operator Notes',
             kind: 'textarea',
             fullWidth: true,
           },
         ]}
       />
 
+      {/* Complete Update RMA Modal */}
       <FormModal
         isOpen={!!updateRmaRow}
         onOpenChange={(o) => {
           if (!o) setUpdateRmaRow(null)
         }}
         title={`Update RMA ${String(updateRmaRow?.rmaNumber ?? '')}`}
+        subtitle="Update RMA lifecycle status, warehouse inspection condition, received quantities, and return carrier tracking."
         submitLabel="Update RMA"
         action={updateRmaRow ? `/returns/${updateRmaRow.id}/status` : '/returns/placeholder/status'}
         initialValues={{
           status: String(updateRmaRow?.status ?? 'received'),
-          itemCondition: String(updateRmaRow?.itemCondition ?? ''),
+          itemCondition: String(updateRmaRow?.itemCondition ?? 'unopened'),
+          resolutionType: String(updateRmaRow?.resolutionType ?? 'refund'),
+          quantityApproved: String(updateRmaRow?.quantityApproved ?? updateRmaRow?.quantityRequested ?? 1),
+          quantityReceived: String(updateRmaRow?.quantityReceived ?? 0),
+          refundAmount: String(updateRmaRow?.refundAmount ?? 0),
+          restockingFeeAmount: String(updateRmaRow?.restockingFeeAmount ?? 0),
+          returnShippingCost: String(updateRmaRow?.returnShippingCost ?? 0),
+          returnCarrier: String(updateRmaRow?.returnCarrier ?? ''),
+          returnTrackingNumber: String(updateRmaRow?.returnTrackingNumber ?? ''),
+          internalNotes: String(updateRmaRow?.internalNotes ?? ''),
         }}
         fields={[
           {
             name: 'status',
-            label: 'RMA status',
+            label: 'RMA Status',
             kind: 'select',
             required: true,
             options: RETURN_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
           },
           {
             name: 'itemCondition',
-            label: 'Inspected item condition',
+            label: 'Inspected Item Condition',
             kind: 'select',
-            options: [
-              { value: 'new', label: 'New' },
-              { value: 'used', label: 'Used' },
-              { value: 'damaged', label: 'Damaged' },
-              { value: 'defective', label: 'Defective' },
-            ],
+            options: ITEM_CONDITIONS,
+          },
+          {
+            name: 'resolutionType',
+            label: 'Resolution Type',
+            kind: 'select',
+            options: RESOLUTIONS.map((r) => ({ value: r, label: r.replace(/_/g, ' ') })),
+          },
+          { name: 'quantityApproved', label: 'Quantity Approved', kind: 'number' },
+          { name: 'quantityReceived', label: 'Quantity Received', kind: 'number' },
+          { name: 'refundAmount', label: 'Refund Amount', kind: 'number' },
+          { name: 'restockingFeeAmount', label: 'Restocking Fee', kind: 'number' },
+          { name: 'returnShippingCost', label: 'Return Shipping Cost', kind: 'number' },
+          { name: 'returnCarrier', label: 'Return Carrier' },
+          { name: 'returnTrackingNumber', label: 'Return Tracking Number' },
+          {
+            name: 'internalNotes',
+            label: 'Internal Warehouse Inspection Notes',
+            kind: 'textarea',
+            fullWidth: true,
           },
         ]}
       />
 
+      {/* Complete Process Refund Modal exposing all refund_transactions fields */}
       <FormModal
         isOpen={createRefundOpen}
         onOpenChange={setCreateRefundOpen}
-        title="Process Refund"
+        title="Process Refund Transaction"
         subtitle="Refunds are capped at order total − already-refunded (over-refund guard)."
         submitLabel="Process Refund"
         action="/refunds"
@@ -217,12 +384,55 @@ export default function Returns({
               label: String(r.rmaNumber),
             })),
           },
-          { name: 'refundNumber', label: 'Refund number', required: true },
-          { name: 'itemsRefundAmount', label: 'Items refund amount', kind: 'number', required: true },
-          { name: 'shippingRefundAmount', label: 'Shipping refund amount', kind: 'number' },
-          { name: 'taxRefundAmount', label: 'Tax refund amount', kind: 'number' },
-          { name: 'restockingFeeDeducted', label: 'Restocking fee deducted', kind: 'number' },
-          { name: 'reason', label: 'Refund reason / notes', kind: 'textarea', fullWidth: true },
+          { name: 'refundNumber', label: 'Refund Number', required: true, placeholder: 'REF-2026-001' },
+          {
+            name: 'externalRefundId',
+            label: 'External Marketplace Refund ID',
+            placeholder: 'AMZ-REF-8821',
+          },
+          {
+            name: 'status',
+            label: 'Refund Status',
+            kind: 'select',
+            default: 'processed',
+            options: [
+              { value: 'processed', label: 'Processed' },
+              { value: 'pending', label: 'Pending' },
+              { value: 'failed', label: 'Failed' },
+            ],
+          },
+          {
+            name: 'currencyCode',
+            label: 'Currency Code',
+            kind: 'select',
+            default: 'USD',
+            options: ['USD', 'EUR', 'GBP', 'CAD', 'INR', 'AED'].map((c) => ({
+              value: c,
+              label: c,
+            })),
+          },
+          { name: 'exchangeRate', label: 'Exchange Rate to USD', kind: 'number', default: '1' },
+          {
+            name: 'itemsRefundAmount',
+            label: 'Items Refund Amount',
+            kind: 'number',
+            required: true,
+          },
+          {
+            name: 'shippingRefundAmount',
+            label: 'Shipping Refund Amount',
+            kind: 'number',
+            default: '0',
+          },
+          { name: 'taxRefundAmount', label: 'Tax Refund Amount', kind: 'number', default: '0' },
+          {
+            name: 'restockingFeeDeducted',
+            label: 'Restocking Fee Deducted',
+            kind: 'number',
+            default: '0',
+          },
+          { name: 'processedAt', label: 'Processed Date', kind: 'date' },
+          { name: 'reason', label: 'Refund Reason / Notes', kind: 'textarea', fullWidth: true },
         ]}
       />
 
@@ -232,7 +442,7 @@ export default function Returns({
       >
         <ResponsiveDataView
           rows={returnRequests}
-          searchKeys={['rmaNumber', 'returnReason']}
+          searchKeys={['rmaNumber', 'returnReason', 'returnTrackingNumber']}
           filterKey="status"
           filterPills={[
             { value: 'all', label: 'All' },
@@ -264,12 +474,14 @@ export default function Returns({
               },
             ],
             actions: (
-              <Button
-                label="Update status"
+              <AppButton
                 variant="secondary"
-                size="sm"
+                size="xs"
+                icon={RefreshCw}
                 onClick={() => setUpdateRmaRow(row)}
-              />
+              >
+                Update Status
+              </AppButton>
             ),
           })}
           columns={[
@@ -282,12 +494,14 @@ export default function Returns({
             col.money('refundAmount', 'Refund', 'currencyCode'),
             col.money('restockingFeeAmount', 'Fee', 'currencyCode'),
             col.action('Actions', (row) => (
-              <Button
-                label="Update"
+              <AppButton
                 variant="secondary"
-                size="sm"
+                size="xs"
+                icon={RefreshCw}
                 onClick={() => setUpdateRmaRow(row)}
-              />
+              >
+                Update
+              </AppButton>
             )),
           ]}
         />

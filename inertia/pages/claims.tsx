@@ -1,16 +1,17 @@
-import { Button } from '@astryxdesign/core/Button'
 import {
   PageHeader,
   PageSection,
   FormModal,
   ResponsiveDataView,
   SavedViewsBar,
+  TopStatusBar,
+  AppButton,
   col,
   money,
   type Row,
 } from '~/lib/ui'
-import { useState } from 'react'
-import { Scale } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Scale, AlertTriangle, ShieldAlert, CheckCircle2, DollarSign, Plus, Edit3 } from 'lucide-react'
 
 type Props = {
   claims: Row[]
@@ -48,6 +49,18 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
   const [createOpen, setCreateOpen] = useState(false)
   const [editRow, setEditRow] = useState<Row | null>(null)
 
+  const stats = useMemo(() => {
+    const openCount = claims.filter((c) =>
+      ['opened', 'under_review', 'action_required', 'appealed'].includes(String(c.status))
+    ).length
+    const wonCount = claims.filter((c) =>
+      ['won', 'marketplace_funded'].includes(String(c.status))
+    ).length
+    const disputedTotal = claims.reduce((acc, c) => acc + Number(c.disputedAmount ?? 0), 0)
+    const liabilityTotal = claims.reduce((acc, c) => acc + Number(c.sellerLiabilityAmount ?? 0), 0)
+    return { openCount, wonCount, disputedTotal, liabilityTotal }
+  }, [claims])
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -56,17 +69,58 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
         icon={Scale}
         badge={`${claims.length} claims tracked`}
         actions={
-          <Button label="+ Open Claim" variant="primary" onClick={() => setCreateOpen(true)} />
+          <AppButton variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>
+            Open Claim
+          </AppButton>
         }
+      />
+
+      <TopStatusBar
+        columns={4}
+        items={[
+          {
+            id: 'active-claims',
+            label: 'Active / Under Review',
+            value: stats.openCount,
+            hint: `${claims.length} total claims`,
+            icon: AlertTriangle,
+            tone: stats.openCount > 0 ? 'warning' : 'success',
+          },
+          {
+            id: 'disputed-amount',
+            label: 'Total Disputed Volume',
+            value: money('USD', stats.disputedTotal),
+            hint: 'Across all open & historical claims',
+            icon: DollarSign,
+            tone: 'info',
+          },
+          {
+            id: 'seller-liability',
+            label: 'Seller Liability Exposure',
+            value: money('USD', stats.liabilityTotal),
+            hint: 'Direct financial exposure',
+            icon: ShieldAlert,
+            tone: stats.liabilityTotal > 0 ? 'error' : 'success',
+          },
+          {
+            id: 'claims-won',
+            label: 'Won / Marketplace Funded',
+            value: stats.wonCount,
+            hint: 'Protected seller metrics',
+            icon: CheckCircle2,
+            tone: 'success',
+          },
+        ]}
       />
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
+      {/* Complete Create Claim Modal exposing all marketplace_claims fields */}
       <FormModal
         isOpen={createOpen}
         onOpenChange={setCreateOpen}
         title="Open Marketplace Claim"
-        subtitle="A-to-z, chargebacks, and INR disputes with seller-liability and response deadlines."
+        subtitle="A-to-z Guarantee, chargebacks, and INR disputes with seller-liability exposure and response deadlines."
         submitLabel="Open Claim"
         action="/claims"
         fields={[
@@ -79,32 +133,65 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
           },
           {
             name: 'sellerAccountId',
-            label: 'Seller account',
+            label: 'Seller Account',
             kind: 'select',
             options: sellerAccounts.map((s) => ({
               value: String(s.id),
               label: String(s.accountName ?? s.id),
             })),
           },
-          { name: 'claimNumber', label: 'Claim number', required: true },
+          { name: 'claimNumber', label: 'Internal Claim Number', required: true, placeholder: 'CLM-2026-001' },
+          {
+            name: 'externalClaimId',
+            label: 'External Marketplace Claim ID',
+            placeholder: 'AMZ-AZ-99201',
+          },
           {
             name: 'claimType',
-            label: 'Claim type',
+            label: 'Claim Type',
             kind: 'select',
             required: true,
             options: CLAIM_TYPES.map((c) => ({ value: c, label: c.replace(/_/g, ' ') })),
           },
-          { name: 'disputedAmount', label: 'Disputed amount', kind: 'number' },
-          { name: 'sellerLiabilityAmount', label: 'Seller liability amount', kind: 'number' },
-          { name: 'respondByAt', label: 'Respond by date', kind: 'date' },
           {
             name: 'status',
-            label: 'Status',
+            label: 'Claim Status',
             kind: 'select',
             default: 'under_review',
             options: CLAIM_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
           },
-          { name: 'reason', label: 'Claim reason / evidence notes', kind: 'textarea', fullWidth: true },
+          {
+            name: 'currencyCode',
+            label: 'Currency Code',
+            kind: 'select',
+            default: 'USD',
+            options: ['USD', 'EUR', 'GBP', 'CAD', 'INR', 'AED'].map((c) => ({
+              value: c,
+              label: c,
+            })),
+          },
+          { name: 'disputedAmount', label: 'Disputed Amount', kind: 'number', default: '0' },
+          {
+            name: 'sellerLiabilityAmount',
+            label: 'Seller Liability Amount',
+            kind: 'number',
+            default: '0',
+          },
+          { name: 'openedAt', label: 'Opened Date', kind: 'date' },
+          { name: 'respondByAt', label: 'Respond By Deadline', kind: 'date' },
+          { name: 'resolvedAt', label: 'Resolved Date (if closed)', kind: 'date' },
+          {
+            name: 'reason',
+            label: 'Buyer Claim Reason',
+            kind: 'textarea',
+            fullWidth: true,
+          },
+          {
+            name: 'resolutionNotes',
+            label: 'Seller Evidence & Resolution Notes',
+            kind: 'textarea',
+            fullWidth: true,
+          },
         ]}
       />
 
@@ -114,32 +201,47 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
           if (!o) setEditRow(null)
         }}
         title={`Update Claim ${String(editRow?.claimNumber ?? '')}`}
-        subtitle="Edit seller liability exposure, claim status, and resolution notes."
+        subtitle="Edit seller liability exposure, claim status, deadlines, and resolution evidence."
         submitLabel="Update Claim"
         action={editRow ? `/claims/${editRow.id}/status` : '/claims/placeholder/status'}
         initialValues={
           editRow
             ? {
                 status: String(editRow.status ?? 'under_review'),
+                claimType: String(editRow.claimType ?? 'a_to_z_guarantee'),
+                externalClaimId: String(editRow.externalClaimId ?? ''),
+                disputedAmount: String(editRow.disputedAmount ?? '0.00'),
                 sellerLiabilityAmount: String(editRow.sellerLiabilityAmount ?? '0.00'),
-                resolutionNotes: String(editRow.reason ?? ''),
                 respondByAt: editRow.respondByAt ? String(editRow.respondByAt).slice(0, 10) : '',
+                resolvedAt: editRow.resolvedAt ? String(editRow.resolvedAt).slice(0, 10) : '',
+                reason: String(editRow.reason ?? ''),
+                resolutionNotes: String(editRow.resolutionNotes ?? editRow.reason ?? ''),
               }
             : undefined
         }
         fields={[
           {
             name: 'status',
-            label: 'Claim status',
+            label: 'Claim Status',
             kind: 'select',
             required: true,
             options: CLAIM_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
           },
-          { name: 'sellerLiabilityAmount', label: 'Seller liability amount', kind: 'number' },
-          { name: 'respondByAt', label: 'Respond by date', kind: 'date' },
+          {
+            name: 'claimType',
+            label: 'Claim Type',
+            kind: 'select',
+            options: CLAIM_TYPES.map((c) => ({ value: c, label: c.replace(/_/g, ' ') })),
+          },
+          { name: 'externalClaimId', label: 'External Marketplace Claim ID' },
+          { name: 'disputedAmount', label: 'Disputed Amount', kind: 'number' },
+          { name: 'sellerLiabilityAmount', label: 'Seller Liability Amount', kind: 'number' },
+          { name: 'respondByAt', label: 'Respond By Date', kind: 'date' },
+          { name: 'resolvedAt', label: 'Resolved Date', kind: 'date' },
+          { name: 'reason', label: 'Claim Reason', kind: 'textarea', fullWidth: true },
           {
             name: 'resolutionNotes',
-            label: 'Resolution notes',
+            label: 'Resolution & Appeal Evidence Notes',
             kind: 'textarea',
             fullWidth: true,
           },
@@ -194,12 +296,14 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
               },
             ],
             actions: (
-              <Button
-                label="Update"
+              <AppButton
                 variant="secondary"
-                size="sm"
+                size="xs"
+                icon={Edit3}
                 onClick={() => setEditRow(row)}
-              />
+              >
+                Update
+              </AppButton>
             ),
           })}
           columns={[
@@ -220,12 +324,14 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
             col.money('sellerLiabilityAmount', 'Liability', 'currencyCode'),
             col.date('respondByAt', 'Respond by'),
             col.action('Actions', (row) => (
-              <Button
-                label="Update"
+              <AppButton
                 variant="secondary"
-                size="sm"
+                size="xs"
+                icon={Edit3}
                 onClick={() => setEditRow(row)}
-              />
+              >
+                Update
+              </AppButton>
             )),
           ]}
         />

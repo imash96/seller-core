@@ -8,6 +8,7 @@ import { ShieldCheck, Lock } from 'lucide-react'
 import { StatusBadge } from '~/components/atoms/status-badge'
 import { PasswordField } from '~/components/molecules/password-field'
 import { DemoCredentialCard } from '~/components/molecules/demo-credential-card'
+import { Stack, VStack } from '@astryxdesign/core'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -63,12 +64,12 @@ export default function Login() {
         </div>
 
         {/* One-Click Demo Switcher Cards */}
-        <div className="space-y-2.5">
+        <VStack gap={3}>
           <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
             <ShieldCheck className="w-4 h-4 text-primary" />
             <span>Quick demo access — one click to populate credentials</span>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <Stack gap={3} wrap="wrap" vAlign="center" hAlign="between">
             <DemoCredentialCard
               roleTitle="Super Admin"
               email="admin@sellercore.io"
@@ -85,14 +86,14 @@ export default function Login() {
               isActive={email === 'ops@sellercore.io'}
               onSelect={fillOps}
             />
-          </div>
-        </div>
+          </Stack>
+        </VStack>
 
         <div className="h-px bg-border" />
 
         <Form action="/" method="post">
           {({ errors, processing }) => (
-            <div className="space-y-4">
+            <VStack gap={4}>
               <div className="flex flex-col gap-1.5 w-full">
                 <label
                   htmlFor="field-email"
@@ -110,9 +111,8 @@ export default function Login() {
                   required
                   autoComplete="email"
                   placeholder="admin@sellercore.io"
-                  className={`w-full h-10 px-3.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
-                    errors.email ? 'border-rose-500 focus:ring-rose-500/30' : 'border-border'
-                  }`}
+                  className={`w-full h-10 px-3.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${errors.email ? 'border-rose-500 focus:ring-rose-500/30' : 'border-border'
+                    }`}
                 />
                 {errors.email && (
                   <p className="text-xs font-medium text-rose-600 dark:text-rose-400">
@@ -149,10 +149,10 @@ export default function Login() {
                   force lockout engages after 5 failed attempts.
                 </span>
               </div>
-            </div>
+            </VStack>
           )}
         </Form>
       </div>
-    </AuthLayout>
+    </AuthLayout >
   )
 }

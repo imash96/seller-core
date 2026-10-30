@@ -3,7 +3,25 @@
  * and breadcrumb label resolution.
  */
 import type { LucideIcon } from 'lucide-react'
-import { LayoutDashboard, Package, Truck, Box, RotateCcw, Scale, Building2, Users, CreditCard, ListChecks, Upload, ScrollText, Shield, Tags, Warehouse, MapPin, } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Package,
+  Truck,
+  Box,
+  RotateCcw,
+  Scale,
+  Building2,
+  Users,
+  CreditCard,
+  ListChecks,
+  Upload,
+  ScrollText,
+  Shield,
+  Tags,
+  Warehouse,
+  MapPin,
+  Globe,
+} from 'lucide-react'
 
 export type NavItem = {
   href: string
@@ -20,12 +38,19 @@ export type NavSection = {
 export const NAVIGATION: NavSection[] = [
   {
     title: 'Dashboard',
+    items: [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }],
+  },
+  {
+    title: 'Product & Catalog Pipeline',
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/catalog', label: 'Catalog (Master)', icon: Tags },
+      { href: '/products', label: 'Products & Variants', icon: Box },
+      { href: '/listing', label: 'Platform Listings', icon: Globe },
+      { href: '/inventory', label: 'Inventory & Stock', icon: Warehouse },
     ],
   },
   {
-    title: 'Orders',
+    title: 'Orders & Fulfillment',
     items: [
       { href: '/orders', label: 'Orders', icon: Package },
       { href: '/shipments', label: 'Shipments & Invoices', icon: Truck },
@@ -35,24 +60,12 @@ export const NAVIGATION: NavSection[] = [
     ],
   },
   {
-    title: 'Product & Catalog',
-    items: [
-      { href: '/inventory', label: 'Inventory', icon: Warehouse },
-      { href: '/products', label: 'Products', icon: Box },
-      { href: '/catalogs', label: 'Catalogs', icon: Tags },
-    ],
-  },
-  {
     title: 'People',
-    items: [
-      { href: '/customers', label: 'Customers & Risk', icon: Users },
-    ],
+    items: [{ href: '/customers', label: 'Customers & Risk', icon: Users }],
   },
   {
     title: 'Finance',
-    items: [
-      { href: '/finance', label: 'Finance & Cards', icon: CreditCard },
-    ],
+    items: [{ href: '/finance', label: 'Finance & Cards', icon: CreditCard }],
   },
   {
     title: 'Tools',
@@ -65,14 +78,12 @@ export const NAVIGATION: NavSection[] = [
   },
   {
     title: 'Admin',
-    items: [
-      { href: '/admin', label: 'Users & RBAC', icon: Shield },
-    ],
+    items: [{ href: '/admin', label: 'Users & RBAC', icon: Shield }],
   },
 ]
 
 /** Flat list for TopNav / simple iteration */
-export const NAV_FLAT: NavItem[] = NAVIGATION.flatMap((section) => section.items,)
+export const NAV_FLAT: NavItem[] = NAVIGATION.flatMap((section) => section.items)
 
 /**
  * Pages that should NOT get the authenticated AppLayout wrapper.
@@ -94,71 +105,42 @@ export const ROUTE_LABELS: Record<string, string> = {
   orders: 'Orders',
   shipments: 'Shipments',
   inventory: 'Inventory',
-  products: 'Products',
-  catalogs: 'Catalogs',
+  products: 'Products & Variants',
+  catalog: 'Catalog (Master)',
+  catalogs: 'Catalog (Master)',
+  listing: 'Platform Listings',
+  listings: 'Platform Listings',
   returns: 'Returns',
   claims: 'Claims',
   customers: 'Customers',
-  finance: 'Finance',
-  tasks: 'Tasks',
+  'seller-accounts': 'Seller Accounts',
+  finance: 'Finance & Cards',
+  tasks: 'Tasks & Reminders',
   import: 'Bulk Import',
   audit: 'Audit History',
-  'address-cleanup': 'Address Cleanup',
   admin: 'Users & RBAC',
-  'seller-accounts': 'Seller Accounts',
-  accounts: 'Accounts',
-  auth: 'Auth',
-  login: 'Sign In',
-  signup: 'Sign Up',
-  settings: 'Settings',
-  tools: 'Tools',
+  'address-cleanup': 'Address Cleanup',
 }
 
-/**
- * Normalize a URL path so trailing slashes and query strings do not
- * interfere with route matching.
- */
-export function normalizePath(pathname: string): string {
-  const path = pathname.split(/[?#]/, 1)[0] || '/'
-  const normalized = `/${path.split('/').filter(Boolean).join('/')}`
-  return normalized === '/' ? '/' : normalized.replace(/\/+$/, '')
-}
+export const MODULE_KEYS = [
+  { key: 'orders', label: 'Orders' },
+  { key: 'products', label: 'Products & Catalog' },
+  { key: 'customers', label: 'Customers' },
+  { key: 'shipments', label: 'Shipments & Invoices' },
+  { key: 'returns', label: 'Returns & Refunds' },
+  { key: 'claims', label: 'Marketplace Claims' },
+  { key: 'finance', label: 'Finance & Ledger' },
+  { key: 'tasks', label: 'Tasks & Reminders' },
+  { key: 'import', label: 'Bulk Import' },
+  { key: 'audit', label: 'Audit Logs' },
+] as const
 
-/**
- * Check whether a page identifier is public.
- * Accepts paths such as /auth/login and /errors/not_found.
- */
-export function isPublicPage(pathname: string): boolean {
-  const normalized = normalizePath(pathname)
-  const pageId = normalized.replace(/^\/+/, '')
-
-  return PUBLIC_PAGES.some((page) => page === pageId)
-}
-
-/**
- * Resolve breadcrumb labels from a URL path.
- * Unknown segments are converted from kebab-case to readable text.
- */
-export function getBreadcrumbs(pathname: string): Array<{
-  href: string
-  label: string
-}> {
-  const normalized = normalizePath(pathname)
-  const segments = normalized.split('/').filter(Boolean)
-
-  if (segments.length === 0) {
-    return [{ href: '/', label: ROUTE_LABELS[''] }]
-  }
-
-  return segments.map((segment, index) => {
-    const href = `/${segments.slice(0, index + 1).join('/')}`
-    const fallbackLabel = decodeURIComponent(segment)
-      .replace(/[-_]+/g, ' ')
-      .replace(/\b\w/g, (char) => char.toUpperCase())
-
-    return {
-      href,
-      label: ROUTE_LABELS[segment] ?? fallbackLabel,
-    }
-  })
+export const MARKETPLACE_LABELS: Record<string, string> = {
+  amazon: 'Amazon',
+  ebay: 'eBay',
+  etsy: 'Etsy',
+  shopify: 'Shopify',
+  direct: 'Direct Webstore',
+  medusa: 'Medusa Website',
+  other: 'Other',
 }

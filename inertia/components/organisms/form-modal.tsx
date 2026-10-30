@@ -3,6 +3,7 @@ import { Form } from '@adonisjs/inertia/react'
 import { Button } from '@astryxdesign/core/Button'
 import { X, Sparkles } from 'lucide-react'
 import { FormField, type FieldDef } from '../molecules/form-field'
+import { VStack } from '@astryxdesign/core'
 
 function stripEmpty<T extends Record<string, unknown>>(data: T): Record<string, unknown> {
   const out: Record<string, unknown> = {}
@@ -67,12 +68,11 @@ export function SmartForm({
       }}
     >
       {({ errors, processing }) => (
-        <div className="space-y-4">
+        <VStack gap={4}>
           {intro && <p className="text-xs text-muted-foreground">{intro}</p>}
           <div
-            className={`grid gap-4 ${
-              compact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-            }`}
+            className={`grid gap-4 ${compact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+              }`}
           >
             {fields.map((f) => (
               <FormField
@@ -94,7 +94,7 @@ export function SmartForm({
               isDisabled={processing || (actionFor ? !values[fields[0]?.name] : false)}
             />
           </div>
-        </div>
+        </VStack>
       )}
     </Form>
   )

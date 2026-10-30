@@ -1,6 +1,13 @@
-import { type ReactNode } from 'react'
+import { createElement, isValidElement, type ComponentType, type ReactNode } from 'react'
 
-export type AvatarTone = 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'purple'
+export type AvatarTone =
+  | 'primary'
+  | 'success'
+  | 'warning'
+  | 'error'
+  | 'info'
+  | 'neutral'
+  | 'purple'
 
 const TONE_CLASSES: Record<AvatarTone, string> = {
   primary: 'bg-primary/12 text-primary border-primary/25',
@@ -18,6 +25,25 @@ const SIZE_CLASSES = {
   lg: 'w-12 h-12 text-sm rounded-2xl',
 }
 
+/**
+ * Safely renders either a ReactNode (<Icon />) or a component reference (Icon / forwardRef).
+ */
+export function renderIconOrNode(icon: unknown, defaultClassName = 'w-5 h-5'): ReactNode {
+  if (icon === null || icon === undefined || typeof icon === 'boolean') return null
+  if (isValidElement(icon)) return icon
+  if (
+    typeof icon === 'function' ||
+    (typeof icon === 'object' && icon !== null && ('render' in icon || '$$typeof' in icon))
+  ) {
+    const Comp = icon as ComponentType<{ className?: string }>
+    return createElement(Comp, { className: defaultClassName })
+  }
+  if (typeof icon === 'string' || typeof icon === 'number') {
+    return icon
+  }
+  return null
+}
+
 export function IconAvatar({
   icon,
   text,
@@ -25,7 +51,7 @@ export function IconAvatar({
   size = 'md',
   className = '',
 }: {
-  icon?: ReactNode
+  icon?: ReactNode | ComponentType<{ className?: string }> | unknown
   text?: string
   tone?: AvatarTone
   size?: 'sm' | 'md' | 'lg'
@@ -33,11 +59,13 @@ export function IconAvatar({
 }) {
   const toneCls = TONE_CLASSES[tone] ?? TONE_CLASSES.primary
   const sizeCls = SIZE_CLASSES[size]
+  const renderedIcon = renderIconOrNode(icon, size === 'sm' ? 'w-4 h-4' : 'w-5 h-5')
+
   return (
     <div
       className={`inline-flex items-center justify-center font-bold border shrink-0 select-none ${sizeCls} ${toneCls} ${className}`}
     >
-      {icon ?? (text ? text.slice(0, 2).toUpperCase() : 'SC')}
+      {renderedIcon ?? (text ? text.slice(0, 2).toUpperCase() : 'SC')}
     </div>
   )
 }

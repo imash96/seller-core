@@ -31,6 +31,7 @@ import {
   CreditCard,
   Activity,
 } from 'lucide-react'
+import { Grid, VStack } from '@astryxdesign/core'
 
 type Props = {
   kpis: DashboardKpis
@@ -67,7 +68,6 @@ const CHANNEL_FILTERS = [
   { value: 'amazon', label: 'Amazon' },
   { value: 'ebay', label: 'eBay' },
   { value: 'etsy', label: 'Etsy' },
-  { value: 'shopify', label: 'Shopify' },
   { value: 'direct', label: 'Direct Webstore' },
 ]
 
@@ -126,7 +126,7 @@ export default function Dashboard(props: Props) {
       (s, o) =>
         s +
         (Number(o.marketplaceFeesAmount || 0) + Number(o.paymentProcessingFeesAmount || 0)) *
-          rateOf(o),
+        rateOf(o),
       0
     )
     const cogs = filteredOrders.reduce((s, o) => s + Number(o.cogsAmount || 0) * rateOf(o), 0)
@@ -170,7 +170,6 @@ export default function Dashboard(props: Props) {
       ebay: '#3b82f6',
       etsy: '#f97316',
       direct: '#10b981',
-      shopify: '#22c55e',
     }
     const entries = Object.entries(counts)
     if (entries.length === 0) {
@@ -224,8 +223,8 @@ export default function Dashboard(props: Props) {
 
   const totalCostBurden =
     Number(activeKpis.totalCogs) +
-      Number(activeKpis.totalMarketplaceFees) +
-      Number(activeKpis.totalShippingCost) || 1
+    Number(activeKpis.totalMarketplaceFees) +
+    Number(activeKpis.totalShippingCost) || 1
 
   return (
     <div className="space-y-6">
@@ -234,25 +233,6 @@ export default function Dashboard(props: Props) {
         description="Real-time multi-currency order economics, carrier invoice reconciliation, risk review queues, and Business vs. Household ledger analytics."
         icon={LayoutDashboard}
         badge={currencyMode === 'reporting' ? 'Reporting USD' : 'Native Currency'}
-        actions={
-          <>
-            <Link href="/orders">
-              <Button label="+ New Order" variant="primary" size="sm" />
-            </Link>
-            <Link href="/products">
-              <Button label="+ New Product" variant="secondary" size="sm" />
-            </Link>
-            <Link href="/shipments">
-              <Button label="+ Record Shipment" variant="secondary" size="sm" />
-            </Link>
-            <Link href="/finance">
-              <Button label="+ Log Transaction" variant="ghost" size="sm" />
-            </Link>
-            <Link href="/tasks">
-              <Button label="+ Create Task" variant="ghost" size="sm" />
-            </Link>
-          </>
-        }
       />
 
       {/* Top Executive Filter Bar */}
@@ -265,11 +245,10 @@ export default function Dashboard(props: Props) {
                 key={ch.value}
                 type="button"
                 onClick={() => setChannelFilter(ch.value)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors whitespace-nowrap ${
-                  active
-                    ? 'bg-primary text-primary-foreground border-primary shadow-2xs'
-                    : 'bg-background text-muted-foreground border-border hover:text-foreground hover:bg-muted'
-                }`}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors whitespace-nowrap ${active
+                  ? 'bg-primary text-primary-foreground border-primary shadow-2xs'
+                  : 'bg-background text-muted-foreground border-border hover:text-foreground hover:bg-muted'
+                  }`}
               >
                 {ch.label}
               </button>
@@ -281,22 +260,20 @@ export default function Dashboard(props: Props) {
           <button
             type="button"
             onClick={() => setCurrencyMode('reporting')}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-              currencyMode === 'reporting'
-                ? 'bg-card text-foreground shadow-2xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${currencyMode === 'reporting'
+              ? 'bg-card text-foreground shadow-2xs'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             Reporting USD
           </button>
           <button
             type="button"
             onClick={() => setCurrencyMode('native')}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-              currencyMode === 'native'
-                ? 'bg-card text-foreground shadow-2xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${currencyMode === 'native'
+              ? 'bg-card text-foreground shadow-2xs'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             Native Breakdown
           </button>
@@ -304,7 +281,7 @@ export default function Dashboard(props: Props) {
       </div>
 
       {/* 4 Hero KPI Scorecards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <Grid columns={{ minWidth: 280, max: 3 }} gap={4}>
         <KpiScorecard
           title="Gross & Net Revenue"
           value={money('USD', activeKpis.grossSales)}
@@ -399,7 +376,7 @@ export default function Dashboard(props: Props) {
             </span>
           </div>
         </KpiScorecard>
-      </div>
+      </Grid>
 
       {/* Secondary Compact Operational Health Strip */}
       <StatStrip
@@ -456,7 +433,7 @@ export default function Dashboard(props: Props) {
         title="Live Operational Queues"
         description="Switch across active operational domains without leaving the command center."
       >
-        <div className="space-y-4">
+        <VStack gap={4}>
           <div className="flex items-center gap-2 overflow-x-auto border-b border-border pb-2.5">
             {QUEUE_TABS.map((tab) => {
               const active = activeTab === tab.id
@@ -465,11 +442,10 @@ export default function Dashboard(props: Props) {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
-                    active
-                      ? 'bg-primary text-primary-foreground shadow-xs'
-                      : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${active
+                    ? 'bg-primary text-primary-foreground shadow-xs'
+                    : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -530,7 +506,7 @@ export default function Dashboard(props: Props) {
 
           {activeTab === 'returns' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="space-y-2.5">
+              <VStack gap={3}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">
                     Open Return Requests (RMAs)
@@ -549,9 +525,9 @@ export default function Dashboard(props: Props) {
                     col.money('refundAmount', 'Refund', 'currencyCode'),
                   ]}
                 />
-              </div>
+              </VStack>
 
-              <div className="space-y-2.5">
+              <VStack gap={3}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">Marketplace Claims</span>
                   <Link href="/claims">
@@ -568,13 +544,13 @@ export default function Dashboard(props: Props) {
                     col.date('respondByAt', 'Respond By'),
                   ]}
                 />
-              </div>
+              </VStack>
             </div>
           )}
 
           {activeTab === 'finance' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="space-y-2.5">
+              <VStack gap={3}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">
                     Registered Credit Cards
@@ -593,9 +569,9 @@ export default function Dashboard(props: Props) {
                     col.money('creditLimit', 'Limit', 'currencyCode'),
                   ]}
                 />
-              </div>
+              </VStack>
 
-              <div className="space-y-2.5">
+              <VStack gap={3}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">
                     Operational Tasks & Reminders
@@ -619,13 +595,13 @@ export default function Dashboard(props: Props) {
                     col.date('dueAt', 'Due'),
                   ]}
                 />
-              </div>
+              </VStack>
             </div>
           )}
 
           {activeTab === 'governance' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="space-y-2.5">
+              <VStack gap={3}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">
                     Connected Seller Accounts
@@ -644,9 +620,9 @@ export default function Dashboard(props: Props) {
                     col.badge('healthStatus', 'Health', STATUS_TONES),
                   ]}
                 />
-              </div>
+              </VStack>
 
-              <div className="space-y-2.5">
+              <VStack gap={3}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">
                     Recent Tamper-Evident Audit Events
@@ -672,10 +648,10 @@ export default function Dashboard(props: Props) {
                     col.date('createdAt', 'When'),
                   ]}
                 />
-              </div>
+              </VStack>
             </div>
           )}
-        </div>
+        </VStack>
       </PageSection>
     </div>
   )

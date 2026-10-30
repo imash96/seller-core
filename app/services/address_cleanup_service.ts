@@ -1,6 +1,7 @@
-import type { CleanedAddress, LineAdd } from '../types/address_cleanup.ts'
+import { type CleanedAddress, type LineAdd } from '../types/address_cleanup.ts'
 import { COUNTRY_ISO_MAP, COUNTRY_LIST } from '../utils/country_list.js'
 import stateCheck from '../utils/state_check.js'
+import { generateDtdcLabelDocx } from '../utils/dtdc_docx_generator.js'
 
 // ---  US city-state-zip pattern: "City, ST 12345" or "City, ST 12345-6789"
 const US_CSZ_REGEX = /^(.+?),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/
@@ -162,12 +163,10 @@ export class CleanAdd {
               break
             case 'ioss':
             case 'vat':
-            case 'rut':
               vatOrIoss = value
               break
+            case 'rut':
             case 'rutId':
-              buyerNationalId = value
-              break
             case 'buyerNationalId':
             case 'taxId':
               buyerNationalId = value
@@ -203,7 +202,7 @@ export class CleanAdd {
   private extractRef(coreLines: string[]): { ref: string; remaining: string[] } {
     if (coreLines.length < 2) return { ref: '', remaining: coreLines }
 
-    const last = coreLines[coreLines.length - 1]
+    const last = coreLines[coreLines.length - 1].replace(/^ref\s*:\s*/i, '').trim()
 
     // If it looks like a country, it's not a ref
     if (matchCountry(last)) return { ref: '', remaining: coreLines }
@@ -216,16 +215,10 @@ export class CleanAdd {
     // If it matches EU zip-city format, not a ref
     if (EU_ZIP_CITY_REGEX.test(last)) return { ref: '', remaining: coreLines }
 
-    // Heuristic: a ref line is typically an order number or alphanumeric ID
-    // - Contains digits and possibly dashes (like 114-5610173-1564218-JCAM or 4208118056)
-    // - Does NOT contain commas (city/state/zip lines do)
-    // - Is NOT a normal street address (usually has letters and numbers mixed)
     const isLikelyRef =
-      // Pure digits (like 4208118056)
+      /^ref\s*:/i.test(coreLines[coreLines.length - 1]) ||
       /^\d{7,}$/.test(last) ||
-      // Order-style: digits/dashes/letters (like 114-5610173-1564218-JCAM, 06-15326-16231)
       /^\d{2,}-\d+/.test(last) ||
-      // Already uppercase alphanumeric with dashes
       /^[A-Z0-9\-]{7,}$/.test(last.toUpperCase())
 
     if (isLikelyRef) {
@@ -246,9 +239,6 @@ export class CleanAdd {
     const remaining: string[] = []
     let country = 'United States'
 
-    // Scan ALL core lines and strip any that are a known country name.
-    // This handles duplicates ("Germany\n...\nGermany") and mid-address
-    // country lines (e.g. country between street and zip-city).
     for (const line of coreLines) {
       const matched = matchCountry(line)
       if (matched) {
@@ -334,20 +324,20 @@ export class CleanAdd {
   }
 
   /**
-   * Build add1/add2/add3 from street lines, wrapping at 35 chars.
+   * Build line1/line2/line3 from street lines, wrapping at 35 chars.
    */
   private extractAddLines(streetLines: string[]): { lines: LineAdd; overflow: boolean } {
     const lineAdd: LineAdd = {
-      add1: '-',
-      add2: '-',
-      add3: '-',
+      line1: '-',
+      line2: '-',
+      line3: '-',
     }
     let overflow = false
     const working = [...streetLines]
     let leftover = ''
 
     for (let i = 0; i < 3 && (i < working.length || leftover); i++) {
-      const key = `add${i + 1}` as keyof LineAdd
+      const key = `line${i + 1}` as keyof LineAdd
       let current = working[i] ? working[i].trim() : ''
 
       if (leftover) {
@@ -417,19 +407,6 @@ export class CleanAdd {
     const cityStateZipLine = coreLines.length > 0 ? coreLines[coreLines.length - 1] : undefined
     const streetLines = coreLines.length > 1 ? coreLines.slice(0, -1) : []
 
-    // Edge case: if we only have one core line left, it's likely the city/state/zip
-    // and there are no street lines (shouldn't happen with valid addresses, but be safe)
-    if (
-      coreLines.length === 1 &&
-      !US_CSZ_REGEX.test(coreLines[0]) &&
-      !CA_CSZ_REGEX.test(coreLines[0]) &&
-      !GENERIC_CSZ_REGEX.test(coreLines[0]) &&
-      !EU_ZIP_CITY_REGEX.test(coreLines[0])
-    ) {
-      // The single remaining line is likely a street address with no CSZ — push to street
-      // This is unlikely but defensive
-    }
-
     const { city, state, zipcode, rawZip } = this.parseCityStateZip(cityStateZipLine, country)
 
     // Step 6: Build add lines from street addresses
@@ -453,9 +430,9 @@ export class CleanAdd {
       name,
       companyName: buyerName || name,
       ...extractedLines,
-      line1: extractedLines.add1 !== '-' ? extractedLines.add1 : '',
-      line2: extractedLines.add2 !== '-' ? extractedLines.add2 : '',
-      line3: extractedLines.add3 !== '-' ? extractedLines.add3 : '',
+      line1: extractedLines.line1,
+      line2: extractedLines.line2,
+      line3: extractedLines.line3,
       city,
       state,
       zipcode,
@@ -491,11 +468,11 @@ export class CleanAdd {
     const rawBlocks = Array.isArray(input)
       ? input
       : input
-          .trim()
-          .normalize('NFD')
-          .replace(/\p{Diacritic}/gu, '')
-          .replace(/\r\n/g, '\n')
-          .split(/\n{2,}/)
+        .trim()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .replace(/\r\n/g, '\n')
+        .split(/\n{2,}/)
 
     for (const block of rawBlocks) {
       if (!block || !block.trim()) continue
@@ -505,10 +482,7 @@ export class CleanAdd {
         .filter(Boolean)
         .map((d) =>
           d.replace(/\w\S*/g, (word) => {
-            // Preserve fully uppercase alphanumeric tokens that contain digits
-            // (order refs, zip codes, etc.)
             if (/^[A-Z0-9\-]{2,}$/.test(word) && /\d/.test(word)) return word
-            // Preserve 2-letter state/province codes when they're all caps
             if (/^[A-Z]{2}$/.test(word)) return word
             return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
           })
@@ -526,9 +500,9 @@ export class CleanAdd {
     const headers = [
       'name',
       'companyName',
-      'add1',
-      'add2',
-      'add3',
+      'line1',
+      'line2',
+      'line3',
       'city',
       'state',
       'zipcode',
@@ -550,5 +524,12 @@ export class CleanAdd {
     }
     const rows = addresses.map((a) => headers.map((h) => escapeCell((a as any)[h])).join(','))
     return [headers.join(','), ...rows].join('\n')
+  }
+
+  /**
+   * Generates a DTDC Shipping Label `.docx` Buffer matching `DTDC Label.docx`.
+   */
+  public static toDocxBuffer(addresses: CleanedAddress[]): Buffer {
+    return generateDtdcLabelDocx(addresses)
   }
 }

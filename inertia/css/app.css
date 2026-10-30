@@ -4,40 +4,199 @@
 @import './light.css';
 @import './dark.css';
 
-/* Tell Tailwind v4 that `dark:` maps to the `.dark` class on :root */
-@custom-variant dark (&:where(.dark, .dark *));
+/* Tell Tailwind v4 that `dark:` maps to `.dark` or `[data-theme="dark"]` */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme='dark'], [data-theme='dark'] *));
 
 @theme inline {
   --font-sans: 'Inter', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
+
+  /* Core Brand & Interactive */
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-subtle: var(--primary-subtle);
+
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-active: var(--secondary-active);
+  --color-secondary-subtle: var(--secondary-subtle);
+
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
+  --color-accent-subtle: var(--accent-subtle);
+
+  /* Canvas & Surfaces */
+  --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
+  --color-background-tertiary: var(--background-tertiary);
+
+  --color-foreground: var(--foreground);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-foreground-tertiary: var(--foreground-tertiary);
+
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-sunken: var(--surface-sunken);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-card-hover: var(--card-hover);
+  --color-card-border: var(--card-border);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover-border: var(--popover-border);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted-hover: var(--muted-hover);
+  --color-subtle: var(--subtle);
+
+  /* Borders, Dividers & Text */
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-divider: var(--divider);
+  --color-divider-strong: var(--divider-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-disabled: var(--text-disabled);
+  --color-text-inverse: var(--text-inverse);
+  --color-text-accent: var(--text-accent);
+
+  /* Semantic Status */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-hover: var(--success-hover);
+  --color-success-active: var(--success-active);
+  --color-success-subtle: var(--success-subtle);
+
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
+  --color-destructive-hover: var(--destructive-hover);
+  --color-destructive-active: var(--destructive-active);
+  --color-destructive-subtle: var(--destructive-subtle);
+
+  --color-error: var(--error);
+  --color-error-foreground: var(--error-foreground);
+  --color-error-hover: var(--error-hover);
+  --color-error-active: var(--error-active);
+  --color-error-subtle: var(--error-subtle);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-hover: var(--warning-hover);
+  --color-warning-active: var(--warning-active);
+  --color-warning-subtle: var(--warning-subtle);
+
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-hover: var(--info-hover);
+  --color-info-active: var(--info-active);
+  --color-info-subtle: var(--info-subtle);
+
+  /* E-Commerce Domain Tokens */
+  --color-badge-new: var(--badge-new);
+  --color-badge-new-foreground: var(--badge-new-foreground);
+  --color-badge-sale: var(--badge-sale);
+  --color-badge-sale-foreground: var(--badge-sale-foreground);
+  --color-badge-limited: var(--badge-limited);
+  --color-badge-limited-foreground: var(--badge-limited-foreground);
+
+  --color-price-current: var(--price-current);
+  --color-price-original: var(--price-original);
+  --color-price-sale: var(--price-sale);
+  --color-price-save: var(--price-save);
+
+  --color-rating-filled: var(--rating-filled);
+  --color-rating-empty: var(--rating-empty);
+  --color-rating-half: var(--rating-half);
+
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+  --color-link-visited: var(--link-visited);
+  --color-link-active: var(--link-active);
+
+  /* Inputs & Rings */
   --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-input-border: var(--input-border);
+  --color-input-border-hover: var(--input-border-hover);
+  --color-input-border-focus: var(--input-border-focus);
+  --color-input-text: var(--input-text);
+  --color-input-placeholder: var(--input-placeholder);
   --color-ring: var(--ring);
+  --color-ring-offset: var(--ring-offset);
+
+  /* Component-Scoped Button Tokens */
+  --color-button-primary: var(--button-primary);
+  --color-button-primary-foreground: var(--button-primary-foreground);
+  --color-button-primary-hover: var(--button-primary-hover);
+  --color-button-primary-active: var(--button-primary-active);
+
+  --color-button-secondary: var(--button-secondary);
+  --color-button-secondary-foreground: var(--button-secondary-foreground);
+  --color-button-secondary-hover: var(--button-secondary-hover);
+  --color-button-secondary-active: var(--button-secondary-active);
+
+  --color-button-destructive: var(--button-destructive);
+  --color-button-destructive-foreground: var(--button-destructive-foreground);
+  --color-button-destructive-hover: var(--button-destructive-hover);
+  --color-button-destructive-active: var(--button-destructive-active);
+
+  --color-button-accent: var(--button-accent);
+  --color-button-accent-foreground: var(--button-accent-foreground);
+  --color-button-accent-hover: var(--button-accent-hover);
+  --color-button-accent-active: var(--button-accent-active);
+
+  --color-button-ghost-foreground: var(--button-ghost-foreground);
+  --color-button-ghost-hover: var(--button-ghost-hover);
+  --color-button-ghost-active: var(--button-ghost-active);
+
+  --color-button-outline: var(--button-outline);
+  --color-button-outline-foreground: var(--button-outline-foreground);
+  --color-button-outline-border: var(--button-outline-border);
+  --color-button-outline-hover: var(--button-outline-hover);
+  --color-button-outline-hover-foreground: var(--button-outline-hover-foreground);
+
+  --color-button-cart: var(--button-cart);
+  --color-button-cart-foreground: var(--button-cart-foreground);
+  --color-button-cart-hover: var(--button-cart-hover);
+
+  --color-button-wishlist: var(--button-wishlist);
+  --color-button-wishlist-foreground: var(--button-wishlist-foreground);
+  --color-button-wishlist-hover: var(--button-wishlist-hover);
+
+  --color-button-badge: var(--button-badge);
+  --color-button-badge-foreground: var(--button-badge-foreground);
+
+  /* Neutral Scale */
+  --color-neutral-50: var(--neutral-50);
+  --color-neutral-100: var(--neutral-100);
+  --color-neutral-200: var(--neutral-200);
+  --color-neutral-300: var(--neutral-300);
+  --color-neutral-400: var(--neutral-400);
+  --color-neutral-500: var(--neutral-500);
+  --color-neutral-600: var(--neutral-600);
+  --color-neutral-700: var(--neutral-700);
+  --color-neutral-800: var(--neutral-800);
+  --color-neutral-900: var(--neutral-900);
+  --color-neutral-950: var(--neutral-950);
+
+  /* Charts & Sidebar */
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: var(--radius);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -48,218 +207,24 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* Bridge legacy and Astryx CSS variables to unified semantic tokens */
-:root,
-.dark,
-[data-theme='light'],
-[data-theme='dark'] {
-  --bg-surface: var(--card);
-  --bg-subtle: var(--muted);
-  --bg-muted: var(--muted);
-  --text-primary: var(--foreground);
-  --text-secondary: var(--secondary-foreground);
-  --text-muted: var(--muted-foreground);
-  --border-default: var(--border);
-  --border-subtle: var(--border);
-  --accent-primary: var(--primary);
-  --astryx-color-background-surface: var(--card);
-  --astryx-color-background-wash: var(--background);
-  --astryx-color-background-muted: var(--muted);
-  --astryx-color-border-default: var(--border);
-  --astryx-color-text-primary: var(--foreground);
-  --astryx-color-text-secondary: var(--muted-foreground);
-}
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--border);
+  }
 
-html,
-body,
-#app {
-  min-height: 100%;
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-}
+  html,
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-.unstyled-link {
-  text-decoration: none;
-  color: inherit;
-}
-
-/* ------------------------------------------------------------------ */
-/* Interactive elements — cursor + focus ring                          */
-/* ------------------------------------------------------------------ */
-button,
-[role='button'],
-a[href],
-select,
-input[type='checkbox'],
-input[type='radio'] {
-  cursor: pointer;
-}
-
-/* Ensure form inputs & selects always inherit readable foreground/background */
-input,
-textarea,
-select {
-  color: var(--foreground);
-}
-
-/* ------------------------------------------------------------------ */
-/* Login page: demo credential cards                                   */
-/* ------------------------------------------------------------------ */
-.demo-card {
-  flex: 1 1 200px;
-  text-align: left;
-  padding: 0.875rem 1rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--border);
-  background-color: var(--card);
-  color: var(--card-foreground);
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.demo-card:hover {
-  border-color: var(--primary);
-  background-color: var(--accent);
-  box-shadow: 0 0 0 3px oklch(from var(--primary) l c h / 0.12);
-}
-
-.demo-card--active {
-  border-color: var(--primary);
-  background-color: oklch(from var(--primary) l c h / 0.08);
-  box-shadow: 0 0 0 3px oklch(from var(--primary) l c h / 0.18);
-}
-
-.demo-card__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 0.5rem;
-  flex-shrink: 0;
-}
-
-.demo-card__icon--admin {
-  background: linear-gradient(135deg, var(--primary), oklch(0.55 0.22 270));
-}
-
-.demo-card__icon--ops {
-  background: linear-gradient(135deg, oklch(0.6 0.18 160), oklch(0.55 0.2 150));
-}
-
-/* ------------------------------------------------------------------ */
-/* Password field input wrapper & toggle button                        */
-/* ------------------------------------------------------------------ */
-.password-input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
-.password-toggle-btn {
-  position: absolute;
-  right: 0.625rem;
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 0.25rem;
-  border-radius: 0.375rem;
-  color: var(--muted-foreground);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: color 0.15s ease, background-color 0.15s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-}
-
-.password-toggle-btn:hover {
-  color: var(--foreground);
-  background-color: var(--muted);
-}
-
-/* ------------------------------------------------------------------ */
-/* Login page: demo prefill link                                       */
-/* ------------------------------------------------------------------ */
-.demo-prefill-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--primary);
-  text-decoration: none;
-  transition: opacity 0.15s ease;
-}
-
-.demo-prefill-link:hover {
-  opacity: 0.85;
-  text-decoration: underline;
-}
-
-/* ------------------------------------------------------------------ */
-/* List page header: search form                                       */
-/* ------------------------------------------------------------------ */
-.search-form {
-  flex: 1 1 220px;
-  min-width: 0;
-}
-
-/* ------------------------------------------------------------------ */
-/* Floating Bulk Actions Bar                                           */
-/* ------------------------------------------------------------------ */
-.bulk-bar-fixed {
-  position: fixed;
-  bottom: 1.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 40;
-  width: calc(100% - 2rem);
-  max-width: 42rem;
-}
-
-/* ------------------------------------------------------------------ */
-/* Meta label (compact metadata grids)                                 */
-/* ------------------------------------------------------------------ */
-.meta-label {
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* ------------------------------------------------------------------ */
-/* Focus rings — consistent across inputs & interactive elements       */
-/* ------------------------------------------------------------------ */
-:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-
-/* ------------------------------------------------------------------ */
-/* Scrollbar polish (Webkit only)                                      */
-/* ------------------------------------------------------------------ */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background-color: var(--border);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background-color: var(--muted-foreground);
-}
-
-/* ------------------------------------------------------------------ */
-/* Selection color                                                     */
-/* ------------------------------------------------------------------ */
-::selection {
-  background-color: oklch(from var(--primary) l c h / 0.2);
-  color: var(--foreground);
+  a.unstyled-link {
+    text-decoration: none;
+    color: inherit;
+  }
 }

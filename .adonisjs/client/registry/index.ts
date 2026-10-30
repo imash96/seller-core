@@ -6,6 +6,12 @@ import type { ApiDefinition } from './tree.d.ts'
 const placeholder: any = {}
 
 const routes = {
+  'store.product_categories': {
+    methods: ["GET","HEAD"],
+    pattern: '/store/product-categories',
+    tokens: [[0,"store"],[0,"product-categories"]],
+    types: placeholder as Registry['store.product_categories']['types'],
+  },
   'session.create': {
     methods: ["GET","HEAD"],
     pattern: '/',
@@ -36,23 +42,41 @@ const routes = {
     tokens: [[0,"customers"]],
     types: placeholder as Registry['pages.customers']['types'],
   },
-  'pages.products': {
+  'pages.catalog': {
     methods: ["GET","HEAD"],
-    pattern: '/products',
-    tokens: [[0,"products"]],
-    types: placeholder as Registry['pages.products']['types'],
-  },
-  'pages.inventory': {
-    methods: ["GET","HEAD"],
-    pattern: '/inventory',
-    tokens: [[0,"inventory"]],
-    types: placeholder as Registry['pages.inventory']['types'],
+    pattern: '/catalog',
+    tokens: [[0,"catalog"]],
+    types: placeholder as Registry['pages.catalog']['types'],
   },
   'pages.catalogs': {
     methods: ["GET","HEAD"],
     pattern: '/catalogs',
     tokens: [[0,"catalogs"]],
     types: placeholder as Registry['pages.catalogs']['types'],
+  },
+  'pages.products': {
+    methods: ["GET","HEAD"],
+    pattern: '/products',
+    tokens: [[0,"products"]],
+    types: placeholder as Registry['pages.products']['types'],
+  },
+  'pages.listing': {
+    methods: ["GET","HEAD"],
+    pattern: '/listing',
+    tokens: [[0,"listing"]],
+    types: placeholder as Registry['pages.listing']['types'],
+  },
+  'pages.listings': {
+    methods: ["GET","HEAD"],
+    pattern: '/listings',
+    tokens: [[0,"listings"]],
+    types: placeholder as Registry['pages.listings']['types'],
+  },
+  'pages.inventory': {
+    methods: ["GET","HEAD"],
+    pattern: '/inventory',
+    tokens: [[0,"inventory"]],
+    types: placeholder as Registry['pages.inventory']['types'],
   },
   'pages.accounts': {
     methods: ["GET","HEAD"],
@@ -107,6 +131,12 @@ const routes = {
     pattern: '/address-cleanup',
     tokens: [[0,"address-cleanup"]],
     types: placeholder as Registry['pages.address_cleanup']['types'],
+  },
+  'pages.tools_address_cleanup': {
+    methods: ["GET","HEAD"],
+    pattern: '/tools/address-cleanup',
+    tokens: [[0,"tools"],[0,"address-cleanup"]],
+    types: placeholder as Registry['pages.tools_address_cleanup']['types'],
   },
   'pages.admin': {
     methods: ["GET","HEAD"],
@@ -186,6 +216,60 @@ const routes = {
     tokens: [[0,"risk-signals"],[1,"id"],[0,"review"]],
     types: placeholder as Registry['risk_signals.review']['types'],
   },
+  'catalogs.sync_categories': {
+    methods: ["POST"],
+    pattern: '/catalogs/sync-categories',
+    tokens: [[0,"catalogs"],[0,"sync-categories"]],
+    types: placeholder as Registry['catalogs.sync_categories']['types'],
+  },
+  'catalogs.import': {
+    methods: ["POST"],
+    pattern: '/catalogs/import',
+    tokens: [[0,"catalogs"],[0,"import"]],
+    types: placeholder as Registry['catalogs.import']['types'],
+  },
+  'catalogs.import_json': {
+    methods: ["POST"],
+    pattern: '/catalogs/import-json',
+    tokens: [[0,"catalogs"],[0,"import-json"]],
+    types: placeholder as Registry['catalogs.import_json']['types'],
+  },
+  'catalog_items.store': {
+    methods: ["POST"],
+    pattern: '/catalog-items',
+    tokens: [[0,"catalog-items"]],
+    types: placeholder as Registry['catalog_items.store']['types'],
+  },
+  'catalog_items.update': {
+    methods: ["POST"],
+    pattern: '/catalog-items/:id',
+    tokens: [[0,"catalog-items"],[1,"id"]],
+    types: placeholder as Registry['catalog_items.update']['types'],
+  },
+  'catalog_items.delete': {
+    methods: ["POST"],
+    pattern: '/catalog-items/:id/delete',
+    tokens: [[0,"catalog-items"],[1,"id"],[0,"delete"]],
+    types: placeholder as Registry['catalog_items.delete']['types'],
+  },
+  'catalog_items.preview': {
+    methods: ["POST"],
+    pattern: '/catalog-items/:id/preview',
+    tokens: [[0,"catalog-items"],[1,"id"],[0,"preview"]],
+    types: placeholder as Registry['catalog_items.preview']['types'],
+  },
+  'catalog_items.convert': {
+    methods: ["POST"],
+    pattern: '/catalog-items/:id/convert',
+    tokens: [[0,"catalog-items"],[1,"id"],[0,"convert"]],
+    types: placeholder as Registry['catalog_items.convert']['types'],
+  },
+  'catalogs.generate_listings': {
+    methods: ["POST"],
+    pattern: '/catalogs/generate-listings',
+    tokens: [[0,"catalogs"],[0,"generate-listings"]],
+    types: placeholder as Registry['catalogs.generate_listings']['types'],
+  },
   'brands.store': {
     methods: ["POST"],
     pattern: '/brands',
@@ -246,29 +330,47 @@ const routes = {
     tokens: [[0,"products"],[1,"id"],[0,"variants"]],
     types: placeholder as Registry['variants.store']['types'],
   },
-  'variants.delete': {
-    methods: ["POST"],
-    pattern: '/variants/:id/delete',
-    tokens: [[0,"variants"],[1,"id"],[0,"delete"]],
-    types: placeholder as Registry['variants.delete']['types'],
-  },
   'variants.update_stock': {
     methods: ["POST"],
     pattern: '/variants/:id/stock',
     tokens: [[0,"variants"],[1,"id"],[0,"stock"]],
     types: placeholder as Registry['variants.update_stock']['types'],
   },
-  'channel_listings.store': {
+  'variants.delete': {
+    methods: ["POST"],
+    pattern: '/variants/:id/delete',
+    tokens: [[0,"variants"],[1,"id"],[0,"delete"]],
+    types: placeholder as Registry['variants.delete']['types'],
+  },
+  'listings.store': {
     methods: ["POST"],
     pattern: '/channel-listings',
     tokens: [[0,"channel-listings"]],
-    types: placeholder as Registry['channel_listings.store']['types'],
+    types: placeholder as Registry['listings.store']['types'],
   },
-  'channel_listings.delete': {
+  'listings.publish_sku': {
+    methods: ["POST"],
+    pattern: '/channel-listings/publish-sku',
+    tokens: [[0,"channel-listings"],[0,"publish-sku"]],
+    types: placeholder as Registry['listings.publish_sku']['types'],
+  },
+  'listings.update': {
+    methods: ["POST"],
+    pattern: '/channel-listings/:id',
+    tokens: [[0,"channel-listings"],[1,"id"]],
+    types: placeholder as Registry['listings.update']['types'],
+  },
+  'listings.publish': {
+    methods: ["POST"],
+    pattern: '/channel-listings/:id/publish',
+    tokens: [[0,"channel-listings"],[1,"id"],[0,"publish"]],
+    types: placeholder as Registry['listings.publish']['types'],
+  },
+  'listings.delete': {
     methods: ["POST"],
     pattern: '/channel-listings/:id/delete',
     tokens: [[0,"channel-listings"],[1,"id"],[0,"delete"]],
-    types: placeholder as Registry['channel_listings.delete']['types'],
+    types: placeholder as Registry['listings.delete']['types'],
   },
   'seller_accounts.store': {
     methods: ["POST"],
@@ -312,6 +414,36 @@ const routes = {
     tokens: [[0,"shipments"],[1,"id"],[0,"status"]],
     types: placeholder as Registry['shipments.update_status']['types'],
   },
+  'shipments.delete': {
+    methods: ["POST"],
+    pattern: '/shipments/:id/delete',
+    tokens: [[0,"shipments"],[1,"id"],[0,"delete"]],
+    types: placeholder as Registry['shipments.delete']['types'],
+  },
+  'carrier_invoices.store': {
+    methods: ["POST"],
+    pattern: '/carrier-invoices',
+    tokens: [[0,"carrier-invoices"]],
+    types: placeholder as Registry['carrier_invoices.store']['types'],
+  },
+  'carrier_invoices.update': {
+    methods: ["POST"],
+    pattern: '/carrier-invoices/:id',
+    tokens: [[0,"carrier-invoices"],[1,"id"]],
+    types: placeholder as Registry['carrier_invoices.update']['types'],
+  },
+  'carrier_invoices.update_status': {
+    methods: ["POST"],
+    pattern: '/carrier-invoices/:id/status',
+    tokens: [[0,"carrier-invoices"],[1,"id"],[0,"status"]],
+    types: placeholder as Registry['carrier_invoices.update_status']['types'],
+  },
+  'carrier_invoices.delete': {
+    methods: ["POST"],
+    pattern: '/carrier-invoices/:id/delete',
+    tokens: [[0,"carrier-invoices"],[1,"id"],[0,"delete"]],
+    types: placeholder as Registry['carrier_invoices.delete']['types'],
+  },
   'shipping_invoices.store': {
     methods: ["POST"],
     pattern: '/shipping-invoices',
@@ -336,6 +468,12 @@ const routes = {
     tokens: [[0,"returns"],[1,"id"],[0,"status"]],
     types: placeholder as Registry['returns.update_status']['types'],
   },
+  'returns.delete': {
+    methods: ["POST"],
+    pattern: '/returns/:id/delete',
+    tokens: [[0,"returns"],[1,"id"],[0,"delete"]],
+    types: placeholder as Registry['returns.delete']['types'],
+  },
   'refunds.store': {
     methods: ["POST"],
     pattern: '/refunds',
@@ -348,11 +486,23 @@ const routes = {
     tokens: [[0,"claims"]],
     types: placeholder as Registry['claims.store']['types'],
   },
+  'claims.update': {
+    methods: ["POST"],
+    pattern: '/claims/:id',
+    tokens: [[0,"claims"],[1,"id"]],
+    types: placeholder as Registry['claims.update']['types'],
+  },
   'claims.update_status': {
     methods: ["POST"],
     pattern: '/claims/:id/status',
     tokens: [[0,"claims"],[1,"id"],[0,"status"]],
     types: placeholder as Registry['claims.update_status']['types'],
+  },
+  'claims.delete': {
+    methods: ["POST"],
+    pattern: '/claims/:id/delete',
+    tokens: [[0,"claims"],[1,"id"],[0,"delete"]],
+    types: placeholder as Registry['claims.delete']['types'],
   },
   'financial_accounts.store': {
     methods: ["POST"],
@@ -372,6 +522,24 @@ const routes = {
     tokens: [[0,"financial-accounts"],[1,"id"],[0,"delete"]],
     types: placeholder as Registry['financial_accounts.delete']['types'],
   },
+  'finance_accounts.store': {
+    methods: ["POST"],
+    pattern: '/finance-accounts',
+    tokens: [[0,"finance-accounts"]],
+    types: placeholder as Registry['finance_accounts.store']['types'],
+  },
+  'finance_accounts.update': {
+    methods: ["POST"],
+    pattern: '/finance-accounts/:id',
+    tokens: [[0,"finance-accounts"],[1,"id"]],
+    types: placeholder as Registry['finance_accounts.update']['types'],
+  },
+  'finance_accounts.delete': {
+    methods: ["POST"],
+    pattern: '/finance-accounts/:id/delete',
+    tokens: [[0,"finance-accounts"],[1,"id"],[0,"delete"]],
+    types: placeholder as Registry['finance_accounts.delete']['types'],
+  },
   'credit_cards.store': {
     methods: ["POST"],
     pattern: '/credit-cards',
@@ -389,18 +557,6 @@ const routes = {
     pattern: '/credit-cards/:id/delete',
     tokens: [[0,"credit-cards"],[1,"id"],[0,"delete"]],
     types: placeholder as Registry['credit_cards.delete']['types'],
-  },
-  'financial_transactions.store': {
-    methods: ["POST"],
-    pattern: '/financial-transactions',
-    tokens: [[0,"financial-transactions"]],
-    types: placeholder as Registry['financial_transactions.store']['types'],
-  },
-  'financial_transactions.void': {
-    methods: ["POST"],
-    pattern: '/financial-transactions/:id/void',
-    tokens: [[0,"financial-transactions"],[1,"id"],[0,"void"]],
-    types: placeholder as Registry['financial_transactions.void']['types'],
   },
   'finance_categories.store': {
     methods: ["POST"],
@@ -420,6 +576,18 @@ const routes = {
     tokens: [[0,"finance-categories"],[1,"id"],[0,"delete"]],
     types: placeholder as Registry['finance_categories.delete']['types'],
   },
+  'financial_transactions.store': {
+    methods: ["POST"],
+    pattern: '/financial-transactions',
+    tokens: [[0,"financial-transactions"]],
+    types: placeholder as Registry['financial_transactions.store']['types'],
+  },
+  'financial_transactions.void': {
+    methods: ["POST"],
+    pattern: '/financial-transactions/:id/void',
+    tokens: [[0,"financial-transactions"],[1,"id"],[0,"void"]],
+    types: placeholder as Registry['financial_transactions.void']['types'],
+  },
   'tasks.store': {
     methods: ["POST"],
     pattern: '/tasks',
@@ -431,6 +599,12 @@ const routes = {
     pattern: '/tasks/:id',
     tokens: [[0,"tasks"],[1,"id"]],
     types: placeholder as Registry['tasks.update']['types'],
+  },
+  'tasks.status': {
+    methods: ["POST"],
+    pattern: '/tasks/:id/status',
+    tokens: [[0,"tasks"],[1,"id"],[0,"status"]],
+    types: placeholder as Registry['tasks.status']['types'],
   },
   'tasks.complete': {
     methods: ["POST"],
@@ -462,17 +636,11 @@ const routes = {
     tokens: [[0,"import"],[0,"upload-catalog"]],
     types: placeholder as Registry['import.upload_catalog']['types'],
   },
-  'import.queue_sync': {
+  'import.sync_accounts': {
     methods: ["POST"],
     pattern: '/import/sync-accounts',
     tokens: [[0,"import"],[0,"sync-accounts"]],
-    types: placeholder as Registry['import.queue_sync']['types'],
-  },
-  'address_cleanup.clean': {
-    methods: ["POST"],
-    pattern: '/address-cleanup',
-    tokens: [[0,"address-cleanup"]],
-    types: placeholder as Registry['address_cleanup.clean']['types'],
+    types: placeholder as Registry['import.sync_accounts']['types'],
   },
   'api.tools.address_clean': {
     methods: ["POST"],
@@ -480,11 +648,29 @@ const routes = {
     tokens: [[0,"api"],[0,"tools"],[0,"address-clean"]],
     types: placeholder as Registry['api.tools.address_clean']['types'],
   },
+  'api.tools.address_clean_docx': {
+    methods: ["POST"],
+    pattern: '/api/tools/address-clean/docx',
+    tokens: [[0,"api"],[0,"tools"],[0,"address-clean"],[0,"docx"]],
+    types: placeholder as Registry['api.tools.address_clean_docx']['types'],
+  },
   'address_cleanup.save_customer': {
     methods: ["POST"],
     pattern: '/address-cleanup/save-customer',
     tokens: [[0,"address-cleanup"],[0,"save-customer"]],
     types: placeholder as Registry['address_cleanup.save_customer']['types'],
+  },
+  'address_cleanup.process': {
+    methods: ["POST"],
+    pattern: '/address-cleanup/process',
+    tokens: [[0,"address-cleanup"],[0,"process"]],
+    types: placeholder as Registry['address_cleanup.process']['types'],
+  },
+  'address_cleanup.export_docx': {
+    methods: ["POST"],
+    pattern: '/address-cleanup/export-docx',
+    tokens: [[0,"address-cleanup"],[0,"export-docx"]],
+    types: placeholder as Registry['address_cleanup.export_docx']['types'],
   },
   'admin.users.store': {
     methods: ["POST"],
@@ -492,17 +678,23 @@ const routes = {
     tokens: [[0,"admin"],[0,"users"]],
     types: placeholder as Registry['admin.users.store']['types'],
   },
+  'admin.users.status': {
+    methods: ["POST"],
+    pattern: '/admin/users/:id/status',
+    tokens: [[0,"admin"],[0,"users"],[1,"id"],[0,"status"]],
+    types: placeholder as Registry['admin.users.status']['types'],
+  },
+  'admin.users.update': {
+    methods: ["POST"],
+    pattern: '/admin/users/:id',
+    tokens: [[0,"admin"],[0,"users"],[1,"id"]],
+    types: placeholder as Registry['admin.users.update']['types'],
+  },
   'admin.users.delete': {
     methods: ["POST"],
     pattern: '/admin/users/:id/delete',
     tokens: [[0,"admin"],[0,"users"],[1,"id"],[0,"delete"]],
     types: placeholder as Registry['admin.users.delete']['types'],
-  },
-  'admin.users.toggle_status': {
-    methods: ["POST"],
-    pattern: '/admin/users/:id/status',
-    tokens: [[0,"admin"],[0,"users"],[1,"id"],[0,"status"]],
-    types: placeholder as Registry['admin.users.toggle_status']['types'],
   },
   'admin.users.assign_role': {
     methods: ["POST"],
@@ -510,17 +702,17 @@ const routes = {
     tokens: [[0,"admin"],[0,"users"],[1,"id"],[0,"roles"]],
     types: placeholder as Registry['admin.users.assign_role']['types'],
   },
+  'admin.users.module_access': {
+    methods: ["POST"],
+    pattern: '/admin/users/:id/modules',
+    tokens: [[0,"admin"],[0,"users"],[1,"id"],[0,"modules"]],
+    types: placeholder as Registry['admin.users.module_access']['types'],
+  },
   'admin.entitlements.toggle': {
     methods: ["POST"],
     pattern: '/admin/entitlements/:id/toggle',
     tokens: [[0,"admin"],[0,"entitlements"],[1,"id"],[0,"toggle"]],
     types: placeholder as Registry['admin.entitlements.toggle']['types'],
-  },
-  'admin.queue.overview': {
-    methods: ["GET","HEAD"],
-    pattern: '/admin/queue/overview',
-    tokens: [[0,"admin"],[0,"queue"],[0,"overview"]],
-    types: placeholder as Registry['admin.queue.overview']['types'],
   },
 } as const satisfies Record<string, AdonisEndpoint>
 

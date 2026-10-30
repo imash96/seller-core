@@ -1,40 +1,55 @@
-import { type ReactNode } from 'react'
+import { isValidElement, type ComponentType, type ReactNode } from 'react'
 import { StatusBadge } from '../atoms/status-badge'
 import { IconAvatar, type AvatarTone } from '../atoms/icon-avatar'
 
 export function KpiScorecard({
   title,
+  label,
   value,
   subtitle,
+  sublabel,
   badge,
   icon,
   tone = 'primary',
   children,
 }: {
-  title: string
+  title?: string
+  label?: string
   value: ReactNode
   subtitle?: ReactNode
+  sublabel?: ReactNode
   badge?: { label: string; variant?: string }
-  icon?: ReactNode
+  icon?: ReactNode | ComponentType<{ className?: string }> | unknown
   tone?: AvatarTone
   children?: ReactNode
 }) {
+  const resolvedTitle = title ?? label ?? ''
+  const resolvedSubtitle = subtitle ?? sublabel
+  const safeValue: ReactNode =
+    value === null || value === undefined
+      ? '—'
+      : isValidElement(value) || typeof value === 'string' || typeof value === 'number'
+        ? value
+        : String(value)
+
   return (
     <div className="bg-card text-card-foreground border border-border rounded-xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {title}
+              {resolvedTitle}
             </span>
             {badge && <StatusBadge label={badge.label} variant={badge.variant ?? 'info'} />}
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight tabular-nums truncate">
-            {value}
+            {safeValue}
           </div>
-          {subtitle && <div className="text-xs text-muted-foreground mt-1">{subtitle}</div>}
+          {resolvedSubtitle && (
+            <div className="text-xs text-muted-foreground mt-1">{resolvedSubtitle}</div>
+          )}
         </div>
-        {icon && <IconAvatar icon={icon} tone={tone} size="md" />}
+        {icon ? <IconAvatar icon={icon} tone={tone} size="md" /> : null}
       </div>
       {children && <div className="pt-2 border-t border-border/70">{children}</div>}
     </div>

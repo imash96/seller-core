@@ -1,6 +1,7 @@
-import { type ReactNode } from 'react'
+import { type ComponentType, type ReactNode } from 'react'
 import { type LucideIcon, TrendingUp, TrendingDown } from 'lucide-react'
 import { StatusBadge } from '../atoms/status-badge'
+import { renderIconOrNode } from '../atoms/icon-avatar'
 
 export interface PageHeaderProps {
   title: string
@@ -9,7 +10,7 @@ export interface PageHeaderProps {
   eyebrow?: ReactNode
   actions?: ReactNode
   meta?: ReactNode
-  icon?: LucideIcon
+  icon?: LucideIcon | ComponentType<{ className?: string }> | ReactNode
   badge?: ReactNode | string
 }
 
@@ -20,16 +21,18 @@ export function PageHeader({
   eyebrow,
   actions,
   meta,
-  icon: Icon,
+  icon,
   badge,
 }: PageHeaderProps) {
   const desc = description ?? subtitle
+  const renderedIcon = renderIconOrNode(icon, 'w-5 h-5 text-primary')
+
   return (
     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-1">
       <div className="flex items-start gap-3.5 min-w-0">
-        {Icon && (
+        {renderedIcon && (
           <div className="w-11 h-11 rounded-xl bg-primary/12 border border-primary/25 flex items-center justify-center shrink-0">
-            <Icon className="w-5 h-5 text-primary" />
+            {renderedIcon}
           </div>
         )}
         <div className="space-y-1 min-w-0">
@@ -64,7 +67,7 @@ export interface StatsCardProps {
     value: number
     trend: 'up' | 'down'
   }
-  icon: LucideIcon
+  icon?: LucideIcon | ComponentType<{ className?: string }> | ReactNode
   description?: string
   iconBg?: string
   iconColor?: string
@@ -74,11 +77,13 @@ export function StatsCard({
   title,
   value,
   change,
-  icon: Icon,
+  icon,
   description,
   iconBg = 'bg-primary/12',
   iconColor = 'text-primary',
 }: StatsCardProps) {
+  const renderedIcon = renderIconOrNode(icon, `w-5 h-5 ${iconColor}`)
+
   return (
     <div className="bg-card text-card-foreground rounded-xl border border-border p-5 shadow-xs hover:shadow-md transition-all">
       <div className="flex items-start justify-between gap-3">
@@ -108,9 +113,11 @@ export function StatsCard({
             </div>
           )}
         </div>
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
-          <Icon className={`w-5 h-5 ${iconColor}`} />
-        </div>
+        {renderedIcon && (
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
+            {renderedIcon}
+          </div>
+        )}
       </div>
     </div>
   )
