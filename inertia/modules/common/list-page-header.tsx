@@ -98,18 +98,10 @@ export function ListPageHeader({
       alignment="end"
       padding={4}
       width={320}
-      content={
-        <Stack gap={3}>
-          {filters}
-        </Stack>
-      }
+      content={<Stack gap={3}>{filters}</Stack>}
     >
       <Button
-        label={
-          activeFilterCount
-            ? `${filterLabel} (${activeFilterCount})`
-            : filterLabel
-        }
+        label={activeFilterCount ? `${filterLabel} (${activeFilterCount})` : filterLabel}
         variant="secondary"
         size="sm"
       />
@@ -165,21 +157,11 @@ export function ListPageHeader({
               {filterButton}
 
               {onExport && (
-                <Button
-                  label="Export"
-                  variant="secondary"
-                  size="sm"
-                  onClick={onExport}
-                />
+                <Button label="Export" variant="secondary" size="sm" onClick={onExport} />
               )}
 
               {showCreate && onCreate && (
-                <Button
-                  label={createLabel}
-                  variant="primary"
-                  size="sm"
-                  onClick={onCreate}
-                />
+                <Button label={createLabel} variant="primary" size="sm" onClick={onCreate} />
               )}
 
               {actions}
@@ -192,4 +174,3 @@ export function ListPageHeader({
     </Card>
   )
 }
-

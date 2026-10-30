@@ -14,8 +14,10 @@ import { renderIconOrNode } from './icon-avatar'
 
 export type AppInputSize = 'sm' | 'md' | 'lg'
 
-export interface AppInputProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'prefix'> {
+export interface AppInputProps extends Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  'size' | 'prefix'
+> {
   label?: string
   hint?: string
   error?: string
@@ -72,15 +74,28 @@ export function AppInput({
   const isPercentage = type === 'percentage'
   const isDate = type === 'date' || type === 'datetime-local'
 
-  const resolvedType = isPassword ? (showPassword ? 'text' : 'password') : type === 'currency' || type === 'decimal' || type === 'percentage' || type === 'integer' ? 'text' : type
-  const resolvedInputMode = isCurrency || isPercentage ? 'decimal' : isInteger ? 'numeric' : rest.inputMode
+  const resolvedType = isPassword
+    ? showPassword
+      ? 'text'
+      : 'password'
+    : type === 'currency' || type === 'decimal' || type === 'percentage' || type === 'integer'
+      ? 'text'
+      : type
+  const resolvedInputMode =
+    isCurrency || isPercentage ? 'decimal' : isInteger ? 'numeric' : rest.inputMode
 
   const heightCls =
-    inputSize === 'sm' ? 'h-8.5 text-xs' : inputSize === 'lg' ? 'h-11 text-sm' : 'h-10 text-xs sm:text-sm'
+    inputSize === 'sm'
+      ? 'h-8.5 text-xs'
+      : inputSize === 'lg'
+        ? 'h-11 text-sm'
+        : 'h-10 text-xs sm:text-sm'
 
-  const leadingIconNode = isSearch
-    ? <Search className="w-4 h-4 text-input-placeholder shrink-0" />
-    : renderIconOrNode(icon, 'w-4 h-4 text-input-placeholder shrink-0')
+  const leadingIconNode = isSearch ? (
+    <Search className="w-4 h-4 text-input-placeholder shrink-0" />
+  ) : (
+    renderIconOrNode(icon, 'w-4 h-4 text-input-placeholder shrink-0')
+  )
 
   const currencyBadge = currencyCode || currencySymbol
 
@@ -101,8 +116,8 @@ export function AppInput({
   const handleCurrencyBlur = (e: FocusEvent<HTMLInputElement>) => {
     if (onBlur) onBlur(e)
     if (isCurrency && decimalPlaces !== undefined && e.target.value !== '') {
-      const num = parseFloat(e.target.value)
-      if (!isNaN(num)) {
+      const num = Number.parseFloat(e.target.value)
+      if (!Number.isNaN(num)) {
         const formatted = num.toFixed(decimalPlaces)
         if (onChange && formatted !== e.target.value) {
           const syntheticEvent = { ...e, target: { ...e.target, value: formatted } }
@@ -114,7 +129,7 @@ export function AppInput({
 
   const handleStep = (direction: 'up' | 'down') => {
     if (disabled) return
-    const currentVal = parseFloat(String(value ?? 0)) || 0
+    const currentVal = Number.parseFloat(String(value ?? 0)) || 0
     const stepVal = Number(step) || 1
     const nextVal = direction === 'up' ? currentVal + stepVal : currentVal - stepVal
     if (min !== undefined && nextVal < Number(min)) return
@@ -223,7 +238,7 @@ export function AppInput({
           )}
 
           {/* Search or Standard Clear Button */}
-          {Boolean((isSearch || onClear) && hasValue && !isPassword) ? (
+          {(isSearch || onClear) && hasValue && !isPassword ? (
             <button
               type="button"
               onClick={() => {

@@ -3,7 +3,7 @@ import { StatusBadge, STATUS_TONES } from '~/components/atoms/status-badge'
 import { Package, Calendar, DollarSign, Truck } from 'lucide-react'
 import { formatMoney, formatDate } from '~/lib/utils'
 import type { Row } from '~/lib/ui'
-import { VStack } from '@astryxdesign/core'
+import { VStack } from '@astryxdesign/core/Stack'
 
 export function OrderDetailsDrawer({
   order,
@@ -95,7 +95,7 @@ export function OrderDetailsDrawer({
         </div>
 
         {/* Line Items */}
-        <div className="space-y-3">
+        <VStack gap={3}>
           <div className="flex items-center gap-2 text-sm font-bold text-foreground">
             <Package className="w-4 h-4 text-primary" />
             <span>Order Line Items ({lineItems.length})</span>
@@ -133,10 +133,10 @@ export function OrderDetailsDrawer({
               ))
             )}
           </VStack>
-        </div>
+        </VStack>
 
         {/* Shipments */}
-        <div className="space-y-3">
+        <VStack gap={3}>
           <div className="flex items-center gap-2 text-sm font-bold text-foreground">
             <Truck className="w-4 h-4 text-primary" />
             <span>Shipments ({shipments.length})</span>
@@ -144,7 +144,7 @@ export function OrderDetailsDrawer({
           {shipments.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No shipments dispatched yet.</p>
           ) : (
-            <div className="space-y-2">
+            <VStack gap={2}>
               {shipments.map((s) => (
                 <div
                   key={String(s.id)}
@@ -163,9 +163,9 @@ export function OrderDetailsDrawer({
                   />
                 </div>
               ))}
-            </div>
+            </VStack>
           )}
-        </div>
+        </VStack>
 
         {/* Financial P&L Waterfall */}
         <div className="space-y-3">
@@ -203,7 +203,7 @@ export function OrderDetailsDrawer({
                 {formatMoney(
                   cur,
                   Number(order.marketplaceFeesAmount ?? 0) +
-                  Number(order.paymentProcessingFeesAmount ?? 0)
+                    Number(order.paymentProcessingFeesAmount ?? 0)
                 )}
               </span>
             </div>
@@ -230,6 +230,6 @@ export function OrderDetailsDrawer({
           </div>
         </div>
       </div>
-    </Drawer >
+    </Drawer>
   )
 }

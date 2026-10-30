@@ -53,7 +53,7 @@ const ORDER_STATUS = [
   'on_hold',
 ]
 
-export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
+export default function Orders({ orders = [], sellerAccounts = [], savedViews = [] }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [editRow, setEditRow] = useState<Row | null>(null)
@@ -79,8 +79,18 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
         customerFullName: 'Jane Doe',
         currencyCode: 'USD',
         lines: [
-          { sku: 'MCTDC01-BLK-NP-RG-M', title: 'Leather Duster Coat', quantityOrdered: 1, unitPrice: 239.99 },
-          { sku: 'MJKBK03-BLK-NP-SL-L', title: 'Moto Biker Jacket', quantityOrdered: 1, unitPrice: 259.99 },
+          {
+            sku: 'MCTDC01-BLK-NP-RG-M',
+            title: 'Leather Duster Coat',
+            quantityOrdered: 1,
+            unitPrice: 239.99,
+          },
+          {
+            sku: 'MJKBK03-BLK-NP-SL-L',
+            title: 'Moto Biker Jacket',
+            quantityOrdered: 1,
+            unitPrice: 259.99,
+          },
         ],
       },
     ],
@@ -98,7 +108,9 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
     for (const o of orders) {
       grossRevenue += Number(o.totalAmount ?? 0)
       netProfit += Number(o.netProfitAmount ?? 0)
-      if (['pending', 'confirmed', 'processing', 'partially_fulfilled'].includes(String(o.status))) {
+      if (
+        ['pending', 'confirmed', 'processing', 'partially_fulfilled'].includes(String(o.status))
+      ) {
         unfulfilled++
       }
       const cust = (o.customer as Row) ?? {}
@@ -138,7 +150,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
           o.marketplaceCode,
           cust.fullName,
           cust.email,
-          ...(((o.lineItems as Row[]) ?? []).map((li) => `${li.sku} ${li.title}`)),
+          ...((o.lineItems as Row[]) ?? []).map((li) => `${li.sku} ${li.title}`),
         ]
           .filter(Boolean)
           .join(' ')
@@ -239,8 +251,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
             icon: Clock,
             tone: 'warning',
             active: statusFilter === 'pending',
-            onClick: () =>
-              setStatusFilter((prev) => (prev === 'pending' ? 'all' : 'pending')),
+            onClick: () => setStatusFilter((prev) => (prev === 'pending' ? 'all' : 'pending')),
           },
           {
             label: 'Fraud / Risk Alerts',
@@ -250,9 +261,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
             tone: 'error',
             active: customerSegmentFilter === 'fraud_risk',
             onClick: () =>
-              setCustomerSegmentFilter((prev) =>
-                prev === 'fraud_risk' ? 'all' : 'fraud_risk'
-              ),
+              setCustomerSegmentFilter((prev) => (prev === 'fraud_risk' ? 'all' : 'fraud_risk')),
           },
         ]}
       />

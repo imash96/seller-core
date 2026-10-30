@@ -80,10 +80,7 @@ export function RecordCard({ card }: { card: CardData }) {
 
           {card.statusBadge && (
             <div className="shrink-0">
-              <StatusBadge
-                label={card.statusBadge.label}
-                variant={card.statusBadge.variant}
-              />
+              <StatusBadge label={card.statusBadge.label} variant={card.statusBadge.variant} />
             </div>
           )}
         </div>

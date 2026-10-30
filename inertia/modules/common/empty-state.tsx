@@ -53,9 +53,7 @@ export function ErrorState({
           {message}
         </Text>
       </Stack>
-      {onRetry && (
-        <Button label="Try Again" variant="primary" onClick={onRetry} />
-      )}
+      {onRetry && <Button label="Try Again" variant="primary" onClick={onRetry} />}
     </Stack>
   )
 }

@@ -67,11 +67,11 @@ const ITEM_CONDITIONS = [
 ]
 
 export default function Returns({
-  returnRequests,
-  refundTransactions,
-  orders,
-  orderLineItems,
-  savedViews,
+  returnRequests = [],
+  refundTransactions = [],
+  orders = [],
+  orderLineItems = [],
+  savedViews = [],
 }: Props) {
   const [createRmaOpen, setCreateRmaOpen] = useState(false)
   const [updateRmaRow, setUpdateRmaRow] = useState<Row | null>(null)
@@ -310,7 +310,9 @@ export default function Returns({
           status: String(updateRmaRow?.status ?? 'received'),
           itemCondition: String(updateRmaRow?.itemCondition ?? 'unopened'),
           resolutionType: String(updateRmaRow?.resolutionType ?? 'refund'),
-          quantityApproved: String(updateRmaRow?.quantityApproved ?? updateRmaRow?.quantityRequested ?? 1),
+          quantityApproved: String(
+            updateRmaRow?.quantityApproved ?? updateRmaRow?.quantityRequested ?? 1
+          ),
           quantityReceived: String(updateRmaRow?.quantityReceived ?? 0),
           refundAmount: String(updateRmaRow?.refundAmount ?? 0),
           restockingFeeAmount: String(updateRmaRow?.restockingFeeAmount ?? 0),
@@ -384,7 +386,12 @@ export default function Returns({
               label: String(r.rmaNumber),
             })),
           },
-          { name: 'refundNumber', label: 'Refund Number', required: true, placeholder: 'REF-2026-001' },
+          {
+            name: 'refundNumber',
+            label: 'Refund Number',
+            required: true,
+            placeholder: 'REF-2026-001',
+          },
           {
             name: 'externalRefundId',
             label: 'External Marketplace Refund ID',

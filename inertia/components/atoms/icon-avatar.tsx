@@ -1,13 +1,6 @@
 import { createElement, isValidElement, type ComponentType, type ReactNode } from 'react'
 
-export type AvatarTone =
-  | 'primary'
-  | 'success'
-  | 'warning'
-  | 'error'
-  | 'info'
-  | 'neutral'
-  | 'purple'
+export type AvatarTone = 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'purple'
 
 const TONE_CLASSES: Record<AvatarTone, string> = {
   primary: 'bg-primary-subtle text-primary border-primary/25',

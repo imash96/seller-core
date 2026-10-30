@@ -1,7 +1,6 @@
 import { Component, type ReactNode, type ErrorInfo, useState } from 'react'
 import { router } from '@inertiajs/react'
-import { VStack } from '@astryxdesign/core/Layout'
-import { Stack } from '@astryxdesign/core/Stack'
+import { Stack, VStack } from '@astryxdesign/core/Stack'
 import { Heading } from '@astryxdesign/core/Heading'
 import { Text } from '@astryxdesign/core/Text'
 import { Card } from '@astryxdesign/core/Card'

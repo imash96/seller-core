@@ -54,9 +54,7 @@ export function capitalize(str: string): string {
 
 /** Convert snake_case or kebab-case to Title Case */
 export function humanize(str: string): string {
-  return str
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+  return str.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 /** Generate user initials from first/last name */

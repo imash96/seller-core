@@ -4,7 +4,7 @@ import { X, Sparkles } from 'lucide-react'
 import { FormField, type FieldDef } from '../molecules/form-field'
 import { AppButton } from '../atoms/button'
 import { StatusBadge } from '../atoms/status-badge'
-import { VStack } from '@astryxdesign/core'
+import { VStack } from '@astryxdesign/core/Stack'
 
 function stripEmpty<T extends Record<string, unknown>>(data: T): Record<string, unknown> {
   const out: Record<string, unknown> = {}
@@ -18,12 +18,12 @@ function stripEmpty<T extends Record<string, unknown>>(data: T): Record<string, 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'
 
 const MODAL_SIZES: Record<ModalSize, string> = {
-  sm: 'max-w-md',
-  md: 'max-w-lg',
-  lg: 'max-w-2xl',
-  xl: 'max-w-4xl',
+  'sm': 'max-w-md',
+  'md': 'max-w-lg',
+  'lg': 'max-w-2xl',
+  'xl': 'max-w-4xl',
   '2xl': 'max-w-5xl',
-  full: 'max-w-6xl',
+  'full': 'max-w-6xl',
 }
 
 export interface AppModalProps {

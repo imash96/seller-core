@@ -19,9 +19,7 @@ export default class OrdersController {
         .preload('customer', (cq) => cq.preload('riskSignals').preload('addresses'))
         .preload('shippingAddress')
         .preload('sellerAccount')
-        .preload('lineItems', (lq) =>
-          lq.preload('productVariant', (vq) => vq.preload('product'))
-        )
+        .preload('lineItems', (lq) => lq.preload('productVariant', (vq) => vq.preload('product')))
         .preload('shipments')
         .orderBy('orderedAt', 'desc')
         .limit(100),
@@ -269,7 +267,10 @@ export default class OrdersController {
           .map((s) => s.trim())
           .filter(Boolean)
 
-    const query = Order.query().where('userId', user.id).preload('customer').orderBy('orderedAt', 'desc')
+    const query = Order.query()
+      .where('userId', user.id)
+      .preload('customer')
+      .orderBy('orderedAt', 'desc')
     if (ids.length > 0) query.whereIn('id', ids)
     const orders = await query.limit(500)
 

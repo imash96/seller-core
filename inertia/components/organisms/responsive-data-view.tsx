@@ -2,7 +2,7 @@ import { type ReactNode, useState, useEffect, useMemo } from 'react'
 import { Table, proportional, pixel } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Card } from '@astryxdesign/core/Card'
-import { Stack, VStack } from '@astryxdesign/core/Stack'
+import { Stack, HStack, VStack } from '@astryxdesign/core/Stack'
 import { Grid } from '@astryxdesign/core/Grid'
 import { Text } from '@astryxdesign/core/Text'
 import { Package, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
@@ -78,29 +78,36 @@ export function AppTable<T extends Row = Row>({
   className = '',
 }: AppTableProps<T>) {
   const cellPadding =
-    density === 'comfortable'
-      ? 'py-4 px-5'
-      : density === 'compact'
-        ? 'py-2.5 px-3'
-        : 'py-3.5 px-4'
+    density === 'comfortable' ? 'py-4 px-5' : density === 'compact' ? 'py-2.5 px-3' : 'py-3.5 px-4'
 
   if (!data || data.length === 0) {
     return (
-      <div className={`rounded-2xl border border-card-border bg-card p-12 text-center shadow-2xs space-y-4 ${className}`}>
-        <div className="mx-auto flex justify-center">
-          <IconAvatar icon={Package} tone="neutral" size="lg" />
-        </div>
-        <div className="space-y-1 max-w-md mx-auto">
+      <VStack
+        gap={4}
+        paddingBlock={10}
+        paddingInline={6}
+        hAlign="center"
+        vAlign="center"
+        className={`rounded-2xl border border-card-border bg-card text-center shadow-2xs ${className}`}
+      >
+        <IconAvatar icon={Package} tone="neutral" size="lg" />
+        <VStack gap={1} hAlign="center" maxWidth={440}>
           <h3 className="text-base font-bold text-foreground">{emptyTitle}</h3>
           <p className="text-xs text-muted-foreground leading-relaxed">{emptyDescription}</p>
-        </div>
-        {emptyAction && <div className="pt-2 flex justify-center">{emptyAction}</div>}
-      </div>
+        </VStack>
+        {emptyAction && (
+          <VStack hAlign="center" paddingBlockStart={1}>
+            {emptyAction}
+          </VStack>
+        )}
+      </VStack>
     )
   }
 
   return (
-    <div className={`rounded-2xl border border-card-border bg-card overflow-hidden shadow-2xs ${className}`}>
+    <div
+      className={`rounded-2xl border border-card-border bg-card overflow-hidden shadow-2xs ${className}`}
+    >
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <thead className="bg-surface-sunken border-b border-border text-[11px] font-bold uppercase tracking-wider text-text-secondary select-none">
@@ -291,6 +298,8 @@ export type ResponsiveDataViewProps = {
   pageSizeOptions?: number[]
   createLabel?: string
   onCreateClick?: () => void
+  padding?: 0 | 0.5 | 1 | 1.5 | 2 | 3 | 4 | 5 | 6 | 8 | 10
+  className?: string
 }
 
 export function ResponsiveDataView({
@@ -307,6 +316,8 @@ export function ResponsiveDataView({
   pageSizeOptions = [10, 25, 50],
   createLabel,
   onCreateClick,
+  padding,
+  className,
 }: ResponsiveDataViewProps) {
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState<string>('all')
@@ -400,44 +411,66 @@ export function ResponsiveDataView({
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center space-y-4 shadow-2xs">
-        <div className="mx-auto flex justify-center">
-          <IconAvatar icon={Package} tone="neutral" size="lg" />
-        </div>
-        <div className="space-y-1.5 max-w-md mx-auto">
+      <VStack
+        gap={4}
+        paddingBlock={10}
+        paddingInline={6}
+        hAlign="center"
+        vAlign="center"
+        className="rounded-2xl border border-dashed border-border bg-card text-center shadow-2xs"
+      >
+        <IconAvatar icon={Package} tone="neutral" size="lg" />
+        <VStack gap={1.5} hAlign="center" maxWidth={440}>
           <h3 className="text-base font-bold text-foreground tracking-tight">{emptyTitle}</h3>
           <p className="text-xs text-muted-foreground leading-relaxed">
             {emptyDescription ?? 'Get started by creating your first record.'}
           </p>
-        </div>
+        </VStack>
         {(emptyAction || (onCreateClick && createLabel)) && (
-          <div className="pt-2 flex items-center justify-center">
+          <VStack hAlign="center" paddingBlockStart={1}>
             {emptyAction ??
               (onCreateClick && createLabel ? (
-                <AppButton label={createLabel} variant="primary" size="md" onClick={onCreateClick} />
+                <AppButton
+                  label={createLabel}
+                  variant="primary"
+                  size="md"
+                  onClick={onCreateClick}
+                />
               ) : null)}
-          </div>
+          </VStack>
         )}
-      </div>
+      </VStack>
     )
   }
 
   return (
-    <VStack gap={4}>
+    <VStack gap={4} padding={padding} className={className}>
       {/* Toolbar */}
       <Card variant="muted" padding={4}>
         <VStack gap={3}>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex-1">
+          <Stack
+            direction="horizontal"
+            wrap="wrap"
+            vAlign="center"
+            hAlign="between"
+            gap={3}
+            className="w-full"
+          >
+            <div className="flex-1 min-w-[200px]">
               {searchKeys.length > 0 && <SearchInputBar value={search} onChange={setSearch} />}
             </div>
-            <div className="flex items-center gap-2.5 flex-wrap self-end sm:self-auto">
+            <HStack gap={2} wrap="wrap" vAlign="center" className="self-end sm:self-auto">
               <ViewModeSwitcher value={viewMode} onChange={setViewMode} />
               {onCreateClick && createLabel && (
-                <AppButton label={createLabel} variant="primary" size="sm" onClick={onCreateClick} />
+                <AppButton
+                  label={createLabel}
+                  variant="primary"
+                  size="sm"
+                  onClick={onCreateClick}
+                />
               )}
-            </div>
-          </div>
+            </HStack>
+          </Stack>
 
           {filterPills && filterKey && (
             <FilterPillGroup
@@ -454,14 +487,16 @@ export function ResponsiveDataView({
 
           <Stack gap={3} wrap="wrap" vAlign="center" hAlign="between">
             <div className="text-xs text-muted-foreground">
-              Showing <strong className="text-foreground font-semibold">{paginated.length}</strong> of{' '}
-              <strong className="text-foreground font-semibold">{sorted.length}</strong>{' '}
+              Showing <strong className="text-foreground font-semibold">{paginated.length}</strong>{' '}
+              of <strong className="text-foreground font-semibold">{sorted.length}</strong>{' '}
               {sorted.length === 1 ? 'record' : 'records'}
               {(search || activeFilter !== 'all') && <span> · filtered from {rows.length}</span>}
               {sortKey && (
                 <span>
                   {' '}
-                  · sorted by <strong className="text-foreground font-medium">{sortKey}</strong>{' '}
+                  · sorted by <strong className="text-foreground font-medium">
+                    {sortKey}
+                  </strong>{' '}
                   {sortDir === 'asc' ? '↑' : '↓'}
                 </span>
               )}
@@ -487,17 +522,22 @@ export function ResponsiveDataView({
 
       {/* Content */}
       {sorted.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center space-y-4 shadow-2xs">
-          <div className="mx-auto flex justify-center">
-            <IconAvatar icon={Filter} tone="warning" size="md" />
-          </div>
-          <div className="space-y-1.5 max-w-md mx-auto">
+        <VStack
+          gap={4}
+          paddingBlock={10}
+          paddingInline={6}
+          hAlign="center"
+          vAlign="center"
+          className="rounded-2xl border border-dashed border-border bg-card text-center shadow-2xs"
+        >
+          <IconAvatar icon={Filter} tone="warning" size="md" />
+          <VStack gap={1.5} hAlign="center" maxWidth={440}>
             <h3 className="text-sm font-bold text-foreground">No matching records</h3>
             <p className="text-xs text-muted-foreground">
               Try adjusting your search query or active filter pills.
             </p>
-          </div>
-          <div className="pt-2 flex items-center justify-center">
+          </VStack>
+          <VStack hAlign="center" paddingBlockStart={1}>
             <AppButton
               label="Clear filters"
               variant="secondary"
@@ -507,8 +547,8 @@ export function ResponsiveDataView({
                 setActiveFilter('all')
               }}
             />
-          </div>
-        </div>
+          </VStack>
+        </VStack>
       ) : effectiveMode === 'cards' ? (
         <Grid columns={{ minWidth: 280, max: 3 }} gap={4}>
           {paginated.map((row) => (

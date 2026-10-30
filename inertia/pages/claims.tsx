@@ -11,7 +11,15 @@ import {
   type Row,
 } from '~/lib/ui'
 import { useState, useMemo } from 'react'
-import { Scale, AlertTriangle, ShieldAlert, CheckCircle2, DollarSign, Plus, Edit3 } from 'lucide-react'
+import {
+  Scale,
+  AlertTriangle,
+  ShieldAlert,
+  CheckCircle2,
+  DollarSign,
+  Plus,
+  Edit3,
+} from 'lucide-react'
 
 type Props = {
   claims: Row[]
@@ -45,7 +53,12 @@ const CLAIM_TYPES = [
   'other',
 ]
 
-export default function Claims({ claims, orders, sellerAccounts, savedViews }: Props) {
+export default function Claims({
+  claims = [],
+  orders = [],
+  sellerAccounts = [],
+  savedViews = [],
+}: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editRow, setEditRow] = useState<Row | null>(null)
 
@@ -140,7 +153,12 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
               label: String(s.accountName ?? s.id),
             })),
           },
-          { name: 'claimNumber', label: 'Internal Claim Number', required: true, placeholder: 'CLM-2026-001' },
+          {
+            name: 'claimNumber',
+            label: 'Internal Claim Number',
+            required: true,
+            placeholder: 'CLM-2026-001',
+          },
           {
             name: 'externalClaimId',
             label: 'External Marketplace Claim ID',
@@ -296,12 +314,7 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
               },
             ],
             actions: (
-              <AppButton
-                variant="secondary"
-                size="xs"
-                icon={Edit3}
-                onClick={() => setEditRow(row)}
-              >
+              <AppButton variant="secondary" size="xs" icon={Edit3} onClick={() => setEditRow(row)}>
                 Update
               </AppButton>
             ),
@@ -324,12 +337,7 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
             col.money('sellerLiabilityAmount', 'Liability', 'currencyCode'),
             col.date('respondByAt', 'Respond by'),
             col.action('Actions', (row) => (
-              <AppButton
-                variant="secondary"
-                size="xs"
-                icon={Edit3}
-                onClick={() => setEditRow(row)}
-              >
+              <AppButton variant="secondary" size="xs" icon={Edit3} onClick={() => setEditRow(row)}>
                 Update
               </AppButton>
             )),

@@ -65,25 +65,20 @@ export function TopStatusBar({
                   {item.label}
                 </span>
                 {item.badge && (
-                  <StatusBadge
-                    label={item.badge.label}
-                    variant={item.badge.variant ?? 'info'}
-                  />
+                  <StatusBadge label={item.badge.label} variant={item.badge.variant ?? 'info'} />
                 )}
               </div>
               <div className="text-xl sm:text-2xl font-extrabold text-foreground tabular-nums tracking-tight truncate">
                 {item.value}
               </div>
               {(item.sublabel || item.hint) && (
-                <div className="text-xs text-muted-foreground truncate">{item.sublabel ?? item.hint}</div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {item.sublabel ?? item.hint}
+                </div>
               )}
             </div>
             {item.icon ? (
-              <IconAvatar
-                icon={item.icon}
-                tone={item.tone ?? 'primary'}
-                size="md"
-              />
+              <IconAvatar icon={item.icon} tone={item.tone ?? 'primary'} size="md" />
             ) : null}
           </div>
         )

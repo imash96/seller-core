@@ -10,6 +10,7 @@ export interface PasswordFieldProps {
   description?: string
   error?: string
   autoComplete?: string
+  icon?: any
 }
 
 export function PasswordField({
@@ -22,6 +23,7 @@ export function PasswordField({
   description,
   error,
   autoComplete = 'current-password',
+  icon,
 }: PasswordFieldProps) {
   return (
     <AppInput
@@ -36,6 +38,7 @@ export function PasswordField({
       hint={description}
       error={error}
       autoComplete={autoComplete}
+      icon={icon}
       fullWidth
     />
   )

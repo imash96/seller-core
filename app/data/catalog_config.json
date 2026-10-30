@@ -1,596 +1,560 @@
 {
-    "FILE NAME": "[Gender][Category][ProductCode][Sequence]-[ColorCode]-[Material]-[Fit/Length].[FORMAT]",
-    "SKU FORMAT": "[ColorCode]-[Gender][Category][ProductCode][Sequence]-[ColorCode]-[Material]-[Fit/Length]-[Size]",
-    "SKU EXAMPLE": "MJKBK01-BLK-NP-SL-XS",
-    "FILE EXAMPLE": "MSR01-BLK-NP-RG",
-    "GENDER": {
-        "M": "Men",
-        "W": "Women",
-        "K": "Kids",
-        "U": "Unisex"
+  "FILE NAME": "[Gender][Category][ProductCode][Sequence]-[ColorCode]-[Material]-[Fit/Length].[FORMAT]",
+  "SKU FORMAT": "[ColorCode]-[Gender][Category][ProductCode][Sequence]-[ColorCode]-[Material]-[Fit/Length]-[Size]",
+  "SKU EXAMPLE": "MJKBK01-BLK-NP-SL-XS",
+  "FILE EXAMPLE": "MSR01-BLK-NP-RG",
+  "GENDER": {
+    "M": "Men",
+    "W": "Women",
+    "K": "Kids",
+    "U": "Unisex"
+  },
+  "Category": {
+    "JK": "Jacket",
+    "CT": "Coat",
+    "BZ": "Blazer",
+    "VS": "Vest",
+    "SH": "Shirt",
+    "TS": "T-Shirt",
+    "PT": "Pants",
+    "TR": "Trouser",
+    "SR": "Shorts",
+    "SK": "Skirt",
+    "FW": "Footwear",
+    "BG": "Bags",
+    "HD": "Home Decor",
+    "AC": "Accessories"
+  },
+  "PRODUCT CODES": {
+    "Jackets": {
+      "BK": "Biker/Motorcycle",
+      "BM": "Bomber/Flight",
+      "CF": "Cafe Racer",
+      "HD": "Hooded",
+      "QL": "Quilted/Padded"
     },
-    "Category": {
-        "JK": "Jacket",
-        "CT": "Coat",
-        "BZ": "Blazer",
-        "VS": "Vest",
-        "SH": "Shirt",
-        "TS": "T-Shirt",
-        "PT": "Pants",
-        "TR": "Trouser",
-        "SR": "Shorts",
-        "SK": "Skirt",
-        "FW": "Footwear",
-        "BG": "Bags",
-        "HD": "Home Decor",
-        "AC": "Accessories"
+    "Coats": {
+      "CR": "Car Coat",
+      "DC": "Duster Coat",
+      "OC": "Overcoat",
+      "PE": "Pea Coat",
+      "TC": "Trench Coat"
     },
-    "PRODUCT CODES": {
-        "Jackets": {
-            "BK": "Biker/Motorcycle",
-            "BM": "Bomber/Flight",
-            "CF": "Cafe Racer",
-            "HD": "Hooded",
-            "QL": "Quilted/Padded"
-        },
-        "Coats": {
-            "CR": "Car Coat",
-            "DC": "Duster Coat",
-            "OC": "Overcoat",
-            "PE": "Pea Coat",
-            "TC": "Trench Coat"
-        },
-        "Blazers": {
-            "BZ": "Blazer"
-        },
-        "Pants": {
-            "PT": "Pants",
-            "TR": "Trouser"
-        },
-        "Shorts": {
-            "SR": "Shorts"
-        },
-        "Skirts": {
-            "A-line": "AL",
-            "Asymmetrical": "AS",
-            "Balloon": "BN",
-            "Pencil": "PN",
-            "Bell": "BE",
-            "Godet": "GD",
-            "Pleated": "PL",
-            "Plate (Circle)": "CP",
-            "Wrap": "WR",
-            "Boho": "BH"
-        },
-        "Shirts": {
-            "ST": "Shirt"
-        },
-        "T-Shirts": {
-            "TS": "TShirt"
-        },
-        "Vest": {
-            "VS": "Vest"
-        },
-        "Bags": {
-            "BP": "Backpack",
-            "MS": "Messenger",
-            "DF": "Duffle",
-            "TB": "Tote Bag",
-            "HB": "Handbag",
-            "SB": "Sling",
-            "LP": "Laptop Bag"
-        },
-        "Footwear": {
-            "BT": "Boots",
-            "FS": "Formal Shoe",
-            "CS": "Casual Shoe",
-            "FL": "Flats/Sandals"
-        },
-        "Home Decor": {
-            "PC": "Pillow Cover",
-            "HA": "Home Accent",
-            "PF": "Pouf",
-            "OT": "Ottoman",
-            "PM": "Placemat"
-        },
-        "Accessories": {
-            "BL": "Belt",
-            "GL": "Gloves",
-            "WL": "Wallet",
-            "SP": "Suspenders",
-            "KC": "Keychains"
-        }
+    "Blazers": {
+      "BZ": "Blazer"
     },
-    "FIT": {
-        "SL": "Slim Fit",
-        "RG": "Regular Fit",
-        "RL": "Relaxed Fit",
-        "TF": "Tailored Fit",
-        "XX": "Not Applicable"
+    "Pants": {
+      "PT": "Pants",
+      "TR": "Trouser"
     },
-    "LENGTH": {
-        "MX": "Maxi",
-        "MD": "Midi",
-        "MN": "Mini",
-        "XX": "Not Applicable"
+    "Shorts": {
+      "SR": "Shorts"
     },
-    "LEATHER CODES": {
-        "NP": "Nappa Leather",
-        "SU": "Suede Leather",
-        "FG": "Full-Grain Leather",
-        "NB": "Nubuck Leather",
-        "SH": "Shearling",
-        "CW": "Cowhide",
-        "GT": "Goat",
-        "BF": "Buffalo"
+    "Skirts": {
+      "A-line": "AL",
+      "Asymmetrical": "AS",
+      "Balloon": "BN",
+      "Pencil": "PN",
+      "Bell": "BE",
+      "Godet": "GD",
+      "Pleated": "PL",
+      "Plate (Circle)": "CP",
+      "Wrap": "WR",
+      "Boho": "BH"
     },
-    "SLEEVE LENGTH DESCRIPTION": [
-        "Long Sleeve",
-        "3/4 Sleeve",
-        "Sleeveless",
-        "Half Sleeve",
-        "Short Sleeve"
-    ],
-    "APPAREL CLOSURE TYPE": [
-        "Zipper",
-        "Button",
-        "Pull-On",
-        "Buckle",
-        "Drawstring",
-        "Hook & Eye",
-        "Hook & Loop",
-        "Lace-Up",
-        "Magnetic",
-        "Snap",
-        "Tie",
-        "Toggle"
-    ],
-    "LENGTH DESCRIPTION": [
-        "Extra Short Length",
-        "Short Length",
-        "Standard Length",
-        "Long Length",
-        "Extra Long Length"
-    ],
-    "LIST PRICE": {
-        "01": [
-            229.99,
-            229.99,
-            229.99,
-            239.99,
-            239.99,
-            239.99,
-            239.99,
-            259.99,
-            269.99,
-            289.99,
-            259.99
-        ],
-        "02": [
-            269.99,
-            269.99,
-            269.99,
-            289.99,
-            289.99,
-            289.99,
-            289.99,
-            309.99,
-            329.99,
-            339.99,
-            309.99
-        ],
-        "03": [
-            239.99,
-            239.99,
-            239.99,
-            259.99,
-            259.99,
-            259.99,
-            259.99,
-            269.99,
-            289.99,
-            309.99,
-            269.99
-        ]
+    "Shirts": {
+      "ST": "Shirt"
     },
-    "Size Data": {
-        "alpha": [
-            {
-                "Size Key": "XX-Small",
-                "Size Value": "2XS"
-            },
-            {
-                "Size Key": "X-Small",
-                "Size Value": "XS"
-            },
-            {
-                "Size Key": "Small",
-                "Size Value": "S"
-            },
-            {
-                "Size Key": "Medium",
-                "Size Value": "M"
-            },
-            {
-                "Size Key": "Large",
-                "Size Value": "L"
-            },
-            {
-                "Size Key": "X-Large",
-                "Size Value": "XL"
-            },
-            {
-                "Size Key": "XX-Large",
-                "Size Value": "2XL"
-            },
-            {
-                "Size Key": "3X-Large",
-                "Size Value": "3XL"
-            },
-            {
-                "Size Key": "4X-Large",
-                "Size Value": "4XL"
-            },
-            {
-                "Size Key": "5X-Large",
-                "Size Value": "5XL"
-            },
-            {
-                "Size Key": "Custom Size",
-                "Size Value": "CS"
-            }
-        ],
-        "numeric": [
-            {
-                "Size Key": "28",
-                "Size Value": "28"
-            },
-            {
-                "Size Key": "30",
-                "Size Value": "30"
-            },
-            {
-                "Size Key": "32",
-                "Size Value": "32"
-            },
-            {
-                "Size Key": "34",
-                "Size Value": "34"
-            },
-            {
-                "Size Key": "36",
-                "Size Value": "36"
-            },
-            {
-                "Size Key": "38",
-                "Size Value": "38"
-            },
-            {
-                "Size Key": "40",
-                "Size Value": "40"
-            },
-            {
-                "Size Key": "42",
-                "Size Value": "42"
-            },
-            {
-                "Size Key": "44",
-                "Size Value": "44"
-            },
-            {
-                "Size Key": "46",
-                "Size Value": "46"
-            },
-            {
-                "Size Key": "48",
-                "Size Value": "48"
-            },
-            {
-                "Size Key": "50",
-                "Size Value": "50"
-            },
-            {
-                "Size Key": "52",
-                "Size Value": "52"
-            },
-            {
-                "Size Key": "54",
-                "Size Value": "54"
-            },
-            {
-                "Size Key": "56",
-                "Size Value": "56"
-            },
-            {
-                "Size Key": "58",
-                "Size Value": "58"
-            },
-            {
-                "Size Key": "60",
-                "Size Value": "60"
-            },
-            {
-                "Size Key": "Custom Size",
-                "Size Value": "CS"
-            }
-        ],
-        "age": [
-            {
-                "Size Key": "0-3M",
-                "Size Value": "0-3 Months"
-            },
-            {
-                "Size Key": "3-6M",
-                "Size Value": "3-6 Months"
-            },
-            {
-                "Size Key": "6-9M",
-                "Size Value": "6-9 Months"
-            },
-            {
-                "Size Key": "9-12M",
-                "Size Value": "9-12 Months"
-            },
-            {
-                "Size Key": "12-18M",
-                "Size Value": "12-18 Months"
-            },
-            {
-                "Size Key": "18-24M",
-                "Size Value": "18-24 Months"
-            },
-            {
-                "Size Key": "2-3Y",
-                "Size Value": "2-3 Years"
-            },
-            {
-                "Size Key": "3-4Y",
-                "Size Value": "3-4 Years"
-            },
-            {
-                "Size Key": "4-5Y",
-                "Size Value": "4-5 Years"
-            },
-            {
-                "Size Key": "5-6Y",
-                "Size Value": "5-6 Years"
-            },
-            {
-                "Size Key": "6-7Y",
-                "Size Value": "6-7 Years"
-            },
-            {
-                "Size Key": "7-8Y",
-                "Size Value": "7-8 Years"
-            },
-            {
-                "Size Key": "8-9Y",
-                "Size Value": "8-9 Years"
-            },
-            {
-                "Size Key": "9-10Y",
-                "Size Value": "9-10 Years"
-            },
-            {
-                "Size Key": "10-12Y",
-                "Size Value": "10-12 Years"
-            },
-            {
-                "Size Key": "12-14Y",
-                "Size Value": "12-14 Years"
-            },
-            {
-                "Size Key": "14-16Y",
-                "Size Value": "14-16 Years"
-            },
-            {
-                "Size Key": "16-18Y",
-                "Size Value": "16-18 Years"
-            },
-            {
-                "Size Key": "Custom Size",
-                "Size Value": "CS"
-            }
-        ],
-        "pillowCover": [
-            {
-                "Size Key": "16x16",
-                "Size Value": "16 x 16 inch"
-            },
-            {
-                "Size Key": "18x18",
-                "Size Value": "18 x 18 inch"
-            },
-            {
-                "Size Key": "20x20",
-                "Size Value": "20 x 20 inch"
-            },
-            {
-                "Size Key": "22x22",
-                "Size Value": "22 x 22 inch"
-            },
-            {
-                "Size Key": "24x24",
-                "Size Value": "24 x 24 inch"
-            },
-            {
-                "Size Key": "16x20",
-                "Size Value": "16 x 20 inch"
-            },
-            {
-                "Size Key": "18x24",
-                "Size Value": "18 x 24 inch"
-            },
-            {
-                "Size Key": "20x26",
-                "Size Value": "20 x 26 inch"
-            },
-            {
-                "Size Key": "20x30",
-                "Size Value": "20 x 30 inch"
-            },
-            {
-                "Size Key": "20x36",
-                "Size Value": "20 x 36 inch"
-            },
-            {
-                "Size Key": "Custom Size",
-                "Size Value": "Custom Size"
-            }
-        ]
+    "T-Shirts": {
+      "TS": "TShirt"
     },
-    "COLOR CODES": {
-        "BLK": {
-            "colorMap": "Black",
-            "colorName": "Black"
-        },
-        "WHT": {
-            "colorMap": "White",
-            "colorName": "White"
-        },
-        "RED": {
-            "colorMap": "Red",
-            "colorName": "Red"
-        },
-        "BLU": {
-            "colorMap": "Blue",
-            "colorName": "Blue"
-        },
-        "LBU": {
-            "colorMap": "Blue",
-            "colorName": "Light Blue"
-        },
-        "DBU": {
-            "colorMap": "Blue",
-            "colorName": "Dark Blue"
-        },
-        "NBU": {
-            "colorMap": "Blue",
-            "colorName": "Navy Blue"
-        },
-        "GRN": {
-            "colorMap": "Green",
-            "colorName": "Green"
-        },
-        "LGR": {
-            "colorMap": "Green",
-            "colorName": "Light Green"
-        },
-        "DGR": {
-            "colorMap": "Green",
-            "colorName": "Dark Green"
-        },
-        "OGR": {
-            "colorMap": "Green",
-            "colorName": "Olive Green"
-        },
-        "BRN": {
-            "colorMap": "Brown",
-            "colorName": "Brown"
-        },
-        "DBR": {
-            "colorMap": "Brown",
-            "colorName": "Dark Brown"
-        },
-        "LBR": {
-            "colorMap": "Brown",
-            "colorName": "Light Brown"
-        },
-        "YLW": {
-            "colorMap": "Yellow",
-            "colorName": "Yellow"
-        },
-        "MYL": {
-            "colorMap": "Yellow",
-            "colorName": "Mustard Yellow"
-        },
-        "ORG": {
-            "colorMap": "Orange",
-            "colorName": "Orange"
-        },
-        "PNK": {
-            "colorMap": "Pink",
-            "colorName": "Pink"
-        },
-        "PUR": {
-            "colorMap": "Purple",
-            "colorName": "Purple"
-        },
-        "GRY": {
-            "colorMap": "Gray",
-            "colorName": "Gray"
-        },
-        "MAR": {
-            "colorMap": "Red",
-            "colorName": "Maroon"
-        },
-        "DTN": {
-            "colorMap": "Beige",
-            "colorName": "Dark Tan"
-        },
-        "TAN": {
-            "colorMap": "Beige",
-            "colorName": "Tan"
-        },
-        "MTN": {
-            "colorMap": "Beige",
-            "colorName": "Mango Tan"
-        },
-        "BGE": {
-            "colorMap": "Beige",
-            "colorName": "Beige"
-        },
-        "BRG": {
-            "colorMap": "Red",
-            "colorName": "Burgundy"
-        },
-        "COG": {
-            "colorMap": "Brown",
-            "colorName": "Cognac"
-        },
-        "CHS": {
-            "colorMap": "Brown",
-            "colorName": "Chestnut"
-        },
-        "ESP": {
-            "colorMap": "Brown",
-            "colorName": "Espresso"
-        },
-        "TAU": {
-            "colorMap": "Beige",
-            "colorName": "Taupe"
-        },
-        "EBN": {
-            "colorMap": "Black",
-            "colorName": "Ebony"
-        },
-        "WAL": {
-            "colorMap": "Brown",
-            "colorName": "Walnut"
-        },
-        "SLV": {
-            "colorMap": "Silver",
-            "colorName": "Silver"
-        },
-        "GLD": {
-            "colorMap": "Gold",
-            "colorName": "Gold"
-        },
-        "BNZ": {
-            "colorMap": "Bronze",
-            "colorName": "Bronze"
-        },
-        "TQR": {
-            "colorMap": "Turquoise",
-            "colorName": "Turquoise"
-        },
-        "OFW": {
-            "colorMap": "Off White",
-            "colorName": "Off White"
-        },
-        "MCL": {
-            "colorMap": "Multicolor",
-            "colorName": "Multicolor"
-        }
+    "Vest": {
+      "VS": "Vest"
+    },
+    "Bags": {
+      "BP": "Backpack",
+      "MS": "Messenger",
+      "DF": "Duffle",
+      "TB": "Tote Bag",
+      "HB": "Handbag",
+      "SB": "Sling",
+      "LP": "Laptop Bag"
+    },
+    "Footwear": {
+      "BT": "Boots",
+      "FS": "Formal Shoe",
+      "CS": "Casual Shoe",
+      "FL": "Flats/Sandals"
+    },
+    "Home Decor": {
+      "PC": "Pillow Cover",
+      "HA": "Home Accent",
+      "PF": "Pouf",
+      "OT": "Ottoman",
+      "PM": "Placemat"
+    },
+    "Accessories": {
+      "BL": "Belt",
+      "GL": "Gloves",
+      "WL": "Wallet",
+      "SP": "Suspenders",
+      "KC": "Keychains"
     }
+  },
+  "FIT": {
+    "SL": "Slim Fit",
+    "RG": "Regular Fit",
+    "RL": "Relaxed Fit",
+    "TF": "Tailored Fit",
+    "XX": "Not Applicable"
+  },
+  "LENGTH": {
+    "MX": "Maxi",
+    "MD": "Midi",
+    "MN": "Mini",
+    "XX": "Not Applicable"
+  },
+  "LEATHER CODES": {
+    "NP": "Nappa Leather",
+    "SU": "Suede Leather",
+    "FG": "Full-Grain Leather",
+    "NB": "Nubuck Leather",
+    "SH": "Shearling",
+    "CW": "Cowhide",
+    "GT": "Goat",
+    "BF": "Buffalo"
+  },
+  "SLEEVE LENGTH DESCRIPTION": [
+    "Long Sleeve",
+    "3/4 Sleeve",
+    "Sleeveless",
+    "Half Sleeve",
+    "Short Sleeve"
+  ],
+  "APPAREL CLOSURE TYPE": [
+    "Zipper",
+    "Button",
+    "Pull-On",
+    "Buckle",
+    "Drawstring",
+    "Hook & Eye",
+    "Hook & Loop",
+    "Lace-Up",
+    "Magnetic",
+    "Snap",
+    "Tie",
+    "Toggle"
+  ],
+  "LENGTH DESCRIPTION": [
+    "Extra Short Length",
+    "Short Length",
+    "Standard Length",
+    "Long Length",
+    "Extra Long Length"
+  ],
+  "LIST PRICE": {
+    "01": [229.99, 229.99, 229.99, 239.99, 239.99, 239.99, 239.99, 259.99, 269.99, 289.99, 259.99],
+    "02": [269.99, 269.99, 269.99, 289.99, 289.99, 289.99, 289.99, 309.99, 329.99, 339.99, 309.99],
+    "03": [239.99, 239.99, 239.99, 259.99, 259.99, 259.99, 259.99, 269.99, 289.99, 309.99, 269.99]
+  },
+  "Size Data": {
+    "alpha": [
+      {
+        "Size Key": "XX-Small",
+        "Size Value": "2XS"
+      },
+      {
+        "Size Key": "X-Small",
+        "Size Value": "XS"
+      },
+      {
+        "Size Key": "Small",
+        "Size Value": "S"
+      },
+      {
+        "Size Key": "Medium",
+        "Size Value": "M"
+      },
+      {
+        "Size Key": "Large",
+        "Size Value": "L"
+      },
+      {
+        "Size Key": "X-Large",
+        "Size Value": "XL"
+      },
+      {
+        "Size Key": "XX-Large",
+        "Size Value": "2XL"
+      },
+      {
+        "Size Key": "3X-Large",
+        "Size Value": "3XL"
+      },
+      {
+        "Size Key": "4X-Large",
+        "Size Value": "4XL"
+      },
+      {
+        "Size Key": "5X-Large",
+        "Size Value": "5XL"
+      },
+      {
+        "Size Key": "Custom Size",
+        "Size Value": "CS"
+      }
+    ],
+    "numeric": [
+      {
+        "Size Key": "28",
+        "Size Value": "28"
+      },
+      {
+        "Size Key": "30",
+        "Size Value": "30"
+      },
+      {
+        "Size Key": "32",
+        "Size Value": "32"
+      },
+      {
+        "Size Key": "34",
+        "Size Value": "34"
+      },
+      {
+        "Size Key": "36",
+        "Size Value": "36"
+      },
+      {
+        "Size Key": "38",
+        "Size Value": "38"
+      },
+      {
+        "Size Key": "40",
+        "Size Value": "40"
+      },
+      {
+        "Size Key": "42",
+        "Size Value": "42"
+      },
+      {
+        "Size Key": "44",
+        "Size Value": "44"
+      },
+      {
+        "Size Key": "46",
+        "Size Value": "46"
+      },
+      {
+        "Size Key": "48",
+        "Size Value": "48"
+      },
+      {
+        "Size Key": "50",
+        "Size Value": "50"
+      },
+      {
+        "Size Key": "52",
+        "Size Value": "52"
+      },
+      {
+        "Size Key": "54",
+        "Size Value": "54"
+      },
+      {
+        "Size Key": "56",
+        "Size Value": "56"
+      },
+      {
+        "Size Key": "58",
+        "Size Value": "58"
+      },
+      {
+        "Size Key": "60",
+        "Size Value": "60"
+      },
+      {
+        "Size Key": "Custom Size",
+        "Size Value": "CS"
+      }
+    ],
+    "age": [
+      {
+        "Size Key": "0-3M",
+        "Size Value": "0-3 Months"
+      },
+      {
+        "Size Key": "3-6M",
+        "Size Value": "3-6 Months"
+      },
+      {
+        "Size Key": "6-9M",
+        "Size Value": "6-9 Months"
+      },
+      {
+        "Size Key": "9-12M",
+        "Size Value": "9-12 Months"
+      },
+      {
+        "Size Key": "12-18M",
+        "Size Value": "12-18 Months"
+      },
+      {
+        "Size Key": "18-24M",
+        "Size Value": "18-24 Months"
+      },
+      {
+        "Size Key": "2-3Y",
+        "Size Value": "2-3 Years"
+      },
+      {
+        "Size Key": "3-4Y",
+        "Size Value": "3-4 Years"
+      },
+      {
+        "Size Key": "4-5Y",
+        "Size Value": "4-5 Years"
+      },
+      {
+        "Size Key": "5-6Y",
+        "Size Value": "5-6 Years"
+      },
+      {
+        "Size Key": "6-7Y",
+        "Size Value": "6-7 Years"
+      },
+      {
+        "Size Key": "7-8Y",
+        "Size Value": "7-8 Years"
+      },
+      {
+        "Size Key": "8-9Y",
+        "Size Value": "8-9 Years"
+      },
+      {
+        "Size Key": "9-10Y",
+        "Size Value": "9-10 Years"
+      },
+      {
+        "Size Key": "10-12Y",
+        "Size Value": "10-12 Years"
+      },
+      {
+        "Size Key": "12-14Y",
+        "Size Value": "12-14 Years"
+      },
+      {
+        "Size Key": "14-16Y",
+        "Size Value": "14-16 Years"
+      },
+      {
+        "Size Key": "16-18Y",
+        "Size Value": "16-18 Years"
+      },
+      {
+        "Size Key": "Custom Size",
+        "Size Value": "CS"
+      }
+    ],
+    "pillowCover": [
+      {
+        "Size Key": "16x16",
+        "Size Value": "16 x 16 inch"
+      },
+      {
+        "Size Key": "18x18",
+        "Size Value": "18 x 18 inch"
+      },
+      {
+        "Size Key": "20x20",
+        "Size Value": "20 x 20 inch"
+      },
+      {
+        "Size Key": "22x22",
+        "Size Value": "22 x 22 inch"
+      },
+      {
+        "Size Key": "24x24",
+        "Size Value": "24 x 24 inch"
+      },
+      {
+        "Size Key": "16x20",
+        "Size Value": "16 x 20 inch"
+      },
+      {
+        "Size Key": "18x24",
+        "Size Value": "18 x 24 inch"
+      },
+      {
+        "Size Key": "20x26",
+        "Size Value": "20 x 26 inch"
+      },
+      {
+        "Size Key": "20x30",
+        "Size Value": "20 x 30 inch"
+      },
+      {
+        "Size Key": "20x36",
+        "Size Value": "20 x 36 inch"
+      },
+      {
+        "Size Key": "Custom Size",
+        "Size Value": "Custom Size"
+      }
+    ]
+  },
+  "COLOR CODES": {
+    "BLK": {
+      "colorMap": "Black",
+      "colorName": "Black"
+    },
+    "WHT": {
+      "colorMap": "White",
+      "colorName": "White"
+    },
+    "RED": {
+      "colorMap": "Red",
+      "colorName": "Red"
+    },
+    "BLU": {
+      "colorMap": "Blue",
+      "colorName": "Blue"
+    },
+    "LBU": {
+      "colorMap": "Blue",
+      "colorName": "Light Blue"
+    },
+    "DBU": {
+      "colorMap": "Blue",
+      "colorName": "Dark Blue"
+    },
+    "NBU": {
+      "colorMap": "Blue",
+      "colorName": "Navy Blue"
+    },
+    "GRN": {
+      "colorMap": "Green",
+      "colorName": "Green"
+    },
+    "LGR": {
+      "colorMap": "Green",
+      "colorName": "Light Green"
+    },
+    "DGR": {
+      "colorMap": "Green",
+      "colorName": "Dark Green"
+    },
+    "OGR": {
+      "colorMap": "Green",
+      "colorName": "Olive Green"
+    },
+    "BRN": {
+      "colorMap": "Brown",
+      "colorName": "Brown"
+    },
+    "DBR": {
+      "colorMap": "Brown",
+      "colorName": "Dark Brown"
+    },
+    "LBR": {
+      "colorMap": "Brown",
+      "colorName": "Light Brown"
+    },
+    "YLW": {
+      "colorMap": "Yellow",
+      "colorName": "Yellow"
+    },
+    "MYL": {
+      "colorMap": "Yellow",
+      "colorName": "Mustard Yellow"
+    },
+    "ORG": {
+      "colorMap": "Orange",
+      "colorName": "Orange"
+    },
+    "PNK": {
+      "colorMap": "Pink",
+      "colorName": "Pink"
+    },
+    "PUR": {
+      "colorMap": "Purple",
+      "colorName": "Purple"
+    },
+    "GRY": {
+      "colorMap": "Gray",
+      "colorName": "Gray"
+    },
+    "MAR": {
+      "colorMap": "Red",
+      "colorName": "Maroon"
+    },
+    "DTN": {
+      "colorMap": "Beige",
+      "colorName": "Dark Tan"
+    },
+    "TAN": {
+      "colorMap": "Beige",
+      "colorName": "Tan"
+    },
+    "MTN": {
+      "colorMap": "Beige",
+      "colorName": "Mango Tan"
+    },
+    "BGE": {
+      "colorMap": "Beige",
+      "colorName": "Beige"
+    },
+    "BRG": {
+      "colorMap": "Red",
+      "colorName": "Burgundy"
+    },
+    "COG": {
+      "colorMap": "Brown",
+      "colorName": "Cognac"
+    },
+    "CHS": {
+      "colorMap": "Brown",
+      "colorName": "Chestnut"
+    },
+    "ESP": {
+      "colorMap": "Brown",
+      "colorName": "Espresso"
+    },
+    "TAU": {
+      "colorMap": "Beige",
+      "colorName": "Taupe"
+    },
+    "EBN": {
+      "colorMap": "Black",
+      "colorName": "Ebony"
+    },
+    "WAL": {
+      "colorMap": "Brown",
+      "colorName": "Walnut"
+    },
+    "SLV": {
+      "colorMap": "Silver",
+      "colorName": "Silver"
+    },
+    "GLD": {
+      "colorMap": "Gold",
+      "colorName": "Gold"
+    },
+    "BNZ": {
+      "colorMap": "Bronze",
+      "colorName": "Bronze"
+    },
+    "TQR": {
+      "colorMap": "Turquoise",
+      "colorName": "Turquoise"
+    },
+    "OFW": {
+      "colorMap": "Off White",
+      "colorName": "Off White"
+    },
+    "MCL": {
+      "colorMap": "Multicolor",
+      "colorName": "Multicolor"
+    }
+  }
 }

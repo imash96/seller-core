@@ -23,52 +23,52 @@ export const CATEGORY_CODES: Record<string, string> = {
 }
 
 export const PRODUCT_CODES: Record<string, Record<string, string>> = {
-  Jackets: {
+  'Jackets': {
     BK: 'Biker/Motorcycle',
     BM: 'Bomber/Flight',
     CF: 'Cafe Racer',
     HD: 'Hooded',
     QL: 'Quilted/Padded',
   },
-  Coats: {
+  'Coats': {
     CR: 'Car Coat',
     DC: 'Duster Coat',
     OC: 'Overcoat',
     PE: 'Pea Coat',
     TC: 'Trench Coat',
   },
-  Blazers: {
+  'Blazers': {
     BZ: 'Blazer',
   },
-  Pants: {
+  'Pants': {
     PT: 'Pants',
     TR: 'Trouser',
   },
-  Shorts: {
+  'Shorts': {
     SR: 'Shorts',
   },
-  Skirts: {
+  'Skirts': {
     'A-line': 'AL',
-    Asymmetrical: 'AS',
-    Balloon: 'BN',
-    Pencil: 'PN',
-    Bell: 'BE',
-    Godet: 'GD',
-    Pleated: 'PL',
+    'Asymmetrical': 'AS',
+    'Balloon': 'BN',
+    'Pencil': 'PN',
+    'Bell': 'BE',
+    'Godet': 'GD',
+    'Pleated': 'PL',
     'Plate (Circle)': 'CP',
-    Wrap: 'WR',
-    Boho: 'BH',
+    'Wrap': 'WR',
+    'Boho': 'BH',
   },
-  Shirts: {
+  'Shirts': {
     ST: 'Shirt',
   },
   'T-Shirts': {
     TS: 'TShirt',
   },
-  Vest: {
+  'Vest': {
     VS: 'Vest',
   },
-  Bags: {
+  'Bags': {
     BP: 'Backpack',
     MS: 'Messenger',
     DF: 'Duffle',
@@ -77,7 +77,7 @@ export const PRODUCT_CODES: Record<string, Record<string, string>> = {
     SB: 'Sling',
     LP: 'Laptop Bag',
   },
-  Footwear: {
+  'Footwear': {
     BT: 'Boots',
     FS: 'Formal Shoe',
     CS: 'Casual Shoe',
@@ -90,7 +90,7 @@ export const PRODUCT_CODES: Record<string, Record<string, string>> = {
     OT: 'Ottoman',
     PM: 'Placemat',
   },
-  Accessories: {
+  'Accessories': {
     BL: 'Belt',
     GL: 'Gloves',
     WL: 'Wallet',

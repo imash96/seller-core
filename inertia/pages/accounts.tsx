@@ -45,7 +45,11 @@ const ACCOUNT_STATUS = [
 ]
 const HEALTH = ['healthy', 'warning', 'critical', 'unknown']
 
-export default function Accounts({ sellerAccounts, salesChannels, savedViews }: Props) {
+export default function Accounts({
+  sellerAccounts = [],
+  salesChannels = [],
+  savedViews = [],
+}: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editRow, setEditRow] = useState<Row | null>(null)
 
@@ -157,9 +161,18 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
             default: 'healthy',
             options: HEALTH.map((s) => ({ value: s, label: s })),
           },
-          { name: 'rateLimitRpm', label: 'Rate Limit (requests / min)', kind: 'number', default: '60' },
+          {
+            name: 'rateLimitRpm',
+            label: 'Rate Limit (requests / min)',
+            kind: 'number',
+            default: '60',
+          },
           { name: 'tokenExpiresAt', label: 'OAuth Token Expiry Date', kind: 'date' },
-          { name: 'apiKey', label: 'API Key / Client ID (AES-256-GCM encrypted)', kind: 'password' },
+          {
+            name: 'apiKey',
+            label: 'API Key / Client ID (AES-256-GCM encrypted)',
+            kind: 'password',
+          },
           {
             name: 'apiSecret',
             label: 'API Secret / Refresh Token (AES-256-GCM encrypted)',
@@ -221,7 +234,11 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
           },
           { name: 'rateLimitRpm', label: 'Rate Limit / min', kind: 'number' },
           { name: 'tokenExpiresAt', label: 'OAuth Token Expiry Date', kind: 'date' },
-          { name: 'apiKey', label: 'Rotate API Key (leave blank to keep current)', kind: 'password' },
+          {
+            name: 'apiKey',
+            label: 'Rotate API Key (leave blank to keep current)',
+            kind: 'password',
+          },
           {
             name: 'apiSecret',
             label: 'Rotate API Secret (leave blank to keep current)',

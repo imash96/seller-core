@@ -18,6 +18,7 @@ const EU_ZIP_CITY_REGEX = /^(\d{4,6})\s+(.+)$/
 // --- Metadata line patterns (order matters — more specific first)
 const META_PATTERNS: { key: string; regex: RegExp }[] = [
   { key: 'phone', regex: /^phone\s*:\s*/i },
+  { key: 'email', regex: /^email\s*:\s*/i },
   { key: 'contactBuyer', regex: /^contact\s+buyer\s*:\s*/i },
   { key: 'buyer', regex: /^buyer\s*:\s*/i },
   { key: 'addressType', regex: /^address\s+type\s*:\s*/i },
@@ -123,6 +124,7 @@ export class CleanAdd {
     name: string
     coreLines: string[]
     phone?: string
+    email?: string
     buyerName?: string
     addressType?: string
     isSignatureRequired: boolean
@@ -132,6 +134,7 @@ export class CleanAdd {
     const name = (lines[0] ?? '').trim()
     const coreLines: string[] = []
     let phone: string | undefined
+    let email: string | undefined
     let buyerName: string | undefined
     let addressType: string | undefined
     let isSignatureRequired = false
@@ -149,6 +152,9 @@ export class CleanAdd {
           switch (key) {
             case 'phone':
               phone = value
+              break
+            case 'email':
+              email = value
               break
             case 'contactBuyer':
             case 'buyer':
@@ -177,6 +183,11 @@ export class CleanAdd {
         }
       }
 
+      if (!matched && !email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(line)) {
+        email = line
+        matched = true
+      }
+
       if (!matched) {
         coreLines.push(line)
       }
@@ -186,6 +197,7 @@ export class CleanAdd {
       name,
       coreLines,
       phone,
+      email,
       buyerName,
       addressType,
       isSignatureRequired,
@@ -375,6 +387,7 @@ export class CleanAdd {
     let { name, coreLines } = classified
     const {
       phone: rawPhone,
+      email,
       buyerName,
       addressType,
       isSignatureRequired,
@@ -443,6 +456,7 @@ export class CleanAdd {
       addLength: streetLines.length,
       phone,
       number: phoneNumber,
+      ...(email ? { email } : {}),
       ...(ext ? { ext } : {}),
       ...(buyerName ? { buyerName } : {}),
       ...(addressType ? { addressType } : {}),
@@ -468,11 +482,11 @@ export class CleanAdd {
     const rawBlocks = Array.isArray(input)
       ? input
       : input
-        .trim()
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .replace(/\r\n/g, '\n')
-        .split(/\n{2,}/)
+          .trim()
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '')
+          .replace(/\r\n/g, '\n')
+          .split(/\n{2,}/)
 
     for (const block of rawBlocks) {
       if (!block || !block.trim()) continue

@@ -34,10 +34,10 @@ type Props = {
 const USER_STATUS = ['pending_activation', 'active', 'suspended', 'locked', 'deactivated']
 
 export default function Admin({
-  allUsers,
-  allRoles,
-  allPermissions,
-  moduleEntitlements,
+  allUsers = [],
+  allRoles = [],
+  allPermissions = [],
+  moduleEntitlements = [],
 }: Props) {
   const [provisionOpen, setProvisionOpen] = useState(false)
   const [editUserRow, setEditUserRow] = useState<Row | null>(null)
@@ -173,7 +173,12 @@ export default function Admin({
         fields={[
           { name: 'fullName', label: 'Full name', required: true },
           { name: 'email', label: 'Email address', kind: 'email', required: true },
-          { name: 'password', label: 'Initial password (min 8 chars)', kind: 'password', required: true },
+          {
+            name: 'password',
+            label: 'Initial password (min 8 chars)',
+            kind: 'password',
+            required: true,
+          },
           { name: 'phone', label: 'Phone number' },
           {
             name: 'roleSlug',
@@ -256,7 +261,7 @@ export default function Admin({
         open={!!inspectRoleRow}
         onClose={() => setInspectRoleRow(null)}
         title={`Role Permissions: ${String(inspectRoleRow?.name ?? '')}`}
-        subtitle={`Slug: ${String(inspectRoleRow?.slug ?? '')} · ${(((inspectRoleRow?.permissions as Row[]) ?? [])).length} permissions attached`}
+        subtitle={`Slug: ${String(inspectRoleRow?.slug ?? '')} · ${((inspectRoleRow?.permissions as Row[]) ?? []).length} permissions attached`}
         width="lg"
         footer={
           <div className="flex justify-end">
@@ -277,9 +282,7 @@ export default function Admin({
                   className="p-3 rounded-xl border border-border bg-muted/20 flex items-center justify-between gap-3 text-xs"
                 >
                   <div>
-                    <span className="font-mono font-bold text-foreground">
-                      {String(perm.slug)}
-                    </span>
+                    <span className="font-mono font-bold text-foreground">{String(perm.slug)}</span>
                     {perm.description && (
                       <p className="text-muted-foreground mt-0.5">{String(perm.description)}</p>
                     )}

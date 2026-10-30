@@ -111,8 +111,7 @@ export default class ToolsController {
         userId: user.id,
         moduleKey,
         name,
-        isDefault:
-          request.input('isDefault') === 'true' || request.input('isDefault') === true,
+        isDefault: request.input('isDefault') === 'true' || request.input('isDefault') === true,
         filters: { status: request.input('filterStatus', 'all') },
         sortConfig: { field: 'created_at', direction: 'desc' },
         columnsConfig: ['order_number', 'status', 'total_amount', 'net_profit_amount'],

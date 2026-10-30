@@ -28,7 +28,7 @@ type Props = { customers: Row[]; riskSignals: Row[]; savedViews?: Row[] }
 
 const RISK_LEVELS = ['low', 'medium', 'high', 'under_review', 'cleared']
 
-export default function Customers({ customers, riskSignals, savedViews }: Props) {
+export default function Customers({ customers = [], riskSignals = [], savedViews = [] }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editRow, setEditRow] = useState<Row | null>(null)
   const [mergeOpen, setMergeOpen] = useState(false)
@@ -65,12 +65,7 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             >
               Merge Duplicates
             </AppButton>
-            <AppButton
-              variant="primary"
-              size="sm"
-              icon={Plus}
-              onClick={() => setCreateOpen(true)}
-            >
+            <AppButton variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>
               Create Customer
             </AppButton>
           </div>

@@ -132,8 +132,7 @@ try {
   const results = cleaner.main(sampleInput)
   console.log(`Total addresses parsed: ${results.length}\n`)
 
-  for (let idx = 0; idx < results.length; idx++) {
-    const r = results[idx]
+  for (const [idx, r] of results.entries()) {
     console.log(`--- Address #${idx + 1} ---`)
     console.log(`  Name:      "${r.name}"`)
     console.log(`  Company:   "${r.companyName}"`)
@@ -235,7 +234,6 @@ try {
     c.pass ? passed++ : failed++
   }
   console.log(`\n  ${passed}/${checks.length} passed, ${failed} failed`)
-
 } catch (e) {
   console.error('FATAL ERROR:', e)
 }

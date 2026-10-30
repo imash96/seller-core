@@ -12,19 +12,11 @@ import {
   displayValue,
 } from '~/lib/ui'
 import { useState } from 'react'
-import {
-  ScrollText,
-  ShieldCheck,
-  Lock,
-  PlusCircle,
-  RefreshCw,
-  Trash2,
-  Eye,
-} from 'lucide-react'
+import { ScrollText, ShieldCheck, Lock, PlusCircle, RefreshCw, Trash2, Eye } from 'lucide-react'
 
 type Props = { auditLogs: Row[] }
 
-export default function Audit({ auditLogs }: Props) {
+export default function Audit({ auditLogs = [] }: Props) {
   const [inspectRow, setInspectRow] = useState<Row | null>(null)
 
   const inserts = auditLogs.filter((r) => String(r.action) === 'INSERT').length

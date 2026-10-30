@@ -283,7 +283,23 @@ export default class FinanceController {
         name,
         slug,
         categoryType: String(request.input('categoryType', 'expense')),
-        costBucket: (['cogs','shipping','marketplace_fee','marketing','software','operations','manufacturing','tax','personal','other_income','sales_revenue'].includes(String(request.input('costBucket', 'operations'))) ? String(request.input('costBucket', 'operations')) : (String(request.input('costBucket')) === 'taxes' ? 'tax' : 'operations')),
+        costBucket: [
+          'cogs',
+          'shipping',
+          'marketplace_fee',
+          'marketing',
+          'software',
+          'operations',
+          'manufacturing',
+          'tax',
+          'personal',
+          'other_income',
+          'sales_revenue',
+        ].includes(String(request.input('costBucket', 'operations')))
+          ? String(request.input('costBucket', 'operations'))
+          : String(request.input('costBucket')) === 'taxes'
+            ? 'tax'
+            : 'operations',
         dataClassification: String(request.input('dataClassification', 'business')),
         isTaxDeductible:
           request.input('isTaxDeductible') === 'true' || request.input('isTaxDeductible') === true,
@@ -305,7 +321,23 @@ export default class FinanceController {
     if (request.input('categoryType')) category.categoryType = String(request.input('categoryType'))
     if (request.input('costBucket')) {
       const rawBucket = String(request.input('costBucket'))
-      category.costBucket = ['cogs','shipping','marketplace_fee','marketing','software','operations','manufacturing','tax','personal','other_income','sales_revenue'].includes(rawBucket) ? rawBucket : (rawBucket === 'taxes' ? 'tax' : 'operations')
+      category.costBucket = [
+        'cogs',
+        'shipping',
+        'marketplace_fee',
+        'marketing',
+        'software',
+        'operations',
+        'manufacturing',
+        'tax',
+        'personal',
+        'other_income',
+        'sales_revenue',
+      ].includes(rawBucket)
+        ? rawBucket
+        : rawBucket === 'taxes'
+          ? 'tax'
+          : 'operations'
     }
     if (request.input('dataClassification'))
       category.dataClassification = String(request.input('dataClassification'))

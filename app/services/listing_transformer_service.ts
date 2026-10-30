@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon'
 import Brand from '#models/brand'
 import Product from '#models/product'
-import ProductVariant from '#models/product_variant'
+import type ProductVariant from '#models/product_variant'
 import ChannelListing from '#models/channel_listing'
 import SellerAccount from '#models/seller_account'
 import SalesChannel from '#models/sales_channel'
@@ -24,7 +24,7 @@ export interface GenerateListingsParams {
 export class ListingTransformerService {
   /**
    * Ensures a fallback SellerAccount exists for the requested platform (`medusa`, `amazon`, `ebay`, `etsy`)
-   * so generated listings can always be stored in `channel_listings` and shown on `/listing`!
+   * so generated listings can always be stored in `channel_listings` and shown on `/listings`!
    */
   static async resolveOrCreateSellerAccount(
     userId: string,
@@ -117,10 +117,7 @@ export class ListingTransformerService {
       publicationStatus = 'unpublished',
     } = params
 
-    const brand = await Brand.query()
-      .where('userId', userId)
-      .andWhere('id', brandId)
-      .firstOrFail()
+    const brand = await Brand.query().where('userId', userId).andWhere('id', brandId).firstOrFail()
 
     const prodQuery = Product.query()
       .where('userId', userId)
@@ -137,7 +134,8 @@ export class ListingTransformerService {
       prodQuery.whereIn('id', productIds)
     }
 
-    const products = (await prodQuery).filter((p) => (p.variants ?? []).length > 0)
+    const queriedProducts = await prodQuery
+    const products = queriedProducts.filter((p) => (p.variants ?? []).length > 0)
     if (products.length === 0) {
       throw new Error('No products with variants found to transform into platform listings.')
     }
@@ -171,12 +169,12 @@ export class ListingTransformerService {
           const catMeta = CategorySyncService.extractCategoryMetadata(product.category)
           const channelCatId =
             plat === 'amazon'
-              ? catMeta.amazon_browse_node ?? '2476517011'
+              ? (catMeta.amazon_browse_node ?? '2476517011')
               : plat === 'ebay'
-                ? catMeta.ebay_category_id ?? '57988'
+                ? (catMeta.ebay_category_id ?? '57988')
                 : plat === 'etsy'
-                  ? catMeta.etsy_taxonomy_id ?? '15834'
-                  : catMeta.medusaId ?? product.categoryId ?? 'medusa'
+                  ? (catMeta.etsy_taxonomy_id ?? '15834')
+                  : (catMeta.medusaId ?? product.categoryId ?? 'medusa')
 
           const channelTitle =
             plat === 'ebay'
@@ -215,10 +213,11 @@ export class ListingTransformerService {
             listing.externalListingId = existing?.externalListingId || extId
             listing.externalVariantId = variant.sku
             listing.externalSku = variant.sku
-            listing.channelTitle = `${channelTitle} - ${(variant.attributes as any)?.color_name || ''} / ${(variant.attributes as any)?.size_key || ''}`.slice(
-              0,
-              500
-            )
+            listing.channelTitle =
+              `${channelTitle} - ${(variant.attributes as any)?.color_name || ''} / ${(variant.attributes as any)?.size_key || ''}`.slice(
+                0,
+                500
+              )
             listing.channelDescription = channelDescription ?? null
             listing.channelCategoryId = String(channelCatId)
             listing.currencyCode = variant.currencyCode || 'USD'
@@ -310,10 +309,7 @@ export class ListingTransformerService {
   /**
    * Publishes all platform listings sharing the same Variant SKU (`externalSku`) across all platforms.
    */
-  static async publishSkuAcrossPlatforms(params: {
-    userId: string
-    sku: string
-  }): Promise<number> {
+  static async publishSkuAcrossPlatforms(params: { userId: string; sku: string }): Promise<number> {
     const listings = await ChannelListing.query()
       .where('userId', params.userId)
       .andWhere('externalSku', params.sku)
@@ -349,7 +345,7 @@ export class ListingTransformerService {
 
   /**
    * Builds a per-variant-SKU transformed payload stored inside `ChannelListing.channelAttributes.transformedPayload`
-   * so every SKU on `/listing` can preview or download its exact platform JSON.
+   * so every SKU on `/listings` can preview or download its exact platform JSON.
    */
   static buildSingleVariantPlatformPayload(
     platform: ListingPlatform,
@@ -433,11 +429,11 @@ export class ListingTransformerService {
             mpn: variant.sku,
             imageUrls: images,
             aspects: {
-              Brand: [brand.name],
-              Color: [colorName],
-              Size: [sizeVal],
+              'Brand': [brand.name],
+              'Color': [colorName],
+              'Size': [sizeVal],
               'Size Type': [String(pAttrs.size_type || 'Regular')],
-              Type: [product.type || 'Coat'],
+              'Type': [product.type || 'Coat'],
               'Outer Shell Material': [String(pAttrs.material || 'Leather')],
             },
           },
@@ -450,11 +446,10 @@ export class ListingTransformerService {
           marketplaceId: 'EBAY_US',
           format: 'FIXED_PRICE',
           categoryId: String(catMeta.ebay_category_id || '57988'),
-          listingDescription: (
-            product.extendedDescription ||
-            product.description ||
-            ''
-          ).slice(0, 3000),
+          listingDescription: (product.extendedDescription || product.description || '').slice(
+            0,
+            3000
+          ),
           pricingSummary: {
             price: { currency: variant.currencyCode || 'USD', value: priceNum.toFixed(2) },
           },
@@ -679,7 +674,10 @@ export class ListingTransformerService {
             },
           ],
           bullet_point: bullets.map((b) => ({ value: String(b), language_tag: 'en_US' })),
-          generic_keyword: genericKeywords.map((k) => ({ value: String(k), language_tag: 'en_US' })),
+          generic_keyword: genericKeywords.map((k) => ({
+            value: String(k),
+            language_tag: 'en_US',
+          })),
           department: [{ value: String(attrs.gender || 'mens') }],
           target_gender: [
             {
@@ -833,22 +831,22 @@ export class ListingTransformerService {
         description: ebayDescription,
         imageUrls: images,
         aspects: {
-          Brand: [brand.name],
-          Type: [product.type || 'Coat'],
-          Style: [String(attrs.coat_silhouette_type || product.type || 'Overcoat')],
+          'Brand': [brand.name],
+          'Type': [product.type || 'Coat'],
+          'Style': [String(attrs.coat_silhouette_type || product.type || 'Overcoat')],
           'Outer Shell Material': [String(attrs.material || 'Leather')],
           'Fabric Type': [String(attrs.fabric || '100% Lambskin Leather')],
           'Lining Material': [String(attrs.lining || 'Polyester')],
-          Closure: Array.isArray(attrs.closure_type)
+          'Closure': Array.isArray(attrs.closure_type)
             ? attrs.closure_type
             : [String(attrs.closure || 'Button')],
           'Collar Style': [String(attrs.collar_type || 'Notch Collar')],
-          Pattern: [String(meta.pattern || 'Solid')],
-          Department: [department],
+          'Pattern': [String(meta.pattern || 'Solid')],
+          'Department': [department],
           'Size Type': [String(attrs.size_type || 'Regular')],
           'Sleeve Length': [String(attrs.sleeve_length || 'Long Sleeve')],
-          Features: Array.isArray(attrs.special_feature) ? attrs.special_feature : [],
-          Model: [String(attrs.model_name || product.title)],
+          'Features': Array.isArray(attrs.special_feature) ? attrs.special_feature : [],
+          'Model': [String(attrs.model_name || product.title)],
         },
         variesBy: {
           aspectsImageVariesBy: ['Color'],
@@ -871,12 +869,12 @@ export class ListingTransformerService {
               mpn: v.sku,
               imageUrls: images,
               aspects: {
-                Brand: [brand.name],
-                Color: [colorName],
-                Size: [sizeVal],
+                'Brand': [brand.name],
+                'Color': [colorName],
+                'Size': [sizeVal],
                 'Size Type': [String(attrs.size_type || 'Regular')],
-                Department: [department],
-                Type: [product.type || 'Coat'],
+                'Department': [department],
+                'Type': [product.type || 'Coat'],
                 'Outer Shell Material': [String(attrs.material || 'Leather')],
               },
             },

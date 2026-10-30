@@ -12,7 +12,9 @@ export function extractSequenceNumber(catalogKey: string, fallbackIndex = 0): st
   if (match) {
     return match[1].padStart(2, '0').slice(-2)
   }
-  return String(fallbackIndex + 1).padStart(2, '0').slice(-2)
+  return String(fallbackIndex + 1)
+    .padStart(2, '0')
+    .slice(-2)
 }
 
 export function buildStructuredBaseCode(params: {

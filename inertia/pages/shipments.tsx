@@ -68,11 +68,11 @@ const CHARGE_TYPES = [
 const INVOICE_PAYMENT = ['unpaid', 'paid', 'partially_paid', 'overdue', 'disputed']
 
 export default function Shipments({
-  shipments,
-  shippingInvoices,
-  orders,
-  orderLineItems,
-  savedViews,
+  shipments = [],
+  shippingInvoices = [],
+  orders = [],
+  orderLineItems = [],
+  savedViews = [],
 }: Props) {
   const [createShipmentOpen, setCreateShipmentOpen] = useState(false)
   const [updateShipmentRow, setUpdateShipmentRow] = useState<Row | null>(null)
@@ -112,11 +112,7 @@ export default function Shipments({
     return shipments.filter((s) => {
       const st = String(s.status ?? 'pending')
       if (statusGroupFilter === 'delivered' && st !== 'delivered') return false
-      if (
-        statusGroupFilter === 'in_transit' &&
-        st !== 'in_transit' &&
-        st !== 'out_for_delivery'
-      ) {
+      if (statusGroupFilter === 'in_transit' && st !== 'in_transit' && st !== 'out_for_delivery') {
         return false
       }
       if (statusGroupFilter === 'waiting' && st !== 'pending' && st !== 'label_created') {
@@ -187,8 +183,7 @@ export default function Shipments({
             icon: CheckCircle2,
             tone: 'success',
             active: statusGroupFilter === 'delivered',
-            onClick: () =>
-              setStatusGroupFilter((p) => (p === 'delivered' ? 'all' : 'delivered')),
+            onClick: () => setStatusGroupFilter((p) => (p === 'delivered' ? 'all' : 'delivered')),
           },
           {
             label: 'In Transit / Out for Delivery',
@@ -197,8 +192,7 @@ export default function Shipments({
             icon: Truck,
             tone: 'info',
             active: statusGroupFilter === 'in_transit',
-            onClick: () =>
-              setStatusGroupFilter((p) => (p === 'in_transit' ? 'all' : 'in_transit')),
+            onClick: () => setStatusGroupFilter((p) => (p === 'in_transit' ? 'all' : 'in_transit')),
           },
           {
             label: 'Waiting for Pickup',
@@ -207,8 +201,7 @@ export default function Shipments({
             icon: Clock,
             tone: 'warning',
             active: statusGroupFilter === 'waiting',
-            onClick: () =>
-              setStatusGroupFilter((p) => (p === 'waiting' ? 'all' : 'waiting')),
+            onClick: () => setStatusGroupFilter((p) => (p === 'waiting' ? 'all' : 'waiting')),
           },
           {
             label: 'Exceptions & Delayed',
@@ -217,8 +210,7 @@ export default function Shipments({
             icon: AlertTriangle,
             tone: stats.exceptions > 0 ? 'error' : 'neutral',
             active: statusGroupFilter === 'exception',
-            onClick: () =>
-              setStatusGroupFilter((p) => (p === 'exception' ? 'all' : 'exception')),
+            onClick: () => setStatusGroupFilter((p) => (p === 'exception' ? 'all' : 'exception')),
           },
           {
             label: 'Invoice Variance Total',
@@ -304,8 +296,7 @@ export default function Shipments({
                 const actCost = Number(
                   shipment.actualInvoicedCost ?? shipment.actualShippingCost ?? 0
                 )
-                const orderNum =
-                  (shipment.order as any)?.orderNumber ?? shipment.orderId ?? '—'
+                const orderNum = (shipment.order as any)?.orderNumber ?? shipment.orderId ?? '—'
                 const items = (shipment.shipmentItems as Row[]) ?? []
 
                 return (
@@ -358,9 +349,7 @@ export default function Shipments({
                           </span>
                           <span
                             className={`font-extrabold tabular-nums ${
-                              actCost > estCost && estCost > 0
-                                ? 'text-error'
-                                : 'text-price-current'
+                              actCost > estCost && estCost > 0 ? 'text-error' : 'text-price-current'
                             }`}
                           >
                             {money(currency, actCost)}
@@ -379,9 +368,7 @@ export default function Shipments({
                       {items.length > 0 && (
                         <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-1">
                           <Package className="w-3.5 h-3.5 text-primary shrink-0" />
-                          <span className="truncate">
-                            {items.length} parcel line(s) fulfilled
-                          </span>
+                          <span className="truncate">{items.length} parcel line(s) fulfilled</span>
                         </div>
                       )}
                     </div>
@@ -463,8 +450,7 @@ export default function Shipments({
                 {shippingInvoices.map((inv) => {
                   const cur = String(inv.currencyCode ?? 'USD')
                   const variance = Number(inv.varianceAmount ?? 0)
-                  const expected =
-                    Number(inv.totalAmount ?? inv.totalBilledAmount ?? 0) - variance
+                  const expected = Number(inv.totalAmount ?? inv.totalBilledAmount ?? 0) - variance
 
                   return (
                     <tr key={String(inv.id)} className="hover:bg-muted/20 transition-colors">
@@ -666,9 +652,7 @@ export default function Shipments({
         }
         initialValues={{
           paymentStatus: String(updateInvoiceRow?.paymentStatus ?? 'paid'),
-          reconciliationStatus: String(
-            updateInvoiceRow?.reconciliationStatus ?? 'resolved'
-          ),
+          reconciliationStatus: String(updateInvoiceRow?.reconciliationStatus ?? 'resolved'),
         }}
         fields={[
           {

@@ -77,13 +77,13 @@ const COST_BUCKETS = [
 ]
 
 export default function Finance({
-  financialAccounts,
-  creditCards,
-  financialTransactions,
-  financeCategories,
-  sellerAccounts,
-  orders,
-  savedViews,
+  financialAccounts = [],
+  creditCards = [],
+  financialTransactions = [],
+  financeCategories = [],
+  sellerAccounts = [],
+  orders = [],
+  savedViews = [],
 }: Props) {
   const [createAccountOpen, setCreateAccountOpen] = useState(false)
   const [editAccountRow, setEditAccountRow] = useState<Row | null>(null)
@@ -304,7 +304,12 @@ export default function Finance({
         action="/credit-cards"
         fields={[
           { name: 'cardLabel', label: 'Card Label', required: true },
-          { name: 'brandName', label: 'Brand (e.g. Visa, Amex)', required: true, placeholder: 'Visa' },
+          {
+            name: 'brandName',
+            label: 'Brand (e.g. Visa, Amex)',
+            required: true,
+            placeholder: 'Visa',
+          },
           { name: 'cardholderName', label: 'Cardholder Name', required: true },
           { name: 'last4Digits', label: 'Last 4 Digits', required: true, placeholder: '4242' },
           { name: 'expMonth', label: 'Exp Month (1–12)', kind: 'number', required: true },
@@ -529,7 +534,9 @@ export default function Finance({
         }}
         title={`Edit Finance Category: ${String(editCatRow?.name ?? '')}`}
         submitLabel="Update Category"
-        action={editCatRow ? `/finance-categories/${editCatRow.id}` : '/finance-categories/placeholder'}
+        action={
+          editCatRow ? `/finance-categories/${editCatRow.id}` : '/finance-categories/placeholder'
+        }
         initialValues={
           editCatRow
             ? {

@@ -34,7 +34,8 @@ createInertiaApp({
     return page.default
   },
   setup({ el, App, props }) {
-    const initialTheme = (props?.initialPage?.props as any)?.preferences?.theme as 'light' | 'dark' | undefined
+    const initialTheme = (props?.initialPage?.props as any)?.preferences?.theme as
+      'light' | 'dark' | undefined
     createRoot(el).render(
       <ErrorBoundary>
         <TuyauProvider client={client}>

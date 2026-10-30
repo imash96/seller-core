@@ -41,11 +41,7 @@ export function PageHeader({
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
               {title}
             </h1>
-            {typeof badge === 'string' ? (
-              <StatusBadge label={badge} variant="info" />
-            ) : (
-              badge
-            )}
+            {typeof badge === 'string' ? <StatusBadge label={badge} variant="info" /> : badge}
             {meta}
           </div>
           {desc && (
@@ -112,7 +108,9 @@ export function StatsCard({
           )}
         </div>
         {renderedIcon && (
-          <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
+          <div
+            className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}
+          >
             {renderedIcon}
           </div>
         )}

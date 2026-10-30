@@ -30,6 +30,7 @@ export interface CleanedAddressItem {
   ref: string
   phone: string
   number: string
+  email?: string
   ext?: string
   buyerName?: string
   addressType?: string
@@ -79,9 +80,8 @@ export function AddressCleanerModule() {
         body: JSON.stringify({ rawText }),
       })
 
-
       const data = await response.json()
-      console.log(data);
+      console.log(data)
       if (!response.ok) {
         throw new Error(data.error || 'Failed to clean addresses')
       }
@@ -215,8 +215,8 @@ export function AddressCleanerModule() {
                 Raw Marketplace Addresses
               </CardTitle>
               <CardDescription className="mt-1">
-                Separate multiple addresses with a blank line. Diacritics, 35-char line wraps,
-                state codes, Phone/Ext, and VAT/IOSS/RUT tags are normalized automatically.
+                Separate multiple addresses with a blank line. Diacritics, 35-char line wraps, state
+                codes, Phone/Ext, and VAT/IOSS/RUT tags are normalized automatically.
               </CardDescription>
             </div>
           </CardHeader>
@@ -273,9 +273,7 @@ export function AddressCleanerModule() {
         <Card rounded>
           <CardHeader>
             <div>
-              <CardTitle>
-                Cleaned Carrier-Ready Output ({result?.addresses?.length ?? 0})
-              </CardTitle>
+              <CardTitle>Cleaned Carrier-Ready Output ({result?.addresses?.length ?? 0})</CardTitle>
               <CardDescription className="mt-1">
                 35-character line-wrapped fields (`line1`, `line2`, `line3`), 2-letter state codes,
                 and compliance flags.
@@ -484,13 +482,22 @@ export function AddressCleanerModule() {
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto rounded-lg border border-border">
-                  <table
-                    ref={tableRef}
-                    className="w-full text-xs border-collapse"
-                  >
+                  <table ref={tableRef} className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="bg-muted/60 text-left">
-                        {['Name', 'Line 1', 'Line 2', 'Line 3', 'City', 'State', 'Zip Code', 'Country', 'Phone', 'Email', 'Ref'].map((h) => (
+                        {[
+                          'Name',
+                          'Line 1',
+                          'Line 2',
+                          'Line 3',
+                          'City',
+                          'State',
+                          'Zip Code',
+                          'Country',
+                          'Phone',
+                          'Email',
+                          'Ref',
+                        ].map((h) => (
                           <th
                             key={h}
                             className="px-3 py-2.5 font-semibold text-muted-foreground whitespace-nowrap border-b border-border"
@@ -506,17 +513,33 @@ export function AddressCleanerModule() {
                           key={i}
                           className="border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors"
                         >
-                          <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">{addr.name}</td>
+                          <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">
+                            {addr.name}
+                          </td>
                           <td className="px-3 py-2 font-mono text-foreground">{addr.line1}</td>
                           <td className="px-3 py-2 font-mono text-foreground">{addr.line2}</td>
                           <td className="px-3 py-2 font-mono text-foreground">{addr.line3}</td>
-                          <td className="px-3 py-2 text-foreground whitespace-nowrap">{addr.city}</td>
-                          <td className="px-3 py-2 text-foreground whitespace-nowrap">{addr.state}</td>
-                          <td className="px-3 py-2 font-mono font-semibold text-foreground whitespace-nowrap">{addr.zipcode || addr.zipCode}</td>
-                          <td className="px-3 py-2 text-foreground whitespace-nowrap">{addr.country}</td>
-                          <td className="px-3 py-2 font-mono text-foreground whitespace-nowrap">{addr.phone}</td>
-                          <td className="px-3 py-2 font-mono text-foreground whitespace-nowrap"></td>
-                          <td className="px-3 py-2 font-mono text-foreground whitespace-nowrap">{addr.ref}</td>
+                          <td className="px-3 py-2 text-foreground whitespace-nowrap">
+                            {addr.city}
+                          </td>
+                          <td className="px-3 py-2 text-foreground whitespace-nowrap">
+                            {addr.state}
+                          </td>
+                          <td className="px-3 py-2 font-mono font-semibold text-foreground whitespace-nowrap">
+                            {addr.zipcode || addr.zipCode}
+                          </td>
+                          <td className="px-3 py-2 text-foreground whitespace-nowrap">
+                            {addr.country}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-foreground whitespace-nowrap">
+                            {addr.phone}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-foreground whitespace-nowrap">
+                            {addr.email || '—'}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-foreground whitespace-nowrap">
+                            {addr.ref}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

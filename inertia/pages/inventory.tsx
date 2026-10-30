@@ -39,7 +39,7 @@ type Props = {
   financeCategories?: Row[]
 }
 
-export default function InventoryPage({ products }: Props) {
+export default function InventoryPage({ products = [] }: Props) {
   const [editStockRow, setEditStockRow] = useState<Row | null>(null)
   const [addVariantOpen, setAddVariantOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -155,8 +155,7 @@ export default function InventoryPage({ products }: Props) {
               icon: CheckCircle2,
               tone: 'success',
               active: healthFilter === 'in_stock',
-              onClick: () =>
-                setHealthFilter((prev) => (prev === 'in_stock' ? 'all' : 'in_stock')),
+              onClick: () => setHealthFilter((prev) => (prev === 'in_stock' ? 'all' : 'in_stock')),
             },
             {
               label: 'Low / Out-of-Stock Alerts',
@@ -269,10 +268,7 @@ export default function InventoryPage({ products }: Props) {
                               : 'error'
 
                         return (
-                          <tr
-                            key={String(row.id)}
-                            className="hover:bg-muted/20 transition-colors"
-                          >
+                          <tr key={String(row.id)} className="hover:bg-muted/20 transition-colors">
                             <td className="py-3.5 px-4 align-middle">
                               <MonoBadge text={String(row.sku)} />
                             </td>

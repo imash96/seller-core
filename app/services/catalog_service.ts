@@ -211,8 +211,8 @@ export class CatalogService {
 
     const savedItems: CatalogItem[] = []
     await db.transaction(async (trx) => {
-      for (let i = 0; i < entries.length; i++) {
-        const [catalogKey, entry] = entries[i] as [string, CatalogJsonEntry]
+      for (const [i, entryPair] of entries.entries()) {
+        const [catalogKey, entry] = entryPair as [string, CatalogJsonEntry]
         if (!entry || typeof entry !== 'object' || !entry.title) continue
 
         const item = await this.upsertCatalogEntryInTrx(
@@ -261,7 +261,8 @@ export class CatalogService {
       sequence,
     })
 
-    const varSpec = entry.varaints ?? entry.variants ?? { color: ['BLK'], size: ['S', 'M', 'L', 'XL'] }
+    const varSpec = entry.varaints ??
+      entry.variants ?? { color: ['BLK'], size: ['S', 'M', 'L', 'XL'] }
     const firstColor =
       Array.isArray(varSpec.color) && varSpec.color.length > 0 ? varSpec.color[0] : 'BLK'
     const fileName = `${structuredCode}-${firstColor}-${leatherInfo.code}-${fitInfo.code}`
@@ -331,7 +332,7 @@ export class CatalogService {
   }
 
   /**
-   * Creates or updates a single `CatalogItem` from form fields on `/catalog`.
+   * Creates or updates a single `CatalogItem` from form fields on `/catalogs`.
    */
   static async upsertSingleCatalogItem(params: {
     userId: string
@@ -522,8 +523,7 @@ export class CatalogService {
         item.gender
       ))
 
-    const activeTier: PriceTierCode =
-      params.priceTier || (item.priceTier as PriceTierCode) || '01'
+    const activeTier: PriceTierCode = params.priceTier || (item.priceTier as PriceTierCode) || '01'
     const skuFormat: SkuFormatMode = params.skuFormat || 'standard'
     const stockOnHand = params.defaultStockOnHand ?? 25
     const costRatio = params.costRatio ?? 0.42
@@ -662,9 +662,7 @@ export class CatalogService {
 
       let prod = await Product.query({ client: trx })
         .where('userId', userId)
-        .andWhere((q) =>
-          q.where('skuPrefix', preview.catalogKey).orWhere('slug', cleanSlugBase)
-        )
+        .andWhere((q) => q.where('skuPrefix', preview.catalogKey).orWhere('slug', cleanSlugBase))
         .first()
 
       if (!prod) {
@@ -726,8 +724,7 @@ export class CatalogService {
       }
       await prod.save()
 
-      for (let i = 0; i < includedVariants.length; i++) {
-        const vPrev = includedVariants[i]
+      for (const [i, vPrev] of includedVariants.entries()) {
         const retailPrice = Number(vPrev.retailPrice || 239.99)
         const costPrice = Number(vPrev.costPrice ?? (retailPrice * 0.42).toFixed(2))
         const manufacturingCost = Number((costPrice * 0.85).toFixed(2))
@@ -748,10 +745,9 @@ export class CatalogService {
         }
 
         variant.productId = prod.id
-        variant.title = (vPrev.title || `${prod.title} - ${vPrev.colorName} / ${vPrev.sizeKey}`).slice(
-          0,
-          255
-        )
+        variant.title = (
+          vPrev.title || `${prod.title} - ${vPrev.colorName} / ${vPrev.sizeKey}`
+        ).slice(0, 255)
         variant.isDefault = i === 0
         variant.mpn = variant.sku
         variant.attributes = {

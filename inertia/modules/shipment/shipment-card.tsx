@@ -68,7 +68,10 @@ export function ShipmentCard({
             <div className="text-muted-foreground uppercase font-semibold">Est. / Actual Cost</div>
             <div className="font-mono font-semibold text-foreground mt-0.5 tabular-nums">
               {formatMoney(currency, shipment.estimatedShippingCost)} /{' '}
-              {formatMoney(currency, shipment.actualInvoicedCost ?? shipment.actualShippingCost ?? 0)}
+              {formatMoney(
+                currency,
+                shipment.actualInvoicedCost ?? shipment.actualShippingCost ?? 0
+              )}
             </div>
           </div>
           <div>
@@ -82,8 +85,7 @@ export function ShipmentCard({
 
       <div className="px-4 py-2.5 border-t border-border bg-muted/30 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
-          Qty:{' '}
-          <strong className="text-foreground">{String(shipment.quantityShipped ?? 1)}</strong>
+          Qty: <strong className="text-foreground">{String(shipment.quantityShipped ?? 1)}</strong>
         </span>
         <button
           type="button"

@@ -1,4 +1,5 @@
-import { Link, usePage } from '@inertiajs/react'
+import { usePage } from '@inertiajs/react'
+import { Link } from '@adonisjs/inertia/react'
 import { Stack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Icon } from '@astryxdesign/core/Icon'
@@ -14,7 +15,10 @@ import { Home, ChevronRight } from 'lucide-react'
  */
 export function BreadcrumbNav() {
   const { url } = usePage()
-  const pathname = url.split('?')[0].replace(/^\/app\/?/, '').replace(/^\//, '')
+  const pathname = url
+    .split('?')[0]
+    .replace(/^\/app\/?/, '')
+    .replace(/^\//, '')
   const segments = pathname.split('/').filter(Boolean)
 
   if (segments.length === 0) {

@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react'
+import { Link } from '@adonisjs/inertia/react'
 import { Box, LogOut, X } from 'lucide-react'
 import Drawer from '~/ui/drawer'
 import { NAVIGATION } from '~/lib/constants'
@@ -15,7 +15,11 @@ export default function MobileMenu({ open, close, logout }: MobileMenuProps) {
     <Drawer open={open} onClose={close} direction="left" hideOnDesktop widthClass="max-w-xs">
       <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
         <div className="h-16 px-5 border-b border-sidebar-border flex items-center justify-between">
-          <Link href="/dashboard" onClick={close} className="flex items-center gap-2.5 unstyled-link">
+          <Link
+            href="/dashboard"
+            onClick={close}
+            className="flex items-center gap-2.5 unstyled-link"
+          >
             <div className="w-9 h-9 bg-sidebar-primary rounded-xl flex items-center justify-center shadow-sm">
               <Box className="w-5 h-5 text-sidebar-primary-foreground" />
             </div>

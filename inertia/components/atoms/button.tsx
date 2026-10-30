@@ -48,8 +48,7 @@ const VARIANT_CLASSES: Record<AppButtonVariant, string> = {
     'bg-button-outline text-button-outline-foreground border border-button-outline-border hover:bg-button-outline-hover hover:text-button-outline-hover-foreground',
   ghost:
     'bg-transparent text-button-ghost-foreground hover:bg-button-ghost-hover active:bg-button-ghost-active border-transparent',
-  cart:
-    'bg-button-cart text-button-cart-foreground hover:bg-button-cart-hover border-transparent shadow-2xs',
+  cart: 'bg-button-cart text-button-cart-foreground hover:bg-button-cart-hover border-transparent shadow-2xs',
   wishlist:
     'bg-button-wishlist text-button-wishlist-foreground hover:bg-button-wishlist-hover border-transparent',
 }

@@ -62,10 +62,7 @@ export function BulkActionsBar({
   if (selectedIds.length === 0) return null
 
   return (
-    <Stack
-      align="center"
-      className="bulk-bar-fixed bulk-bar-enter"
-    >
+    <Stack align="center" className="bulk-bar-fixed bulk-bar-enter">
       <Card padding={4} elevation="high" width={480}>
         <Stack direction="horizontal" align="center" gap={4} wrap="wrap">
           <Stack direction="horizontal" align="center" gap={3}>
@@ -74,9 +71,7 @@ export function BulkActionsBar({
               <Text type="label" weight="semibold">
                 {selectedIds.length} {resource} selected
               </Text>
-              <Text type="supporting">
-                Perform bulk operations
-              </Text>
+              <Text type="supporting">Perform bulk operations</Text>
             </Stack>
           </Stack>
 
@@ -105,12 +100,7 @@ export function BulkActionsBar({
               onClick={handleBulkExport}
               isDisabled={processing}
             />
-            <Button
-              label="Clear"
-              variant="ghost"
-              size="sm"
-              onClick={onClearSelection}
-            />
+            <Button label="Clear" variant="ghost" size="sm" onClick={onClearSelection} />
           </Stack>
         </Stack>
       </Card>

@@ -1,10 +1,14 @@
-import { Link, usePage } from '@inertiajs/react'
+import { usePage } from '@inertiajs/react'
+import { Link } from '@adonisjs/inertia/react'
 import { ChevronRight, Home } from 'lucide-react'
 import { ROUTE_LABELS } from '~/lib/constants'
 
 export function BreadcrumbNav() {
   const { url } = usePage()
-  const pathname = (url || '/').split('?')[0].replace(/^\/app\/?/, '').replace(/^\//, '')
+  const pathname = (url || '/')
+    .split('?')[0]
+    .replace(/^\/app\/?/, '')
+    .replace(/^\//, '')
   const segments = pathname.split('/').filter(Boolean)
 
   if (segments.length === 0 || (segments.length === 1 && segments[0] === 'dashboard')) {

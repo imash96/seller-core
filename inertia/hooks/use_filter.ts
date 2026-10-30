@@ -15,11 +15,11 @@ interface FilterState {
  */
 export function useFilter(defaultSort = 'newest') {
   const { url } = usePage()
-  const searchParams = new URLSearchParams(url.split('?')[1])
 
   const pendingReplaceRef = useRef<number | null>(null)
 
   const initialState = useMemo((): FilterState => {
+    const searchParams = new URLSearchParams(url.split('?')[1])
     const filters: Record<string, Set<string>> = {}
     let page = 1
     let sort = defaultSort
@@ -42,35 +42,32 @@ export function useFilter(defaultSort = 'newest') {
     })
 
     return { filters, page, sort }
-  }, [url])
+  }, [url, defaultSort])
 
   const [state, setState] = useState<FilterState>(initialState)
 
-  const scheduleReplace = useCallback(
-    (qs: string) => {
-      if (pendingReplaceRef.current) {
-        clearTimeout(pendingReplaceRef.current)
-        pendingReplaceRef.current = null
-      }
+  const scheduleReplace = useCallback((qs: string) => {
+    if (pendingReplaceRef.current) {
+      clearTimeout(pendingReplaceRef.current)
+      pendingReplaceRef.current = null
+    }
 
-      pendingReplaceRef.current = window.setTimeout(() => {
-        Promise.resolve().then(() => {
-          try {
-            const href = qs ? `?${qs}` : window.location.pathname
-            router.get(href, undefined, {
-              replace: true,
-              preserveScroll: true,
-              preserveState: true,
-            })
-          } catch {
-            // Safety net — router.replace should work in client hooks
-          }
-        })
-        pendingReplaceRef.current = null
-      }, 50)
-    },
-    []
-  )
+    pendingReplaceRef.current = window.setTimeout(() => {
+      Promise.resolve().then(() => {
+        try {
+          const href = qs ? `?${qs}` : window.location.pathname
+          router.get(href, undefined, {
+            replace: true,
+            preserveScroll: true,
+            preserveState: true,
+          })
+        } catch {
+          // Safety net — router.replace should work in client hooks
+        }
+      })
+      pendingReplaceRef.current = null
+    }, 50)
+  }, [])
 
   const updateURLFromState = useCallback(
     (nextState: FilterState) => {

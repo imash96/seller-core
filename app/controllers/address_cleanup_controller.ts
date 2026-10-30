@@ -87,9 +87,7 @@ export default class AddressCleanupController {
     try {
       const cleaner = new CleanAdd()
       const addresses =
-        Array.isArray(preCleaned) && preCleaned.length > 0
-          ? preCleaned
-          : cleaner.main(rawText)
+        Array.isArray(preCleaned) && preCleaned.length > 0 ? preCleaned : cleaner.main(rawText)
 
       if (!addresses || addresses.length === 0) {
         return response.status(422).json({ error: 'No addresses provided for DOCX generation.' })

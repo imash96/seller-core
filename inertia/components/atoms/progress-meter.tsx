@@ -44,7 +44,9 @@ export function ProgressMeter({
           )}
         </div>
       )}
-      <div className={`w-full ${heightCls} rounded-full bg-surface-sunken border border-border-subtle overflow-hidden p-0.5`}>
+      <div
+        className={`w-full ${heightCls} rounded-full bg-surface-sunken border border-border-subtle overflow-hidden p-0.5`}
+      >
         <div
           className={`h-full rounded-full transition-all duration-300 ${barColor}`}
           style={{ width: `${clamped}%` }}

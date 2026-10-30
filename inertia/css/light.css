@@ -236,7 +236,12 @@
   --gradient-primary: linear-gradient(135deg, oklch(0.51 0.21 262) 0%, oklch(0.56 0.19 292) 100%);
   --gradient-accent: linear-gradient(135deg, oklch(0.56 0.19 292) 0%, oklch(0.6 0.18 320) 100%);
   --gradient-warm: linear-gradient(135deg, oklch(0.66 0.18 45) 0%, oklch(0.58 0.21 24) 100%);
-  --gradient-hero: linear-gradient(135deg, oklch(0.16 0.04 255) 0%, oklch(0.24 0.08 268) 55%, oklch(0.2 0.06 290) 100%);
+  --gradient-hero: linear-gradient(
+    135deg,
+    oklch(0.16 0.04 255) 0%,
+    oklch(0.24 0.08 268) 55%,
+    oklch(0.2 0.06 290) 100%
+  );
   --gradient-card: linear-gradient(180deg, oklch(1 0 0) 0%, oklch(0.985 0.005 245) 100%);
   --gradient-surface: linear-gradient(180deg, oklch(0.99 0.004 245) 0%, oklch(0.965 0.01 245) 100%);
   --marquee-mask: linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%);

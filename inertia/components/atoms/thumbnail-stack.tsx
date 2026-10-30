@@ -23,7 +23,12 @@ const SIZE_DIMS = {
 function isUsableImageUrl(url?: string | null): boolean {
   if (!url || typeof url !== 'string') return false
   if (url.includes('example.com/')) return false
-  return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/') || url.startsWith('data:image/')
+  return (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('/') ||
+    url.startsWith('data:image/')
+  )
 }
 
 function FallbackProductGraphic({
@@ -55,13 +60,7 @@ function FallbackProductGraphic({
   )
 }
 
-function SingleThumb({
-  item,
-  index,
-}: {
-  item: ThumbnailStackItem
-  index: number
-}) {
+function SingleThumb({ item, index }: { item: ThumbnailStackItem; index: number }) {
   const [failed, setFailed] = useState(false)
   const valid = isUsableImageUrl(item.imageUrl) && !failed
 
@@ -85,11 +84,7 @@ function SingleThumb({
  * - When `items.length > 1`: renders tilted background product thumbnails (`-rotate-6`, `rotate-6`)
  *   layered behind the primary front thumbnail plus a `+N` multi-item count pill.
  */
-export function ThumbnailStack({
-  items,
-  size = 'md',
-  className = '',
-}: ThumbnailStackProps) {
+export function ThumbnailStack({ items, size = 'md', className = '' }: ThumbnailStackProps) {
   const list = items?.length ? items : [{ sku: 'ITEM', title: 'Product' }]
   const primary = list[0]
   const secondary = list[1]

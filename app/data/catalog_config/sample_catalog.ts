@@ -15,7 +15,7 @@ export const SAMPLE_CATALOG_JSON: CatalogJsonPayload = {
     shortDescription:
       "Handcrafted 100% genuine full-grain lambskin leather men's full-length duster coat with quilted polyester lining, 4-button single-breasted closure, notch lapel collar with storm latch, and 4 secure pockets.",
     extendedDescription:
-      "✨ COMMANDING FULL-LENGTH LEATHER DUSTER COAT ✨\n\nElevate your outerwear collection with the Velocity Long Duster Coat — meticulously handcrafted from 100% genuine lambskin leather for a supple drape and all-season durability.\n\n🧥 KEY HIGHLIGHTS:\n• 100% Genuine Lambskin Leather exterior with warm quilted polyester lining\n• Full-length ankle silhouette with rear center kick pleat for effortless movement\n• Classic 4-button single-breasted front with matte black hardware\n• Notch lapel collar with button-up throat latch (storm tab)\n• Two external waist flap pockets + two internal pockets (1 zippered, 1 open)",
+      '✨ COMMANDING FULL-LENGTH LEATHER DUSTER COAT ✨\n\nElevate your outerwear collection with the Velocity Long Duster Coat — meticulously handcrafted from 100% genuine lambskin leather for a supple drape and all-season durability.\n\n🧥 KEY HIGHLIGHTS:\n• 100% Genuine Lambskin Leather exterior with warm quilted polyester lining\n• Full-length ankle silhouette with rear center kick pleat for effortless movement\n• Classic 4-button single-breasted front with matte black hardware\n• Notch lapel collar with button-up throat latch (storm tab)\n• Two external waist flap pockets + two internal pockets (1 zippered, 1 open)',
     pattern: 'Solid',
     attributes: {
       material: 'Leather',
@@ -80,7 +80,7 @@ export const SAMPLE_CATALOG_JSON: CatalogJsonPayload = {
     shortDescription:
       "Men's full-length 100% lambskin leather duster trench coat featuring a 4-button single-breasted front, notch lapel collar with storm throat latch, rear center vent, and 4 functional pockets.",
     extendedDescription:
-      "🔥 HERITAGE FULL-LENGTH LAMBSKIN DUSTER TRENCH 🔥\n\nDesigned for statement style and rugged weather protection, the Heritage Duster Coat is cut from 100% genuine full-grain lambskin leather.\n\n🧥 FEATURES & CRAFTSMANSHIP:\n• Supple 100% Lambskin Leather shell + quilted polyester thermal lining\n• Ankle-length duster cut with rear kick pleat for natural stride\n• Matte black 4-button single-breasted closure\n• Notch lapel collar with convertible storm throat latch\n• 2 outer waist flap pockets + 2 interior security pockets",
+      '🔥 HERITAGE FULL-LENGTH LAMBSKIN DUSTER TRENCH 🔥\n\nDesigned for statement style and rugged weather protection, the Heritage Duster Coat is cut from 100% genuine full-grain lambskin leather.\n\n🧥 FEATURES & CRAFTSMANSHIP:\n• Supple 100% Lambskin Leather shell + quilted polyester thermal lining\n• Ankle-length duster cut with rear kick pleat for natural stride\n• Matte black 4-button single-breasted closure\n• Notch lapel collar with convertible storm throat latch\n• 2 outer waist flap pockets + 2 interior security pockets',
     pattern: 'Solid',
     attributes: {
       material: 'Leather',
@@ -157,7 +157,8 @@ export const SAMPLE_CATALOG_JSON: CatalogJsonPayload = {
       coat_silhouette_type: 'Motorcycle Jacket',
       collar: 'Snap-Down Lapel Collar',
       collar_type: 'Notch Collar',
-      pocket_description: 'Three external zippered pockets, one coin flap pocket, and two interior pockets.',
+      pocket_description:
+        'Three external zippered pockets, one coin flap pocket, and two interior pockets.',
       pockets: ['Zip Pocket', 'Coin Flap Pocket', 'Interior Pocket'],
       sleeve_length: 'Long Sleeve',
       sleeve_type: 'Zipper Cuff Sleeve',
@@ -217,7 +218,9 @@ export const SAMPLE_CATALOG_JSON: CatalogJsonPayload = {
         'BUTTERY NAPPA LAMBSKIN: Hand-selected full-grain Nappa lambskin leather with a smooth, lightweight feel.',
         'CONTOURED CAFE RACER CUT: Minimalist stand snap collar and princess seams tailored for a sleek feminine fit.',
       ],
-      generic_keyword: ['womens cafe racer leather jacket; womens moto jacket; burgundy leather jacket;'],
+      generic_keyword: [
+        'womens cafe racer leather jacket; womens moto jacket; burgundy leather jacket;',
+      ],
       special_feature: ['Stand collar with snap closure', 'Contoured princess seams'],
     },
     images: ['https://example.com/valkyrie1.jpg', 'https://example.com/valkyrie2.jpg'],

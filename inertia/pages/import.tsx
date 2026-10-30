@@ -12,14 +12,7 @@ import {
   type Row,
 } from '~/lib/ui'
 import { useState, useMemo } from 'react'
-import {
-  Upload,
-  CheckCircle2,
-  AlertTriangle,
-  RefreshCw,
-  Database,
-  Eye,
-} from 'lucide-react'
+import { Upload, CheckCircle2, AlertTriangle, RefreshCw, Database, Eye } from 'lucide-react'
 
 type Props = {
   syncJobs: Row[]
@@ -34,7 +27,7 @@ type Props = {
   savedViews?: Row[]
 }
 
-export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) {
+export default function Import({ syncJobs = [], sellerAccounts = [], savedViews = [] }: Props) {
   const [importOpen, setImportOpen] = useState(false)
   const [syncOpen, setSyncOpen] = useState(false)
   const [inspectJob, setInspectJob] = useState<Row | null>(null)
@@ -224,8 +217,7 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
       >
         {inspectJob && (
           <div className="space-y-3">
-            {Array.isArray((inspectJob as any).errors) &&
-            (inspectJob as any).errors.length > 0 ? (
+            {Array.isArray((inspectJob as any).errors) && (inspectJob as any).errors.length > 0 ? (
               (inspectJob as any).errors.map((e: Row, i: number) => (
                 <div
                   key={i}

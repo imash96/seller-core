@@ -52,11 +52,7 @@ export function OrderCard({
   const thumbItems =
     lineItems.length > 0
       ? lineItems.map((li) => ({
-          imageUrl: String(
-            li.imageUrl ??
-              (li.productVariant as any)?.product?.images?.[0] ??
-              ''
-          ),
+          imageUrl: String(li.imageUrl ?? (li.productVariant as any)?.product?.images?.[0] ?? ''),
           sku: String(li.sku ?? ''),
           title: String(li.title ?? ''),
           quantity: Number(li.quantityOrdered ?? 1),
@@ -211,9 +207,7 @@ export function OrderCard({
                       <span className="font-mono text-[11px] font-semibold text-foreground">
                         {String(li.sku)}
                       </span>
-                      <span className="text-muted-foreground truncate">
-                        — {String(li.title)}
-                      </span>
+                      <span className="text-muted-foreground truncate">— {String(li.title)}</span>
                     </div>
                     <span className="font-semibold text-foreground tabular-nums shrink-0">
                       {formatMoney(currency, li.lineTotalAmount ?? li.unitPrice)}
@@ -339,7 +333,10 @@ export function OrderCard({
               )}
               {customer.totalSpent && Number(customer.totalSpent) > 0 && (
                 <span className="text-[11px] text-muted-foreground">
-                  LTV: <strong className="text-foreground">{formatMoney(currency, customer.totalSpent)}</strong>
+                  LTV:{' '}
+                  <strong className="text-foreground">
+                    {formatMoney(currency, customer.totalSpent)}
+                  </strong>
                 </span>
               )}
             </div>

@@ -59,12 +59,12 @@ const PLATFORMS = [
 ] as const
 
 export default function Products({
-  products,
-  brands,
-  categories,
-  sellerAccounts,
-  channelListings,
-  savedViews,
+  products = [],
+  brands = [],
+  categories = [],
+  sellerAccounts = [],
+  channelListings = [],
+  savedViews = [],
 }: Props) {
   const [createProductOpen, setCreateProductOpen] = useState(false)
   const [editProductRow, setEditProductRow] = useState<Row | null>(null)
@@ -188,7 +188,10 @@ export default function Products({
       return
     }
     if (selectedPlatforms.length === 0) {
-      setBanner({ tone: 'error', message: 'Please select at least one target e-commerce platform.' })
+      setBanner({
+        tone: 'error',
+        message: 'Please select at least one target e-commerce platform.',
+      })
       return
     }
     setConvertingListing(true)
@@ -212,11 +215,14 @@ export default function Products({
       })
       const data = await res.json()
       if (!res.ok || (!data.ok && !data.success)) {
-        setBanner({ tone: 'error', message: data.error ?? 'Failed to convert product to listings.' })
+        setBanner({
+          tone: 'error',
+          message: data.error ?? 'Failed to convert product to listings.',
+        })
       } else {
         setBanner({
           tone: 'success',
-          message: `Linked "${convertModalProduct.title}" with Brand "${data.brandName}" and generated ${data.channelListingsUpserted} platform listings across ${(data.platforms ?? selectedPlatforms).join(', ').toUpperCase()}. View & publish them in /listing!`,
+          message: `Linked "${convertModalProduct.title}" with Brand "${data.brandName}" and generated ${data.channelListingsUpserted} platform listings across ${(data.platforms ?? selectedPlatforms).join(', ').toUpperCase()}. View & publish them in /listings!`,
         })
         setConvertModalProduct(null)
         router.reload()
@@ -269,16 +275,16 @@ export default function Products({
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             <AppButton
-              label="← Catalog (/catalog)"
+              label="← Catalog (/catalogs)"
               variant="secondary"
               size="sm"
-              onClick={() => router.visit('/catalog')}
+              onClick={() => router.visit('/catalogs')}
             />
             <AppButton
-              label="Listings (/listing) →"
+              label="Listings (/listings) →"
               variant="secondary"
               size="sm"
-              onClick={() => router.visit('/listing')}
+              onClick={() => router.visit('/listings')}
             />
             <AppButton
               label="+ Brand"
@@ -342,8 +348,7 @@ export default function Products({
             icon: Building2,
             tone: 'warning',
             active: brandFilter === 'unbranded',
-            onClick: () =>
-              setBrandFilter((prev) => (prev === 'unbranded' ? 'all' : 'unbranded')),
+            onClick: () => setBrandFilter((prev) => (prev === 'unbranded' ? 'all' : 'unbranded')),
           },
           {
             label: 'Medusa Categories',
@@ -376,10 +381,10 @@ export default function Products({
               {banner.tone === 'success' && (
                 <button
                   type="button"
-                  onClick={() => router.visit('/listing')}
+                  onClick={() => router.visit('/listings')}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-primary underline cursor-pointer"
                 >
-                  <span>Open /listing to review & publish by SKU</span>
+                  <span>Open /listings to review & publish by SKU</span>
                   <ExternalLink className="h-3.5 w-3.5" />
                 </button>
               )}
@@ -473,10 +478,10 @@ export default function Products({
               </p>
               <div className="flex items-center justify-center gap-2">
                 <AppButton
-                  label="Convert from /catalog"
+                  label="Convert from /catalogs"
                   variant="secondary"
                   size="sm"
-                  onClick={() => router.visit('/catalog')}
+                  onClick={() => router.visit('/catalogs')}
                 />
                 <AppButton
                   label="+ Create Product"
@@ -506,15 +511,10 @@ export default function Products({
                         },
                       ]
 
-                const prices = pVariants
-                  .map((v) => Number(v.retailPrice ?? 0))
-                  .filter((n) => n > 0)
+                const prices = pVariants.map((v) => Number(v.retailPrice ?? 0)).filter((n) => n > 0)
                 const minPrice = prices.length ? Math.min(...prices) : 0
                 const maxPrice = prices.length ? Math.max(...prices) : 0
-                const totalStock = pVariants.reduce(
-                  (sum, v) => sum + Number(v.stockOnHand ?? 0),
-                  0
-                )
+                const totalStock = pVariants.reduce((sum, v) => sum + Number(v.stockOnHand ?? 0), 0)
                 const brandName = (product.brand as any)?.name
                 const catName = (product.category as any)?.name ?? 'Uncategorized'
                 const catPath = (product.category as any)?.taxonomyPath ?? ''
@@ -775,7 +775,10 @@ export default function Products({
                           <Badge label={`Etsy: ${meta.etsy_taxonomy_id}`} variant="success" />
                         )}
                         {meta.google_product_category_id && (
-                          <Badge label={`Google: ${meta.google_product_category_id}`} variant="neutral" />
+                          <Badge
+                            label={`Google: ${meta.google_product_category_id}`}
+                            variant="neutral"
+                          />
                         )}
                         {!meta.amazon_browse_node &&
                           !meta.ebay_category_id &&
@@ -1007,7 +1010,8 @@ export default function Products({
                   Convert Product to Platform Listings
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Associate <strong>{String(convertModalProduct.title)}</strong> with a Brand and generate platform-specific listings for Medusa Website, Amazon, eBay, and Etsy.
+                  Associate <strong>{String(convertModalProduct.title)}</strong> with a Brand and
+                  generate platform-specific listings for Medusa Website, Amazon, eBay, and Etsy.
                 </p>
               </div>
               <button
@@ -1085,7 +1089,9 @@ export default function Products({
                     onChange={(e) => setSelectedSellerAccountId(e.target.value)}
                     className="w-full rounded-xl border border-input-border bg-input-background px-3 py-2 text-xs text-foreground"
                   >
-                    <option value="">Auto-resolve per Platform (Medusa / Amazon / eBay / Etsy)</option>
+                    <option value="">
+                      Auto-resolve per Platform (Medusa / Amazon / eBay / Etsy)
+                    </option>
                     {sellerAccounts.map((sa) => (
                       <option key={String(sa.id)} value={String(sa.id)}>
                         {String(sa.accountName)}
@@ -1366,8 +1372,17 @@ export default function Products({
             options: categories.map((c) => ({ value: String(c.id), label: String(c.name) })),
           },
           { name: 'type', label: 'Product Type', section: '2. Classification & Status' },
-          { name: 'collectionName', label: 'Collection Name', section: '2. Classification & Status' },
-          { name: 'weightGrams', label: 'Weight (grams)', kind: 'number', section: '2. Classification & Status' },
+          {
+            name: 'collectionName',
+            label: 'Collection Name',
+            section: '2. Classification & Status',
+          },
+          {
+            name: 'weightGrams',
+            label: 'Weight (grams)',
+            kind: 'number',
+            section: '2. Classification & Status',
+          },
           {
             name: 'status',
             label: 'Status',
@@ -1413,19 +1428,72 @@ export default function Products({
         }
         fields={[
           { name: 'sku', label: 'Variant SKU', required: true, section: '1. Variant Identity' },
-          { name: 'title', label: 'Variant Title (e.g. Black / Medium)', required: true, section: '1. Variant Identity' },
+          {
+            name: 'title',
+            label: 'Variant Title (e.g. Black / Medium)',
+            required: true,
+            section: '1. Variant Identity',
+          },
           { name: 'barcodeUpcEan', label: 'Barcode (UPC / EAN)', section: '1. Variant Identity' },
           { name: 'mpn', label: 'MPN', section: '1. Variant Identity' },
           { name: 'asin', label: 'Amazon ASIN', section: '1. Variant Identity' },
-          { name: 'retailPrice', label: 'Retail price ($)', kind: 'number', required: true, section: '2. Pricing & Stock' },
-          { name: 'compareAtPrice', label: 'Compare-at price ($)', kind: 'number', section: '2. Pricing & Stock' },
-          { name: 'costPrice', label: 'Cost price (COGS $)', kind: 'number', section: '2. Pricing & Stock' },
-          { name: 'manufacturingCost', label: 'Manufacturing cost ($)', kind: 'number', section: '2. Pricing & Stock' },
-          { name: 'packagingCost', label: 'Packaging cost ($)', kind: 'number', section: '2. Pricing & Stock' },
-          { name: 'stockOnHand', label: 'Stock on hand', kind: 'number', default: '25', section: '2. Pricing & Stock' },
-          { name: 'reorderPoint', label: 'Reorder alert threshold', kind: 'number', default: '10', section: '2. Pricing & Stock' },
-          { name: 'attributeName', label: 'Primary Attribute Dimension (e.g. color)', default: 'color', section: '3. Normalized Attributes' },
-          { name: 'attributeValue', label: 'Primary Attribute Value (e.g. Black)', placeholder: 'Black', section: '3. Normalized Attributes' },
+          {
+            name: 'retailPrice',
+            label: 'Retail price ($)',
+            kind: 'number',
+            required: true,
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'compareAtPrice',
+            label: 'Compare-at price ($)',
+            kind: 'number',
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'costPrice',
+            label: 'Cost price (COGS $)',
+            kind: 'number',
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'manufacturingCost',
+            label: 'Manufacturing cost ($)',
+            kind: 'number',
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'packagingCost',
+            label: 'Packaging cost ($)',
+            kind: 'number',
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'stockOnHand',
+            label: 'Stock on hand',
+            kind: 'number',
+            default: '25',
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'reorderPoint',
+            label: 'Reorder alert threshold',
+            kind: 'number',
+            default: '10',
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'attributeName',
+            label: 'Primary Attribute Dimension (e.g. color)',
+            default: 'color',
+            section: '3. Normalized Attributes',
+          },
+          {
+            name: 'attributeValue',
+            label: 'Primary Attribute Value (e.g. Black)',
+            placeholder: 'Black',
+            section: '3. Normalized Attributes',
+          },
         ]}
       />
 
@@ -1447,15 +1515,57 @@ export default function Products({
             options: products.map((p) => ({ value: String(p.id), label: String(p.title) })),
           },
           { name: 'sku', label: 'Variant SKU', required: true, section: '1. Parent Product & SKU' },
-          { name: 'title', label: 'Variant Title (Color / Size)', required: true, section: '1. Parent Product & SKU' },
-          { name: 'barcodeUpcEan', label: 'Barcode (UPC / EAN)', section: '1. Parent Product & SKU' },
+          {
+            name: 'title',
+            label: 'Variant Title (Color / Size)',
+            required: true,
+            section: '1. Parent Product & SKU',
+          },
+          {
+            name: 'barcodeUpcEan',
+            label: 'Barcode (UPC / EAN)',
+            section: '1. Parent Product & SKU',
+          },
           { name: 'asin', label: 'Amazon ASIN', section: '1. Parent Product & SKU' },
-          { name: 'retailPrice', label: 'Retail price ($)', kind: 'number', required: true, section: '2. Pricing & Stock' },
-          { name: 'costPrice', label: 'Cost price ($)', kind: 'number', section: '2. Pricing & Stock' },
-          { name: 'stockOnHand', label: 'Stock on hand', kind: 'number', default: '25', section: '2. Pricing & Stock' },
-          { name: 'reorderPoint', label: 'Reorder point', kind: 'number', default: '10', section: '2. Pricing & Stock' },
-          { name: 'attributeName', label: 'Attribute dimension', placeholder: 'size', section: '3. Attributes' },
-          { name: 'attributeValue', label: 'Attribute value', placeholder: 'Large', section: '3. Attributes' },
+          {
+            name: 'retailPrice',
+            label: 'Retail price ($)',
+            kind: 'number',
+            required: true,
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'costPrice',
+            label: 'Cost price ($)',
+            kind: 'number',
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'stockOnHand',
+            label: 'Stock on hand',
+            kind: 'number',
+            default: '25',
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'reorderPoint',
+            label: 'Reorder point',
+            kind: 'number',
+            default: '10',
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'attributeName',
+            label: 'Attribute dimension',
+            placeholder: 'size',
+            section: '3. Attributes',
+          },
+          {
+            name: 'attributeValue',
+            label: 'Attribute value',
+            placeholder: 'Large',
+            section: '3. Attributes',
+          },
         ]}
       />
 
@@ -1544,9 +1654,18 @@ export default function Products({
         submitLabel="Create Category"
         action="/categories"
         fields={[
-          { name: 'name', label: 'Category Name', required: true, section: '1. Category Hierarchy' },
+          {
+            name: 'name',
+            label: 'Category Name',
+            required: true,
+            section: '1. Category Hierarchy',
+          },
           { name: 'slug', label: 'Slug (e.g. duster)', section: '1. Category Hierarchy' },
-          { name: 'taxonomyPath', label: 'Medusa Handle / Taxonomy Path (e.g. men/outerwear/coats/duster)', section: '1. Category Hierarchy' },
+          {
+            name: 'taxonomyPath',
+            label: 'Medusa Handle / Taxonomy Path (e.g. men/outerwear/coats/duster)',
+            section: '1. Category Hierarchy',
+          },
           {
             name: 'parentCategoryId',
             label: 'Parent Category',
@@ -1557,7 +1676,13 @@ export default function Products({
               ...categories.map((c) => ({ value: String(c.id), label: String(c.name) })),
             ],
           },
-          { name: 'description', label: 'Category Description', kind: 'textarea', fullWidth: true, section: '1. Category Hierarchy' },
+          {
+            name: 'description',
+            label: 'Category Description',
+            kind: 'textarea',
+            fullWidth: true,
+            section: '1. Category Hierarchy',
+          },
         ]}
       />
 

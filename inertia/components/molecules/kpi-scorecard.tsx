@@ -110,7 +110,9 @@ export function StatStrip({
             <span className="text-lg sm:text-xl font-bold text-foreground tabular-nums truncate">
               {it.value}
             </span>
-            {it.hint && <span className="text-[11px] text-muted-foreground truncate">{it.hint}</span>}
+            {it.hint && (
+              <span className="text-[11px] text-muted-foreground truncate">{it.hint}</span>
+            )}
           </div>
         ))}
       </div>

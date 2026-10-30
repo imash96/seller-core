@@ -185,10 +185,7 @@ export default function Listings({
         }
       })
       .filter((group) => {
-        if (
-          (platformFilter !== 'all' || statusFilter !== 'all') &&
-          group.platforms.length === 0
-        ) {
+        if ((platformFilter !== 'all' || statusFilter !== 'all') && group.platforms.length === 0) {
           return false
         }
         if (searchQuery.trim()) {
@@ -215,13 +212,7 @@ export default function Listings({
       if (statusFilter !== 'all' && String(l.listingStatus) !== statusFilter) return false
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase()
-        const hay = [
-          l.externalSku,
-          l.externalListingId,
-          l.productTitle,
-          l.brandName,
-          l.platform,
-        ]
+        const hay = [l.externalSku, l.externalListingId, l.productTitle, l.brandName, l.platform]
           .filter(Boolean)
           .join(' ')
           .toLowerCase()
@@ -431,7 +422,7 @@ export default function Listings({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Platform Listings Studio (/listing)"
+        title="Platform Listings Studio (/listings)"
         description="View generated e-commerce listings grouped by Variant SKU across Medusa Website, Amazon SP-API, eBay Inventory API, and Etsy Open API v3. Inspect transformed JSON payloads and publish per SKU or per platform."
         icon={Globe}
         badge={`${skuGroups.length} SKUs · ${channelListings.length} platform listings · ${syncedCount} synced`}
@@ -599,7 +590,8 @@ export default function Listings({
                   No platform listings generated yet.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Convert a Product to Platform Listings from <code>/products</code> or click &ldquo;+ Generate Platform Listings&rdquo; below.
+                  Convert a Product to Platform Listings from <code>/products</code> or click
+                  &ldquo;+ Generate Platform Listings&rdquo; below.
                 </p>
                 <AppButton
                   label="+ Generate Platform Listings"
@@ -834,9 +826,7 @@ export default function Listings({
                           <div className="flex items-center justify-end gap-1.5">
                             <AppButton
                               label={
-                                busyKey === `pub-${l.id}`
-                                  ? 'Publishing...'
-                                  : 'Publish on Platform'
+                                busyKey === `pub-${l.id}` ? 'Publishing...' : 'Publish on Platform'
                               }
                               variant="primary"
                               size="xs"
@@ -888,7 +878,8 @@ export default function Listings({
                   Generate Multi-Platform Listings
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Link Products & Variants with a Brand and run platform transformers for Medusa, Amazon, eBay, and Etsy.
+                  Link Products & Variants with a Brand and run platform transformers for Medusa,
+                  Amazon, eBay, and Etsy.
                 </p>
               </div>
               <button
@@ -945,9 +936,7 @@ export default function Listings({
                           checked={checked}
                           onChange={() =>
                             setSelectedPlatforms((prev) =>
-                              prev.includes(plat)
-                                ? prev.filter((x) => x !== plat)
-                                : [...prev, plat]
+                              prev.includes(plat) ? prev.filter((x) => x !== plat) : [...prev, plat]
                             )
                           }
                         />
@@ -1015,9 +1004,7 @@ export default function Listings({
                 onClick={() => setGenerateModalOpen(false)}
               />
               <AppButton
-                label={
-                  busyKey === 'gen-listings' ? 'Generating...' : 'Generate Platform Listings'
-                }
+                label={busyKey === 'gen-listings' ? 'Generating...' : 'Generate Platform Listings'}
                 variant="primary"
                 size="sm"
                 loading={busyKey === 'gen-listings'}
@@ -1060,16 +1047,12 @@ export default function Listings({
                   label="External Listing ID / Offer ID *"
                   required
                   value={editForm.externalListingId}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, externalListingId: e.target.value })
-                  }
+                  onChange={(e) => setEditForm({ ...editForm, externalListingId: e.target.value })}
                 />
                 <AppInput
                   label="External Variant ID"
                   value={editForm.externalVariantId}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, externalVariantId: e.target.value })
-                  }
+                  onChange={(e) => setEditForm({ ...editForm, externalVariantId: e.target.value })}
                 />
                 <AppInput
                   label="Channel SKU Override"
@@ -1084,9 +1067,7 @@ export default function Listings({
                 <AppInput
                   label="Channel Category / Browse Node ID"
                   value={editForm.channelCategoryId}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, channelCategoryId: e.target.value })
-                  }
+                  onChange={(e) => setEditForm({ ...editForm, channelCategoryId: e.target.value })}
                 />
                 <AppInput
                   label="Currency Code"
@@ -1104,9 +1085,7 @@ export default function Listings({
                   label="Allocated Quantity"
                   type="number"
                   value={editForm.allocatedQuantity}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, allocatedQuantity: e.target.value })
-                  }
+                  onChange={(e) => setEditForm({ ...editForm, allocatedQuantity: e.target.value })}
                 />
                 <AppSelect
                   label="Listing Status"
@@ -1122,9 +1101,7 @@ export default function Listings({
                 <AppSelect
                   label="Publication Status"
                   value={editForm.publicationStatus}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, publicationStatus: e.target.value })
-                  }
+                  onChange={(e) => setEditForm({ ...editForm, publicationStatus: e.target.value })}
                   options={[
                     { value: 'published', label: 'published' },
                     { value: 'draft', label: 'draft' },

@@ -105,10 +105,16 @@ export default class ReturnsController {
     if (request.input('resolutionType')) {
       rma.resolutionType = String(request.input('resolutionType'))
     }
-    if (request.input('quantityApproved') !== undefined && request.input('quantityApproved') !== '') {
+    if (
+      request.input('quantityApproved') !== undefined &&
+      request.input('quantityApproved') !== ''
+    ) {
       rma.quantityApproved = Math.max(0, Number(request.input('quantityApproved')))
     }
-    if (request.input('quantityReceived') !== undefined && request.input('quantityReceived') !== '') {
+    if (
+      request.input('quantityReceived') !== undefined &&
+      request.input('quantityReceived') !== ''
+    ) {
       rma.quantityReceived = Math.max(0, Number(request.input('quantityReceived')))
     }
     if (request.input('refundAmount') !== undefined && request.input('refundAmount') !== '') {

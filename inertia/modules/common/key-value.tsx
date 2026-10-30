@@ -20,12 +20,7 @@ export function KeyValue({ label, value, muted = false }: KeyValueProps) {
       <Text type="supporting" as="span">
         {label}
       </Text>
-      <Text
-        type="body"
-        as="span"
-        weight="medium"
-        color={muted ? 'secondary' : undefined}
-      >
+      <Text type="body" as="span" weight="medium" color={muted ? 'secondary' : undefined}>
         {value}
       </Text>
     </Stack>

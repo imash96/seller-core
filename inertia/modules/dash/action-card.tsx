@@ -1,41 +1,42 @@
-import { Link } from '@inertiajs/react'
+import { Link } from '@adonisjs/inertia/react'
 import type { LucideIcon } from 'lucide-react'
 import { ChevronRight } from 'lucide-react'
 
 export type ActionColorKey = 'blue' | 'green' | 'purple' | 'red' | 'yellow'
 
-const STYLES: Record<ActionColorKey, { bg: string; icon: string; border: string; hover: string }> = {
-  yellow: {
-    bg: 'bg-warning-subtle/40',
-    icon: 'text-warning bg-warning-subtle',
-    border: 'border-warning/20',
-    hover: 'hover:border-warning/40',
-  },
-  blue: {
-    bg: 'bg-info-subtle/40',
-    icon: 'text-info bg-info-subtle',
-    border: 'border-info/20',
-    hover: 'hover:border-info/40',
-  },
-  purple: {
-    bg: 'bg-accent-subtle/40',
-    icon: 'text-accent bg-accent-subtle',
-    border: 'border-accent/20',
-    hover: 'hover:border-accent/40',
-  },
-  green: {
-    bg: 'bg-success-subtle/40',
-    icon: 'text-success bg-success-subtle',
-    border: 'border-success/20',
-    hover: 'hover:border-success/40',
-  },
-  red: {
-    bg: 'bg-error-subtle/40',
-    icon: 'text-error bg-error-subtle',
-    border: 'border-error/20',
-    hover: 'hover:border-error/40',
-  },
-}
+const STYLES: Record<ActionColorKey, { bg: string; icon: string; border: string; hover: string }> =
+  {
+    yellow: {
+      bg: 'bg-warning-subtle/40',
+      icon: 'text-warning bg-warning-subtle',
+      border: 'border-warning/20',
+      hover: 'hover:border-warning/40',
+    },
+    blue: {
+      bg: 'bg-info-subtle/40',
+      icon: 'text-info bg-info-subtle',
+      border: 'border-info/20',
+      hover: 'hover:border-info/40',
+    },
+    purple: {
+      bg: 'bg-accent-subtle/40',
+      icon: 'text-accent bg-accent-subtle',
+      border: 'border-accent/20',
+      hover: 'hover:border-accent/40',
+    },
+    green: {
+      bg: 'bg-success-subtle/40',
+      icon: 'text-success bg-success-subtle',
+      border: 'border-success/20',
+      hover: 'hover:border-success/40',
+    },
+    red: {
+      bg: 'bg-error-subtle/40',
+      icon: 'text-error bg-error-subtle',
+      border: 'border-error/20',
+      hover: 'hover:border-error/40',
+    },
+  }
 
 export default function ActionCard({
   label,

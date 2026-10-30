@@ -117,16 +117,27 @@ export default function AuthLayout({
         </div>
 
         <div className="w-full max-w-md">
-          <div className="lg:hidden flex items-center gap-2.5 mb-8 justify-center">
-            <div className="bg-primary p-2 rounded-xl">
-              <Boxes className="h-6 w-6 text-primary-foreground" />
+          <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
+            <div className="bg-primary/10 text-primary border border-primary/20 p-2.5 rounded-xl shadow-xs">
+              <Boxes className="h-6 w-6" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-foreground">Seller Core</span>
+            <div>
+              <span className="text-xl font-bold tracking-tight text-foreground block leading-none">
+                Seller Core
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                Enterprise Operations Platform
+              </span>
+            </div>
           </div>
 
           <div className="mb-6">
-            <h2 className="text-2xl sm:text-3xl font-bold text-foreground">{title}</h2>
-            {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+              {title}
+            </h2>
+            {subtitle && (
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{subtitle}</p>
+            )}
           </div>
 
           {children}

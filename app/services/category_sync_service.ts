@@ -192,9 +192,7 @@ export class CategorySyncService {
         .toLowerCase()
         .replace(/^\/+|\/+$/g, '')
 
-      const existingQuery = ProductCategory.query()
-        .where('userId', userId)
-        .andWhere('slug', handle)
+      const existingQuery = ProductCategory.query().where('userId', userId).andWhere('slug', handle)
       if (trx) existingQuery.useTransaction(trx)
       let cat = await existingQuery.first()
 
@@ -259,15 +257,17 @@ export class CategorySyncService {
       categories = await loadCategories()
     }
 
-    const rawHandle = (categoryHandle ?? '').trim().toLowerCase().replace(/^\/+|\/+$/g, '')
+    const rawHandle = (categoryHandle ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/^\/+|\/+$/g, '')
     const normalizedHandle = this.normalizeCategoryHandle(rawHandle)
 
     // Step 1: Exact handle / slug / taxonomyPath match
     if (rawHandle) {
       const exact = categories.find(
         (c) =>
-          c.slug.toLowerCase() === rawHandle ||
-          (c.taxonomyPath ?? '').toLowerCase() === rawHandle
+          c.slug.toLowerCase() === rawHandle || (c.taxonomyPath ?? '').toLowerCase() === rawHandle
       )
       if (exact) return exact
     }
@@ -319,8 +319,7 @@ export class CategorySyncService {
       for (let len = parts.length - 1; len >= 1; len--) {
         const prefix = parts.slice(0, len).join('/')
         const ancestor = categories.find(
-          (c) =>
-            c.slug.toLowerCase() === prefix || (c.taxonomyPath ?? '').toLowerCase() === prefix
+          (c) => c.slug.toLowerCase() === prefix || (c.taxonomyPath ?? '').toLowerCase() === prefix
         )
         if (ancestor) return ancestor
       }

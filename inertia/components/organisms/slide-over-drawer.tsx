@@ -5,12 +5,12 @@ import { renderIconOrNode } from '../atoms/icon-avatar'
 export type DrawerSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'
 
 const SIZE_MAP: Record<DrawerSize, string> = {
-  sm: 'max-w-md',
-  md: 'max-w-lg',
-  lg: 'max-w-xl',
-  xl: 'max-w-2xl',
+  'sm': 'max-w-md',
+  'md': 'max-w-lg',
+  'lg': 'max-w-xl',
+  'xl': 'max-w-2xl',
   '2xl': 'max-w-3xl',
-  full: 'max-w-5xl',
+  'full': 'max-w-5xl',
 }
 
 export interface SlideOverDrawerProps {
@@ -91,7 +91,9 @@ export function SlideOverDrawer({
               <h2 className="text-base sm:text-lg font-bold text-foreground leading-snug tracking-tight">
                 {title}
               </h2>
-              {subtitle && <p className="text-xs text-muted-foreground leading-relaxed">{subtitle}</p>}
+              {subtitle && (
+                <p className="text-xs text-muted-foreground leading-relaxed">{subtitle}</p>
+              )}
             </div>
           </div>
           <button

@@ -47,10 +47,8 @@ router
     router.get('/dashboard', [DashboardController, 'index']).as('dashboard')
     router.get('/orders', [OrdersController, 'index']).as('pages.orders')
     router.get('/customers', [CustomersController, 'index']).as('pages.customers')
-    router.get('/catalog', [ProductsController, 'catalogsPage']).as('pages.catalog')
     router.get('/catalogs', [ProductsController, 'catalogsPage']).as('pages.catalogs')
     router.get('/products', [ProductsController, 'index']).as('pages.products')
-    router.get('/listing', [ProductsController, 'listingsPage']).as('pages.listing')
     router.get('/listings', [ProductsController, 'listingsPage']).as('pages.listings')
     router.get('/inventory', [ProductsController, 'inventoryPage']).as('pages.inventory')
     router.get('/seller-accounts', [SellerAccountsController, 'index']).as('pages.accounts')
@@ -62,7 +60,9 @@ router
     router.get('/import', [ToolsController, 'importPage']).as('pages.import')
     router.get('/audit', [ToolsController, 'auditPage']).as('pages.audit')
     router.get('/address-cleanup', [AddressCleanupController, 'index']).as('pages.address_cleanup')
-    router.get('/tools/address-cleanup', [AddressCleanupController, 'index']).as('pages.tools_address_cleanup')
+    router
+      .get('/tools/address-cleanup', [AddressCleanupController, 'index'])
+      .as('pages.tools_address_cleanup')
     router.get('/admin', [AdminController, 'index']).as('pages.admin')
 
     router.post('/logout', [SessionController, 'destroy']).as('session.destroy')
@@ -96,15 +96,11 @@ router
     router
       .post('/catalogs/sync-categories', [ProductsController, 'syncMedusaCategories'])
       .as('catalogs.sync_categories')
-    router
-      .post('/catalogs/import', [ProductsController, 'importCatalogJson'])
-      .as('catalogs.import')
+    router.post('/catalogs/import', [ProductsController, 'importCatalogJson']).as('catalogs.import')
     router
       .post('/catalogs/import-json', [ProductsController, 'importCatalogJson'])
       .as('catalogs.import_json')
-    router
-      .post('/catalog-items', [ProductsController, 'saveCatalogItem'])
-      .as('catalog_items.store')
+    router.post('/catalog-items', [ProductsController, 'saveCatalogItem']).as('catalog_items.store')
     router
       .post('/catalog-items/:id', [ProductsController, 'saveCatalogItem'])
       .as('catalog_items.update')
@@ -134,19 +130,13 @@ router
 
     router.post('/products', [ProductsController, 'storeProduct']).as('products.store')
     router.post('/products/:id', [ProductsController, 'updateProduct']).as('products.update')
-    router
-      .post('/products/:id/delete', [ProductsController, 'deleteProduct'])
-      .as('products.delete')
+    router.post('/products/:id/delete', [ProductsController, 'deleteProduct']).as('products.delete')
 
-    router
-      .post('/products/:id/variants', [ProductsController, 'storeVariant'])
-      .as('variants.store')
+    router.post('/products/:id/variants', [ProductsController, 'storeVariant']).as('variants.store')
     router
       .post('/variants/:id/stock', [ProductsController, 'updateVariantStock'])
       .as('variants.update_stock')
-    router
-      .post('/variants/:id/delete', [ProductsController, 'deleteVariant'])
-      .as('variants.delete')
+    router.post('/variants/:id/delete', [ProductsController, 'deleteVariant']).as('variants.delete')
 
     router
       .post('/channel-listings', [ProductsController, 'storeChannelListing'])
@@ -206,8 +196,14 @@ router
       .post('/shipping-invoices', [ShipmentsController, 'storeCarrierInvoice'])
       .as('shipping_invoices.store')
     router
+      .post('/shipping-invoices/:id', [ShipmentsController, 'updateCarrierInvoice'])
+      .as('shipping_invoices.update')
+    router
       .post('/shipping-invoices/:id/status', [ShipmentsController, 'updateCarrierInvoice'])
       .as('shipping_invoices.update_status')
+    router
+      .post('/shipping-invoices/:id/delete', [ShipmentsController, 'deleteCarrierInvoice'])
+      .as('shipping_invoices.delete')
 
     /* ---------- Returns (RMA) & refunds ---------- */
     router.post('/returns', [ReturnsController, 'storeReturn']).as('returns.store')
@@ -313,9 +309,7 @@ router
       .post('/admin/users/:id/status', [AdminController, 'toggleUserStatus'])
       .as('admin.users.status')
     router.post('/admin/users/:id', [AdminController, 'updateUser']).as('admin.users.update')
-    router
-      .post('/admin/users/:id/delete', [AdminController, 'deleteUser'])
-      .as('admin.users.delete')
+    router.post('/admin/users/:id/delete', [AdminController, 'deleteUser']).as('admin.users.delete')
     router
       .post('/admin/users/:id/roles', [AdminController, 'assignUserRole'])
       .as('admin.users.assign_role')

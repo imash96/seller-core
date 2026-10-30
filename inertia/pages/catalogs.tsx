@@ -314,7 +314,8 @@ export default function Catalogs({
       collarType: 'Notch Lapel',
       sleeveLength: 'Long Sleeve',
       sleeveType: 'Zipper Gusset Cuff Sleeve',
-      pocketDescription: 'Three external zippered pockets and two internal leather-trimmed pockets.',
+      pocketDescription:
+        'Three external zippered pockets and two internal leather-trimmed pockets.',
       pocketsCsv: 'Zip Pocket, Coin Flap Pocket, Interior Welt Pocket',
       modelName: 'Apex Moto Biker Jacket',
       sizeType: 'regular',
@@ -328,7 +329,8 @@ export default function Catalogs({
       featuresLines:
         '100% Genuine Lambskin Leather\nHeavy-Duty YKK Zippers\nInterior & Exterior Security Pockets\nBreathable Quilted Liner',
       keywordsLines: 'biker leather jacket; mens motorcycle jacket; lambskin moto jacket',
-      specialFeaturesLines: 'Zippered cuffs\nAction back bi-swing shoulders\nReinforced elbow panels',
+      specialFeaturesLines:
+        'Zippered cuffs\nAction back bi-swing shoulders\nReinforced elbow panels',
     })
     setEditCatalogModalOpen(true)
   }
@@ -387,7 +389,9 @@ export default function Catalogs({
       lining: String(attrs.lining ?? 'Polyester'),
       hardware: String(attrs.hardware ?? 'Durable Black Matte Buttons'),
       closure: String(attrs.closure ?? 'Single-Breasted Front Button Closure'),
-      closureTypeCsv: Array.isArray(attrs.closure_type) ? attrs.closure_type.join(', ') : 'Zipper, Snap',
+      closureTypeCsv: Array.isArray(attrs.closure_type)
+        ? attrs.closure_type.join(', ')
+        : 'Zipper, Snap',
       coatSilhouetteType: String(attrs.coat_silhouette_type ?? 'Overcoat'),
       collar: String(attrs.collar ?? 'Classic Notch Lapel Collar'),
       collarType: String(attrs.collar_type ?? 'Notch Collar'),
@@ -407,9 +411,7 @@ export default function Catalogs({
         : Array.isArray(item.features)
           ? item.features.join('\n')
           : '',
-      keywordsLines: Array.isArray(attrs.generic_keyword)
-        ? attrs.generic_keyword.join('\n')
-        : '',
+      keywordsLines: Array.isArray(attrs.generic_keyword) ? attrs.generic_keyword.join('\n') : '',
       specialFeaturesLines: Array.isArray(attrs.special_feature)
         ? attrs.special_feature.join('\n')
         : '',
@@ -708,7 +710,7 @@ export default function Catalogs({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Master Catalog Studio (/catalog)"
+        title="Master Catalog Studio (/catalogs)"
         description="Brand-agnostic master catalog stored in PostgreSQL with modular SKU/Color/Size/Price config, multi-facet filtering, complete 4-section CRUD modals, and interactive Product & Variant Preview before conversion."
         icon={Layers}
         badge={`${catalogItems.length} catalog SKUs · ${convertedCount} converted · ${categories.length} categories`}
@@ -1041,9 +1043,7 @@ export default function Catalogs({
                         : ['S', 'M', 'L', 'XL']
                     const isConverted = item.status === 'converted'
                     const skuKey = String(item.skuCode ?? item.catalogKey ?? '')
-                    const baseCode = String(
-                      item.structuredBaseCode ?? item.structuredCode ?? ''
-                    )
+                    const baseCode = String(item.structuredBaseCode ?? item.structuredCode ?? '')
                     const prodType = String(item.productType ?? item.type ?? 'Outerwear')
 
                     return (
@@ -1087,7 +1087,8 @@ export default function Catalogs({
                             <span className="font-mono text-primary">{colors.join(', ')}</span>
                           </div>
                           <div className="text-muted-foreground mt-0.5 line-clamp-1">
-                            Sizes ({sizes.length}): <span className="font-mono">{sizes.join(', ')}</span>
+                            Sizes ({sizes.length}):{' '}
+                            <span className="font-mono">{sizes.join(', ')}</span>
                           </div>
                         </td>
                         <td className="py-3.5 px-4 align-top">
@@ -1179,7 +1180,9 @@ export default function Catalogs({
                   Generated Product & Variants Preview (Editable Before Creation)
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Review and customize all generated parent Product metadata, multi-length titles, category linkage, and individual Cartesian (Color × Size) variant SKUs before saving to `/products`.
+                  Review and customize all generated parent Product metadata, multi-length titles,
+                  category linkage, and individual Cartesian (Color × Size) variant SKUs before
+                  saving to `/products`.
                 </p>
               </div>
               <button
@@ -1208,18 +1211,14 @@ export default function Catalogs({
                     <AppInput
                       label="Title 75 (Etsy / Amazon)"
                       value={previewData.title75 ?? previewData.title}
-                      onChange={(e) =>
-                        setPreviewData({ ...previewData, title75: e.target.value })
-                      }
+                      onChange={(e) => setPreviewData({ ...previewData, title75: e.target.value })}
                     />
                   </div>
                   <div>
                     <AppInput
                       label="Title 80 (eBay)"
                       value={previewData.title80 ?? previewData.title}
-                      onChange={(e) =>
-                        setPreviewData({ ...previewData, title80: e.target.value })
-                      }
+                      onChange={(e) => setPreviewData({ ...previewData, title80: e.target.value })}
                     />
                   </div>
                   <div>
@@ -1258,9 +1257,7 @@ export default function Catalogs({
                     <AppInput
                       label="Subtitle (60c)"
                       value={previewData.subTitle}
-                      onChange={(e) =>
-                        setPreviewData({ ...previewData, subTitle: e.target.value })
-                      }
+                      onChange={(e) => setPreviewData({ ...previewData, subTitle: e.target.value })}
                     />
                   </div>
                   <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1289,10 +1286,12 @@ export default function Catalogs({
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      2. Generated Product Variants ({previewData.variants.length} SKUs from Color × Size)
+                      2. Generated Product Variants ({previewData.variants.length} SKUs from Color ×
+                      Size)
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                      Edit any SKU, Variant Title, Color, Size, Retail Tier Price, Cost Price, or Initial Stock before saving.
+                      Edit any SKU, Variant Title, Color, Size, Retail Tier Price, Cost Price, or
+                      Initial Stock before saving.
                     </p>
                   </div>
                   <AppButton
@@ -1409,7 +1408,8 @@ export default function Catalogs({
             <div className="flex items-center justify-between border-t border-divider px-6 py-4 bg-muted/25">
               <div className="text-xs text-muted-foreground">
                 Creates <strong>1 Parent Product</strong> +{' '}
-                <strong>{previewData.variants.length} ProductVariants</strong> with normalized color & size attributes.
+                <strong>{previewData.variants.length} ProductVariants</strong> with normalized color
+                & size attributes.
               </div>
               <div className="flex items-center gap-2">
                 <AppButton
@@ -1452,7 +1452,8 @@ export default function Catalogs({
                     : 'Create New Master Catalog SKU (Complete Specification)'}
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Complete 4-section specification covering Multi-Length Titles, Modular Taxonomy Codes, Cartesian Variant Matrix, and Garment Construction Attributes.
+                  Complete 4-section specification covering Multi-Length Titles, Modular Taxonomy
+                  Codes, Cartesian Variant Matrix, and Garment Construction Attributes.
                 </p>
               </div>
               <button
@@ -1481,9 +1482,7 @@ export default function Catalogs({
                   <AppInput
                     label="Structured Base Code"
                     value={formState.structuredCode}
-                    onChange={(e) =>
-                      setFormState({ ...formState, structuredCode: e.target.value })
-                    }
+                    onChange={(e) => setFormState({ ...formState, structuredCode: e.target.value })}
                     placeholder="MCTDC01 (Auto if blank)"
                   />
                   <AppInput
@@ -1537,9 +1536,7 @@ export default function Catalogs({
                       label="Extended Subtitle 125 (Max 125 chars)"
                       maxLength={125}
                       value={formState.subTitle125}
-                      onChange={(e) =>
-                        setFormState({ ...formState, subTitle125: e.target.value })
-                      }
+                      onChange={(e) => setFormState({ ...formState, subTitle125: e.target.value })}
                     />
                   </div>
                 </div>
@@ -1597,9 +1594,7 @@ export default function Catalogs({
                   <AppSelect
                     label="Category Code"
                     value={formState.categoryCode}
-                    onChange={(e) =>
-                      setFormState({ ...formState, categoryCode: e.target.value })
-                    }
+                    onChange={(e) => setFormState({ ...formState, categoryCode: e.target.value })}
                     options={[
                       { value: 'CT', label: 'CT — Coat' },
                       { value: 'JK', label: 'JK — Jacket' },
@@ -1666,9 +1661,7 @@ export default function Catalogs({
                   <AppSelect
                     label="Price Tier (LIST PRICE)"
                     value={formState.priceTierCode}
-                    onChange={(e) =>
-                      setFormState({ ...formState, priceTierCode: e.target.value })
-                    }
+                    onChange={(e) => setFormState({ ...formState, priceTierCode: e.target.value })}
                     options={[
                       { value: '01', label: 'Tier 01 ($229.99–$289.99)' },
                       { value: '02', label: 'Tier 02 ($269.99–$339.99)' },
@@ -1768,9 +1761,7 @@ export default function Catalogs({
                   <AppInput
                     label="Closure Types (comma-separated)"
                     value={formState.closureTypeCsv}
-                    onChange={(e) =>
-                      setFormState({ ...formState, closureTypeCsv: e.target.value })
-                    }
+                    onChange={(e) => setFormState({ ...formState, closureTypeCsv: e.target.value })}
                   />
                   <AppInput
                     label="Coat Silhouette Type"
@@ -1797,9 +1788,7 @@ export default function Catalogs({
                   <AppInput
                     label="Sleeve Length"
                     value={formState.sleeveLength}
-                    onChange={(e) =>
-                      setFormState({ ...formState, sleeveLength: e.target.value })
-                    }
+                    onChange={(e) => setFormState({ ...formState, sleeveLength: e.target.value })}
                   />
                   <AppInput
                     label="Sleeve Type"
@@ -1858,17 +1847,13 @@ export default function Catalogs({
                     label="Bullet Points (1 per line)"
                     rows={3}
                     value={formState.featuresLines}
-                    onChange={(e) =>
-                      setFormState({ ...formState, featuresLines: e.target.value })
-                    }
+                    onChange={(e) => setFormState({ ...formState, featuresLines: e.target.value })}
                   />
                   <AppTextarea
                     label="Generic Search Keywords (1 per line)"
                     rows={3}
                     value={formState.keywordsLines}
-                    onChange={(e) =>
-                      setFormState({ ...formState, keywordsLines: e.target.value })
-                    }
+                    onChange={(e) => setFormState({ ...formState, keywordsLines: e.target.value })}
                   />
                   <AppTextarea
                     label="Special Features (1 per line)"
@@ -1913,7 +1898,8 @@ export default function Catalogs({
                   Import Brand-Agnostic Master Catalog JSON
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Upload or paste a Catalog JSON file (keyed by SKU1, SKU2, etc.) to store in the database.
+                  Upload or paste a Catalog JSON file (keyed by SKU1, SKU2, etc.) to store in the
+                  database.
                 </p>
               </div>
               <button
@@ -1982,9 +1968,7 @@ export default function Catalogs({
         badge={
           detailDrawerItem ? (
             <>
-              <MonoBadge
-                text={String(detailDrawerItem.skuCode ?? detailDrawerItem.catalogKey)}
-              />
+              <MonoBadge text={String(detailDrawerItem.skuCode ?? detailDrawerItem.catalogKey)} />
               <MonoBadge
                 text={String(
                   detailDrawerItem.structuredBaseCode ?? detailDrawerItem.structuredCode

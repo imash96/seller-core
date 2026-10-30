@@ -106,31 +106,29 @@ export default class ProductsController {
   }
 
   /**
-   * GET /catalog & GET /catalogs
+   * GET /catalogs
    */
   async catalogsPage({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
-    const [catalogItems, products, channelListings, savedViews, sharedLookups] = await Promise.all(
-      [
-        CatalogService.listCatalogItems(user.id),
-        Product.query()
-          .where('userId', user.id)
-          .preload('brand')
-          .preload('category')
-          .preload('variants', (q) => q.preload('variantAttributes').preload('listings'))
-          .orderBy('createdAt', 'desc')
-          .limit(100),
-        ChannelListing.query()
-          .where('userId', user.id)
-          .preload('product')
-          .preload('productVariant')
-          .preload('sellerAccount')
-          .orderBy('createdAt', 'desc')
-          .limit(200),
-        WorkspaceLookupService.savedViewsFor(user.id, 'products'),
-        WorkspaceLookupService.lookups(user.id),
-      ]
-    )
+    const [catalogItems, products, channelListings, savedViews, sharedLookups] = await Promise.all([
+      CatalogService.listCatalogItems(user.id),
+      Product.query()
+        .where('userId', user.id)
+        .preload('brand')
+        .preload('category')
+        .preload('variants', (q) => q.preload('variantAttributes').preload('listings'))
+        .orderBy('createdAt', 'desc')
+        .limit(100),
+      ChannelListing.query()
+        .where('userId', user.id)
+        .preload('product')
+        .preload('productVariant')
+        .preload('sellerAccount')
+        .orderBy('createdAt', 'desc')
+        .limit(200),
+      WorkspaceLookupService.savedViewsFor(user.id, 'products'),
+      WorkspaceLookupService.lookups(user.id),
+    ])
 
     const enrichedCatalogItems = catalogItems.map((c) => {
       const raw = c.serialize()
@@ -218,7 +216,7 @@ export default class ProductsController {
   }
 
   /**
-   * GET /listing & GET /listings
+   * GET /listings
    */
   async listingsPage({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
@@ -382,8 +380,7 @@ export default class ProductsController {
     const user = auth.getUserOrFail()
 
     const rawCatalogInput = request.input('catalogJson')
-    let rawJsonText =
-      typeof rawCatalogInput === 'string' ? rawCatalogInput.trim() : ''
+    let rawJsonText = typeof rawCatalogInput === 'string' ? rawCatalogInput.trim() : ''
     const uploadedFile = request.file('catalogFile', {
       size: '10mb',
       extnames: ['json'],
@@ -419,8 +416,7 @@ export default class ProductsController {
       'standard') as SkuFormatMode
     const defaultStockOnHand = Math.max(0, Number(request.input('defaultStockOnHand', 25)) || 25)
     const convertImmediately =
-      request.input('convertImmediately') === true ||
-      request.input('convertImmediately') === 'true'
+      request.input('convertImmediately') === true || request.input('convertImmediately') === 'true'
 
     try {
       const result = await CatalogService.importCatalogJson({
@@ -464,9 +460,7 @@ export default class ProductsController {
   async saveCatalogItem({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     const id = params.id || request.input('id') || null
-    const catalogKey = String(
-      request.input('catalogKey') || request.input('skuCode') || ''
-    ).trim()
+    const catalogKey = String(request.input('catalogKey') || request.input('skuCode') || '').trim()
     const title = String(request.input('title', '')).trim()
 
     if (!catalogKey || !title) {
@@ -511,7 +505,9 @@ export default class ProductsController {
         ageGroup: request.input('ageGroup'),
         careInstructions: request.input('careInstructions'),
         modelName: request.input('modelName'),
-        priceTier: (request.input('priceTier') || request.input('priceTierCode') || '01') as PriceTierCode,
+        priceTier: (request.input('priceTier') ||
+          request.input('priceTierCode') ||
+          '01') as PriceTierCode,
         colorsCsv: request.input('colorsCsv') || request.input('colorCodes'),
         sizesCsv: request.input('sizesCsv') || request.input('sizeCodes'),
         imagesCsv: request.input('imagesCsv'),
@@ -572,11 +568,9 @@ export default class ProductsController {
   async previewCatalogConversion({ auth, params, request, response }: HttpContext) {
     const user = auth.getUserOrFail()
     const priceTier = (String(request.input('priceTier', '')).trim() || undefined) as
-      | PriceTierCode
-      | undefined
+      PriceTierCode | undefined
     const skuFormat = (String(request.input('skuFormat', '')).trim() || undefined) as
-      | SkuFormatMode
-      | undefined
+      SkuFormatMode | undefined
     const defaultStockOnHand = Number(request.input('defaultStockOnHand', 25)) || 25
 
     try {
@@ -635,8 +629,7 @@ export default class ProductsController {
           ...rawPreview,
           catalogItemId: rawPreview.catalogItemId || params.id,
           catalogKey: rawPreview.catalogKey || rawPreview.skuKey || 'SKU1',
-          structuredCode:
-            rawPreview.structuredCode || rawPreview.structuredBaseCode || 'MCTDC01',
+          structuredCode: rawPreview.structuredCode || rawPreview.structuredBaseCode || 'MCTDC01',
           type: rawPreview.type || rawPreview.productType || 'Duster Coat',
           priceTier: rawPreview.priceTier || rawPreview.priceTierCode || '01',
           variants: Array.isArray(rawPreview.variants)
@@ -684,9 +677,8 @@ export default class ProductsController {
   async generatePlatformListings({ auth, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     const brandId = String(request.input('brandId', '')).trim()
-    const platform = (String(request.input('platform', 'medusa'))
-      .trim()
-      .toLowerCase() || 'medusa') as ListingPlatform
+    const platform = (String(request.input('platform', 'medusa')).trim().toLowerCase() ||
+      'medusa') as ListingPlatform
 
     const rawPlatforms = request.input('platforms')
     const platforms: ListingPlatform[] | undefined = Array.isArray(rawPlatforms)

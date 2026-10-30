@@ -31,7 +31,8 @@ import {
   CreditCard,
   Activity,
 } from 'lucide-react'
-import { Grid, VStack } from '@astryxdesign/core'
+import { Grid } from '@astryxdesign/core'
+import { VStack } from '@astryxdesign/core/Stack'
 
 type Props = {
   kpis: DashboardKpis
@@ -126,7 +127,7 @@ export default function Dashboard(props: Props) {
       (s, o) =>
         s +
         (Number(o.marketplaceFeesAmount || 0) + Number(o.paymentProcessingFeesAmount || 0)) *
-        rateOf(o),
+          rateOf(o),
       0
     )
     const cogs = filteredOrders.reduce((s, o) => s + Number(o.cogsAmount || 0) * rateOf(o), 0)
@@ -223,8 +224,8 @@ export default function Dashboard(props: Props) {
 
   const totalCostBurden =
     Number(activeKpis.totalCogs) +
-    Number(activeKpis.totalMarketplaceFees) +
-    Number(activeKpis.totalShippingCost) || 1
+      Number(activeKpis.totalMarketplaceFees) +
+      Number(activeKpis.totalShippingCost) || 1
 
   return (
     <div className="space-y-6">
@@ -245,10 +246,11 @@ export default function Dashboard(props: Props) {
                 key={ch.value}
                 type="button"
                 onClick={() => setChannelFilter(ch.value)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors whitespace-nowrap ${active
-                  ? 'bg-primary text-primary-foreground border-primary shadow-2xs'
-                  : 'bg-background text-muted-foreground border-border hover:text-foreground hover:bg-muted'
-                  }`}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors whitespace-nowrap ${
+                  active
+                    ? 'bg-primary text-primary-foreground border-primary shadow-2xs'
+                    : 'bg-background text-muted-foreground border-border hover:text-foreground hover:bg-muted'
+                }`}
               >
                 {ch.label}
               </button>
@@ -260,20 +262,22 @@ export default function Dashboard(props: Props) {
           <button
             type="button"
             onClick={() => setCurrencyMode('reporting')}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${currencyMode === 'reporting'
-              ? 'bg-card text-foreground shadow-2xs'
-              : 'text-muted-foreground hover:text-foreground'
-              }`}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+              currencyMode === 'reporting'
+                ? 'bg-card text-foreground shadow-2xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
             Reporting USD
           </button>
           <button
             type="button"
             onClick={() => setCurrencyMode('native')}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${currencyMode === 'native'
-              ? 'bg-card text-foreground shadow-2xs'
-              : 'text-muted-foreground hover:text-foreground'
-              }`}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+              currencyMode === 'native'
+                ? 'bg-card text-foreground shadow-2xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
             Native Breakdown
           </button>
@@ -286,7 +290,10 @@ export default function Dashboard(props: Props) {
           title="Gross & Net Revenue"
           value={money('USD', activeKpis.grossSales)}
           subtitle={`Net after refunds: ${money('USD', activeKpis.netSales)}`}
-          badge={{ label: `Refunds ${refundRate}%`, variant: Number(refundRate) > 10 ? 'warning' : 'info' }}
+          badge={{
+            label: `Refunds ${refundRate}%`,
+            variant: Number(refundRate) > 10 ? 'warning' : 'info',
+          }}
           icon={<DollarSign className="w-5 h-5" />}
           tone="primary"
         >
@@ -313,7 +320,9 @@ export default function Dashboard(props: Props) {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span>Cost Stack (COGS / Fees / Ship)</span>
-              <span className="tabular-nums">Ship: {money('USD', activeKpis.totalShippingCost)}</span>
+              <span className="tabular-nums">
+                Ship: {money('USD', activeKpis.totalShippingCost)}
+              </span>
             </div>
             <div className="flex h-2 rounded-full overflow-hidden bg-muted">
               <div
@@ -442,10 +451,11 @@ export default function Dashboard(props: Props) {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${active
-                    ? 'bg-primary text-primary-foreground shadow-xs'
-                    : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
-                    }`}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                    active
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
                 >
                   {tab.label}
                 </button>

@@ -18,7 +18,7 @@ const ThemeModeContext = createContext<ThemeModeContextValue>({
   toggleMode: () => {},
 })
 
-function detectInitialTheme(initialPropTheme?: ThemeMode): ThemeMode {
+function detectInitialTheme(fallbackTheme?: ThemeMode): ThemeMode {
   if (typeof document !== 'undefined') {
     const el = document.documentElement
     if (el.classList.contains('dark') || el.getAttribute('data-theme') === 'dark') {
@@ -32,7 +32,7 @@ function detectInitialTheme(initialPropTheme?: ThemeMode): ThemeMode {
       return cookieMatch
     }
   }
-  return initialPropTheme === 'dark' ? 'dark' : 'light'
+  return fallbackTheme === 'dark' ? 'dark' : 'light'
 }
 
 export function ThemeModeProvider({
@@ -42,7 +42,9 @@ export function ThemeModeProvider({
   initialTheme?: ThemeMode
   children: ReactNode
 }) {
-  const [mode, setModeState] = useState<ThemeMode>(() => detectInitialTheme(initialPropTheme(initialTheme)))
+  const [mode, setModeState] = useState<ThemeMode>(() =>
+    detectInitialTheme(initialPropTheme(initialTheme))
+  )
 
   const applyDomTheme = useCallback((nextMode: ThemeMode) => {
     if (typeof document === 'undefined') return

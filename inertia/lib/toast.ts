@@ -10,7 +10,7 @@
  * a component that lives under `<LayerProvider>` — they accept the
  * `showToast` function returned by `useToast()`.
  */
-import { useToast } from '@astryxdesign/core/Toast'
+import type { useToast } from '@astryxdesign/core/Toast'
 
 type ShowToast = ReturnType<typeof useToast>
 
