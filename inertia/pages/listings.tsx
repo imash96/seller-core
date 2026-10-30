@@ -52,6 +52,12 @@ type Props = {
   brands?: Row[]
   categories?: Row[]
   sellerAccounts?: Row[]
+  savedViews?: Row[]
+  catalogConfig?: any
+  salesChannels?: Row[]
+  orders?: Row[]
+  orderLineItems?: Row[]
+  financeCategories?: Row[]
 }
 
 const PLATFORM_BADGES: Record<
@@ -874,7 +880,7 @@ export default function Listings({
           MODAL 1: GENERATE MULTI-PLATFORM LISTINGS FROM PRODUCTS + BRAND
          ===================================================================== */}
       {generateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-xs p-4">
           <div className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between border-b border-divider px-6 py-4 bg-muted/30">
               <div>
@@ -1026,7 +1032,7 @@ export default function Listings({
           MODAL 2: COMPLETE EDIT CHANNEL LISTING MODAL (ALL DB COLUMNS)
          ===================================================================== */}
       {editingListing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-xs p-4 overflow-y-auto">
           <form
             onSubmit={handleSaveListingEdit}
             className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"

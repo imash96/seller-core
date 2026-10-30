@@ -15,9 +15,9 @@ export function CurrencyText({
   const toneClass = !colored
     ? 'text-foreground'
     : num > 0
-      ? 'text-emerald-600 dark:text-emerald-400'
+      ? 'text-success'
       : num < 0
-        ? 'text-rose-600 dark:text-rose-400'
+        ? 'text-error'
         : 'text-muted-foreground'
 
   return (

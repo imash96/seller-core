@@ -84,8 +84,8 @@ export class ListingTransformerService {
       externalSellerId: `${platform.toUpperCase()}-STORE`,
       marketplaceRegion: 'US',
       defaultCurrency: 'USD',
-      connectionStatus: 'connected',
-      isActive: true,
+      status: 'active',
+      healthStatus: 'healthy',
     })
   }
 

@@ -229,7 +229,7 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
               (inspectJob as any).errors.map((e: Row, i: number) => (
                 <div
                   key={i}
-                  className="p-3.5 rounded-xl border border-rose-500/25 bg-rose-500/10 space-y-1"
+                  className="p-3.5 rounded-xl border border-error/25 bg-error-subtle space-y-1"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <StatusBadge

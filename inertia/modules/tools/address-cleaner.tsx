@@ -223,7 +223,7 @@ export function AddressCleanerModule() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 px-4 py-3 rounded-xl text-xs font-medium">
+                <div className="bg-error-subtle border border-error/25 text-error px-4 py-3 rounded-xl text-xs font-medium">
                   {error}
                 </div>
               )}
@@ -295,7 +295,7 @@ export function AddressCleanerModule() {
                 <button
                   type="button"
                   onClick={downloadCSV}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-success hover:bg-success-hover text-success-foreground text-xs font-semibold rounded-xl transition cursor-pointer shadow-xs"
                 >
                   <Download className="w-3.5 h-3.5" /> Download CSV
                 </button>
@@ -367,7 +367,7 @@ export function AddressCleanerModule() {
                     </div>
 
                     {addr.warnings && addr.warnings.length > 0 && (
-                      <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs space-y-1">
+                      <div className="p-2.5 rounded-lg bg-warning-subtle border border-warning/25 text-warning text-xs space-y-1">
                         {addr.warnings.map((w, wi) => (
                           <div key={wi} className="flex items-center gap-1.5">
                             <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
@@ -426,7 +426,7 @@ export function AddressCleanerModule() {
                       >
                         {copiedIdx === index ? (
                           <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Copied
+                            <CheckCircle2 className="w-3.5 h-3.5 text-success" /> Copied
                           </>
                         ) : (
                           <>

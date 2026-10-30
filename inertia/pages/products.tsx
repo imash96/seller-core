@@ -46,6 +46,8 @@ type Props = {
   financeCategories: Row[]
   channelListings?: Row[]
   savedViews?: Row[]
+  catalogConfig?: any
+  sampleCatalogJson?: any
 }
 
 const PRODUCT_STATUS = ['draft', 'active', 'archived', 'discontinued']
@@ -990,7 +992,7 @@ export default function Products({
           MODAL: CONVERT PRODUCT TO PLATFORM LISTINGS (BRAND + MULTI-PLATFORM)
          ===================================================================== */}
       {convertModalProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-xs p-4">
           <div className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden">
             <div className="flex items-start justify-between border-b border-divider px-6 py-4 bg-muted/30">
               <div>

@@ -1,15 +1,16 @@
 import { type ReactNode, useState, useEffect, useMemo } from 'react'
 import { Table, proportional, pixel } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
-import { Button } from '@astryxdesign/core/Button'
 import { Card } from '@astryxdesign/core/Card'
 import { Stack, VStack } from '@astryxdesign/core/Stack'
 import { Grid } from '@astryxdesign/core/Grid'
 import { Text } from '@astryxdesign/core/Text'
-import { Package, Filter } from 'lucide-react'
+import { Package, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatMoney, formatDate, shortId } from '~/lib/utils'
 import { StatusBadge } from '../atoms/status-badge'
 import { MonoBadge } from '../atoms/mono-badge'
+import { IconAvatar } from '../atoms/icon-avatar'
+import { AppButton } from '../atoms/button'
 import { SearchInputBar } from '../molecules/search-input-bar'
 import { FilterPillGroup, type FilterPill } from '../molecules/filter-pill-group'
 import { ViewModeSwitcher, type ViewModeOption } from '../molecules/view-mode-switcher'
@@ -30,6 +31,160 @@ export function displayValue(v: unknown): string {
     return o.id ? shortId(o.id) : JSON.stringify(v).slice(0, 40)
   }
   return String(v)
+}
+
+export type TableDensity = 'comfortable' | 'standard' | 'compact'
+
+export interface AppTableColumn<T = Row> {
+  key: string
+  header: ReactNode
+  align?: 'left' | 'center' | 'right' | 'end'
+  width?: string | number
+  sortable?: boolean
+  render?: (row: T, index: number) => ReactNode
+}
+
+export interface AppTableProps<T = Row> {
+  data: T[]
+  columns: AppTableColumn<T>[]
+  idKey?: (row: T) => string
+  density?: TableDensity
+  zebra?: boolean
+  hover?: boolean
+  sortKey?: string | null
+  sortDir?: 'asc' | 'desc'
+  onSort?: (colKey: string) => void
+  selectedIds?: string[]
+  emptyTitle?: string
+  emptyDescription?: string
+  emptyAction?: ReactNode
+  className?: string
+}
+
+export function AppTable<T extends Row = Row>({
+  data,
+  columns,
+  idKey = (r) => String(r.id ?? JSON.stringify(r).slice(0, 32)),
+  density = 'standard',
+  zebra = true,
+  hover = true,
+  sortKey,
+  sortDir = 'asc',
+  onSort,
+  selectedIds = [],
+  emptyTitle = 'No records found',
+  emptyDescription = 'There are no items to display right now.',
+  emptyAction,
+  className = '',
+}: AppTableProps<T>) {
+  const cellPadding =
+    density === 'comfortable'
+      ? 'py-4 px-5'
+      : density === 'compact'
+        ? 'py-2.5 px-3'
+        : 'py-3.5 px-4'
+
+  if (!data || data.length === 0) {
+    return (
+      <div className={`rounded-2xl border border-card-border bg-card p-12 text-center shadow-2xs space-y-4 ${className}`}>
+        <div className="mx-auto flex justify-center">
+          <IconAvatar icon={Package} tone="neutral" size="lg" />
+        </div>
+        <div className="space-y-1 max-w-md mx-auto">
+          <h3 className="text-base font-bold text-foreground">{emptyTitle}</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">{emptyDescription}</p>
+        </div>
+        {emptyAction && <div className="pt-2 flex justify-center">{emptyAction}</div>}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`rounded-2xl border border-card-border bg-card overflow-hidden shadow-2xs ${className}`}>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-left">
+          <thead className="bg-surface-sunken border-b border-border text-[11px] font-bold uppercase tracking-wider text-text-secondary select-none">
+            <tr>
+              {columns.map((col) => {
+                const isRight = col.align === 'right' || col.align === 'end'
+                const isCenter = col.align === 'center'
+                const isSorted = sortKey === col.key
+                return (
+                  <th
+                    key={col.key}
+                    scope="col"
+                    style={col.width ? { width: col.width } : undefined}
+                    onClick={() => col.sortable && onSort?.(col.key)}
+                    className={`${cellPadding} whitespace-nowrap ${
+                      isRight ? 'text-right' : isCenter ? 'text-center' : 'text-left'
+                    } ${col.sortable ? 'cursor-pointer hover:text-foreground transition-colors' : ''}`}
+                  >
+                    <div
+                      className={`inline-flex items-center gap-1.5 ${
+                        isRight ? 'justify-end w-full' : isCenter ? 'justify-center w-full' : ''
+                      }`}
+                    >
+                      <span>{col.header}</span>
+                      {col.sortable && (
+                        <span className="text-muted-foreground">
+                          {isSorted ? (
+                            sortDir === 'asc' ? (
+                              <ArrowUp className="w-3.5 h-3.5 text-primary" />
+                            ) : (
+                              <ArrowDown className="w-3.5 h-3.5 text-primary" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 opacity-60" />
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-divider text-xs sm:text-sm text-text-primary">
+            {data.map((row, idx) => {
+              const rowId = idKey(row)
+              const isSelected = selectedIds.includes(rowId)
+              return (
+                <tr
+                  key={rowId}
+                  className={`transition-colors ${
+                    isSelected
+                      ? 'bg-primary-subtle/40'
+                      : zebra && idx % 2 === 1
+                        ? 'bg-subtle/35'
+                        : 'bg-card'
+                  } ${hover ? 'hover:bg-muted-hover/60' : ''}`}
+                >
+                  {columns.map((col) => {
+                    const isRight = col.align === 'right' || col.align === 'end'
+                    const isCenter = col.align === 'center'
+                    return (
+                      <td
+                        key={col.key}
+                        className={`${cellPadding} align-middle ${
+                          isRight
+                            ? 'text-right font-mono tabular-nums'
+                            : isCenter
+                              ? 'text-center'
+                              : 'text-left'
+                        }`}
+                      >
+                        {col.render ? col.render(row, idx) : displayValue(row[col.key])}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 }
 
 export function DataTable({
@@ -245,21 +400,21 @@ export function ResponsiveDataView({
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center space-y-3">
-        <div className="mx-auto w-12 h-12 rounded-2xl bg-muted border border-border flex items-center justify-center text-muted-foreground">
-          <Package className="w-6 h-6" />
+      <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center space-y-4 shadow-2xs">
+        <div className="mx-auto flex justify-center">
+          <IconAvatar icon={Package} tone="neutral" size="lg" />
         </div>
-        <div className="space-y-1 max-w-md mx-auto">
-          <h3 className="text-base font-bold text-foreground">{emptyTitle}</h3>
-          <p className="text-xs text-muted-foreground">
+        <div className="space-y-1.5 max-w-md mx-auto">
+          <h3 className="text-base font-bold text-foreground tracking-tight">{emptyTitle}</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">
             {emptyDescription ?? 'Get started by creating your first record.'}
           </p>
         </div>
         {(emptyAction || (onCreateClick && createLabel)) && (
-          <div className="pt-1 flex items-center justify-center">
+          <div className="pt-2 flex items-center justify-center">
             {emptyAction ??
               (onCreateClick && createLabel ? (
-                <Button label={createLabel} variant="primary" size="sm" onClick={onCreateClick} />
+                <AppButton label={createLabel} variant="primary" size="md" onClick={onCreateClick} />
               ) : null)}
           </div>
         )}
@@ -270,81 +425,80 @@ export function ResponsiveDataView({
   return (
     <VStack gap={4}>
       {/* Toolbar */}
-      <Card variant="muted" padding={3}>
+      <Card variant="muted" padding={4}>
         <VStack gap={3}>
-          {searchKeys.length > 0 ? (
-            <SearchInputBar value={search} onChange={setSearch} />
-          ) : (
-            <div />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex-1">
+              {searchKeys.length > 0 && <SearchInputBar value={search} onChange={setSearch} />}
+            </div>
+            <div className="flex items-center gap-2.5 flex-wrap self-end sm:self-auto">
+              <ViewModeSwitcher value={viewMode} onChange={setViewMode} />
+              {onCreateClick && createLabel && (
+                <AppButton label={createLabel} variant="primary" size="sm" onClick={onCreateClick} />
+              )}
+            </div>
+          </div>
+
+          {filterPills && filterKey && (
+            <FilterPillGroup
+              pills={filterPills}
+              activeValue={activeFilter}
+              onSelect={setActiveFilter}
+              getCount={(val) =>
+                val === 'all'
+                  ? rows.length
+                  : rows.filter((r) => String(r[filterKey] ?? '') === val).length
+              }
+            />
           )}
 
-          <div className="flex items-center gap-2 flex-wrap ml-auto">
-            <ViewModeSwitcher value={viewMode} onChange={setViewMode} />
-            {onCreateClick && createLabel && (
-              <Button label={createLabel} variant="primary" size="sm" onClick={onCreateClick} />
+          <Stack gap={3} wrap="wrap" vAlign="center" hAlign="between">
+            <div className="text-xs text-muted-foreground">
+              Showing <strong className="text-foreground font-semibold">{paginated.length}</strong> of{' '}
+              <strong className="text-foreground font-semibold">{sorted.length}</strong>{' '}
+              {sorted.length === 1 ? 'record' : 'records'}
+              {(search || activeFilter !== 'all') && <span> · filtered from {rows.length}</span>}
+              {sortKey && (
+                <span>
+                  {' '}
+                  · sorted by <strong className="text-foreground font-medium">{sortKey}</strong>{' '}
+                  {sortDir === 'asc' ? '↑' : '↓'}
+                </span>
+              )}
+            </div>
+
+            {sorted.length > (pageSizeOptions[0] ?? 10) && (
+              <select
+                aria-label="Records per page"
+                value={String(pageSize)}
+                onChange={(e) => setPageSize(Number(e.target.value || 10))}
+                className="h-8 px-2.5 rounded-xl border border-input-border bg-card text-foreground text-xs font-medium cursor-pointer"
+              >
+                {pageSizeOptions.map((n) => (
+                  <option key={n} value={String(n)}>
+                    {n} / page
+                  </option>
+                ))}
+              </select>
             )}
-          </div>
+          </Stack>
         </VStack>
-
-        {filterPills && filterKey && (
-          <FilterPillGroup
-            pills={filterPills}
-            activeValue={activeFilter}
-            onSelect={setActiveFilter}
-            getCount={(val) =>
-              val === 'all'
-                ? rows.length
-                : rows.filter((r) => String(r[filterKey] ?? '') === val).length
-            }
-          />
-        )}
-
-        <Stack gap={3} wrap="wrap" vAlign="center" hAlign="between">
-          <div>
-            Showing <strong className="text-foreground font-semibold">{paginated.length}</strong> of{' '}
-            <strong className="text-foreground font-semibold">{sorted.length}</strong>{' '}
-            {sorted.length === 1 ? 'record' : 'records'}
-            {(search || activeFilter !== 'all') && <span> · filtered from {rows.length}</span>}
-            {sortKey && (
-              <span>
-                {' '}
-                · sorted by <strong className="text-foreground">{sortKey}</strong>{' '}
-                {sortDir === 'asc' ? '↑' : '↓'}
-              </span>
-            )}
-          </div>
-
-          {sorted.length > (pageSizeOptions[0] ?? 10) && (
-            <select
-              aria-label="Records per page"
-              value={String(pageSize)}
-              onChange={(e) => setPageSize(Number(e.target.value || 10))}
-              className="h-7 px-2.5 rounded-lg border border-border bg-card text-foreground text-xs font-medium"
-            >
-              {pageSizeOptions.map((n) => (
-                <option key={n} value={String(n)}>
-                  {n} / page
-                </option>
-              ))}
-            </select>
-          )}
-        </Stack>
       </Card>
 
       {/* Content */}
       {sorted.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center space-y-3">
-          <div className="mx-auto w-11 h-11 rounded-2xl bg-muted border border-border flex items-center justify-center text-muted-foreground">
-            <Filter className="w-5 h-5" />
+        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center space-y-4 shadow-2xs">
+          <div className="mx-auto flex justify-center">
+            <IconAvatar icon={Filter} tone="warning" size="md" />
           </div>
-          <div className="space-y-1 max-w-md mx-auto">
+          <div className="space-y-1.5 max-w-md mx-auto">
             <h3 className="text-sm font-bold text-foreground">No matching records</h3>
             <p className="text-xs text-muted-foreground">
               Try adjusting your search query or active filter pills.
             </p>
           </div>
-          <div className="pt-1 flex items-center justify-center">
-            <Button
+          <div className="pt-2 flex items-center justify-center">
+            <AppButton
               label="Clear filters"
               variant="secondary"
               size="sm"

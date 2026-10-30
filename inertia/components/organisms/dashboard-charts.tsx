@@ -32,32 +32,32 @@ export function WaterfallChart({
   currencyCode?: string
 }) {
   const steps = [
-    { label: 'Gross Sales', value: Number(kpis.grossSales), color: '#4f46e5', isTotal: false },
-    { label: '− Refunds', value: -Number(kpis.totalRefunded), color: '#ef4444', isTotal: false },
-    { label: '= Net Sales', value: Number(kpis.netSales), color: '#10b981', isTotal: true },
-    { label: '− COGS', value: -Number(kpis.totalCogs), color: '#f59e0b', isTotal: false },
+    { label: 'Gross Sales', value: Number(kpis.grossSales), color: 'var(--chart-1)', isTotal: false },
+    { label: '− Refunds', value: -Number(kpis.totalRefunded), color: 'var(--error)', isTotal: false },
+    { label: '= Net Sales', value: Number(kpis.netSales), color: 'var(--success)', isTotal: true },
+    { label: '− COGS', value: -Number(kpis.totalCogs), color: 'var(--warning)', isTotal: false },
     {
       label: '− Channel Fees',
       value: -Number(kpis.totalMarketplaceFees),
-      color: '#f97316',
+      color: 'var(--chart-5)',
       isTotal: false,
     },
     {
       label: '− Shipping Cost',
       value: -Number(kpis.totalShippingCost),
-      color: '#06b6d4',
+      color: 'var(--chart-2)',
       isTotal: false,
     },
     {
       label: '= Order Net Profit',
       value: Number(kpis.orderNetProfit),
-      color: '#8b5cf6',
+      color: 'var(--chart-6)',
       isTotal: true,
     },
     {
       label: '− Business Opex',
       value: -Number(kpis.businessOperatingExpenses),
-      color: '#64748b',
+      color: 'var(--muted-foreground)',
       isTotal: false,
     },
   ]
@@ -93,12 +93,13 @@ export function WaterfallChart({
                 />
               </div>
               <span
-                className={`w-24 text-right text-xs font-semibold tabular-nums ${step.value < 0
-                  ? 'text-rose-600 dark:text-rose-400'
-                  : step.isTotal
-                    ? 'text-emerald-600 dark:text-emerald-400 font-bold'
-                    : 'text-foreground'
-                  }`}
+                className={`w-24 text-right text-xs font-semibold tabular-nums ${
+                  step.value < 0
+                    ? 'text-error'
+                    : step.isTotal
+                      ? 'text-success font-bold'
+                      : 'text-foreground'
+                }`}
               >
                 {step.value > 0 ? '+' : ''}
                 {formatMoney(currencyCode, step.value)}
@@ -173,7 +174,12 @@ export function RevenueTrendChart({
     y: H - padY - ((v - minV) / range) * (H - padY * 2),
   }))
 
-  const strokeColor = mode === 'revenue' ? '#4f46e5' : mode === 'profit' ? '#10b981' : '#f59e0b'
+  const strokeColor =
+    mode === 'revenue'
+      ? 'var(--chart-1)'
+      : mode === 'profit'
+        ? 'var(--success)'
+        : 'var(--warning)'
 
   return (
     <div className="space-y-3">
@@ -428,7 +434,7 @@ export function CreditUtilizationBars({
             <span className="w-20 text-muted-foreground font-medium">Household</span>
             <div className="flex-1 h-3.5 rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full bg-rose-500 rounded-full"
+                className="h-full bg-chart-5 rounded-full"
                 style={{ width: `${(householdSpend / totalSpend) * 100}%` }}
               />
             </div>

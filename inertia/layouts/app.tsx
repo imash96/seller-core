@@ -114,7 +114,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-rose-400 w-full hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
+                className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-error w-full hover:bg-error-subtle rounded-xl transition-colors cursor-pointer"
               >
                 <LogOut className="w-4 h-4" /> Sign out
               </button>

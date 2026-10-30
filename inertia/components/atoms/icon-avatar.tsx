@@ -10,12 +10,12 @@ export type AvatarTone =
   | 'purple'
 
 const TONE_CLASSES: Record<AvatarTone, string> = {
-  primary: 'bg-primary/12 text-primary border-primary/25',
-  info: 'bg-blue-500/12 text-blue-600 dark:text-blue-400 border-blue-500/25',
-  success: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
-  warning: 'bg-amber-500/12 text-amber-600 dark:text-amber-400 border-amber-500/25',
-  error: 'bg-rose-500/12 text-rose-600 dark:text-rose-400 border-rose-500/25',
-  purple: 'bg-violet-500/12 text-violet-600 dark:text-violet-400 border-violet-500/25',
+  primary: 'bg-primary-subtle text-primary border-primary/25',
+  info: 'bg-info-subtle text-info border-info/30',
+  success: 'bg-success-subtle text-success border-success/30',
+  warning: 'bg-warning-subtle text-warning border-warning/30',
+  error: 'bg-error-subtle text-error border-error/30',
+  purple: 'bg-accent-subtle text-accent border-accent/30',
   neutral: 'bg-muted text-muted-foreground border-border',
 }
 

@@ -22,8 +22,8 @@ export default function AuthLayout({
       {/* Left Branding Panel */}
       <div className="hidden lg:flex lg:w-[52%] bg-sidebar text-sidebar-foreground p-14 items-center justify-center relative overflow-hidden border-r border-sidebar-border">
         <div className="absolute inset-0 opacity-25 pointer-events-none">
-          <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-indigo-500/30 rounded-full blur-[120px]" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] bg-blue-500/25 rounded-full blur-[120px]" />
+          <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-primary/30 rounded-full blur-[120px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] bg-accent/25 rounded-full blur-[120px]" />
         </div>
 
         <div className="relative z-10 max-w-lg w-full">
@@ -43,7 +43,7 @@ export default function AuthLayout({
 
           <h1 className="text-4xl xl:text-5xl font-extrabold text-sidebar-foreground mb-5 leading-tight">
             The modern system for{' '}
-            <span className="text-indigo-400">multi-channel fulfillment & P&L.</span>
+            <span className="text-sidebar-primary">multi-channel fulfillment & P&L.</span>
           </h1>
           <p className="text-base text-sidebar-foreground/80 mb-10 leading-relaxed">
             Streamline orders, inventory, carrier invoice reconciliation, RMA returns, and
@@ -54,7 +54,7 @@ export default function AuthLayout({
           <div className="grid grid-cols-1 gap-5">
             <div className="flex items-start gap-4">
               <div className="bg-sidebar-accent p-2.5 rounded-xl border border-sidebar-border shrink-0">
-                <ShieldCheck className="h-5 w-5 text-indigo-400" />
+                <ShieldCheck className="h-5 w-5 text-sidebar-primary" />
               </div>
               <div>
                 <h3 className="font-semibold text-sidebar-foreground text-sm mb-0.5">
@@ -67,7 +67,7 @@ export default function AuthLayout({
             </div>
             <div className="flex items-start gap-4">
               <div className="bg-sidebar-accent p-2.5 rounded-xl border border-sidebar-border shrink-0">
-                <Zap className="h-5 w-5 text-emerald-400" />
+                <Zap className="h-5 w-5 text-success" />
               </div>
               <div>
                 <h3 className="font-semibold text-sidebar-foreground text-sm mb-0.5">
@@ -81,7 +81,7 @@ export default function AuthLayout({
             </div>
             <div className="flex items-start gap-4">
               <div className="bg-sidebar-accent p-2.5 rounded-xl border border-sidebar-border shrink-0">
-                <Lock className="h-5 w-5 text-amber-400" />
+                <Lock className="h-5 w-5 text-warning" />
               </div>
               <div>
                 <h3 className="font-semibold text-sidebar-foreground text-sm mb-0.5">
@@ -95,7 +95,7 @@ export default function AuthLayout({
             </div>
             <div className="flex items-start gap-4">
               <div className="bg-sidebar-accent p-2.5 rounded-xl border border-sidebar-border shrink-0">
-                <Globe className="h-5 w-5 text-sky-400" />
+                <Globe className="h-5 w-5 text-info" />
               </div>
               <div>
                 <h3 className="font-semibold text-sidebar-foreground text-sm mb-0.5">

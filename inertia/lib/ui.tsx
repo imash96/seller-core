@@ -51,7 +51,11 @@ export { SearchInputBar } from '~/components/molecules/search-input-bar'
 export { FilterPillGroup, type FilterPill } from '~/components/molecules/filter-pill-group'
 export { ViewModeSwitcher, type ViewModeOption } from '~/components/molecules/view-mode-switcher'
 export { SortPillBar } from '~/components/molecules/sort-pill-bar'
-export { PaginationBar } from '~/components/molecules/pagination-bar'
+export {
+  PaginationBar,
+  AppPagination,
+  type PaginationBarProps,
+} from '~/components/molecules/pagination-bar'
 export { KpiScorecard, KpiCard, StatStrip } from '~/components/molecules/kpi-scorecard'
 export { TopStatusBar, type StatusBarItem } from '~/components/molecules/top-status-bar'
 export { Accordion, AccordionItem, type AccordionItemProps } from '~/components/molecules/accordion'
@@ -61,18 +65,30 @@ export { SavedViewsBar } from '~/components/molecules/saved-views-bar'
 export { DemoCredentialCard } from '~/components/molecules/demo-credential-card'
 
 /* Organisms */
-export { FormModal, ConfirmDialog, SmartForm } from '~/components/organisms/form-modal'
+export {
+  AppModal,
+  FormModal,
+  ConfirmDialog,
+  SmartForm,
+  type AppModalProps,
+  type ModalSize,
+} from '~/components/organisms/form-modal'
 export {
   SlideOverDrawer,
   AppDrawer,
   type SlideOverDrawerProps,
+  type DrawerSize,
 } from '~/components/organisms/slide-over-drawer'
 export {
+  AppTable,
   ResponsiveDataView,
   DataTable,
   col,
   displayValue,
   type Row,
+  type AppTableProps,
+  type AppTableColumn,
+  type TableDensity,
   type ResponsiveDataViewProps,
 } from '~/components/organisms/responsive-data-view'
 export {

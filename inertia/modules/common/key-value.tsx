@@ -16,7 +16,7 @@ export function KeyValue({ label, value, muted = false }: KeyValueProps) {
   if (value === undefined || value === null || value === '') return null
 
   return (
-    <Stack direction="horizontal" align="center" justify="space-between" gap={3}>
+    <Stack direction="horizontal" align="center" justify="between" gap={3}>
       <Text type="supporting" as="span">
         {label}
       </Text>
@@ -25,7 +25,6 @@ export function KeyValue({ label, value, muted = false }: KeyValueProps) {
         as="span"
         weight="medium"
         color={muted ? 'secondary' : undefined}
-        align="end"
       >
         {value}
       </Text>
@@ -47,11 +46,11 @@ export function Meta({ label, value, muted = false }: MetaProps) {
   if (value === undefined || value === null || value === '') return null
 
   return (
-    <Stack gap={0}>
-      <Text type="supporting" as="dt" size="2xs" className="meta-label">
+    <Stack gap={0.5}>
+      <Text type="supporting" as="span" size="2xs">
         {label}
       </Text>
-      <Text type="body" as="dd" weight="medium" color={muted ? 'secondary' : undefined}>
+      <Text type="body" as="span" weight="medium" color={muted ? 'secondary' : undefined}>
         {value}
       </Text>
     </Stack>

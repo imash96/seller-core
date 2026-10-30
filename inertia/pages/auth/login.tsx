@@ -6,6 +6,7 @@ import AuthLayout from '~/layouts/auth'
 import { useState, useEffect } from 'react'
 import { ShieldCheck, Lock } from 'lucide-react'
 import { StatusBadge } from '~/components/atoms/status-badge'
+import { AppInput } from '~/components/atoms/input'
 import { PasswordField } from '~/components/molecules/password-field'
 import { DemoCredentialCard } from '~/components/molecules/demo-credential-card'
 import { Stack, VStack } from '@astryxdesign/core'
@@ -94,32 +95,19 @@ export default function Login() {
         <Form action="/" method="post">
           {({ errors, processing }) => (
             <VStack gap={4}>
-              <div className="flex flex-col gap-1.5 w-full">
-                <label
-                  htmlFor="field-email"
-                  className="text-xs font-semibold text-foreground flex items-center gap-1"
-                >
-                  <span>Email Address</span>
-                  <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  id="field-email"
-                  name="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  placeholder="admin@sellercore.io"
-                  className={`w-full h-10 px-3.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${errors.email ? 'border-rose-500 focus:ring-rose-500/30' : 'border-border'
-                    }`}
-                />
-                {errors.email && (
-                  <p className="text-xs font-medium text-rose-600 dark:text-rose-400">
-                    {errors.email}
-                  </p>
-                )}
-              </div>
+              <AppInput
+                id="field-email"
+                name="email"
+                type="email"
+                label="Email Address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                placeholder="admin@sellercore.io"
+                error={errors.email}
+                fullWidth
+              />
 
               <PasswordField
                 label="Password"

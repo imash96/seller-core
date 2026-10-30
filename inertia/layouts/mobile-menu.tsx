@@ -16,14 +16,14 @@ export default function MobileMenu({ open, close, logout }: MobileMenuProps) {
       <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
         <div className="h-16 px-5 border-b border-sidebar-border flex items-center justify-between">
           <Link href="/dashboard" onClick={close} className="flex items-center gap-2.5 unstyled-link">
-            <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
-              <Box className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 bg-sidebar-primary rounded-xl flex items-center justify-center shadow-sm">
+              <Box className="w-5 h-5 text-sidebar-primary-foreground" />
             </div>
             <div>
-              <span className="text-base font-bold text-white tracking-tight block leading-none">
+              <span className="text-base font-bold text-sidebar-foreground tracking-tight block leading-none">
                 Seller Core
               </span>
-              <span className="text-[11px] text-slate-400 block mt-0.5">
+              <span className="text-[11px] text-sidebar-foreground/60 block mt-0.5">
                 Operations & P&L Suite
               </span>
             </div>
@@ -31,7 +31,7 @@ export default function MobileMenu({ open, close, logout }: MobileMenuProps) {
           <button
             type="button"
             onClick={close}
-            className="p-2 hover:bg-sidebar-accent rounded-lg text-slate-300 transition-colors"
+            className="p-2 hover:bg-sidebar-accent rounded-lg text-sidebar-foreground/75 transition-colors"
             aria-label="Close navigation"
           >
             <X className="w-5 h-5" />
@@ -41,7 +41,7 @@ export default function MobileMenu({ open, close, logout }: MobileMenuProps) {
         <nav className="flex-1 px-4 py-5 overflow-y-auto space-y-6">
           {NAVIGATION.map((section) => (
             <div key={section.title}>
-              <div className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <div className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">
                 {section.title}
               </div>
               <div className="space-y-1">
@@ -57,7 +57,7 @@ export default function MobileMenu({ open, close, logout }: MobileMenuProps) {
           <button
             type="button"
             onClick={logout}
-            className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-rose-400 w-full hover:bg-rose-500/10 rounded-xl transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-error w-full hover:bg-error-subtle rounded-xl transition-colors"
           >
             <LogOut className="w-4 h-4" /> Sign out
           </button>

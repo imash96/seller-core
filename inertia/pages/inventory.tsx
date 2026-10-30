@@ -28,8 +28,15 @@ import {
 
 type Props = {
   products: Row[]
-  sellerAccounts: Row[]
+  sellerAccounts?: Row[]
   channelListings?: Row[]
+  savedViews?: Row[]
+  brands?: Row[]
+  categories?: Row[]
+  salesChannels?: Row[]
+  orders?: Row[]
+  orderLineItems?: Row[]
+  financeCategories?: Row[]
 }
 
 export default function InventoryPage({ products }: Props) {

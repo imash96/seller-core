@@ -49,7 +49,7 @@ export default class ClaimsController {
       disputedAmount: disputedAmount.toFixed(2),
       sellerLiabilityAmount: sellerLiabilityAmount.toFixed(2),
       reason: request.input('reason') || 'Customer marketplace claim opened',
-      resolutionNotes: request.input('resolutionNotes') || null,
+      evidenceSubmitted: { resolutionNotes: request.input('resolutionNotes') || null },
       respondByAt: respondByAt ? DateTime.fromISO(String(respondByAt)) : null,
     })
 
@@ -89,7 +89,7 @@ export default class ClaimsController {
     }
     const notes = request.input('resolutionNotes')
     if (notes !== undefined && notes !== null && notes !== '') {
-      claim.resolutionNotes = String(notes)
+      claim.evidenceSubmitted = { ...(claim.evidenceSubmitted || {}), resolutionNotes: String(notes) }
     }
     const respondByAt = request.input('respondByAt')
     if (respondByAt) claim.respondByAt = DateTime.fromISO(String(respondByAt))

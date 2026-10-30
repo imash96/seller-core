@@ -86,7 +86,7 @@ export default function Audit({ auditLogs }: Props) {
       />
 
       <div className="p-4 rounded-xl bg-muted/40 border border-border flex items-center gap-2.5 flex-wrap text-xs text-muted-foreground">
-        <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+        <ShieldCheck className="w-4 h-4 text-success shrink-0" />
         <span className="font-semibold text-foreground">How it works:</span>
         <StatusBadge variant="neutral" label="Database trigger writes audit_logs" />
         <StatusBadge variant="neutral" label="Before/After JSONB → SHA-256 checksum → Append" />

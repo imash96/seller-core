@@ -43,9 +43,9 @@ export const NAVIGATION: NavSection[] = [
   {
     title: 'Product & Catalog Pipeline',
     items: [
-      { href: '/catalog', label: 'Catalog (Master)', icon: Tags },
+      { href: '/catalogs', label: 'Catalog (Master)', icon: Tags },
       { href: '/products', label: 'Products & Variants', icon: Box },
-      { href: '/listing', label: 'Platform Listings', icon: Globe },
+      { href: '/listings', label: 'Platform Listings', icon: Globe },
       { href: '/inventory', label: 'Inventory & Stock', icon: Warehouse },
     ],
   },

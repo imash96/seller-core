@@ -7,6 +7,7 @@ export interface StatusBarItem {
   label: string
   value: ReactNode
   sublabel?: ReactNode
+  hint?: ReactNode
   icon?: ReactNode | ComponentType<{ className?: string }> | unknown
   tone?: AvatarTone
   badge?: { label: string; variant?: string }
@@ -73,8 +74,8 @@ export function TopStatusBar({
               <div className="text-xl sm:text-2xl font-extrabold text-foreground tabular-nums tracking-tight truncate">
                 {item.value}
               </div>
-              {item.sublabel && (
-                <div className="text-xs text-muted-foreground truncate">{item.sublabel}</div>
+              {(item.sublabel || item.hint) && (
+                <div className="text-xs text-muted-foreground truncate">{item.sublabel ?? item.hint}</div>
               )}
             </div>
             {item.icon ? (

@@ -155,9 +155,9 @@ export default class OrdersController {
       orderId: order.id,
       orderNumber: order.orderNumber,
       userId: user.id,
-      previousStatus: prevStatus,
-      newStatus: status,
-      changedByUserId: user.id,
+      fromStatus: prevStatus,
+      toStatus: status,
+      actorUserId: user.id,
       requestId: request.id(),
     })
 
@@ -197,18 +197,18 @@ export default class OrdersController {
     const payload = await request.validateUsing(bulkOrderImportValidator)
 
     try {
-      const parsed = JSON.parse(payload.jsonPayload)
+      const parsed = JSON.parse(payload.ordersJson)
       const items = Array.isArray(parsed) ? parsed : [parsed]
-      const { syncJob, created, skipped } = await OrderService.importMarketplaceBatch({
+      const result = await OrderService.importBulkOrders({
         userId: user.id,
+        actorUserId: user.id,
         sellerAccountId: payload.sellerAccountId ?? null,
-        marketplaceCode: payload.marketplaceCode,
-        defaultReportingCurrency: user.defaultCurrency || 'USD',
-        items,
+        idempotencyKey: payload.idempotencyKey,
+        orders: items,
       })
       session.flash(
         'success',
-        `Sync job ${syncJob.id}: imported ${created} new orders (${skipped} idempotent duplicates skipped).`
+        `Sync job ${result.job.id}: imported ${result.createdOrderIds.length} new orders (${result.duplicateOrderNumbers.length} duplicates skipped).`
       )
     } catch (err: any) {
       session.flash('error', `Bulk import failed: ${err.message}`)

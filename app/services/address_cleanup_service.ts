@@ -1,4 +1,4 @@
-import { type CleanedAddress, type LineAdd } from '../types/address_cleanup.ts'
+import { type CleanedAddress, type LineAdd } from '../types/address_cleanup.js'
 import { COUNTRY_ISO_MAP, COUNTRY_LIST } from '../utils/country_list.js'
 import stateCheck from '../utils/state_check.js'
 import { generateDtdcLabelDocx } from '../utils/dtdc_docx_generator.js'

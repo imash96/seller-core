@@ -247,7 +247,7 @@ export default class ProductsController {
       const platform = String(
         attrs.platform ||
           c.sellerAccount?.salesChannel?.code ||
-          c.sellerAccount?.marketplaceCode ||
+          (c.sellerAccount as any)?.marketplaceCode ||
           'medusa'
       ).toLowerCase()
       return {
@@ -298,7 +298,7 @@ export default class ProductsController {
       }
     }
 
-    for (const l of enrichedListings) {
+    for (const l of enrichedListings as any[]) {
       const skuKey = String(l.externalSku || 'SKU')
       if (!skuMap.has(skuKey)) {
         skuMap.set(skuKey, {

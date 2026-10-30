@@ -32,7 +32,7 @@ export function SavedViewsBar({
             onClick={() =>
               router.post(`/saved-views/${v.id}/delete`, {}, { preserveScroll: true })
             }
-            className="w-4 h-4 rounded-full hover:bg-rose-500/15 text-muted-foreground hover:text-rose-600 inline-flex items-center justify-center transition-colors"
+            className="w-4 h-4 rounded-full hover:bg-error-subtle text-muted-foreground hover:text-error inline-flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-3 h-3" />
           </button>

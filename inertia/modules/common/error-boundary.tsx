@@ -109,7 +109,7 @@ function ErrorFallback({
       <VStack gap={6} hAlign="center" maxWidth={560}>
         {/* Icon */}
         <VStack gap={0} hAlign="center">
-          <span className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-red-500/10 text-red-500 mb-4 ring-1 ring-red-500/20">
+          <span className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-error-subtle text-error mb-4 ring-1 ring-error/25">
             <AlertTriangle className="w-8 h-8" />
           </span>
           <Heading level={2} justify="center">

@@ -196,7 +196,7 @@ export function OrderDetailsDrawer({
               <span>Order Total ({cur})</span>
               <span className="tabular-nums">{formatMoney(cur, order.totalAmount)}</span>
             </div>
-            <div className="flex justify-between text-xs text-rose-600 dark:text-rose-400">
+            <div className="flex justify-between text-xs text-error">
               <span>− Marketplace & Payment Fees</span>
               <span className="tabular-nums">
                 −
@@ -207,7 +207,7 @@ export function OrderDetailsDrawer({
                 )}
               </span>
             </div>
-            <div className="flex justify-between text-xs text-amber-600 dark:text-amber-400">
+            <div className="flex justify-between text-xs text-warning">
               <span>− COGS & Shipping Cost</span>
               <span className="tabular-nums">
                 −
@@ -218,12 +218,12 @@ export function OrderDetailsDrawer({
               </span>
             </div>
             {Number(order.refundedAmount ?? 0) > 0 && (
-              <div className="flex justify-between text-xs text-rose-600 dark:text-rose-400">
+              <div className="flex justify-between text-xs text-error">
                 <span>− Refunded</span>
                 <span className="tabular-nums">−{formatMoney(cur, order.refundedAmount)}</span>
               </div>
             )}
-            <div className="flex justify-between pt-2 border-t border-border text-base font-bold text-emerald-600 dark:text-emerald-400">
+            <div className="flex justify-between pt-2 border-t border-border text-base font-bold text-success">
               <span>True Net Profit ({repCur})</span>
               <span className="tabular-nums">{formatMoney(repCur, order.netProfitAmount)}</span>
             </div>
