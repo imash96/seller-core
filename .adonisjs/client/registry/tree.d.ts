@@ -14,10 +14,8 @@ export interface ApiDefinition {
   pages: {
     orders: typeof routes['pages.orders']
     customers: typeof routes['pages.customers']
-    catalog: typeof routes['pages.catalog']
     catalogs: typeof routes['pages.catalogs']
     products: typeof routes['pages.products']
-    listing: typeof routes['pages.listing']
     listings: typeof routes['pages.listings']
     inventory: typeof routes['pages.inventory']
     accounts: typeof routes['pages.accounts']
@@ -109,7 +107,9 @@ export interface ApiDefinition {
   }
   shippingInvoices: {
     store: typeof routes['shipping_invoices.store']
+    update: typeof routes['shipping_invoices.update']
     updateStatus: typeof routes['shipping_invoices.update_status']
+    delete: typeof routes['shipping_invoices.delete']
   }
   returns: {
     store: typeof routes['returns.store']

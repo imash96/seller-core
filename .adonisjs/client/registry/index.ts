@@ -42,12 +42,6 @@ const routes = {
     tokens: [[0,"customers"]],
     types: placeholder as Registry['pages.customers']['types'],
   },
-  'pages.catalog': {
-    methods: ["GET","HEAD"],
-    pattern: '/catalog',
-    tokens: [[0,"catalog"]],
-    types: placeholder as Registry['pages.catalog']['types'],
-  },
   'pages.catalogs': {
     methods: ["GET","HEAD"],
     pattern: '/catalogs',
@@ -59,12 +53,6 @@ const routes = {
     pattern: '/products',
     tokens: [[0,"products"]],
     types: placeholder as Registry['pages.products']['types'],
-  },
-  'pages.listing': {
-    methods: ["GET","HEAD"],
-    pattern: '/listing',
-    tokens: [[0,"listing"]],
-    types: placeholder as Registry['pages.listing']['types'],
   },
   'pages.listings': {
     methods: ["GET","HEAD"],
@@ -450,11 +438,23 @@ const routes = {
     tokens: [[0,"shipping-invoices"]],
     types: placeholder as Registry['shipping_invoices.store']['types'],
   },
+  'shipping_invoices.update': {
+    methods: ["POST"],
+    pattern: '/shipping-invoices/:id',
+    tokens: [[0,"shipping-invoices"],[1,"id"]],
+    types: placeholder as Registry['shipping_invoices.update']['types'],
+  },
   'shipping_invoices.update_status': {
     methods: ["POST"],
     pattern: '/shipping-invoices/:id/status',
     tokens: [[0,"shipping-invoices"],[1,"id"],[0,"status"]],
     types: placeholder as Registry['shipping_invoices.update_status']['types'],
+  },
+  'shipping_invoices.delete': {
+    methods: ["POST"],
+    pattern: '/shipping-invoices/:id/delete',
+    tokens: [[0,"shipping-invoices"],[1,"id"],[0,"delete"]],
+    types: placeholder as Registry['shipping_invoices.delete']['types'],
   },
   'returns.store': {
     methods: ["POST"],

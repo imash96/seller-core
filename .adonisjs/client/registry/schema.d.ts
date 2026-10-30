@@ -85,19 +85,6 @@ export interface Registry {
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/customers_controller').default['index']>>>
     }
   }
-  'pages.catalog': {
-    methods: ["GET","HEAD"]
-    pattern: '/catalog'
-    types: {
-      body: {}
-      paramsTuple: []
-      params: {}
-      query: {}
-      response: ExtractResponse<Awaited<ReturnType<import('#controllers/products_controller').default['catalogsPage']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/products_controller').default['catalogsPage']>>>
-      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/products_controller').default['catalogsPage']>>>
-    }
-  }
   'pages.catalogs': {
     methods: ["GET","HEAD"]
     pattern: '/catalogs'
@@ -122,19 +109,6 @@ export interface Registry {
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/products_controller').default['index']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/products_controller').default['index']>>>
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/products_controller').default['index']>>>
-    }
-  }
-  'pages.listing': {
-    methods: ["GET","HEAD"]
-    pattern: '/listing'
-    types: {
-      body: {}
-      paramsTuple: []
-      params: {}
-      query: {}
-      response: ExtractResponse<Awaited<ReturnType<import('#controllers/products_controller').default['listingsPage']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/products_controller').default['listingsPage']>>>
-      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/products_controller').default['listingsPage']>>>
     }
   }
   'pages.listings': {
@@ -969,6 +943,19 @@ export interface Registry {
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['storeCarrierInvoice']>>>
     }
   }
+  'shipping_invoices.update': {
+    methods: ["POST"]
+    pattern: '/shipping-invoices/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['updateCarrierInvoice']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['updateCarrierInvoice']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['updateCarrierInvoice']>>>
+    }
+  }
   'shipping_invoices.update_status': {
     methods: ["POST"]
     pattern: '/shipping-invoices/:id/status'
@@ -980,6 +967,19 @@ export interface Registry {
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['updateCarrierInvoice']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['updateCarrierInvoice']>>>
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['updateCarrierInvoice']>>>
+    }
+  }
+  'shipping_invoices.delete': {
+    methods: ["POST"]
+    pattern: '/shipping-invoices/:id/delete'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['deleteCarrierInvoice']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['deleteCarrierInvoice']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['deleteCarrierInvoice']>>>
     }
   }
   'returns.store': {
