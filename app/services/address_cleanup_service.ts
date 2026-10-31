@@ -482,11 +482,11 @@ export class CleanAdd {
     const rawBlocks = Array.isArray(input)
       ? input
       : input
-        .trim()
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .replace(/\r\n/g, '\n')
-        .split(/\n{2,}/)
+          .trim()
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '')
+          .replace(/\r\n/g, '\n')
+          .split(/\n{2,}/)
 
     for (const block of rawBlocks) {
       if (!block || !block.trim()) continue

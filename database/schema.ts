@@ -106,6 +106,153 @@ export class BrandSchema extends BaseModel {
   declare websiteUrl: string | null
 }
 
+export class CatalogItemSchema extends BaseModel {
+  static $columns = [
+    'attributes',
+    'catalogKey',
+    'categoryCode',
+    'categoryHandle',
+    'categoryName',
+    'convertedProductId',
+    'createdAt',
+    'description',
+    'extendedDescription',
+    'fileName',
+    'fitCode',
+    'gender',
+    'id',
+    'images',
+    'materialCode',
+    'pattern',
+    'priceTier',
+    'productCode',
+    'resolvedCategoryId',
+    'shortDescription',
+    'status',
+    'structuredCode',
+    'subTitle',
+    'subTitle125',
+    'tags',
+    'title',
+    'title75',
+    'title80',
+    'type',
+    'updatedAt',
+    'userId',
+    'variantsSpec',
+  ] as const
+  $columns = CatalogItemSchema.$columns
+  @column({
+    prepare: (v) =>
+      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
+  })
+  declare attributes: any
+  @column()
+  declare catalogKey: string
+  @column()
+  declare categoryCode: string
+  @column()
+  declare categoryHandle: string | null
+  @column()
+  declare categoryName: string
+  @column()
+  declare convertedProductId: string | null
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare description: string | null
+  @column()
+  declare extendedDescription: string | null
+  @column()
+  declare fileName: string | null
+  @column()
+  declare fitCode: string
+  @column()
+  declare gender: string
+  @column({ isPrimary: true })
+  declare id: string
+  @column({
+    prepare: (v) =>
+      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
+  })
+  declare images: any
+  @column()
+  declare materialCode: string
+  @column()
+  declare pattern: string | null
+  @column()
+  declare priceTier: string
+  @column()
+  declare productCode: string
+  @column()
+  declare resolvedCategoryId: string | null
+  @column()
+  declare shortDescription: string | null
+  @column()
+  declare status: string
+  @column()
+  declare structuredCode: string | null
+  @column()
+  declare subTitle: string | null
+  @column()
+  declare subTitle125: string | null
+  @column({
+    prepare: (v) =>
+      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
+  })
+  declare tags: any
+  @column()
+  declare title: string
+  @column()
+  declare title75: string | null
+  @column()
+  declare title80: string | null
+  @column()
+  declare type: string | null
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+  @column()
+  declare userId: string
+  @column({
+    prepare: (v) =>
+      v === null || v === undefined || typeof v === 'string' ? v : JSON.stringify(v),
+  })
+  declare variantsSpec: any
+}
+
+export class ChannelListingPriceSchema extends BaseModel {
+  static $columns = [
+    'amount',
+    'channelListingId',
+    'createdAt',
+    'currencyCode',
+    'id',
+    'priceType',
+    'productVariantId',
+    'updatedAt',
+    'userId',
+  ] as const
+  $columns = ChannelListingPriceSchema.$columns
+  @column()
+  declare amount: string
+  @column()
+  declare channelListingId: string
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare currencyCode: string
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare priceType: string
+  @column()
+  declare productVariantId: string | null
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+  @column()
+  declare userId: string
+}
+
 export class ChannelListingSchema extends BaseModel {
   static $columns = [
     'allocatedQuantity',
@@ -874,6 +1021,39 @@ export class OrderImportPayloadSchema extends BaseModel {
   declare userId: string
 }
 
+export class OrderLineItemPriceSchema extends BaseModel {
+  static $columns = [
+    'amount',
+    'createdAt',
+    'currencyCode',
+    'fieldKey',
+    'id',
+    'orderId',
+    'orderLineItemId',
+    'updatedAt',
+    'userId',
+  ] as const
+  $columns = OrderLineItemPriceSchema.$columns
+  @column()
+  declare amount: string
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare currencyCode: string
+  @column()
+  declare fieldKey: string
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare orderId: string
+  @column()
+  declare orderLineItemId: string
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+  @column()
+  declare userId: string
+}
+
 export class OrderLineItemSchema extends BaseModel {
   static $columns = [
     'asin',
@@ -956,6 +1136,45 @@ export class OrderLineItemSchema extends BaseModel {
   declare userId: string
   @column()
   declare variantTitle: string | null
+}
+
+export class OrderPriceSchema extends BaseModel {
+  static $columns = [
+    'amount',
+    'createdAt',
+    'currencyCode',
+    'exchangeRate',
+    'fieldKey',
+    'id',
+    'orderId',
+    'reportingAmount',
+    'reportingCurrencyCode',
+    'updatedAt',
+    'userId',
+  ] as const
+  $columns = OrderPriceSchema.$columns
+  @column()
+  declare amount: string
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare currencyCode: string
+  @column()
+  declare exchangeRate: string
+  @column()
+  declare fieldKey: string
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare orderId: string
+  @column()
+  declare reportingAmount: string | null
+  @column()
+  declare reportingCurrencyCode: string | null
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+  @column()
+  declare userId: string
 }
 
 export class OrderSchema extends BaseModel {
@@ -1261,6 +1480,39 @@ export class ProductCategorySchema extends BaseModel {
   declare userId: string
 }
 
+export class ProductPriceSchema extends BaseModel {
+  static $columns = [
+    'amount',
+    'createdAt',
+    'currencyCode',
+    'id',
+    'priceType',
+    'productId',
+    'sizeValue',
+    'updatedAt',
+    'userId',
+  ] as const
+  $columns = ProductPriceSchema.$columns
+  @column()
+  declare amount: string
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare currencyCode: string
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare priceType: string
+  @column()
+  declare productId: string
+  @column()
+  declare sizeValue: string | null
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+  @column()
+  declare userId: string
+}
+
 export class ProductVariantAttributeSchema extends BaseModel {
   static $columns = [
     'attributeName',
@@ -1281,6 +1533,51 @@ export class ProductVariantAttributeSchema extends BaseModel {
   declare id: string
   @column()
   declare productVariantId: string
+  @column()
+  declare userId: string
+}
+
+export class ProductVariantPriceSchema extends BaseModel {
+  static $columns = [
+    'amount',
+    'compareAtAmount',
+    'costAmount',
+    'createdAt',
+    'currencyCode',
+    'id',
+    'manufacturingCostAmount',
+    'packagingCostAmount',
+    'priceType',
+    'productId',
+    'productVariantId',
+    'updatedAt',
+    'userId',
+  ] as const
+  $columns = ProductVariantPriceSchema.$columns
+  @column()
+  declare amount: string
+  @column()
+  declare compareAtAmount: string | null
+  @column()
+  declare costAmount: string | null
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare currencyCode: string
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare manufacturingCostAmount: string | null
+  @column()
+  declare packagingCostAmount: string | null
+  @column()
+  declare priceType: string
+  @column()
+  declare productId: string
+  @column()
+  declare productVariantId: string
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
   @column()
   declare userId: string
 }

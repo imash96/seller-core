@@ -44,7 +44,23 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
   let amazonChannel: SalesChannel
   let sellerAccountA: SellerAccount
 
+  let dbAvailable = false
+
+  group.tap((t) => {
+    t.skip(() => !dbAvailable, 'PostgreSQL database not available in current environment')
+  })
+
   group.setup(async () => {
+    try {
+      await db.rawQuery('SELECT 1')
+      dbAvailable = true
+    } catch {
+      console.warn(
+        'PostgreSQL database not reachable; skipping live integration tests in architecture_and_operations.spec.ts.'
+      )
+      return
+    }
+
     // Ensure permissions and roles exist for RBAC testing
     const pViewOrders = await Permission.updateOrCreate(
       { slug: 'orders.view' },
@@ -268,15 +284,16 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
   test('4. Products support 0 variation dimensions (simple) and multi-dimensional variations', async ({
     assert,
   }) => {
-    const simpleSku = `TEST-SIMPLE-${Date.now()}`
+    const nonce = Date.now()
+    const simpleSku = `TEST-SIMPLE-${nonce}`
     const simpleProduct = await CatalogService.createProduct({
       userId: merchantA.id,
-      title: 'Simple USB-C Cable',
+      title: `Simple USB-C Cable ${nonce}`,
       hasVariants: false,
       variants: [
         {
           sku: simpleSku,
-          title: 'Simple USB-C Cable',
+          title: `Simple USB-C Cable ${nonce}`,
           retailPrice: 19.99,
           costPrice: 4.5,
           manufacturingCost: 3.0,
@@ -291,17 +308,17 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
     assert.equal(simpleProduct.variants.length, 1)
     assert.isTrue(simpleProduct.variants[0].isDefault)
 
-    const multiSku1 = `TEST-VAR-BLK-M-${Date.now()}`
-    const multiSku2 = `TEST-VAR-SLV-L-${Date.now()}`
+    const multiSku1 = `TEST-VAR-BLK-M-${nonce}`
+    const multiSku2 = `TEST-VAR-SLV-L-${nonce}`
     const multiProduct = await CatalogService.createProduct({
       userId: merchantA.id,
-      title: 'Ergonomic Laptop Stand',
+      title: `Ergonomic Laptop Stand ${nonce}`,
       hasVariants: true,
       variationDimensions: ['color', 'size'],
       variants: [
         {
           sku: multiSku1,
-          title: 'Ergonomic Laptop Stand - Black / Medium',
+          title: `Ergonomic Laptop Stand - Black / Medium ${nonce}`,
           retailPrice: 89.0,
           costPrice: 25.0,
           stockOnHand: 30,
@@ -309,7 +326,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
         },
         {
           sku: multiSku2,
-          title: 'Ergonomic Laptop Stand - Silver / Large',
+          title: `Ergonomic Laptop Stand - Silver / Large ${nonce}`,
           retailPrice: 99.0,
           costPrice: 28.0,
           stockOnHand: 20,
