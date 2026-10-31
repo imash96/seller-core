@@ -25,11 +25,14 @@ import FinancialTransaction from '#models/financial_transaction'
 import TasksReminder from '#models/tasks_reminder'
 import SavedView from '#models/saved_view'
 import AuditLog from '#models/audit_log'
+import { PriceService } from '../services/price_service.js'
 import { RbacService } from '../services/rbac_service.js'
+import { normalizePriceMoney } from '../types/price.js'
 
 export default class DashboardController {
   async index({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
+    await PriceService.ensurePriceTables()
 
     const [
       effectiveRbac,
@@ -64,7 +67,8 @@ export default class DashboardController {
         .where('userId', user.id)
         .preload('customer')
         .preload('sellerAccount')
-        .preload('lineItems')
+        .preload('orderPrices')
+        .preload('lineItems', (lq) => lq.preload('linePrices'))
         .preload('shipments')
         .orderBy('orderedAt', 'desc')
         .limit(50),
@@ -83,7 +87,10 @@ export default class DashboardController {
         .where('userId', user.id)
         .preload('brand')
         .preload('category')
-        .preload('variants', (q) => q.preload('variantAttributes').preload('listings'))
+        .preload('priceRecords')
+        .preload('variants', (q) =>
+          q.preload('variantAttributes').preload('priceRecords').preload('listings')
+        )
         .orderBy('createdAt', 'desc')
         .limit(50),
       Brand.query().where('userId', user.id).orderBy('name', 'asc'),
@@ -196,17 +203,33 @@ export default class DashboardController {
       .filter((t) => t.dataClassification === 'household_personal')
       .reduce((sum, t) => sum + Number(t.reportingAmount || 0), 0)
 
+    const invoiceVarianceVal = shippingInvoices.reduce(
+      (sum, inv) => sum + Number(inv.varianceAmount || 0),
+      0
+    )
+
+    const repCur = (user.defaultCurrency || 'USD').toUpperCase()
+
     const kpis = {
       totalOrders: orders.length,
       grossSales: grossSales.toFixed(2),
+      grossSalesMoney: normalizePriceMoney(grossSales, repCur),
       netSales: (grossSales - totalRefunded).toFixed(2),
+      netSalesMoney: normalizePriceMoney(grossSales - totalRefunded, repCur),
       totalRefunded: totalRefunded.toFixed(2),
+      totalRefundedMoney: normalizePriceMoney(totalRefunded, repCur),
       totalMarketplaceFees: totalMarketplaceFees.toFixed(2),
+      totalMarketplaceFeesMoney: normalizePriceMoney(totalMarketplaceFees, repCur),
       totalCogs: totalCogs.toFixed(2),
+      totalCogsMoney: normalizePriceMoney(totalCogs, repCur),
       totalShippingCost: totalShippingCost.toFixed(2),
+      totalShippingCostMoney: normalizePriceMoney(totalShippingCost, repCur),
       orderNetProfit: netProfit.toFixed(2),
+      orderNetProfitMoney: normalizePriceMoney(netProfit, repCur),
       businessOperatingExpenses: businessExpenses.toFixed(2),
+      businessOperatingExpensesMoney: normalizePriceMoney(businessExpenses, repCur),
       householdExpenses: householdExpenses.toFixed(2),
+      householdExpensesMoney: normalizePriceMoney(householdExpenses, repCur),
       pendingOrders: orders.filter((o) =>
         ['draft', 'pending', 'confirmed', 'processing'].includes(o.status)
       ).length,
@@ -219,9 +242,8 @@ export default class DashboardController {
         (r) => !['closed', 'rejected', 'refunded'].includes(r.status)
       ).length,
       pendingRiskReviews: riskSignals.filter((r) => r.reviewStatus === 'pending_review').length,
-      invoiceVarianceTotal: shippingInvoices
-        .reduce((sum, inv) => sum + Number(inv.varianceAmount || 0), 0)
-        .toFixed(2),
+      invoiceVarianceTotal: invoiceVarianceVal.toFixed(2),
+      invoiceVarianceTotalMoney: normalizePriceMoney(invoiceVarianceVal, repCur),
     }
 
     return inertia.render('dashboard', {

@@ -20,8 +20,8 @@ export default function MetricCard({
   change,
   icon: Icon,
   description,
-  iconBg = 'bg-primary-subtle',
-  iconColor = 'text-primary',
+  iconBg = 'bg-blue-500/10',
+  iconColor = 'text-blue-600 dark:text-blue-400',
 }: MetricCardProps) {
   return (
     <Card className="hover:shadow-md transition-shadow" rounded>
@@ -36,7 +36,9 @@ export default function MetricCard({
             {change && (
               <div
                 className={`flex items-center gap-1 text-xs font-medium mt-2 ${
-                  change.trend === 'up' ? 'text-success' : 'text-error'
+                  change.trend === 'up'
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-rose-600 dark:text-rose-400'
                 }`}
               >
                 {change.trend === 'up' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}

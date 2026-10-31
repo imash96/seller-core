@@ -94,7 +94,9 @@ export function StatsCard({
           {change && (
             <div
               className={`flex items-center gap-1 text-xs font-semibold mt-2 ${
-                change.trend === 'up' ? 'text-success' : 'text-error'
+                change.trend === 'up'
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-rose-600 dark:text-rose-400'
               }`}
             >
               {change.trend === 'up' ? (
@@ -135,20 +137,16 @@ export function PageSection({
   return (
     <section
       id={id}
-      className="rounded-2xl border border-card-border bg-card text-card-foreground shadow-xs overflow-hidden"
+      className="bg-card text-card-foreground border border-border rounded-xl p-5 sm:p-6 shadow-xs space-y-4"
     >
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 sm:px-6 sm:py-5 border-b border-border-subtle bg-surface-elevated/40">
-        <div className="space-y-1 min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border">
+        <div className="space-y-0.5 min-w-0">
           <h2 className="text-base sm:text-lg font-bold text-foreground tracking-tight">{title}</h2>
-          {description && (
-            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              {description}
-            </p>
-          )}
+          {description && <p className="text-xs sm:text-sm text-muted-foreground">{description}</p>}
         </div>
         {actions && <div className="flex items-center gap-2 flex-wrap shrink-0">{actions}</div>}
       </div>
-      <div className="p-5 sm:p-6">{children}</div>
+      <div>{children}</div>
     </section>
   )
 }

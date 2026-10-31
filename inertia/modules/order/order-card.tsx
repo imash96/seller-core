@@ -16,7 +16,7 @@ import { StatusBadge, STATUS_TONES } from '~/components/atoms/status-badge'
 import { MonoBadge } from '~/components/atoms/mono-badge'
 import { ThumbnailStack } from '~/components/atoms/thumbnail-stack'
 import { AppButton } from '~/components/atoms/button'
-import { formatMoney, formatDate } from '~/lib/utils'
+import { convertToLocale, resolvePriceMoney, formatDate } from '~/lib/utils'
 import type { Row } from '~/lib/ui'
 
 export interface OrderCardProps {
@@ -90,10 +90,30 @@ export function OrderCard({
     riskScore >= 60 ||
     riskSignals.some((s) => s.status !== 'dismissed')
 
-  const currency = String(order.currencyCode || 'USD')
-  const netProfit = Number(order.netProfitAmount ?? 0)
-  const totalFees =
-    Number(order.marketplaceFeesAmount ?? 0) + Number(order.paymentProcessingFeesAmount ?? 0)
+  const currency = String(order.currencyCode || 'USD').toUpperCase()
+  const totalMoney = resolvePriceMoney(order.totalMoney ?? order.totalAmount, currency)
+  const cogsMoney = resolvePriceMoney(order.cogsMoney ?? order.cogsAmount, currency)
+  const mktFeesMoney = resolvePriceMoney(
+    order.marketplaceFeesMoney ?? order.marketplaceFeesAmount,
+    currency
+  )
+  const payFeesMoney = resolvePriceMoney(
+    order.paymentProcessingFeesMoney ?? order.paymentProcessingFeesAmount,
+    currency
+  )
+  const totalFeesMoney = {
+    currency_code: mktFeesMoney.currency_code,
+    amount: Number((mktFeesMoney.amount + payFeesMoney.amount).toFixed(2)),
+  }
+  const shippingCostMoney = resolvePriceMoney(
+    order.shippingCostMoney ?? order.shippingCostAmount,
+    currency
+  )
+  const netProfitMoney = resolvePriceMoney(order.netProfitMoney ?? order.netProfitAmount, currency)
+  const customerLtvMoney = resolvePriceMoney(
+    customer.totalSpentMoney ?? customer.totalSpent,
+    String(customer.preferredCurrency || currency)
+  )
 
   return (
     <div
@@ -195,73 +215,97 @@ export function OrderCard({
             {/* Compact Line Items List */}
             {lineItems.length > 0 && (
               <div className="rounded-xl border border-border-subtle bg-muted/25 p-2.5 space-y-1.5 max-h-28 overflow-y-auto">
-                {lineItems.map((li, i) => (
-                  <div
-                    key={String(li.id ?? i)}
-                    className="flex items-center justify-between gap-2 text-xs"
-                  >
-                    <div className="min-w-0 flex items-center gap-1.5">
-                      <span className="font-bold text-primary tabular-nums">
-                        {String(li.quantityOrdered ?? 1)}×
+                {lineItems.map((li, i) => {
+                  const liMoney = resolvePriceMoney(
+                    li.lineTotalMoney ?? li.unitPriceMoney ?? li.lineTotalAmount ?? li.unitPrice,
+                    String(li.currencyCode || currency)
+                  )
+                  return (
+                    <div
+                      key={String(li.id ?? i)}
+                      className="flex items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="min-w-0 flex items-center gap-1.5">
+                        <span className="font-bold text-primary tabular-nums">
+                          {String(li.quantityOrdered ?? 1)}×
+                        </span>
+                        <span className="font-mono text-[11px] font-semibold text-foreground">
+                          {String(li.sku)}
+                        </span>
+                        <span className="text-muted-foreground truncate">— {String(li.title)}</span>
+                      </div>
+                      <span className="font-semibold text-foreground tabular-nums shrink-0 font-mono">
+                        {convertToLocale({
+                          amount: liMoney.amount,
+                          currency_code: liMoney.currency_code,
+                        })}
                       </span>
-                      <span className="font-mono text-[11px] font-semibold text-foreground">
-                        {String(li.sku)}
-                      </span>
-                      <span className="text-muted-foreground truncate">— {String(li.title)}</span>
                     </div>
-                    <span className="font-semibold text-foreground tabular-nums shrink-0">
-                      {formatMoney(currency, li.lineTotalAmount ?? li.unitPrice)}
-                    </span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
 
-          {/* Transparent 5-Column P&L Economics Strip */}
+          {/* Transparent 5-Column P&L Economics Strip (each field carries its own currency_code) */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 border-t border-divider text-xs">
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Total Paid
+                Total ({totalMoney.currency_code})
               </span>
-              <span className="font-bold text-price-current tabular-nums">
-                {formatMoney(currency, order.totalAmount)}
-              </span>
-            </div>
-            <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                COGS
-              </span>
-              <span className="font-semibold text-foreground-secondary tabular-nums">
-                {formatMoney(currency, order.cogsAmount)}
+              <span className="font-bold text-price-current tabular-nums font-mono">
+                {convertToLocale({
+                  amount: totalMoney.amount,
+                  currency_code: totalMoney.currency_code,
+                })}
               </span>
             </div>
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Channel Fees
+                COGS ({cogsMoney.currency_code})
               </span>
-              <span className="font-semibold text-foreground-secondary tabular-nums">
-                {formatMoney(currency, totalFees)}
-              </span>
-            </div>
-            <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Shipping
-              </span>
-              <span className="font-semibold text-foreground-secondary tabular-nums">
-                {formatMoney(currency, order.shippingCostAmount)}
+              <span className="font-semibold text-foreground-secondary tabular-nums font-mono">
+                {convertToLocale({
+                  amount: cogsMoney.amount,
+                  currency_code: cogsMoney.currency_code,
+                })}
               </span>
             </div>
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Net Profit
+                Fees ({totalFeesMoney.currency_code})
+              </span>
+              <span className="font-semibold text-foreground-secondary tabular-nums font-mono">
+                {convertToLocale({
+                  amount: totalFeesMoney.amount,
+                  currency_code: totalFeesMoney.currency_code,
+                })}
+              </span>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Ship ({shippingCostMoney.currency_code})
+              </span>
+              <span className="font-semibold text-foreground-secondary tabular-nums font-mono">
+                {convertToLocale({
+                  amount: shippingCostMoney.amount,
+                  currency_code: shippingCostMoney.currency_code,
+                })}
+              </span>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Profit ({netProfitMoney.currency_code})
               </span>
               <span
-                className={`font-extrabold tabular-nums ${
-                  netProfit >= 0 ? 'text-price-save' : 'text-error'
+                className={`font-extrabold tabular-nums font-mono ${
+                  netProfitMoney.amount >= 0 ? 'text-price-save' : 'text-error'
                 }`}
               >
-                {formatMoney(currency, netProfit)}
+                {convertToLocale({
+                  amount: netProfitMoney.amount,
+                  currency_code: netProfitMoney.currency_code,
+                })}
               </span>
             </div>
           </div>
@@ -331,11 +375,14 @@ export function OrderCard({
                   Verified Buyer (Risk Score: {riskScore})
                 </span>
               )}
-              {customer.totalSpent && Number(customer.totalSpent) > 0 && (
+              {customerLtvMoney.amount > 0 && (
                 <span className="text-[11px] text-muted-foreground">
                   LTV:{' '}
-                  <strong className="text-foreground">
-                    {formatMoney(currency, customer.totalSpent)}
+                  <strong className="text-foreground font-mono">
+                    {convertToLocale({
+                      amount: customerLtvMoney.amount,
+                      currency_code: customerLtvMoney.currency_code,
+                    })}
                   </strong>
                 </span>
               )}

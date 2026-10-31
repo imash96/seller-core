@@ -42,6 +42,7 @@ export const createProductValidator = vine.create({
   hasVariants: vine.string().trim().optional(),
   variationDimensions: vine.string().trim().optional(),
   description: vine.string().trim().optional().nullable(),
+  pricesJson: vine.string().trim().optional(),
 })
 
 export const createOrderValidator = vine.create({
@@ -50,6 +51,7 @@ export const createOrderValidator = vine.create({
   sellerAccountId: objectId().optional().nullable(),
   marketplaceCode: vine.string().trim().maxLength(50).optional(),
   currencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
+  reportingCurrencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
   exchangeRate: vine.number().min(0.0001).optional(),
   shippingCostAmount: vine.number().min(0).optional(),
   customerFullName: vine.string().trim().minLength(2).maxLength(255),
@@ -70,9 +72,10 @@ export const createOrderValidator = vine.create({
 })
 
 export const bulkOrderImportValidator = vine.create({
-  idempotencyKey: vine.string().trim().minLength(3).maxLength(150),
+  idempotencyKey: vine.string().trim().minLength(3).maxLength(150).optional(),
   sellerAccountId: objectId().optional().nullable(),
-  ordersJson: vine.string().trim().minLength(2),
+  ordersJson: vine.string().trim().minLength(2).optional(),
+  jsonPayload: vine.string().trim().minLength(2).optional(),
 })
 
 export const createShipmentValidator = vine.create({

@@ -16,7 +16,7 @@ import { ScrollText, ShieldCheck, Lock, PlusCircle, RefreshCw, Trash2, Eye } fro
 
 type Props = { auditLogs: Row[] }
 
-export default function Audit({ auditLogs = [] }: Props) {
+export default function Audit({ auditLogs }: Props) {
   const [inspectRow, setInspectRow] = useState<Row | null>(null)
 
   const inserts = auditLogs.filter((r) => String(r.action) === 'INSERT').length
@@ -78,7 +78,7 @@ export default function Audit({ auditLogs = [] }: Props) {
       />
 
       <div className="p-4 rounded-xl bg-muted/40 border border-border flex items-center gap-2.5 flex-wrap text-xs text-muted-foreground">
-        <ShieldCheck className="w-4 h-4 text-success shrink-0" />
+        <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
         <span className="font-semibold text-foreground">How it works:</span>
         <StatusBadge variant="neutral" label="Database trigger writes audit_logs" />
         <StatusBadge variant="neutral" label="Before/After JSONB → SHA-256 checksum → Append" />
@@ -161,7 +161,7 @@ export default function Audit({ auditLogs = [] }: Props) {
         onClose={() => setInspectRow(null)}
         title={`Audit Event: ${String(inspectRow?.action ?? '')}`}
         subtitle={`Entity: ${String(inspectRow?.entityType ?? '')} (${String(inspectRow?.entityId ?? '')})`}
-        badges={
+        badge={
           inspectRow && (
             <StatusBadge
               variant={

@@ -10,8 +10,7 @@ import {
   FormModal,
   SavedViewsBar,
   PaginationBar,
-  STATUS_TONES,
-  money,
+  convertToLocale,
   type Row,
 } from '~/lib/ui'
 import { OrderCard } from '~/modules/order/order-card'
@@ -53,7 +52,7 @@ const ORDER_STATUS = [
   'on_hold',
 ]
 
-export default function Orders({ orders = [], sellerAccounts = [], savedViews = [] }: Props) {
+export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [editRow, setEditRow] = useState<Row | null>(null)
@@ -83,12 +82,14 @@ export default function Orders({ orders = [], sellerAccounts = [], savedViews = 
             sku: 'MCTDC01-BLK-NP-RG-M',
             title: 'Leather Duster Coat',
             quantityOrdered: 1,
+            currencyCode: 'USD',
             unitPrice: 239.99,
           },
           {
             sku: 'MJKBK03-BLK-NP-SL-L',
             title: 'Moto Biker Jacket',
             quantityOrdered: 1,
+            currencyCode: 'USD',
             unitPrice: 259.99,
           },
         ],
@@ -191,7 +192,7 @@ export default function Orders({ orders = [], sellerAccounts = [], savedViews = 
     <div className="space-y-6">
       <PageHeader
         title="Orders & Multi-Currency P&L"
-        description="3-section order cards featuring stacked product thumbnails, transparent P&L waterfall economics, and customer repeat/fraud intelligence."
+        description="3-section order cards featuring stacked product thumbnails, multi-currency OrderPrice & OrderLineItemPrice P&L waterfall economics, and customer repeat/fraud intelligence."
         icon={Package}
         badge={`${orders.length} orders`}
         actions={
@@ -228,7 +229,7 @@ export default function Orders({ orders = [], sellerAccounts = [], savedViews = 
           {
             label: 'Total Orders',
             value: String(orders.length),
-            sublabel: `Gross Revenue: ${money('USD', stats.grossRevenue)}`,
+            sublabel: `Gross Revenue: ${convertToLocale({ amount: stats.grossRevenue, currency_code: 'USD' })}`,
             icon: DollarSign,
             tone: 'primary',
             active: statusFilter === 'all' && customerSegmentFilter === 'all',
@@ -239,7 +240,7 @@ export default function Orders({ orders = [], sellerAccounts = [], savedViews = 
           },
           {
             label: 'True Net Profit',
-            value: money('USD', stats.netProfit),
+            value: convertToLocale({ amount: stats.netProfit, currency_code: 'USD' }),
             sublabel: 'After COGS, Fees & Shipping',
             icon: TrendingUp,
             tone: 'success',
@@ -306,7 +307,7 @@ export default function Orders({ orders = [], sellerAccounts = [], savedViews = 
       {/* Unified Filter Bar + 3-Section Order Cards List */}
       <PageSection
         title="Order Operations Queue (3-Section Cards)"
-        description="Left: Product thumbnail stack (tilted layered images when multi-item). Center: Order & P&L breakdown. Right: Customer address & Repeat/Fraud intelligence."
+        description="Left: Product thumbnail stack (tilted layered images when multi-item). Center: Multi-currency OrderPrice & OrderLineItemPrice P&L breakdown. Right: Customer address & Repeat/Fraud intelligence."
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 rounded-2xl border border-card-border bg-muted/25 p-3.5">
@@ -427,8 +428,8 @@ export default function Orders({ orders = [], sellerAccounts = [], savedViews = 
       <FormModal
         isOpen={createOpen}
         onOpenChange={setCreateOpen}
-        title="Create Order"
-        subtitle="Manual order entry with automatic P&L waterfall calculation."
+        title="Create Order (Multi-Currency OrderPrice & OrderLineItemPrice)"
+        subtitle="Manual order entry with per-field currency codes and automatic P&L waterfall calculation."
         submitLabel="Create Order"
         action="/orders"
         fields={[
@@ -464,7 +465,13 @@ export default function Orders({ orders = [], sellerAccounts = [], savedViews = 
           },
           {
             name: 'currencyCode',
-            label: 'Currency',
+            label: 'Order Currency Code (USD, INR, EUR, GBP, CAD, MXN)',
+            default: 'USD',
+            section: '1. Order & Channel',
+          },
+          {
+            name: 'reportingCurrencyCode',
+            label: 'Reporting Currency Code',
             default: 'USD',
             section: '1. Order & Channel',
           },
@@ -578,16 +585,26 @@ export default function Orders({ orders = [], sellerAccounts = [], savedViews = 
         isOpen={bulkOpen}
         onOpenChange={setBulkOpen}
         title="Idempotent Bulk Order Import (JSON)"
-        subtitle="Deduplicates on (seller_account_id, external_order_id) and creates a SyncJob audit trail."
+        subtitle="Deduplicates on (seller_account_id, external_order_id) and creates OrderPrice, OrderLineItemPrice, and SyncJob records."
         submitLabel="Run Import Batch"
         action="/orders/bulk-import"
         presetActions={[
           {
             label: 'Load Sample Multi-Item JSON',
-            values: { marketplaceCode: 'amazon', jsonPayload: sampleJson },
+            values: {
+              idempotencyKey: 'batch-orders-2026-01',
+              marketplaceCode: 'amazon',
+              ordersJson: sampleJson,
+            },
           },
         ]}
         fields={[
+          {
+            name: 'idempotencyKey',
+            label: 'Idempotency key',
+            default: 'batch-orders-2026-01',
+            required: true,
+          },
           {
             name: 'marketplaceCode',
             label: 'Marketplace code',
@@ -611,7 +628,7 @@ export default function Orders({ orders = [], sellerAccounts = [], savedViews = 
             })),
           },
           {
-            name: 'jsonPayload',
+            name: 'ordersJson',
             label: 'JSON orders array',
             kind: 'textarea',
             required: true,

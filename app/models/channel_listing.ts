@@ -1,17 +1,23 @@
 /**
  * ChannelListing — maps to "channel_listings".
  * Per-seller-account listing mapping for one product variant (Amazon ASIN/listing, eBay item id, Etsy listing, storefront URL).
- *
- * This file is generated from database/schema.dbml — keep the two in sync.
+ * Exposes multi-currency `prices: Array<{ currency_code: string, amount: number }>` via `ChannelListingPrice` and `channelAttributes.prices`.
  */
-import { belongsTo, column } from '@adonisjs/lucid/orm'
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import { belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import type { DateTime } from 'luxon'
 import Product from './product.js'
 import ProductVariant from './product_variant.js'
 import SellerAccount from './seller_account.js'
+import ChannelListingPrice from './channel_listing_price.js'
 import { prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import {
+  type PriceMoney,
+  buildMultiCurrencyPriceArray,
+  normalizePriceMoney,
+  normalizePriceMoneyArray,
+} from '../types/price.js'
 
 export default class ChannelListing extends AppBaseModel {
   static readonly table = 'channel_listings'
@@ -91,4 +97,33 @@ export default class ChannelListing extends AppBaseModel {
 
   @belongsTo(() => ProductVariant, { foreignKey: 'productVariantId' })
   declare public productVariant: BelongsTo<typeof ProductVariant>
+
+  @hasMany(() => ChannelListingPrice, { foreignKey: 'channelListingId' })
+  declare public priceRecords: HasMany<typeof ChannelListingPrice>
+
+  override serialize(): Record<string, any> {
+    const raw = super.serialize()
+    const baseCur = (this.currencyCode || 'USD').toUpperCase()
+    const listedNum = Number(this.listedPrice ?? 0)
+    const attrs = (this.channelAttributes ?? {}) as Record<string, any>
+
+    let prices: PriceMoney[] = []
+    if (Array.isArray(this.priceRecords) && this.priceRecords.length > 0) {
+      prices = this.priceRecords.map((pr) => ({
+        currency_code: (pr.currencyCode || baseCur).toUpperCase(),
+        amount: Number(Number(pr.amount ?? 0).toFixed(2)),
+      }))
+    } else if (Array.isArray(attrs.prices) && attrs.prices.length > 0) {
+      prices = normalizePriceMoneyArray(attrs.prices, listedNum, baseCur)
+    } else {
+      prices = buildMultiCurrencyPriceArray(listedNum || 239.99)
+    }
+
+    return {
+      ...raw,
+      price: prices,
+      prices,
+      listedPriceMoney: normalizePriceMoney(listedNum, baseCur),
+    }
+  }
 }

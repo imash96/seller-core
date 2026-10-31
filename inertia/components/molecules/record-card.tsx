@@ -15,19 +15,18 @@ export type CardData = {
 }
 
 const ACCENT_STRIP_CLASSES: Record<string, string> = {
-  success: 'bg-success',
-  green: 'bg-success',
-  error: 'bg-error',
-  red: 'bg-error',
-  warning: 'bg-warning',
-  yellow: 'bg-warning',
-  orange: 'bg-warning',
-  info: 'bg-info',
-  blue: 'bg-info',
-  purple: 'bg-accent',
-  teal: 'bg-info',
-  cyan: 'bg-info',
-  primary: 'bg-primary',
+  success: 'bg-emerald-500',
+  green: 'bg-emerald-500',
+  error: 'bg-rose-500',
+  red: 'bg-rose-500',
+  warning: 'bg-amber-500',
+  yellow: 'bg-amber-500',
+  orange: 'bg-orange-500',
+  info: 'bg-blue-500',
+  blue: 'bg-blue-500',
+  purple: 'bg-violet-500',
+  teal: 'bg-teal-500',
+  cyan: 'bg-cyan-500',
   neutral: 'bg-border',
 }
 

@@ -45,11 +45,7 @@ const ACCOUNT_STATUS = [
 ]
 const HEALTH = ['healthy', 'warning', 'critical', 'unknown']
 
-export default function Accounts({
-  sellerAccounts = [],
-  salesChannels = [],
-  savedViews = [],
-}: Props) {
+export default function Accounts({ sellerAccounts, salesChannels, savedViews }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editRow, setEditRow] = useState<Row | null>(null)
 

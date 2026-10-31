@@ -22,7 +22,10 @@ import {
   ProgressMeter,
   FormModal,
   PaginationBar,
-  money,
+  MultiCurrencyPriceStack,
+  convertToLocale,
+  resolvePriceMoney,
+  type PriceMoney,
   type Row,
 } from '~/lib/ui'
 
@@ -39,7 +42,7 @@ type Props = {
   financeCategories?: Row[]
 }
 
-export default function InventoryPage({ products = [] }: Props) {
+export default function InventoryPage({ products }: Props) {
   const [editStockRow, setEditStockRow] = useState<Row | null>(null)
   const [addVariantOpen, setAddVariantOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -57,6 +60,15 @@ export default function InventoryPage({ products = [] }: Props) {
         const reorderPoint = Number(v.reorderPoint ?? 15)
         const stockHealth =
           available <= 0 ? 'out_of_stock' : available <= reorderPoint ? 'low_stock' : 'in_stock'
+        const currencyCode = String(v.currencyCode || 'USD').toUpperCase()
+        const costMoney = resolvePriceMoney(v.costPriceMoney ?? v.costPrice, currencyCode)
+        const retailMoney = resolvePriceMoney(v.retailPriceMoney ?? v.retailPrice, currencyCode)
+        const invValAmount = Number((onHand * costMoney.amount).toFixed(2))
+        const pricesArray = Array.isArray(v.prices)
+          ? (v.prices as PriceMoney[])
+          : Array.isArray(v.price)
+            ? (v.price as PriceMoney[])
+            : [retailMoney]
         list.push({
           ...v,
           productTitle: p.title,
@@ -65,7 +77,14 @@ export default function InventoryPage({ products = [] }: Props) {
           stockAvailable: available,
           reorderPoint,
           stockHealth,
-          inventoryValue: (onHand * Number(v.costPrice ?? 0)).toFixed(2),
+          costPriceMoney: costMoney,
+          retailPriceMoney: retailMoney,
+          prices: pricesArray,
+          inventoryValue: invValAmount.toFixed(2),
+          inventoryValueMoney: {
+            currency_code: costMoney.currency_code,
+            amount: invValAmount,
+          },
         })
       }
     }
@@ -106,7 +125,7 @@ export default function InventoryPage({ products = [] }: Props) {
       <div className="space-y-6">
         <PageHeader
           title="Inventory & Warehouse Stock Control (/inventory)"
-          description="Monitor real-time SKU stock levels, reorder alerts, reserved units, and cost valuation across all products and variants."
+          description="Monitor real-time SKU stock levels, reorder alerts, reserved units, and multi-currency ProductVariantPrice valuation across all products and variants."
           icon={Warehouse}
           badge={`${variantRows.length} active SKUs · ${totalUnits.toLocaleString()} units`}
           actions={
@@ -143,7 +162,7 @@ export default function InventoryPage({ products = [] }: Props) {
             },
             {
               label: 'Inventory Cost Valuation',
-              value: money('USD', totalValue),
+              value: convertToLocale({ amount: totalValue, currency_code: 'USD' }),
               sublabel: 'Based on unit COGS × On Hand',
               icon: PackageCheck,
               tone: 'info',
@@ -170,10 +189,10 @@ export default function InventoryPage({ products = [] }: Props) {
           ]}
         />
 
-        {/* Inventory Table Section with Generous Padding & Polished Action Buttons */}
+        {/* Inventory Table Section with Multi-Currency Prices */}
         <PageSection
-          title="Warehouse SKU Stock & Valuation Ledger"
-          description="Filter by stock health or search any SKU to adjust on-hand inventory and retail price."
+          title="Warehouse SKU Stock & Multi-Currency Valuation Ledger"
+          description="Filter by stock health or search any SKU to adjust on-hand inventory and multi-currency retail prices (USD, INR, EUR, GBP, CAD, MXN)."
           actions={
             <AppButton
               label="+ Add Variant SKU"
@@ -251,7 +270,7 @@ export default function InventoryPage({ products = [] }: Props) {
                         <th className="py-3.5 px-4 text-right">On Hand</th>
                         <th className="py-3.5 px-4 text-right">Available</th>
                         <th className="py-3.5 px-4 text-right">Unit Cost</th>
-                        <th className="py-3.5 px-4 text-right">Retail Price</th>
+                        <th className="py-3.5 px-4">Multi-Currency Prices</th>
                         <th className="py-3.5 px-4 text-right">Stock Valuation</th>
                         <th className="py-3.5 px-4 text-right">Actions</th>
                       </tr>
@@ -266,6 +285,9 @@ export default function InventoryPage({ products = [] }: Props) {
                             : row.stockHealth === 'low_stock'
                               ? 'warning'
                               : 'error'
+                        const costMoney = row.costPriceMoney as PriceMoney
+                        const invMoney = row.inventoryValueMoney as PriceMoney
+                        const pricesList = (row.prices as PriceMoney[]) ?? []
 
                         return (
                           <tr key={String(row.id)} className="hover:bg-muted/20 transition-colors">
@@ -296,18 +318,22 @@ export default function InventoryPage({ products = [] }: Props) {
                               {String(row.stockAvailable ?? 0)}
                             </td>
                             <td className="py-3.5 px-4 align-middle text-right text-muted-foreground tabular-nums">
-                              {money(String(row.currencyCode || 'USD'), row.costPrice)}
+                              {convertToLocale(costMoney)}
                             </td>
-                            <td className="py-3.5 px-4 align-middle text-right font-bold text-price-current tabular-nums">
-                              {money(String(row.currencyCode || 'USD'), row.retailPrice)}
+                            <td className="py-3.5 px-4 align-middle">
+                              <MultiCurrencyPriceStack
+                                prices={pricesList}
+                                primaryCurrency={String(row.currencyCode || 'USD')}
+                                maxBadges={4}
+                              />
                             </td>
                             <td className="py-3.5 px-4 align-middle text-right font-extrabold text-foreground tabular-nums">
-                              {money('USD', row.inventoryValue)}
+                              {convertToLocale(invMoney)}
                             </td>
                             <td className="py-3.5 px-4 align-middle text-right">
                               <div className="flex items-center justify-end gap-1.5">
                                 <AppButton
-                                  label="Adjust Stock & Price"
+                                  label="Adjust Stock & Prices"
                                   variant="primary"
                                   size="xs"
                                   icon={SlidersHorizontal}
@@ -346,9 +372,9 @@ export default function InventoryPage({ products = [] }: Props) {
           onOpenChange={(o) => {
             if (!o) setEditStockRow(null)
           }}
-          title={`Adjust Stock & Price: ${String(editStockRow?.sku ?? '')}`}
-          subtitle="Updates stock_on_hand and retail_price with non-negative CHECK protection."
-          submitLabel="Save Stock & Price"
+          title={`Adjust Stock & Multi-Currency Prices: ${String(editStockRow?.sku ?? '')}`}
+          subtitle="Updates stock_on_hand, primary retail_price, and multi-currency ProductVariantPrice records."
+          submitLabel="Save Stock & Multi-Currency Prices"
           action={
             editStockRow ? `/variants/${editStockRow.id}/stock` : '/variants/placeholder/stock'
           }
@@ -356,20 +382,38 @@ export default function InventoryPage({ products = [] }: Props) {
             editStockRow
               ? {
                   stockOnHand: String(editStockRow.stockOnHand ?? 0),
+                  currencyCode: String(editStockRow.currencyCode ?? 'USD'),
                   retailPrice: String(editStockRow.retailPrice ?? 0),
+                  pricesJson: JSON.stringify(
+                    Array.isArray(editStockRow.prices)
+                      ? editStockRow.prices
+                      : [
+                          {
+                            currency_code: String(editStockRow.currencyCode || 'USD'),
+                            amount: Number(editStockRow.retailPrice ?? 149.99),
+                          },
+                        ]
+                  ),
                 }
               : undefined
           }
           fields={[
             { name: 'stockOnHand', label: 'Stock on hand', kind: 'number', required: true },
-            { name: 'retailPrice', label: 'Retail price (USD)', kind: 'number', required: true },
+            { name: 'currencyCode', label: 'Primary Currency Code', default: 'USD' },
+            { name: 'retailPrice', label: 'Primary Retail Price', kind: 'number', required: true },
+            {
+              name: 'pricesJson',
+              label: 'Multi-Currency Price Array (ProductVariantPrice)',
+              kind: 'prices',
+              fullWidth: true,
+            },
           ]}
         />
 
         <FormModal
           isOpen={addVariantOpen}
           onOpenChange={setAddVariantOpen}
-          title="Add Product Variant SKU"
+          title="Add Product Variant SKU (with Multi-Currency Prices)"
           submitLabel="Create Variant"
           action="/products/placeholder/variants"
           actionFor={(v) => `/products/${v.productId}/variants`}
@@ -383,11 +427,18 @@ export default function InventoryPage({ products = [] }: Props) {
             },
             { name: 'sku', label: 'Variant SKU', required: true },
             { name: 'title', label: 'Variant title', required: true },
-            { name: 'retailPrice', label: 'Retail price', kind: 'number', required: true },
-            { name: 'costPrice', label: 'Unit cost price', kind: 'number' },
+            { name: 'currencyCode', label: 'Primary Currency Code', default: 'USD' },
+            { name: 'retailPrice', label: 'Primary Retail price', kind: 'number', required: true },
+            { name: 'costPrice', label: 'Unit cost price (COGS)', kind: 'number' },
             { name: 'stockOnHand', label: 'Initial stock on hand', kind: 'number', default: '25' },
             { name: 'attributeName', label: 'Attribute dimension (e.g. color)' },
             { name: 'attributeValue', label: 'Attribute value (e.g. Obsidian)' },
+            {
+              name: 'pricesJson',
+              label: 'Multi-Currency Price Array (USD, INR, EUR, GBP, CAD, MXN)',
+              kind: 'prices',
+              fullWidth: true,
+            },
           ]}
         />
       </div>

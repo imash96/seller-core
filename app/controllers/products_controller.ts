@@ -11,11 +11,13 @@ import SellerAccount from '#models/seller_account'
 import { CatalogService, type GeneratedProductPreview } from '../services/catalog_service.js'
 import { CategorySyncService } from '../services/category_sync_service.js'
 import { ListingTransformerService } from '../services/listing_transformer_service.js'
+import { PriceService } from '../services/price_service.js'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import {
   MAIN_CATALOG_CONFIG,
   SAMPLE_CATALOG_JSON,
   resolveGenderCode,
+  resolveTierMultiCurrencyPrices,
 } from '../data/catalog_config/index.js'
 import { generateEntityId } from '../utils/generate_entity_id.js'
 import type {
@@ -24,6 +26,12 @@ import type {
   PriceTierCode,
   SkuFormatMode,
 } from '../types/catalog_pipeline.js'
+import {
+  type PriceMoney,
+  buildMultiCurrencyPriceArray,
+  normalizePriceMoney,
+  normalizePriceMoneyArray,
+} from '../types/price.js'
 import {
   createProductValidator,
   updateProductValidator,
@@ -46,12 +54,16 @@ export default class ProductsController {
    */
   async index({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
+    await PriceService.ensurePriceTables()
     const [products, channelListings, savedViews, sharedLookups] = await Promise.all([
       Product.query()
         .where('userId', user.id)
         .preload('brand')
         .preload('category')
-        .preload('variants', (q) => q.preload('variantAttributes').preload('listings'))
+        .preload('priceRecords')
+        .preload('variants', (q) =>
+          q.preload('variantAttributes').preload('priceRecords').preload('listings')
+        )
         .orderBy('createdAt', 'desc')
         .limit(100),
       ChannelListing.query()
@@ -59,6 +71,7 @@ export default class ProductsController {
         .preload('product')
         .preload('productVariant')
         .preload('sellerAccount')
+        .preload('priceRecords')
         .orderBy('createdAt', 'desc')
         .limit(200),
       WorkspaceLookupService.savedViewsFor(user.id, 'products'),
@@ -79,12 +92,16 @@ export default class ProductsController {
    */
   async inventoryPage({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
+    await PriceService.ensurePriceTables()
     const [products, channelListings, savedViews, sharedLookups] = await Promise.all([
       Product.query()
         .where('userId', user.id)
         .preload('brand')
         .preload('category')
-        .preload('variants', (q) => q.preload('variantAttributes').preload('listings'))
+        .preload('priceRecords')
+        .preload('variants', (q) =>
+          q.preload('variantAttributes').preload('priceRecords').preload('listings')
+        )
         .orderBy('createdAt', 'desc')
         .limit(100),
       ChannelListing.query()
@@ -92,6 +109,7 @@ export default class ProductsController {
         .preload('product')
         .preload('productVariant')
         .preload('sellerAccount')
+        .preload('priceRecords')
         .orderBy('createdAt', 'desc')
         .limit(200),
       WorkspaceLookupService.savedViewsFor(user.id, 'products'),
@@ -106,17 +124,21 @@ export default class ProductsController {
   }
 
   /**
-   * GET /catalogs
+   * GET /catalog & GET /catalogs
    */
   async catalogsPage({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
+    await PriceService.ensurePriceTables()
     const [catalogItems, products, channelListings, savedViews, sharedLookups] = await Promise.all([
       CatalogService.listCatalogItems(user.id),
       Product.query()
         .where('userId', user.id)
         .preload('brand')
         .preload('category')
-        .preload('variants', (q) => q.preload('variantAttributes').preload('listings'))
+        .preload('priceRecords')
+        .preload('variants', (q) =>
+          q.preload('variantAttributes').preload('priceRecords').preload('listings')
+        )
         .orderBy('createdAt', 'desc')
         .limit(100),
       ChannelListing.query()
@@ -124,6 +146,7 @@ export default class ProductsController {
         .preload('product')
         .preload('productVariant')
         .preload('sellerAccount')
+        .preload('priceRecords')
         .orderBy('createdAt', 'desc')
         .limit(200),
       WorkspaceLookupService.savedViewsFor(user.id, 'products'),
@@ -140,6 +163,8 @@ export default class ProductsController {
       const colors = Array.isArray(varSpec.color) ? varSpec.color : ['BLK']
       const sizes = Array.isArray(varSpec.size) ? varSpec.size : ['S', 'M', 'L', 'XL']
       const genderInfo = resolveGenderCode(c.gender)
+      const tierCode = (c.priceTier || '01') as PriceTierCode
+      const prices = resolveTierMultiCurrencyPrices(tierCode, 3)
 
       return {
         ...raw,
@@ -154,8 +179,10 @@ export default class ProductsController {
         leatherCode: c.materialCode,
         materialCode: c.materialCode,
         lengthCode: 'RG',
-        priceTierCode: c.priceTier || '01',
-        priceTier: c.priceTier || '01',
+        priceTierCode: tierCode,
+        priceTier: tierCode,
+        price: prices,
+        prices,
         colorCodes: colors,
         sizeCodes: sizes,
         variantsConfig: {
@@ -198,6 +225,7 @@ export default class ProductsController {
                 p,
               ])
             ),
+            multiCurrencyPrices: resolveTierMultiCurrencyPrices(tier as PriceTierCode, 3),
           },
         ])
       ),
@@ -216,23 +244,28 @@ export default class ProductsController {
   }
 
   /**
-   * GET /listings
+   * GET /listing & GET /listings
    */
   async listingsPage({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
+    await PriceService.ensurePriceTables()
     const [products, channelListings, savedViews, sharedLookups] = await Promise.all([
       Product.query()
         .where('userId', user.id)
         .preload('brand')
         .preload('category')
-        .preload('variants', (q) => q.preload('variantAttributes').preload('listings'))
+        .preload('priceRecords')
+        .preload('variants', (q) =>
+          q.preload('variantAttributes').preload('priceRecords').preload('listings')
+        )
         .orderBy('createdAt', 'desc')
         .limit(100),
       ChannelListing.query()
         .where('userId', user.id)
         .preload('product', (q) => q.preload('brand').preload('category'))
-        .preload('productVariant')
+        .preload('productVariant', (vq) => vq.preload('priceRecords'))
         .preload('sellerAccount', (q) => q.preload('salesChannel'))
+        .preload('priceRecords')
         .orderBy('createdAt', 'desc')
         .limit(300),
       WorkspaceLookupService.savedViewsFor(user.id, 'products'),
@@ -272,6 +305,8 @@ export default class ProductsController {
         brandName: string
         categoryName: string
         retailPrice: number
+        retailPriceMoney: PriceMoney
+        prices: PriceMoney[]
         stockOnHand: number
         platforms: any[]
       }
@@ -280,6 +315,7 @@ export default class ProductsController {
     for (const p of products) {
       for (const v of p.variants ?? []) {
         if (!skuMap.has(v.sku)) {
+          const vSer = v.serialize()
           skuMap.set(v.sku, {
             sku: v.sku,
             productVariantId: v.id,
@@ -289,6 +325,8 @@ export default class ProductsController {
             brandName: p.brand?.name ?? 'Brand-Agnostic',
             categoryName: p.category?.name ?? 'Outerwear',
             retailPrice: Number(v.retailPrice ?? 0),
+            retailPriceMoney: vSer.retailPriceMoney,
+            prices: vSer.prices,
             stockOnHand: Number(v.stockOnHand ?? 0),
             platforms: [],
           })
@@ -296,9 +334,11 @@ export default class ProductsController {
       }
     }
 
-    for (const l of enrichedListings as any[]) {
+    for (const l of enrichedListings as Array<Record<string, any>>) {
       const skuKey = String(l.externalSku || 'SKU')
       if (!skuMap.has(skuKey)) {
+        const lPriceNum = Number(l.listedPrice ?? 0)
+        const lCur = String(l.currencyCode || 'USD').toUpperCase()
         skuMap.set(skuKey, {
           sku: skuKey,
           productVariantId: String(l.productVariantId ?? ''),
@@ -307,7 +347,11 @@ export default class ProductsController {
           variantTitle: String(l.variantTitle ?? skuKey),
           brandName: String(l.brandName ?? 'Artisan Hide'),
           categoryName: String(l.categoryName ?? 'Outerwear'),
-          retailPrice: Number(l.listedPrice ?? 0),
+          retailPrice: lPriceNum,
+          retailPriceMoney: normalizePriceMoney(lPriceNum, lCur),
+          prices: Array.isArray((l as any).prices)
+            ? (l as any).prices
+            : buildMultiCurrencyPriceArray(lPriceNum),
           stockOnHand: Number(l.allocatedQuantity ?? 0),
           platforms: [],
         })
@@ -632,11 +676,13 @@ export default class ProductsController {
           structuredCode: rawPreview.structuredCode || rawPreview.structuredBaseCode || 'MCTDC01',
           type: rawPreview.type || rawPreview.productType || 'Duster Coat',
           priceTier: rawPreview.priceTier || rawPreview.priceTierCode || '01',
+          prices: normalizePriceMoneyArray(rawPreview.prices, 239.99),
           variants: Array.isArray(rawPreview.variants)
             ? rawPreview.variants.map((v: any) => ({
                 ...v,
                 sizeValue: v.sizeValue || v.sizeCode || 'M',
                 sizeKey: v.sizeKey || v.sizeLabel || 'Medium',
+                prices: normalizePriceMoneyArray(v.prices, Number(v.retailPrice ?? 239.99)),
                 included: v.included !== false,
               }))
             : [],
@@ -648,7 +694,7 @@ export default class ProductsController {
         preview,
       })
 
-      const msg = `Converted Catalog SKU "${preview.catalogKey}" → Product "${product.title}" with ${variantsCreated} variants!`
+      const msg = `Converted Catalog SKU "${preview.catalogKey}" → Product "${product.title}" with ${variantsCreated} multi-currency variants!`
       if (wantsJson(request)) {
         return response.json({
           ok: true,
@@ -844,9 +890,11 @@ export default class ProductsController {
    */
   async updateChannelListing({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
+    await PriceService.ensurePriceTables()
     const listing = await ChannelListing.query()
       .where('userId', user.id)
       .andWhere('id', params.id)
+      .preload('priceRecords')
       .firstOrFail()
 
     if (request.input('channelTitle') !== undefined) {
@@ -893,7 +941,32 @@ export default class ProductsController {
       }
     }
 
+    const rawPrices = request.input('prices') ?? request.input('pricesJson')
+    if (rawPrices !== undefined) {
+      const normalizedPrices = normalizePriceMoneyArray(
+        rawPrices,
+        Number(listing.listedPrice ?? 239.99),
+        listing.currencyCode || 'USD'
+      )
+      listing.channelAttributes = {
+        ...(listing.channelAttributes ?? {}),
+        prices: normalizedPrices,
+      }
+      if (normalizedPrices.length > 0) {
+        listing.currencyCode = normalizedPrices[0].currency_code
+        listing.listedPrice = normalizedPrices[0].amount.toFixed(2)
+      }
+      await PriceService.syncChannelListingPrices({
+        userId: user.id,
+        channelListingId: listing.id,
+        productVariantId: listing.productVariantId,
+        prices: normalizedPrices,
+        priceType: 'listed',
+      })
+    }
+
     await listing.save()
+    await listing.load('priceRecords')
     const msg = `Listing ${listing.externalListingId} (${listing.externalSku}) updated.`
     if (wantsJson(request)) {
       return response.json({ ok: true, success: true, message: msg, listing: listing.serialize() })
@@ -920,6 +993,14 @@ export default class ProductsController {
           : Array.isArray(rawVD)
             ? rawVD
             : []
+
+      const rawPrices = request.input('prices') ?? request.input('pricesJson')
+      const normalizedPrices = normalizePriceMoneyArray(
+        rawPrices,
+        payload.retailPrice,
+        payload.currencyCode || 'USD'
+      )
+
       const product = await CatalogService.createProduct({
         userId: user.id,
         brandId: payload.brandId ?? null,
@@ -929,13 +1010,15 @@ export default class ProductsController {
         skuPrefix: (payload as any).skuPrefix ?? payload.sku,
         hasVariants,
         variationDimensions,
+        prices: normalizedPrices,
         variants: [
           {
             sku: payload.sku,
             title: payload.title,
             asin: payload.asin ?? null,
-            currencyCode: payload.currencyCode || 'USD',
-            retailPrice: payload.retailPrice,
+            currencyCode: normalizedPrices[0]?.currency_code || payload.currencyCode || 'USD',
+            retailPrice: normalizedPrices[0]?.amount ?? payload.retailPrice,
+            prices: normalizedPrices,
             costPrice: payload.costPrice ?? 0,
             manufacturingCost: payload.manufacturingCost ?? 0,
             packagingCost: payload.packagingCost ?? 0,
@@ -943,7 +1026,10 @@ export default class ProductsController {
           },
         ],
       })
-      session.flash('success', `Product "${product.title}" (SKU: ${payload.sku}) created.`)
+      session.flash(
+        'success',
+        `Product "${product.title}" (SKU: ${payload.sku}) created with multi-currency prices.`
+      )
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to create product')
     }
@@ -952,6 +1038,7 @@ export default class ProductsController {
 
   async updateProduct({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
+    await PriceService.ensurePriceTables()
     const payload = await request.validateUsing(updateProductValidator)
     const product = await Product.query()
       .where('id', params.id)
@@ -960,6 +1047,21 @@ export default class ProductsController {
     product.merge(payload)
     if (request.input('skuPrefix')) {
       product.skuPrefix = String(request.input('skuPrefix')).trim()
+    }
+    const rawPrices = request.input('prices') ?? request.input('pricesJson')
+    if (rawPrices !== undefined) {
+      const normalizedPrices = normalizePriceMoneyArray(rawPrices, 239.99, 'USD')
+      product.listPrice = normalizedPrices
+      product.metadata = {
+        ...(product.metadata ?? {}),
+        prices: normalizedPrices,
+      }
+      await PriceService.syncProductPrices({
+        userId: user.id,
+        productId: product.id,
+        prices: normalizedPrices,
+        priceType: 'retail',
+      })
     }
     await product.save()
     session.flash('success', `Product "${product.title}" updated.`)
@@ -981,11 +1083,15 @@ export default class ProductsController {
 
   async storeVariant({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
+    await PriceService.ensurePriceTables()
     const payload = await request.validateUsing(createVariantValidator)
     const product = await Product.query()
       .where('id', params.id)
       .andWhere('userId', user.id)
       .firstOrFail()
+
+    const rawPrices = request.input('prices') ?? request.input('pricesJson')
+    const varPrices = normalizePriceMoneyArray(rawPrices, payload.retailPrice, 'USD')
 
     await db.transaction(async (trx) => {
       const variant = await ProductVariant.create(
@@ -994,16 +1100,27 @@ export default class ProductsController {
           productId: product.id,
           sku: payload.sku,
           title: payload.title,
-          retailPrice: payload.retailPrice.toFixed(2),
+          retailPrice: (varPrices[0]?.amount ?? payload.retailPrice).toFixed(2),
           costPrice: (payload.costPrice ?? 0).toFixed(2),
           stockOnHand: payload.stockOnHand ?? 0,
           stockReserved: 0,
-          currencyCode: 'USD',
+          currencyCode: varPrices[0]?.currency_code || 'USD',
+          attributes: { prices: varPrices },
           isDefault: false,
           status: 'active',
         },
         { client: trx }
       )
+
+      await PriceService.syncVariantPrices({
+        userId: user.id,
+        productId: product.id,
+        productVariantId: variant.id,
+        prices: varPrices,
+        baseCostUsd: payload.costPrice ?? 0,
+        trx,
+      })
+
       if (payload.attributeName && payload.attributeValue) {
         await trx.table('product_variant_attributes').insert({
           id: generateEntityId('pattr'),
@@ -1021,12 +1138,13 @@ export default class ProductsController {
       }
     })
 
-    session.flash('success', `Variant ${payload.sku} created.`)
+    session.flash('success', `Variant ${payload.sku} created with multi-currency prices.`)
     return response.redirect().back()
   }
 
   async updateVariantStock({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
+    await PriceService.ensurePriceTables()
     const variant = await ProductVariant.query()
       .where('userId', user.id)
       .andWhere('id', params.id)
@@ -1034,18 +1152,48 @@ export default class ProductsController {
 
     const stockOnHand = Number(request.input('stockOnHand', variant.stockOnHand))
     const retailPrice = Number(request.input('retailPrice', variant.retailPrice))
-    if (stockOnHand < 0 || retailPrice < 0) {
-      session.flash('error', 'Stock and price must be non-negative.')
+    const costPrice =
+      request.input('costPrice') !== undefined && request.input('costPrice') !== ''
+        ? Number(request.input('costPrice'))
+        : Number(variant.costPrice ?? 0)
+
+    if (stockOnHand < 0 || retailPrice < 0 || costPrice < 0) {
+      session.flash('error', 'Stock and prices must be non-negative.')
       return response.redirect().back()
     }
 
     variant.stockOnHand = stockOnHand
     variant.retailPrice = retailPrice.toFixed(2)
+    variant.costPrice = costPrice.toFixed(2)
+    if (request.input('currencyCode')) {
+      variant.currencyCode = String(request.input('currencyCode')).trim().toUpperCase()
+    }
+
+    const rawPrices = request.input('prices') ?? request.input('pricesJson')
+    const varPrices = normalizePriceMoneyArray(
+      rawPrices,
+      retailPrice,
+      variant.currencyCode || 'USD'
+    )
+    variant.attributes = {
+      ...(variant.attributes ?? {}),
+      prices: varPrices,
+    }
     await variant.save()
+
+    await PriceService.syncVariantPrices({
+      userId: user.id,
+      productId: variant.productId,
+      productVariantId: variant.id,
+      prices: varPrices,
+      baseCostUsd: costPrice,
+      manufacturingCostUsd: Number(variant.manufacturingCost ?? 0),
+      packagingCostUsd: Number(variant.packagingCost ?? 0),
+    })
 
     session.flash(
       'success',
-      `Updated SKU ${variant.sku}: Stock=${stockOnHand}, Price=${variant.retailPrice}`
+      `Updated SKU ${variant.sku}: Stock=${stockOnHand}, Price=${variant.retailPrice} (${varPrices.length} currencies synced)`
     )
     return response.redirect().back()
   }
@@ -1174,6 +1322,7 @@ export default class ProductsController {
 
   async storeChannelListing({ auth, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
+    await PriceService.ensurePriceTables()
     const productVariantId = String(request.input('productVariantId', '')).trim()
     const sellerAccountId = String(request.input('sellerAccountId', '')).trim()
     const channelSku = String(request.input('channelSku', '')).trim()
@@ -1183,26 +1332,44 @@ export default class ProductsController {
     const variant = await ProductVariant.query()
       .where('userId', user.id)
       .andWhere('id', productVariantId)
+      .preload('priceRecords')
       .firstOrFail()
     const sellerAccount = await SellerAccount.query()
       .where('userId', user.id)
       .andWhere('id', sellerAccountId)
       .firstOrFail()
 
-    await ChannelListing.create({
+    const effPrice = listedPrice > 0 ? listedPrice : Number(variant.retailPrice)
+    const rawPrices = request.input('prices') ?? request.input('pricesJson')
+    const lPrices = normalizePriceMoneyArray(
+      rawPrices ?? variant.serialize().prices,
+      effPrice,
+      sellerAccount.defaultCurrency || 'USD'
+    )
+
+    const created = await ChannelListing.create({
       userId: user.id,
       sellerAccountId: sellerAccount.id,
       productId: variant.productId,
       productVariantId: variant.id,
       externalListingId: externalListingId || `LST-${Date.now()}`,
       externalSku: channelSku || variant.sku,
-      currencyCode: sellerAccount.defaultCurrency || 'USD',
-      listedPrice: (listedPrice > 0 ? listedPrice : Number(variant.retailPrice)).toFixed(2),
+      currencyCode: lPrices[0]?.currency_code || sellerAccount.defaultCurrency || 'USD',
+      listedPrice: (lPrices[0]?.amount ?? effPrice).toFixed(2),
       allocatedQuantity: Number(request.input('allocatedQuantity', variant.stockOnHand)),
       listingStatus: 'active',
       publicationStatus: 'published',
       syncStatus: 'synced',
+      channelAttributes: { prices: lPrices },
       lastSyncedAt: DateTime.now(),
+    })
+
+    await PriceService.syncChannelListingPrices({
+      userId: user.id,
+      channelListingId: created.id,
+      productVariantId: variant.id,
+      prices: lPrices,
+      priceType: 'listed',
     })
 
     session.flash(

@@ -1,7 +1,7 @@
 import db from '@adonisjs/lucid/services/db'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 import ProductCategory from '#models/product_category'
-import { product_categories, flattenMedusaCategories } from '../data/data_category.js'
+import { PRODUCT_CATEGORIES, flattenMedusaCategories } from '../data/data_category.js'
 import type { MedusaCategoryMetadata, MedusaProductCategory } from '../types/catalog_pipeline.js'
 
 export interface ResolvedCategoryMetadata extends MedusaCategoryMetadata {
@@ -41,7 +41,7 @@ export class CategorySyncService {
    * Returns the Medusa `/store/product-categories` response payload.
    */
   static getBuiltInMedusaCategories(): MedusaProductCategory[] {
-    return product_categories
+    return PRODUCT_CATEGORIES
   }
 
   /**
@@ -138,7 +138,7 @@ export class CategorySyncService {
     userId: string,
     medusaBaseUrl?: string | null
   ): Promise<{ syncedCount: number; source: string }> {
-    let tree: MedusaProductCategory[] = product_categories
+    let tree: MedusaProductCategory[] = PRODUCT_CATEGORIES
     let source = 'built-in data-category.ts (/store/product-categories)'
 
     const cleanUrl = (medusaBaseUrl ?? process.env.MEDUSA_BACKEND_URL ?? '').trim()
@@ -253,7 +253,7 @@ export class CategorySyncService {
     let categories = await loadCategories()
     const hasMedusaHandles = categories.some((c) => (c.taxonomyPath ?? c.slug).includes('/'))
     if (categories.length === 0 || !hasMedusaHandles) {
-      await this.upsertCategoryTree(userId, product_categories, null, trx)
+      await this.upsertCategoryTree(userId, PRODUCT_CATEGORIES, null, trx)
       categories = await loadCategories()
     }
 

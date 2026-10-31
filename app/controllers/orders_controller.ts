@@ -5,6 +5,7 @@ import Customer from '#models/customer'
 import OrderPlaced from '#events/order_placed'
 import OrderStatusChanged from '#events/order_status_changed'
 import { OrderService } from '../services/order_service.js'
+import { PriceService } from '../services/price_service.js'
 import { RbacService } from '../services/rbac_service.js'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createOrderValidator, bulkOrderImportValidator } from '#validators/operations'
@@ -13,13 +14,19 @@ import { OrderStatus } from '../enums/index.js'
 export default class OrdersController {
   async index({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
+    await PriceService.ensurePriceTables()
     const [orders, customers, savedViews, sharedLookups] = await Promise.all([
       Order.query()
         .where('userId', user.id)
         .preload('customer', (cq) => cq.preload('riskSignals').preload('addresses'))
         .preload('shippingAddress')
         .preload('sellerAccount')
-        .preload('lineItems', (lq) => lq.preload('productVariant', (vq) => vq.preload('product')))
+        .preload('orderPrices')
+        .preload('lineItems', (lq) =>
+          lq
+            .preload('linePrices')
+            .preload('productVariant', (vq) => vq.preload('product').preload('priceRecords'))
+        )
         .preload('shipments')
         .orderBy('orderedAt', 'desc')
         .limit(100),
@@ -71,9 +78,12 @@ export default class OrdersController {
         externalOrderId: payload.externalOrderId ?? null,
         marketplaceCode: payload.marketplaceCode || 'direct',
         currencyCode: payload.currencyCode || 'USD',
-        reportingCurrencyCode: user.defaultCurrency || 'USD',
+        reportingCurrencyCode:
+          request.input('reportingCurrencyCode') || user.defaultCurrency || 'USD',
         exchangeRate: payload.exchangeRate ?? 1.0,
         shippingCostAmount: payload.shippingCostAmount ?? 0,
+        shippingCostCurrencyCode:
+          request.input('shippingCostCurrencyCode') || payload.currencyCode || 'USD',
         customer: {
           fullName: payload.customerFullName,
           email: payload.customerEmail ?? null,
@@ -93,6 +103,7 @@ export default class OrdersController {
             sku: payload.sku,
             title: payload.itemTitle,
             quantityOrdered: payload.quantityOrdered,
+            currencyCode: payload.currencyCode || 'USD',
             unitPrice: payload.unitPrice,
             unitCostAmount: payload.unitCostAmount,
             taxAmount: payload.taxAmount ?? 0,
@@ -113,7 +124,10 @@ export default class OrdersController {
         requestId: request.id(),
       })
 
-      session.flash('success', `Order ${order.orderNumber} created with P&L calculated.`)
+      session.flash(
+        'success',
+        `Order ${order.orderNumber} created with multi-currency OrderPrice records and P&L calculated.`
+      )
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to create order')
     }
@@ -195,18 +209,54 @@ export default class OrdersController {
     const payload = await request.validateUsing(bulkOrderImportValidator)
 
     try {
-      const parsed = JSON.parse(payload.ordersJson)
+      const rawJson = String(
+        (payload as any).ordersJson ||
+          request.input('ordersJson') ||
+          request.input('jsonPayload') ||
+          '[]'
+      )
+      const parsed = JSON.parse(rawJson)
       const items = Array.isArray(parsed) ? parsed : [parsed]
-      const result = await OrderService.importBulkOrders({
+      const normalizedOrders = items.map((item: any, idx: number) => ({
+        orderNumber: String(item.orderNumber || `IMP-${Date.now()}-${idx + 1}`),
+        externalOrderId: item.externalOrderId ? String(item.externalOrderId) : null,
+        marketplaceCode: String(item.marketplaceCode || 'amazon'),
+        currencyCode: String(item.currencyCode || 'USD').toUpperCase(),
+        reportingCurrencyCode: user.defaultCurrency || 'USD',
+        exchangeRate: Number(item.exchangeRate || 1),
+        shippingCostAmount: Number(item.shippingCostAmount || 0),
+        customer: {
+          fullName: String(item.customerFullName || item.customer?.fullName || 'Marketplace Buyer'),
+          email: item.customerEmail || item.customer?.email || null,
+          phone: item.customerPhone || item.customer?.phone || null,
+        },
+        lines: Array.isArray(item.lines)
+          ? item.lines.map((l: any) => ({
+              sku: String(l.sku || 'SKU-001'),
+              title: String(l.title || l.sku || 'Imported Item'),
+              quantityOrdered: Math.max(1, Number(l.quantityOrdered || 1)),
+              currencyCode: String(l.currencyCode || item.currencyCode || 'USD').toUpperCase(),
+              unitPrice: Number(l.unitPrice || 0),
+              unitCostAmount: Number(l.unitCostAmount || 0),
+              taxAmount: Number(l.taxAmount || 0),
+              discountAmount: Number(l.discountAmount || 0),
+              shippingAmount: Number(l.shippingAmount || 0),
+            }))
+          : [],
+      }))
+
+      const { job, createdOrderIds, duplicateOrderNumbers } = await OrderService.importBulkOrders({
         userId: user.id,
         actorUserId: user.id,
         sellerAccountId: payload.sellerAccountId ?? null,
-        idempotencyKey: payload.idempotencyKey,
-        orders: items,
+        idempotencyKey:
+          payload.idempotencyKey || request.input('idempotencyKey') || `batch-${Date.now()}`,
+        orders: normalizedOrders,
       })
+
       session.flash(
         'success',
-        `Sync job ${result.job.id}: imported ${result.createdOrderIds.length} new orders (${result.duplicateOrderNumbers.length} duplicates skipped).`
+        `Sync job ${job.id}: imported ${createdOrderIds.length} new orders (${duplicateOrderNumbers.length} duplicates skipped).`
       )
     } catch (err: any) {
       session.flash('error', `Bulk import failed: ${err.message}`)

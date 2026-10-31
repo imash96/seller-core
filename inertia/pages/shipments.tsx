@@ -68,11 +68,11 @@ const CHARGE_TYPES = [
 const INVOICE_PAYMENT = ['unpaid', 'paid', 'partially_paid', 'overdue', 'disputed']
 
 export default function Shipments({
-  shipments = [],
-  shippingInvoices = [],
-  orders = [],
-  orderLineItems = [],
-  savedViews = [],
+  shipments,
+  shippingInvoices,
+  orders,
+  orderLineItems,
+  savedViews,
 }: Props) {
   const [createShipmentOpen, setCreateShipmentOpen] = useState(false)
   const [updateShipmentRow, setUpdateShipmentRow] = useState<Row | null>(null)

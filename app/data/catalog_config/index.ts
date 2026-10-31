@@ -9,7 +9,7 @@ import {
 } from './sku.js'
 import { COLOR_CODES, resolveColorInfo, type ColorCodeEntry } from './colors.js'
 import { SIZE_DATA, resolveSizeInfo, type SizeGroupKey, type SizeDataEntry } from './sizes.js'
-import { LIST_PRICES, resolveTierPrice } from './prices.js'
+import { LIST_PRICES, resolveTierPrice, resolveTierMultiCurrencyPrices } from './prices.js'
 import {
   GENDER_CODES,
   CATEGORY_CODES,
@@ -44,6 +44,7 @@ export {
   type SizeDataEntry,
   LIST_PRICES,
   resolveTierPrice,
+  resolveTierMultiCurrencyPrices,
   GENDER_CODES,
   CATEGORY_CODES,
   PRODUCT_CODES,

@@ -38,7 +38,7 @@ const TASK_TYPES = [
 const PRIORITIES = ['low', 'medium', 'high', 'urgent']
 const STATUSES = ['pending', 'in_progress', 'completed', 'snoozed', 'dismissed']
 
-export default function Tasks({ tasksReminders = [], savedViews = [] }: Props) {
+export default function Tasks({ tasksReminders, savedViews }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editRow, setEditRow] = useState<Row | null>(null)
   const [createViewOpen, setCreateViewOpen] = useState(false)

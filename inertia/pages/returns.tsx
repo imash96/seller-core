@@ -67,11 +67,11 @@ const ITEM_CONDITIONS = [
 ]
 
 export default function Returns({
-  returnRequests = [],
-  refundTransactions = [],
-  orders = [],
-  orderLineItems = [],
-  savedViews = [],
+  returnRequests,
+  refundTransactions,
+  orders,
+  orderLineItems,
+  savedViews,
 }: Props) {
   const [createRmaOpen, setCreateRmaOpen] = useState(false)
   const [updateRmaRow, setUpdateRmaRow] = useState<Row | null>(null)

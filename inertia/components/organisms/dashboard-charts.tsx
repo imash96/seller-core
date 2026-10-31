@@ -3,7 +3,7 @@ import { formatMoney } from '~/lib/utils'
 import { StatusBadge } from '../atoms/status-badge'
 import { ProgressMeter } from '../atoms/progress-meter'
 import type { Row } from './responsive-data-view'
-import { VStack } from '@astryxdesign/core/Stack'
+import { VStack } from '@astryxdesign/core'
 
 export type DashboardKpis = {
   totalOrders: number
@@ -32,42 +32,32 @@ export function WaterfallChart({
   currencyCode?: string
 }) {
   const steps = [
-    {
-      label: 'Gross Sales',
-      value: Number(kpis.grossSales),
-      color: 'var(--chart-1)',
-      isTotal: false,
-    },
-    {
-      label: '− Refunds',
-      value: -Number(kpis.totalRefunded),
-      color: 'var(--error)',
-      isTotal: false,
-    },
-    { label: '= Net Sales', value: Number(kpis.netSales), color: 'var(--success)', isTotal: true },
-    { label: '− COGS', value: -Number(kpis.totalCogs), color: 'var(--warning)', isTotal: false },
+    { label: 'Gross Sales', value: Number(kpis.grossSales), color: '#4f46e5', isTotal: false },
+    { label: '− Refunds', value: -Number(kpis.totalRefunded), color: '#ef4444', isTotal: false },
+    { label: '= Net Sales', value: Number(kpis.netSales), color: '#10b981', isTotal: true },
+    { label: '− COGS', value: -Number(kpis.totalCogs), color: '#f59e0b', isTotal: false },
     {
       label: '− Channel Fees',
       value: -Number(kpis.totalMarketplaceFees),
-      color: 'var(--chart-5)',
+      color: '#f97316',
       isTotal: false,
     },
     {
       label: '− Shipping Cost',
       value: -Number(kpis.totalShippingCost),
-      color: 'var(--chart-2)',
+      color: '#06b6d4',
       isTotal: false,
     },
     {
       label: '= Order Net Profit',
       value: Number(kpis.orderNetProfit),
-      color: 'var(--chart-6)',
+      color: '#8b5cf6',
       isTotal: true,
     },
     {
       label: '− Business Opex',
       value: -Number(kpis.businessOperatingExpenses),
-      color: 'var(--muted-foreground)',
+      color: '#64748b',
       isTotal: false,
     },
   ]
@@ -76,7 +66,7 @@ export function WaterfallChart({
   const [hovered, setHovered] = useState<{ label: string; value: number } | null>(null)
 
   return (
-    <VStack gap={3}>
+    <div className="space-y-3">
       <VStack gap={3}>
         {steps.map((step) => {
           const barW = Math.max(4, (Math.abs(step.value) / maxAbs) * 100)
@@ -106,9 +96,9 @@ export function WaterfallChart({
               <span
                 className={`w-24 text-right text-xs font-semibold tabular-nums ${
                   step.value < 0
-                    ? 'text-error'
+                    ? 'text-rose-600 dark:text-rose-400'
                     : step.isTotal
-                      ? 'text-success font-bold'
+                      ? 'text-emerald-600 dark:text-emerald-400 font-bold'
                       : 'text-foreground'
                 }`}
               >
@@ -133,7 +123,7 @@ export function WaterfallChart({
           <span>Hover any bar to inspect exact P&L share of gross revenue</span>
         )}
       </div>
-    </VStack>
+    </div>
   )
 }
 
@@ -185,8 +175,7 @@ export function RevenueTrendChart({
     y: H - padY - ((v - minV) / range) * (H - padY * 2),
   }))
 
-  const strokeColor =
-    mode === 'revenue' ? 'var(--chart-1)' : mode === 'profit' ? 'var(--success)' : 'var(--warning)'
+  const strokeColor = mode === 'revenue' ? '#4f46e5' : mode === 'profit' ? '#10b981' : '#f59e0b'
 
   return (
     <div className="space-y-3">
@@ -369,7 +358,7 @@ export function CreditUtilizationBars({
 
   return (
     <VStack gap={4}>
-      <VStack gap={3}>
+      <div className="space-y-3">
         <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Credit Card Utilization & Payment Due Alerts
         </div>
@@ -388,7 +377,7 @@ export function CreditUtilizationBars({
                 )
               : null
             return (
-              <VStack key={String(card.id)} gap={1.5}>
+              <div key={String(card.id)} className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2 text-xs flex-wrap">
                   <span className="font-semibold text-foreground">
                     {String(card.cardLabel)} ···· {String(card.last4Digits)}
@@ -409,11 +398,11 @@ export function CreditUtilizationBars({
                   </div>
                 </div>
                 <ProgressMeter value={pct} variant={variant} showValue size="sm" />
-              </VStack>
+              </div>
             )
           })
         )}
-      </VStack>
+      </div>
 
       <div className="h-px bg-border" />
 
@@ -421,7 +410,7 @@ export function CreditUtilizationBars({
         <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Business vs. Household Ledger Segregation
         </div>
-        <VStack gap={2}>
+        <div className="space-y-2">
           <div className="flex items-center gap-3 text-xs">
             <span className="w-20 text-muted-foreground font-medium">Business</span>
             <div className="flex-1 h-3.5 rounded-full bg-muted overflow-hidden">
@@ -438,7 +427,7 @@ export function CreditUtilizationBars({
             <span className="w-20 text-muted-foreground font-medium">Household</span>
             <div className="flex-1 h-3.5 rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full bg-chart-5 rounded-full"
+                className="h-full bg-rose-500 rounded-full"
                 style={{ width: `${(householdSpend / totalSpend) * 100}%` }}
               />
             </div>
@@ -446,7 +435,7 @@ export function CreditUtilizationBars({
               {formatMoney('USD', householdSpend)}
             </span>
           </div>
-        </VStack>
+        </div>
       </VStack>
     </VStack>
   )

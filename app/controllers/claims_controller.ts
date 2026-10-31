@@ -27,10 +27,7 @@ export default class ClaimsController {
     const user = auth.getUserOrFail()
     try {
       const orderId = String(request.input('orderId', '')).trim()
-      const order = await Order.query()
-        .where('userId', user.id)
-        .andWhere('id', orderId)
-        .firstOrFail()
+      const order = await Order.query().where('userId', user.id).andWhere('id', orderId).firstOrFail()
 
       const claimNumber = String(request.input('claimNumber', `CLM-${Date.now()}`)).trim()
       const claimType = String(request.input('claimType', 'a_to_z_guarantee'))

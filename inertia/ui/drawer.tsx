@@ -47,7 +47,7 @@ export default function Drawer({
   return (
     <div className={`fixed inset-0 z-50 ${hideOnDesktop ? 'lg:hidden' : ''}`}>
       <div
-        className="fixed inset-0 bg-scrim backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />

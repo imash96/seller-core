@@ -12,8 +12,12 @@ import {
   SlideOverDrawer,
   Badge,
   MonoBadge,
+  MultiCurrencyPriceStack,
+  convertToLocale,
+  type PriceMoney,
   type Row,
 } from '~/lib/ui'
+import type React from 'react'
 import { useState, useMemo } from 'react'
 import {
   Layers,
@@ -59,6 +63,7 @@ type PreviewVariant = {
   sizeValue?: string
   sizeKey?: string
   retailPrice: number
+  prices?: PriceMoney[]
   costPrice: number
   manufacturingCost: number
   packagingCost: number
@@ -109,7 +114,7 @@ type Props = {
   brands?: Row[]
   sellerAccounts?: Row[]
   channelListings?: Row[]
-  modularConfig?: any
+  modularConfig?: ModularConfig
   catalogConfig?: any
   sampleCatalogJson?: any
   salesChannels?: Row[]
@@ -117,6 +122,7 @@ type Props = {
   orderLineItems?: Row[]
   financeCategories?: Row[]
   savedViews?: Row[]
+  [key: string]: any
 }
 
 export default function Catalogs({
@@ -221,7 +227,7 @@ export default function Catalogs({
   }, [catalogItems])
 
   const filteredItems = useMemo(() => {
-    return catalogItems.filter((item: Row) => {
+    return catalogItems.filter((item) => {
       const itemGenderCode = String(item.genderCode || item.gender || '')
       const itemCategoryCode = String(item.categoryCode || '')
       const itemType = String(item.productType || item.type || '')
@@ -704,13 +710,13 @@ export default function Catalogs({
     setCatalogJsonText(text)
   }
 
-  const convertedCount = catalogItems.filter((i: Row) => i.status === 'converted').length
+  const convertedCount = catalogItems.filter((i) => i.status === 'converted').length
   const readyCount = catalogItems.length - convertedCount
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Master Catalog Studio (/catalogs)"
+        title="Master Catalog Studio (/catalog)"
         description="Brand-agnostic master catalog stored in PostgreSQL with modular SKU/Color/Size/Price config, multi-facet filtering, complete 4-section CRUD modals, and interactive Product & Variant Preview before conversion."
         icon={Layers}
         badge={`${catalogItems.length} catalog SKUs · ${convertedCount} converted · ${categories.length} categories`}
@@ -868,7 +874,7 @@ export default function Catalogs({
                   />
                 </div>
                 <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-                  {Object.entries(modularConfig.colorCodes).map(([code, c]: [string, any]) => (
+                  {Object.entries(modularConfig.colorCodes).map(([code, c]) => (
                     <div key={code} className="flex items-center justify-between text-[11px]">
                       <span className="font-mono font-semibold text-foreground">{code}</span>
                       <span className="text-muted-foreground">
@@ -885,7 +891,7 @@ export default function Catalogs({
                   <Badge label="Tier Pricing" variant="success" />
                 </div>
                 <div className="space-y-2">
-                  {Object.entries(modularConfig.priceTiers).map(([tier, data]: [string, any]) => (
+                  {Object.entries(modularConfig.priceTiers).map(([tier, data]) => (
                     <div key={tier} className="rounded-lg border border-divider bg-muted/20 p-2">
                       <div className="font-semibold text-foreground">
                         Tier {tier} — {data.label}
@@ -1026,7 +1032,7 @@ export default function Catalogs({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-divider">
-                  {filteredItems.map((item: Row) => {
+                  {filteredItems.map((item) => {
                     const varSpec = (item.variantsSpec ?? item.variantsConfig ?? {}) as Record<
                       string,
                       any
@@ -1164,7 +1170,7 @@ export default function Catalogs({
           MODAL 1: CONVERT TO PRODUCT — GENERATED PREVIEW & INLINE EDIT MODAL
          ===================================================================== */}
       {previewModalOpen && previewData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-xs p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="relative w-full max-w-5xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl max-h-[92vh] flex flex-col">
             <div className="flex items-start justify-between gap-4 border-b border-divider px-6 py-4 bg-muted/30">
               <div>
@@ -1246,7 +1252,7 @@ export default function Catalogs({
                       }
                       options={[
                         { value: '', label: `Auto-resolved (${previewData.categoryName})` },
-                        ...categories.map((c: Row) => ({
+                        ...categories.map((c) => ({
                           value: String(c.id),
                           label: `${c.name} (${c.taxonomyPath ?? c.slug})`,
                         })),
@@ -1311,7 +1317,7 @@ export default function Catalogs({
                         <th className="py-2.5 px-3">Variant Title</th>
                         <th className="py-2.5 px-3">Color</th>
                         <th className="py-2.5 px-3">Size</th>
-                        <th className="py-2.5 px-3">Retail Price ($)</th>
+                        <th className="py-2.5 px-3">Retail Price & Multi-Currency</th>
                         <th className="py-2.5 px-3">Cost ($)</th>
                         <th className="py-2.5 px-3">Stock</th>
                         <th className="py-2.5 px-3 text-right">Remove</th>
@@ -1356,7 +1362,7 @@ export default function Catalogs({
                               className="w-20 rounded border border-input-border bg-input-background px-2 py-1 text-xs text-foreground"
                             />
                           </td>
-                          <td className="py-2 px-3">
+                          <td className="py-2 px-3 space-y-1">
                             <input
                               type="number"
                               step="0.01"
@@ -1364,8 +1370,15 @@ export default function Catalogs({
                               onChange={(e) =>
                                 updatePreviewVariant(idx, 'retailPrice', Number(e.target.value))
                               }
-                              className="w-20 rounded border border-input-border bg-input-background px-2 py-1 text-xs font-bold text-price-current"
+                              className="w-24 rounded border border-input-border bg-input-background px-2 py-1 text-xs font-bold text-price-current"
                             />
+                            {Array.isArray(v.prices) && v.prices.length > 0 && (
+                              <MultiCurrencyPriceStack
+                                prices={v.prices}
+                                primaryCurrency="USD"
+                                maxBadges={3}
+                              />
+                            )}
                           </td>
                           <td className="py-2 px-3">
                             <input
@@ -1439,7 +1452,7 @@ export default function Catalogs({
           MODAL 2: COMPLETE 4-SECTION CREATE / EDIT CATALOG SKU MODAL (ALL DB FIELDS)
          ===================================================================== */}
       {editCatalogModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-xs p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
           <form
             onSubmit={handleSaveCatalogItem}
             className="relative w-full max-w-5xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl max-h-[92vh] flex flex-col"
@@ -1574,7 +1587,7 @@ export default function Catalogs({
                     }
                     options={[
                       { value: '', label: 'Auto-Resolve from Handle / Type' },
-                      ...categories.map((c: Row) => ({
+                      ...categories.map((c) => ({
                         value: String(c.id),
                         label: `${c.name} (${c.taxonomyPath ?? c.slug})`,
                       })),
@@ -1890,7 +1903,7 @@ export default function Catalogs({
           MODAL 3: IMPORT BULK CATALOG JSON MODAL
          ===================================================================== */}
       {importJsonModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="relative w-full max-w-3xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl flex flex-col max-h-[88vh]">
             <div className="flex items-center justify-between border-b border-divider px-6 py-4 bg-muted/30">
               <div>

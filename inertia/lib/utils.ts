@@ -3,15 +3,167 @@
  * Pure helpers only — no React or Astryx imports.
  */
 
-/** Format a currency amount with Intl.NumberFormat */
-export function formatMoney(currency: string | undefined, amount: unknown): string {
-  const n = Number(amount ?? 0)
-  const cur = (currency || 'USD').toUpperCase()
-  try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur }).format(n)
-  } catch {
-    return `${cur} ${n.toFixed(2)}`
+export interface PriceMoney {
+  currency_code: string
+  amount: number
+}
+
+export type ConvertToLocaleParams = {
+  amount: number
+  currency_code: string
+  minimumFractionDigits?: number
+  maximumFractionDigits?: number
+  locale?: string
+}
+
+// export const isObject = (input: any): boolean => input instanceof Object && !Array.isArray(input);
+function isObject(value: any) {
+  const type = typeof value
+  return value !== null && value !== undefined && (type === 'object' || type === 'function')
+}
+
+export const isArray = Array.isArray
+
+export const isEmpty = (input: any): boolean => {
+  if (input === null || input === undefined) return true
+  if (isObject(input)) return Object.keys(input as object).length === 0
+  if (isArray(input)) return (input as unknown[]).length === 0
+  if (typeof input === 'string') return input.trim().length === 0
+  return false
+}
+
+export const convertToLocale = ({
+  amount,
+  currency_code,
+  minimumFractionDigits = 2,
+  maximumFractionDigits = 2,
+  locale = 'en-US',
+}: ConvertToLocaleParams): string => {
+  if (!currency_code || isEmpty(currency_code)) {
+    return amount.toString()
   }
+
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currency_code,
+      minimumFractionDigits,
+      maximumFractionDigits,
+    }).format(amount)
+  } catch (error) {
+    console.error(`convertToLocale: invalid currency code "${currency_code}"`, error)
+    return `${amount.toFixed(maximumFractionDigits ?? 2)} ${currency_code.toUpperCase()}`
+  }
+}
+
+/**
+ * Resolves any price input — a PriceMoney object `{ currency_code, amount }`,
+ * an array of PriceMoney `[{ currency_code, amount }]`, or a scalar number/string
+ * with a fallback currency code — into a canonical `{ currency_code, amount }` object.
+ */
+export function resolvePriceMoney(
+  input: unknown,
+  fallbackCurrencyCode: string = 'USD',
+  preferredCurrencyCode?: string
+): PriceMoney {
+  if (isArray(input) && input.length > 0) {
+    const targetCur = (preferredCurrencyCode || fallbackCurrencyCode || 'USD').toUpperCase()
+    const match =
+      (input as any[]).find(
+        (p) =>
+          p &&
+          typeof p === 'object' &&
+          String(p.currency_code || p.currencyCode || '').toUpperCase() === targetCur
+      ) ?? input[0]
+    if (match && typeof match === 'object') {
+      return {
+        currency_code: String(match.currency_code || match.currencyCode || targetCur).toUpperCase(),
+        amount: Number(match.amount ?? match.price ?? 0) || 0,
+      }
+    }
+  }
+
+  if (input && typeof input === 'object' && !isArray(input)) {
+    const obj = input as Record<string, any>
+    if ('amount' in obj || 'currency_code' in obj || 'currencyCode' in obj || 'price' in obj) {
+      return {
+        currency_code: String(
+          obj.currency_code || obj.currencyCode || fallbackCurrencyCode || 'USD'
+        ).toUpperCase(),
+        amount: Number(obj.amount ?? obj.price ?? 0) || 0,
+      }
+    }
+  }
+
+  return {
+    currency_code: (fallbackCurrencyCode || 'USD').toUpperCase(),
+    amount: Number(input ?? 0) || 0,
+  }
+}
+
+/**
+ * Formats a currency amount using `convertToLocale`.
+ * Supports:
+ * - `formatMoney({ currency_code: 'INR', amount: 6449.99 })`
+ * - `formatMoney([{ currency_code: 'USD', amount: 149.99 }, { currency_code: 'INR', amount: 6449.99 }])`
+ * - `formatMoney('INR', 6449.99)`
+ * - `formatMoney('USD', { currency_code: 'EUR', amount: 129.99 })`
+ */
+export function formatMoney(
+  currencyOrPrice: string | PriceMoney | PriceMoney[] | undefined,
+  amountOrUndefined?: unknown,
+  locale = 'en-US'
+): string {
+  if (currencyOrPrice && typeof currencyOrPrice === 'object' && amountOrUndefined === undefined) {
+    const resolved = resolvePriceMoney(currencyOrPrice, 'USD')
+    return convertToLocale({
+      amount: resolved.amount,
+      currency_code: resolved.currency_code,
+      locale,
+    })
+  }
+
+  if (amountOrUndefined && typeof amountOrUndefined === 'object') {
+    const fallback =
+      typeof currencyOrPrice === 'string' && !isEmpty(currencyOrPrice)
+        ? currencyOrPrice.toUpperCase()
+        : 'USD'
+    const resolved = resolvePriceMoney(amountOrUndefined, fallback, fallback)
+    return convertToLocale({
+      amount: resolved.amount,
+      currency_code: resolved.currency_code,
+      locale,
+    })
+  }
+
+  const currencyCode =
+    typeof currencyOrPrice === 'string' && !isEmpty(currencyOrPrice)
+      ? currencyOrPrice.toUpperCase()
+      : 'USD'
+  const amount = Number(amountOrUndefined ?? 0) || 0
+  return convertToLocale({ amount, currency_code: currencyCode, locale })
+}
+
+/**
+ * Formats a multi-currency price array `[{ currency_code: 'USD', amount: 149.99 }, ...]`
+ * using `convertToLocale`.
+ */
+export function formatPriceArray(
+  prices: unknown,
+  locale = 'en-US'
+): Array<{ currency_code: string; amount: number; formatted: string }> {
+  if (!isArray(prices)) return []
+  return prices
+    .filter((p) => p && typeof p === 'object')
+    .map((p: any) => {
+      const currencyCode = String(p.currency_code || p.currencyCode || 'USD').toUpperCase()
+      const amount = Number(p.amount ?? p.price ?? 0) || 0
+      return {
+        currency_code: currencyCode,
+        amount,
+        formatted: convertToLocale({ amount, currency_code: currencyCode, locale }),
+      }
+    })
 }
 
 /** Format a date value to locale string, returns '—' for falsy/invalid */

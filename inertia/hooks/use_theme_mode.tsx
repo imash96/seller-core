@@ -18,7 +18,7 @@ const ThemeModeContext = createContext<ThemeModeContextValue>({
   toggleMode: () => {},
 })
 
-function detectInitialTheme(fallbackTheme?: ThemeMode): ThemeMode {
+function detectInitialTheme(propTheme?: ThemeMode): ThemeMode {
   if (typeof document !== 'undefined') {
     const el = document.documentElement
     if (el.classList.contains('dark') || el.getAttribute('data-theme') === 'dark') {
@@ -32,7 +32,7 @@ function detectInitialTheme(fallbackTheme?: ThemeMode): ThemeMode {
       return cookieMatch
     }
   }
-  return fallbackTheme === 'dark' ? 'dark' : 'light'
+  return propTheme === 'dark' ? 'dark' : 'light'
 }
 
 export function ThemeModeProvider({

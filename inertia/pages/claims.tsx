@@ -53,12 +53,7 @@ const CLAIM_TYPES = [
   'other',
 ]
 
-export default function Claims({
-  claims = [],
-  orders = [],
-  sellerAccounts = [],
-  savedViews = [],
-}: Props) {
+export default function Claims({ claims, orders, sellerAccounts, savedViews }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editRow, setEditRow] = useState<Row | null>(null)
 

@@ -33,12 +33,7 @@ type Props = {
 
 const USER_STATUS = ['pending_activation', 'active', 'suspended', 'locked', 'deactivated']
 
-export default function Admin({
-  allUsers = [],
-  allRoles = [],
-  allPermissions = [],
-  moduleEntitlements = [],
-}: Props) {
+export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitlements }: Props) {
   const [provisionOpen, setProvisionOpen] = useState(false)
   const [editUserRow, setEditUserRow] = useState<Row | null>(null)
   const [assignRoleOpen, setAssignRoleOpen] = useState(false)

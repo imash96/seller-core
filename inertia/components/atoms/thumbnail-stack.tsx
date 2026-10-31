@@ -42,8 +42,8 @@ function FallbackProductGraphic({
 }) {
   const palettes = [
     'from-primary/20 via-accent/15 to-primary/5 text-primary border-primary/30',
-    'from-success/20 via-info/15 to-success/5 text-success border-success/30',
-    'from-warning/20 via-accent/15 to-warning/5 text-warning border-warning/30',
+    'from-emerald-500/20 via-teal-500/15 to-emerald-500/5 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+    'from-amber-500/20 via-orange-500/15 to-amber-500/5 text-amber-600 dark:text-amber-400 border-amber-500/30',
   ]
   const palette = palettes[index % palettes.length]
   const code = (sku || title || 'SKU').slice(0, 6).toUpperCase()

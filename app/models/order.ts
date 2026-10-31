@@ -1,8 +1,7 @@
 /**
  * Order — maps to "orders".
- * Order header. Idempotent marketplace imports rely on (seller_account_id, external_order_id). P&L fields follow documented metric definitions (see docs/FINANCE_MODEL.md).
- *
- * This file is generated from database/schema.dbml — keep the two in sync.
+ * Order header. Attaches OrderPrice records and per-field { currency_code, amount } objects
+ * for every financial/amount field on the order.
  */
 import { belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
@@ -10,11 +9,13 @@ import type { DateTime } from 'luxon'
 import Customer from './customer.js'
 import CustomerAddress from './customer_address.js'
 import OrderLineItem from './order_line_item.js'
+import OrderPrice from './order_price.js'
 import SellerAccount from './seller_account.js'
 import Shipment from './shipment.js'
 import SyncJob from './sync_job.js'
 import { prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import { type PriceMoney, normalizePriceMoney } from '../types/price.js'
 
 export default class Order extends AppBaseModel {
   static readonly table = 'orders'
@@ -170,6 +171,71 @@ export default class Order extends AppBaseModel {
   @hasMany(() => OrderLineItem, { foreignKey: 'orderId' })
   declare public lineItems: HasMany<typeof OrderLineItem>
 
+  @hasMany(() => OrderPrice, { foreignKey: 'orderId' })
+  declare public orderPrices: HasMany<typeof OrderPrice>
+
   @hasMany(() => Shipment, { foreignKey: 'orderId' })
   declare public shipments: HasMany<typeof Shipment>
+
+  override serialize(): Record<string, any> {
+    const raw = super.serialize()
+    const baseCur = (this.currencyCode || 'USD').toUpperCase()
+    const repCur = (this.reportingCurrencyCode || 'USD').toUpperCase()
+
+    // Map any preloaded OrderPrice rows by field_key so each field uses its own stored currency_code
+    const byField = new Map<string, PriceMoney>()
+    if (Array.isArray(this.orderPrices)) {
+      for (const op of this.orderPrices) {
+        byField.set(op.fieldKey, {
+          currency_code: (op.currencyCode || baseCur).toUpperCase(),
+          amount: Number(Number(op.amount ?? 0).toFixed(2)),
+        })
+      }
+    }
+
+    const resolveField = (fieldKey: string, rawVal: unknown, fallbackCur = baseCur): PriceMoney => {
+      return byField.get(fieldKey) ?? normalizePriceMoney(rawVal, fallbackCur)
+    }
+
+    const subtotalMoney = resolveField('subtotal_amount', this.subtotalAmount)
+    const taxMoney = resolveField('tax_amount', this.taxAmount)
+    const discountMoney = resolveField('discount_amount', this.discountAmount)
+    const shippingChargedMoney = resolveField('shipping_charged_amount', this.shippingChargedAmount)
+    const totalMoney = resolveField('total_amount', this.totalAmount)
+    const marketplaceFeesMoney = resolveField('marketplace_fees_amount', this.marketplaceFeesAmount)
+    const paymentProcessingFeesMoney = resolveField(
+      'payment_processing_fees_amount',
+      this.paymentProcessingFeesAmount
+    )
+    const shippingCostMoney = resolveField('shipping_cost_amount', this.shippingCostAmount)
+    const cogsMoney = resolveField('cogs_amount', this.cogsAmount)
+    const refundedMoney = resolveField('refunded_amount', this.refundedAmount)
+    const netProceedsMoney = resolveField('net_proceeds_amount', this.netProceedsAmount)
+    const grossProfitMoney = resolveField('gross_profit_amount', this.grossProfitAmount)
+    const netProfitMoney = resolveField('net_profit_amount', this.netProfitAmount)
+    const reportingTotalMoney = resolveField(
+      'reporting_total_amount',
+      this.reportingTotalAmount,
+      repCur
+    )
+
+    return {
+      ...raw,
+      subtotalMoney,
+      taxMoney,
+      discountMoney,
+      shippingChargedMoney,
+      totalMoney,
+      marketplaceFeesMoney,
+      paymentProcessingFeesMoney,
+      shippingCostMoney,
+      cogsMoney,
+      refundedMoney,
+      netProceedsMoney,
+      grossProfitMoney,
+      netProfitMoney,
+      reportingTotalMoney,
+      prices: [totalMoney, ...(repCur !== totalMoney.currency_code ? [reportingTotalMoney] : [])],
+    }
+  }
 }

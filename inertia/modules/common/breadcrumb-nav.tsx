@@ -1,5 +1,5 @@
-import { usePage } from '@inertiajs/react'
 import { Link } from '@adonisjs/inertia/react'
+import { usePage } from '@inertiajs/react'
 import { Stack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Icon } from '@astryxdesign/core/Icon'

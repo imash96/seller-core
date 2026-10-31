@@ -43,7 +43,6 @@
   --color-surface-foreground: var(--surface-foreground);
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-sunken: var(--surface-sunken);
-  --color-surface-hover: var(--surface-hover);
 
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -53,14 +52,6 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover-border: var(--popover-border);
-
-  --color-table-header: var(--table-header);
-  --color-table-header-foreground: var(--table-header-foreground);
-  --color-table-row: var(--table-row);
-  --color-table-row-alt: var(--table-row-alt);
-  --color-table-row-hover: var(--table-row-hover);
-  --color-table-row-selected: var(--table-row-selected);
-  --color-table-border: var(--table-border);
 
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
@@ -87,46 +78,30 @@
   --color-success-hover: var(--success-hover);
   --color-success-active: var(--success-active);
   --color-success-subtle: var(--success-subtle);
-  --color-success-text: var(--success-text);
-  --color-success-border: var(--success-border);
 
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive-hover: var(--destructive-hover);
   --color-destructive-active: var(--destructive-active);
   --color-destructive-subtle: var(--destructive-subtle);
-  --color-destructive-text: var(--destructive-text);
-  --color-destructive-border: var(--destructive-border);
 
   --color-error: var(--error);
   --color-error-foreground: var(--error-foreground);
   --color-error-hover: var(--error-hover);
   --color-error-active: var(--error-active);
   --color-error-subtle: var(--error-subtle);
-  --color-error-text: var(--error-text);
-  --color-error-border: var(--error-border);
 
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-warning-hover: var(--warning-hover);
   --color-warning-active: var(--warning-active);
   --color-warning-subtle: var(--warning-subtle);
-  --color-warning-text: var(--warning-text);
-  --color-warning-border: var(--warning-border);
 
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-info-hover: var(--info-hover);
   --color-info-active: var(--info-active);
   --color-info-subtle: var(--info-subtle);
-  --color-info-text: var(--info-text);
-  --color-info-border: var(--info-border);
-
-  /* Overlays & Scrims */
-  --color-scrim: var(--scrim);
-  --color-overlay: var(--overlay);
-  --color-overlay-light: var(--overlay-light);
-  --color-overlay-heavy: var(--overlay-heavy);
 
   /* E-Commerce Domain Tokens */
   --color-badge-new: var(--badge-new);
@@ -158,10 +133,6 @@
   --color-input-border-focus: var(--input-border-focus);
   --color-input-text: var(--input-text);
   --color-input-placeholder: var(--input-placeholder);
-  --color-input-disabled-background: var(--input-disabled-background);
-  --color-input-disabled-text: var(--input-disabled-text);
-  --color-input-disabled-border: var(--input-disabled-border);
-  --color-input-addon-bg: var(--input-addon-bg);
   --color-ring: var(--ring);
   --color-ring-offset: var(--ring-offset);
 
@@ -226,7 +197,6 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --color-chart-6: var(--chart-6);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);

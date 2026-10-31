@@ -1,9 +1,9 @@
 import Drawer from '~/ui/drawer'
 import { StatusBadge, STATUS_TONES } from '~/components/atoms/status-badge'
 import { Package, Calendar, DollarSign, Truck } from 'lucide-react'
-import { formatMoney, formatDate } from '~/lib/utils'
+import { convertToLocale, formatDate, resolvePriceMoney, type PriceMoney } from '~/lib/utils'
 import type { Row } from '~/lib/ui'
-import { VStack } from '@astryxdesign/core/Stack'
+import { VStack } from '@astryxdesign/core'
 
 export function OrderDetailsDrawer({
   order,
@@ -23,7 +23,28 @@ export function OrderDetailsDrawer({
   const shipments = (order.shipments as Row[]) ?? []
   const customer = (order.customer as Row) ?? {}
   const cur = String(order.currencyCode || 'USD')
-  const repCur = String(order.reportingCurrencyCode || 'USD')
+  const repCur = String(order.reportingCurrencyCode || cur)
+
+  const fmtMoneyField = (
+    moneyObj: unknown,
+    fallbackAmount: unknown,
+    fallbackCurrency = cur
+  ): string => {
+    const resolved = resolvePriceMoney(moneyObj ?? fallbackAmount, fallbackCurrency)
+    return convertToLocale({
+      amount: resolved.amount,
+      currency_code: resolved.currency_code,
+    })
+  }
+
+  const subtotalMoney = resolvePriceMoney(order.subtotalMoney ?? order.subtotalAmount, cur)
+  const shippingChargedMoney = resolvePriceMoney(
+    order.shippingChargedMoney ?? order.shippingChargedAmount,
+    cur
+  )
+  const taxMoney = resolvePriceMoney(order.taxMoney ?? order.taxAmount, cur)
+  const totalMoney = resolvePriceMoney(order.totalMoney ?? order.totalAmount, cur)
+  const netProfitMoney = resolvePriceMoney(order.netProfitMoney ?? order.netProfitAmount, repCur)
 
   return (
     <Drawer
@@ -94,8 +115,8 @@ export function OrderDetailsDrawer({
           </div>
         </div>
 
-        {/* Line Items */}
-        <VStack gap={3}>
+        {/* Line Items with OrderLineItemPrice objects */}
+        <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-bold text-foreground">
             <Package className="w-4 h-4 text-primary" />
             <span>Order Line Items ({lineItems.length})</span>
@@ -104,39 +125,46 @@ export function OrderDetailsDrawer({
             {lineItems.length === 0 ? (
               <p className="text-xs text-muted-foreground italic">No line items recorded.</p>
             ) : (
-              lineItems.map((li) => (
-                <div
-                  key={String(li.id)}
-                  className="p-3.5 rounded-xl border border-border bg-muted/20 flex items-center justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">
-                      {String(li.title || li.sku)}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      SKU: {String(li.sku)} · Qty: {String(li.quantityOrdered ?? 1)} (Fulfilled:{' '}
-                      {String(li.quantityFulfilled ?? 0)})
-                    </p>
+              lineItems.map((li) => {
+                const liCur = String(li.currencyCode || cur)
+                const unitPriceMoney = resolvePriceMoney(li.unitPriceMoney ?? li.unitPrice, liCur)
+                const lineTotalMoney = resolvePriceMoney(
+                  li.lineTotalMoney ??
+                    li.lineTotalAmount ??
+                    unitPriceMoney.amount * Number(li.quantityOrdered ?? 1),
+                  liCur
+                )
+                return (
+                  <div
+                    key={String(li.id)}
+                    className="p-3.5 rounded-xl border border-border bg-muted/20 flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {String(li.title || li.sku)}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        SKU: {String(li.sku)} · Qty: {String(li.quantityOrdered ?? 1)} (Fulfilled:{' '}
+                        {String(li.quantityFulfilled ?? 0)})
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-foreground tabular-nums">
+                        {convertToLocale(lineTotalMoney)}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground tabular-nums">
+                        {convertToLocale(unitPriceMoney)} / unit
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-foreground tabular-nums">
-                      {formatMoney(
-                        cur,
-                        Number(li.unitPrice ?? 0) * Number(li.quantityOrdered ?? 1)
-                      )}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground tabular-nums">
-                      {formatMoney(cur, li.unitPrice)} / unit
-                    </p>
-                  </div>
-                </div>
-              ))
+                )
+              })
             )}
           </VStack>
-        </VStack>
+        </div>
 
         {/* Shipments */}
-        <VStack gap={3}>
+        <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-bold text-foreground">
             <Truck className="w-4 h-4 text-primary" />
             <span>Shipments ({shipments.length})</span>
@@ -144,7 +172,7 @@ export function OrderDetailsDrawer({
           {shipments.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No shipments dispatched yet.</p>
           ) : (
-            <VStack gap={2}>
+            <div className="space-y-2">
               {shipments.map((s) => (
                 <div
                   key={String(s.id)}
@@ -163,69 +191,77 @@ export function OrderDetailsDrawer({
                   />
                 </div>
               ))}
-            </VStack>
+            </div>
           )}
-        </VStack>
+        </div>
 
-        {/* Financial P&L Waterfall */}
+        {/* Financial P&L Waterfall with per-field OrderPrice currency codes */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-bold text-foreground">
             <DollarSign className="w-4 h-4 text-primary" />
-            <span>Order P&L Waterfall</span>
+            <span>Order P&L Waterfall (Multi-Currency OrderPrice Ledger)</span>
           </div>
           <div className="p-4 rounded-xl border border-border bg-muted/25 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal</span>
+              <span className="text-muted-foreground">
+                Subtotal ({subtotalMoney.currency_code})
+              </span>
               <span className="font-medium text-foreground tabular-nums">
-                {formatMoney(cur, order.subtotalAmount)}
+                {convertToLocale(subtotalMoney)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Shipping Charged</span>
+              <span className="text-muted-foreground">
+                Shipping Charged ({shippingChargedMoney.currency_code})
+              </span>
               <span className="font-medium text-foreground tabular-nums">
-                {formatMoney(cur, order.shippingChargedAmount)}
+                {convertToLocale(shippingChargedMoney)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax</span>
+              <span className="text-muted-foreground">Tax ({taxMoney.currency_code})</span>
               <span className="font-medium text-foreground tabular-nums">
-                {formatMoney(cur, order.taxAmount)}
+                {convertToLocale(taxMoney)}
               </span>
             </div>
             <div className="flex justify-between pt-2 border-t border-border font-bold text-foreground">
-              <span>Order Total ({cur})</span>
-              <span className="tabular-nums">{formatMoney(cur, order.totalAmount)}</span>
+              <span>Order Total ({totalMoney.currency_code})</span>
+              <span className="tabular-nums">{convertToLocale(totalMoney)}</span>
             </div>
             <div className="flex justify-between text-xs text-error">
               <span>− Marketplace & Payment Fees</span>
               <span className="tabular-nums">
                 −
-                {formatMoney(
-                  cur,
-                  Number(order.marketplaceFeesAmount ?? 0) +
-                    Number(order.paymentProcessingFeesAmount ?? 0)
-                )}
+                {convertToLocale({
+                  currency_code:
+                    (order.marketplaceFeesMoney as PriceMoney | undefined)?.currency_code || cur,
+                  amount:
+                    Number(order.marketplaceFeesAmount ?? 0) +
+                    Number(order.paymentProcessingFeesAmount ?? 0),
+                })}
               </span>
             </div>
             <div className="flex justify-between text-xs text-warning">
-              <span>− COGS & Shipping Cost</span>
+              <span>− COGS & Actual Shipping Cost</span>
               <span className="tabular-nums">
                 −
-                {formatMoney(
-                  cur,
-                  Number(order.cogsAmount ?? 0) + Number(order.shippingCostAmount ?? 0)
-                )}
+                {convertToLocale({
+                  currency_code: (order.cogsMoney as PriceMoney | undefined)?.currency_code || cur,
+                  amount: Number(order.cogsAmount ?? 0) + Number(order.shippingCostAmount ?? 0),
+                })}
               </span>
             </div>
             {Number(order.refundedAmount ?? 0) > 0 && (
               <div className="flex justify-between text-xs text-error">
                 <span>− Refunded</span>
-                <span className="tabular-nums">−{formatMoney(cur, order.refundedAmount)}</span>
+                <span className="tabular-nums">
+                  −{fmtMoneyField(order.refundedMoney, order.refundedAmount, cur)}
+                </span>
               </div>
             )}
             <div className="flex justify-between pt-2 border-t border-border text-base font-bold text-success">
-              <span>True Net Profit ({repCur})</span>
-              <span className="tabular-nums">{formatMoney(repCur, order.netProfitAmount)}</span>
+              <span>True Net Profit ({netProfitMoney.currency_code})</span>
+              <span className="tabular-nums">{convertToLocale(netProfitMoney)}</span>
             </div>
           </div>
         </div>

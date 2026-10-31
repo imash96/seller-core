@@ -41,8 +41,8 @@ export function Meta({ label, value, muted = false }: MetaProps) {
   if (value === undefined || value === null || value === '') return null
 
   return (
-    <Stack gap={0.5}>
-      <Text type="supporting" as="span" size="2xs">
+    <Stack gap={0}>
+      <Text type="supporting" as="span" size="2xs" className="meta-label">
         {label}
       </Text>
       <Text type="body" as="span" weight="medium" color={muted ? 'secondary' : undefined}>

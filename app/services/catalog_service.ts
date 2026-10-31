@@ -12,8 +12,8 @@ import {
   EntitySyncStatus,
 } from '../enums/index.js'
 import { CategorySyncService } from './category_sync_service.js'
+import { PriceService } from './price_service.js'
 import {
-  MAIN_CATALOG_CONFIG,
   SAMPLE_CATALOG_JSON,
   extractSequenceNumber,
   buildStructuredBaseCode,
@@ -24,6 +24,7 @@ import {
   resolveColorInfo,
   resolveSizeInfo,
   resolveTierPrice,
+  resolveTierMultiCurrencyPrices,
   formatVariantSku,
 } from '../data/catalog_config/index.js'
 import type {
@@ -32,6 +33,7 @@ import type {
   PriceTierCode,
   SkuFormatMode,
 } from '../types/catalog_pipeline.js'
+import { type PriceMoney, normalizePriceMoney, normalizePriceMoneyArray } from '../types/price.js'
 
 export interface VariantInput {
   sku: string
@@ -41,6 +43,7 @@ export interface VariantInput {
   asin?: string | null
   currencyCode?: string
   retailPrice: number
+  prices?: PriceMoney[]
   compareAtPrice?: number | null
   costPrice?: number
   manufacturingCost?: number
@@ -55,6 +58,7 @@ export interface VariantInput {
     asin?: string | null
     channelTitle?: string | null
     listedPrice?: number
+    prices?: PriceMoney[]
     allocatedQuantity?: number
   }>
 }
@@ -73,6 +77,9 @@ export interface GeneratedVariantPreview {
   fitName: string
   retailPrice: number
   costPrice: number
+  prices: PriceMoney[]
+  retailPriceMoney: PriceMoney
+  costPriceMoney: PriceMoney
   stockOnHand: number
   included: boolean
 }
@@ -101,6 +108,7 @@ export interface GeneratedProductPreview {
   fitName: string
   priceTier: PriceTierCode
   skuFormat: SkuFormatMode
+  prices: PriceMoney[]
   images: string[]
   tags: string[]
   attributes: Record<string, unknown>
@@ -111,10 +119,10 @@ let catalogTableEnsured = false
 
 export class CatalogService {
   /**
-   * Idempotently ensures the `catalog_items` table exists in PostgreSQL even if
-   * `node ace migration:run` has not been re-run yet.
+   * Idempotently ensures the `catalog_items` and multi-currency price tables exist in PostgreSQL.
    */
   static async ensureCatalogTable(): Promise<void> {
+    await PriceService.ensurePriceTables()
     if (catalogTableEnsured) return
     try {
       await db.rawQuery(`
@@ -165,10 +173,6 @@ export class CatalogService {
     }
   }
 
-  /**
-   * Lists all DB-stored `CatalogItem` rows for the user, auto-seeding the sample catalog
-   * (`SKU1`, `SKU2`, `SKU3`, `SKU4`) on first visit if the user has zero catalog items.
-   */
   static async listCatalogItems(userId: string): Promise<CatalogItem[]> {
     await this.ensureCatalogTable()
     let items = await CatalogItem.query()
@@ -193,10 +197,6 @@ export class CatalogService {
     return items
   }
 
-  /**
-   * Saves a Catalog JSON payload (`{"SKU1": {...}, "SKU2": {...}}`) into `catalog_items` table
-   * as brand-agnostic catalog records ready to filter, edit, preview, and convert to Products.
-   */
   static async saveCatalogJsonToDb(params: {
     userId: string
     catalogPayload: CatalogJsonPayload
@@ -211,8 +211,9 @@ export class CatalogService {
 
     const savedItems: CatalogItem[] = []
     await db.transaction(async (trx) => {
-      for (const [i, entryPair] of entries.entries()) {
-        const [catalogKey, entry] = entryPair as [string, CatalogJsonEntry]
+      for (const [i, [catalogKey, entry]] of entries.entries() as IterableIterator<
+        [number, [string, CatalogJsonEntry]]
+      >) {
         if (!entry || typeof entry !== 'object' || !entry.title) continue
 
         const item = await this.upsertCatalogEntryInTrx(
@@ -315,7 +316,10 @@ export class CatalogService {
     item.materialCode = leatherInfo.code
     item.fitCode = fitInfo.code
     item.priceTier = activeTier
-    item.attributes = entry.attributes ?? {}
+    item.attributes = {
+      ...(entry.attributes ?? {}),
+      prices: resolveTierMultiCurrencyPrices(activeTier, 3),
+    }
     item.images = Array.isArray(entry.images) ? entry.images : []
     item.tags = Array.isArray(entry.tags) ? entry.tags : []
     item.variantsSpec = {
@@ -331,9 +335,6 @@ export class CatalogService {
     return item
   }
 
-  /**
-   * Creates or updates a single `CatalogItem` from form fields on `/catalogs`.
-   */
   static async upsertSingleCatalogItem(params: {
     userId: string
     id?: string | null
@@ -486,9 +487,6 @@ export class CatalogService {
     })
   }
 
-  /**
-   * Deletes a `CatalogItem` by ID.
-   */
   static async deleteCatalogItem(userId: string, id: string): Promise<void> {
     await this.ensureCatalogTable()
     const item = await CatalogItem.query().where('userId', userId).andWhere('id', id).firstOrFail()
@@ -497,7 +495,7 @@ export class CatalogService {
 
   /**
    * Builds a rich, editable Product + Cartesian Variant Matrix preview for a single `CatalogItem`
-   * BEFORE creating the `Product` and `ProductVariant` rows in PostgreSQL.
+   * including multi-currency `prices: PriceMoney[]` arrays (`USD`, `INR`, `EUR`, `GBP`, `CAD`, `MXN`).
    */
   static async buildProductPreviewFromCatalogItem(params: {
     userId: string
@@ -562,6 +560,7 @@ export class CatalogService {
         const sizeInfo = resolveSizeInfo(rawSize, sizeGroup)
         const retailPrice = resolveTierPrice(activeTier, sizeInfo.sizeIndex)
         const costPrice = Number((retailPrice * costRatio).toFixed(2))
+        const multiPrices = resolveTierMultiCurrencyPrices(activeTier, sizeInfo.sizeIndex)
         const sku = formatVariantSku({
           catalogKey: item.catalogKey,
           structuredCode,
@@ -586,11 +585,17 @@ export class CatalogService {
           fitName: fitInfo.name,
           retailPrice,
           costPrice,
+          prices: multiPrices,
+          retailPriceMoney: normalizePriceMoney(retailPrice, 'USD'),
+          costPriceMoney: normalizePriceMoney(costPrice, 'USD'),
           stockOnHand,
           included: true,
         })
       }
     }
+
+    const baseProductPrices =
+      variants.length > 0 ? variants[0].prices : resolveTierMultiCurrencyPrices(activeTier, 3)
 
     return {
       catalogItemId: item.id,
@@ -616,6 +621,7 @@ export class CatalogService {
       fitName: fitInfo.name,
       priceTier: activeTier,
       skuFormat,
+      prices: baseProductPrices,
       images: Array.isArray(item.images) ? item.images : [],
       tags: Array.isArray(item.tags) ? item.tags : [],
       attributes: (item.attributes ?? {}) as Record<string, unknown>,
@@ -624,8 +630,8 @@ export class CatalogService {
   }
 
   /**
-   * Confirms and converts a `CatalogItem` (with user-edited product & variant preview fields)
-   * into a brand-agnostic `Product` (`brandId = null`) + `ProductVariant` + `ProductVariantAttribute` rows.
+   * Confirms and converts a `CatalogItem` into a brand-agnostic `Product` + `ProductVariant` +
+   * `ProductPrice` + `ProductVariantPrice` + `ProductVariantAttribute` rows.
    */
   static async createProductFromPreview(params: {
     userId: string
@@ -674,9 +680,8 @@ export class CatalogService {
         prod.useTransaction(trx)
       }
 
-      const tierPriceArray =
-        MAIN_CATALOG_CONFIG['LIST PRICE'][preview.priceTier] ??
-        MAIN_CATALOG_CONFIG['LIST PRICE']['01']
+      const firstVarUsd = Number(includedVariants[0]?.retailPrice ?? 239.99)
+      const productPrices = normalizePriceMoneyArray(preview.prices, firstVarUsd, 'USD')
 
       prod.brandId = null
       prod.categoryId = category ? category.id : preview.categoryId || null
@@ -697,11 +702,7 @@ export class CatalogService {
       prod.status = ProductStatus.ACTIVE
       prod.hasVariants = true
       prod.variationDimensions = ['color', 'size']
-      prod.listPrice = tierPriceArray.map((price, idx) => ({
-        currency_code: 'USD',
-        size_value: MAIN_CATALOG_CONFIG['Size Data'].alpha[idx]?.['Size Value'] ?? String(idx),
-        price,
-      }))
+      prod.listPrice = productPrices
       prod.salePrice = []
       prod.images = Array.isArray(preview.images) ? preview.images : []
       prod.tags = Array.isArray(preview.tags) ? preview.tags : []
@@ -720,15 +721,25 @@ export class CatalogService {
         pattern: preview.pattern || 'Solid',
         category_handle: preview.categoryHandle,
         resolved_category_handle: preview.categoryHandle,
+        prices: productPrices,
         attributes: preview.attributes ?? {},
       }
       await prod.save()
+
+      await PriceService.syncProductPrices({
+        userId,
+        productId: prod.id,
+        prices: productPrices,
+        priceType: 'retail',
+        trx,
+      })
 
       for (const [i, vPrev] of includedVariants.entries()) {
         const retailPrice = Number(vPrev.retailPrice || 239.99)
         const costPrice = Number(vPrev.costPrice ?? (retailPrice * 0.42).toFixed(2))
         const manufacturingCost = Number((costPrice * 0.85).toFixed(2))
         const packagingCost = Number((costPrice * 0.15).toFixed(2))
+        const variantPrices = normalizePriceMoneyArray(vPrev.prices, retailPrice, 'USD')
 
         let variant = await ProductVariant.query({ client: trx })
           .where('userId', userId)
@@ -764,8 +775,9 @@ export class CatalogService {
           fit_code: vPrev.fitCode,
           fit_name: vPrev.fitName,
           structured_code: preview.structuredCode,
+          prices: variantPrices,
         }
-        variant.currencyCode = 'USD'
+        variant.currencyCode = variantPrices[0]?.currency_code || 'USD'
         variant.retailPrice = retailPrice.toFixed(2)
         variant.compareAtPrice = (retailPrice + 40).toFixed(2)
         variant.costPrice = costPrice.toFixed(2)
@@ -778,6 +790,17 @@ export class CatalogService {
         variant.status = VariantStatus.ACTIVE
         await variant.save()
         variantsCreated += 1
+
+        await PriceService.syncVariantPrices({
+          userId,
+          productId: prod.id,
+          productVariantId: variant.id,
+          prices: variantPrices,
+          baseCostUsd: costPrice,
+          manufacturingCostUsd: manufacturingCost,
+          packagingCostUsd: packagingCost,
+          trx,
+        })
 
         await ProductVariantAttribute.query({ client: trx })
           .where('productVariantId', variant.id)
@@ -827,7 +850,7 @@ export class CatalogService {
   }
 
   /**
-   * Creates a product with zero (standalone) or multiple variations.
+   * Creates a product with zero (standalone) or multiple variations, persisting `ProductPrice` and `ProductVariantPrice`.
    */
   static async createProduct(input: {
     userId: string
@@ -841,8 +864,10 @@ export class CatalogService {
     hasVariants: boolean
     variationDimensions?: string[]
     weightGrams?: number | null
+    prices?: PriceMoney[]
     variants: VariantInput[]
   }): Promise<Product> {
+    await this.ensureCatalogTable()
     if (!input.variants || input.variants.length === 0) {
       throw new Error(
         'VALIDATION_ERROR: Product must provide at least one sellable SKU definition.'
@@ -857,6 +882,14 @@ export class CatalogService {
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/^-|-$/g, '') || `prod-${Date.now()}`
 
+      const firstRetail = Number(input.variants[0]?.retailPrice ?? 149.99)
+      const firstCur = (input.variants[0]?.currencyCode || 'USD').toUpperCase()
+      const productPrices = normalizePriceMoneyArray(
+        input.prices ?? input.variants[0]?.prices,
+        firstRetail,
+        firstCur
+      )
+
       const product = new Product()
       product.useTransaction(trx)
       product.userId = input.userId
@@ -869,6 +902,7 @@ export class CatalogService {
       product.status = input.status || ProductStatus.ACTIVE
       product.hasVariants = Boolean(input.hasVariants && input.variants.length > 0)
       product.variationDimensions = input.variationDimensions ?? []
+      product.listPrice = productPrices
       product.weightGrams =
         input.weightGrams !== undefined && input.weightGrams !== null
           ? Number(input.weightGrams).toFixed(2)
@@ -876,11 +910,26 @@ export class CatalogService {
       product.dimensionsCm = {}
       product.images = []
       product.tags = []
-      product.metadata = {}
+      product.metadata = { prices: productPrices }
       await product.save()
+
+      await PriceService.syncProductPrices({
+        userId: input.userId,
+        productId: product.id,
+        prices: productPrices,
+        priceType: 'retail',
+        trx,
+      })
 
       for (let i = 0; i < input.variants.length; i++) {
         const vInput = input.variants[i]
+        const varCur = (vInput.currencyCode || 'USD').toUpperCase()
+        const varPrices = normalizePriceMoneyArray(
+          vInput.prices ?? input.prices,
+          Number(vInput.retailPrice),
+          varCur
+        )
+
         const variant = new ProductVariant()
         variant.useTransaction(trx)
         variant.userId = input.userId
@@ -891,8 +940,11 @@ export class CatalogService {
         variant.barcodeUpcEan = vInput.barcodeUpcEan ?? null
         variant.mpn = vInput.mpn ?? null
         variant.asin = vInput.asin ?? null
-        variant.attributes = vInput.attributes ?? {}
-        variant.currencyCode = (vInput.currencyCode || 'USD').toUpperCase()
+        variant.attributes = {
+          ...(vInput.attributes ?? {}),
+          prices: varPrices,
+        }
+        variant.currencyCode = varCur
         variant.retailPrice = Number(vInput.retailPrice).toFixed(2)
         variant.compareAtPrice =
           vInput.compareAtPrice !== undefined && vInput.compareAtPrice !== null
@@ -913,6 +965,17 @@ export class CatalogService {
         variant.status = VariantStatus.ACTIVE
         await variant.save()
 
+        await PriceService.syncVariantPrices({
+          userId: input.userId,
+          productId: product.id,
+          productVariantId: variant.id,
+          prices: varPrices,
+          baseCostUsd: Number(vInput.costPrice ?? 0),
+          manufacturingCostUsd: Number(vInput.manufacturingCost ?? 0),
+          packagingCostUsd: Number(vInput.packagingCost ?? 0),
+          trx,
+        })
+
         if (vInput.attributes) {
           for (const [attrName, attrValue] of Object.entries(vInput.attributes)) {
             if (attrName && attrValue) {
@@ -929,6 +992,11 @@ export class CatalogService {
 
         if (vInput.listings && vInput.listings.length > 0) {
           for (const lInput of vInput.listings) {
+            const lPrices = normalizePriceMoneyArray(
+              lInput.prices ?? varPrices,
+              Number(lInput.listedPrice ?? vInput.retailPrice),
+              varCur
+            )
             const listing = new ChannelListing()
             listing.useTransaction(trx)
             listing.userId = input.userId
@@ -945,8 +1013,17 @@ export class CatalogService {
             listing.listingStatus = ListingStatus.ACTIVE
             listing.publicationStatus = PublicationStatus.PUBLISHED
             listing.syncStatus = EntitySyncStatus.SYNCED
-            listing.channelAttributes = {}
+            listing.channelAttributes = { prices: lPrices }
             await listing.save()
+
+            await PriceService.syncChannelListingPrices({
+              userId: input.userId,
+              channelListingId: listing.id,
+              productVariantId: variant.id,
+              prices: lPrices,
+              priceType: 'listed',
+              trx,
+            })
           }
         }
       }
@@ -955,10 +1032,6 @@ export class CatalogService {
     })
   }
 
-  /**
-   * Batch imports a Catalog JSON payload into `catalog_items` AND optionally converts all entries
-   * directly into `Product` + `ProductVariant` rows.
-   */
   static async importCatalogJson(params: {
     userId: string
     catalogPayload: CatalogJsonPayload

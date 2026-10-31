@@ -31,8 +31,7 @@ import {
   CreditCard,
   Activity,
 } from 'lucide-react'
-import { Grid } from '@astryxdesign/core'
-import { VStack } from '@astryxdesign/core/Stack'
+import { Grid, VStack } from '@astryxdesign/core'
 
 type Props = {
   kpis: DashboardKpis
@@ -165,21 +164,21 @@ export default function Dashboard(props: Props) {
       counts[key] = (counts[key] ?? 0) + 1
     }
     const colors: Record<string, string> = {
-      amazon: 'var(--chart-3)',
-      amazon_us: 'var(--chart-3)',
-      amazon_ca: 'var(--warning)',
-      ebay: 'var(--chart-1)',
-      etsy: 'var(--chart-5)',
-      direct: 'var(--success)',
+      amazon: '#f59e0b',
+      amazon_us: '#f59e0b',
+      amazon_ca: '#fbbf24',
+      ebay: '#3b82f6',
+      etsy: '#f97316',
+      direct: '#10b981',
     }
     const entries = Object.entries(counts)
     if (entries.length === 0) {
-      return [{ label: 'No Orders', value: 1, color: 'var(--muted-foreground)' }]
+      return [{ label: 'No Orders', value: 1, color: '#64748b' }]
     }
     return entries.map(([label, value]) => ({
       label: label.replace(/_/g, ' '),
       value,
-      color: colors[label] ?? 'var(--primary)',
+      color: colors[label] ?? '#6366f1',
     }))
   }, [filteredOrders])
 
@@ -190,22 +189,22 @@ export default function Dashboard(props: Props) {
       counts[key] = (counts[key] ?? 0) + 1
     }
     const colors: Record<string, string> = {
-      delivered: 'var(--success)',
-      fulfilled: 'var(--chart-2)',
-      confirmed: 'var(--chart-1)',
-      processing: 'var(--primary)',
-      partially_fulfilled: 'var(--info)',
-      pending: 'var(--warning)',
-      cancelled: 'var(--error)',
+      delivered: '#10b981',
+      fulfilled: '#059669',
+      confirmed: '#3b82f6',
+      processing: '#6366f1',
+      partially_fulfilled: '#0ea5e9',
+      pending: '#f59e0b',
+      cancelled: '#ef4444',
     }
     const entries = Object.entries(counts).slice(0, 6)
     if (entries.length === 0) {
-      return [{ label: 'None', value: 1, color: 'var(--muted-foreground)' }]
+      return [{ label: 'None', value: 1, color: '#64748b' }]
     }
     return entries.map(([label, value]) => ({
       label: label.replace(/_/g, ' '),
       value,
-      color: colors[label] ?? 'var(--muted-foreground)',
+      color: colors[label] ?? '#94a3b8',
     }))
   }, [filteredOrders])
 
@@ -329,21 +328,21 @@ export default function Dashboard(props: Props) {
                 style={{
                   width: `${(Number(activeKpis.totalCogs) / totalCostBurden) * 100}%`,
                 }}
-                className="bg-chart-3"
+                className="bg-amber-500"
                 title="COGS"
               />
               <div
                 style={{
                   width: `${(Number(activeKpis.totalMarketplaceFees) / totalCostBurden) * 100}%`,
                 }}
-                className="bg-chart-5"
+                className="bg-orange-500"
                 title="Marketplace & Payment Fees"
               />
               <div
                 style={{
                   width: `${(Number(activeKpis.totalShippingCost) / totalCostBurden) * 100}%`,
                 }}
-                className="bg-chart-2"
+                className="bg-cyan-500"
                 title="Shipping Cost"
               />
             </div>

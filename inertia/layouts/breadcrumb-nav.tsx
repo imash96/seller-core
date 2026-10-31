@@ -1,5 +1,5 @@
-import { usePage } from '@inertiajs/react'
 import { Link } from '@adonisjs/inertia/react'
+import { usePage } from '@inertiajs/react'
 import { ChevronRight, Home } from 'lucide-react'
 import { ROUTE_LABELS } from '~/lib/constants'
 

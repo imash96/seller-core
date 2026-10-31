@@ -1,18 +1,19 @@
 /**
  * OrderLineItem — maps to "order_line_items".
- * Order lines snapshot SKU/title/prices at sale time. Quantities track fulfillment, return and cancellation invariants.
- *
- * This file is generated from database/schema.dbml — keep the two in sync.
+ * Order lines snapshot SKU/title/prices at sale time.
+ * Attaches OrderLineItemPrice records and per-field { currency_code, amount } objects.
  */
 import { belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import type { DateTime } from 'luxon'
 import ChannelListing from './channel_listing.js'
 import Order from './order.js'
+import OrderLineItemPrice from './order_line_item_price.js'
 import ProductVariant from './product_variant.js'
 import ReturnRequest from './return_request.js'
 import ShipmentItem from './shipment_item.js'
 import AppBaseModel from './base_model.js'
+import { type PriceMoney, normalizePriceMoney } from '../types/price.js'
 
 export default class OrderLineItem extends AppBaseModel {
   static readonly table = 'order_line_items'
@@ -102,9 +103,52 @@ export default class OrderLineItem extends AppBaseModel {
   @belongsTo(() => ChannelListing, { foreignKey: 'channelListingId' })
   declare public channelListing: BelongsTo<typeof ChannelListing>
 
+  @hasMany(() => OrderLineItemPrice, { foreignKey: 'orderLineItemId' })
+  declare public linePrices: HasMany<typeof OrderLineItemPrice>
+
   @hasMany(() => ShipmentItem, { foreignKey: 'orderLineItemId' })
   declare public shipmentItems: HasMany<typeof ShipmentItem>
 
   @hasMany(() => ReturnRequest, { foreignKey: 'orderLineItemId' })
   declare public returnRequests: HasMany<typeof ReturnRequest>
+
+  override serialize(): Record<string, any> {
+    const raw = super.serialize()
+    const baseCur = (this.currencyCode || 'USD').toUpperCase()
+
+    const byField = new Map<string, PriceMoney>()
+    if (Array.isArray(this.linePrices)) {
+      for (const lp of this.linePrices) {
+        byField.set(lp.fieldKey, {
+          currency_code: (lp.currencyCode || baseCur).toUpperCase(),
+          amount: Number(Number(lp.amount ?? 0).toFixed(2)),
+        })
+      }
+    }
+
+    const resolveField = (fieldKey: string, rawVal: unknown): PriceMoney => {
+      return byField.get(fieldKey) ?? normalizePriceMoney(rawVal, baseCur)
+    }
+
+    const unitPriceMoney = resolveField('unit_price', this.unitPrice)
+    const discountMoney = resolveField('discount_amount', this.discountAmount)
+    const taxMoney = resolveField('tax_amount', this.taxAmount)
+    const shippingMoney = resolveField('shipping_amount', this.shippingAmount)
+    const lineTotalMoney = resolveField('line_total_amount', this.lineTotalAmount)
+    const unitCostMoney = resolveField('unit_cost_amount', this.unitCostAmount)
+    const marketplaceFeeMoney = resolveField('marketplace_fee_amount', this.marketplaceFeeAmount)
+    const refundedMoney = resolveField('refunded_amount', this.refundedAmount)
+
+    return {
+      ...raw,
+      unitPriceMoney,
+      discountMoney,
+      taxMoney,
+      shippingMoney,
+      lineTotalMoney,
+      unitCostMoney,
+      marketplaceFeeMoney,
+      refundedMoney,
+    }
+  }
 }

@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/naming-convention */
 import type { MedusaProductCategory } from '../types/catalog_pipeline.js'
 
-export const product_categories = [
+export const PRODUCT_CATEGORIES = [
   {
     name: 'Men',
     rank: 0,
@@ -1765,13 +1764,15 @@ export const product_categories = [
   },
 ] as MedusaProductCategory[]
 
+export const productCategories = PRODUCT_CATEGORIES
+
 export interface FlattenedMedusaCategory extends MedusaProductCategory {
   parentHandle: string | null
   depth: number
 }
 
 export function flattenMedusaCategories(
-  nodes: MedusaProductCategory[] = product_categories,
+  nodes: MedusaProductCategory[] = PRODUCT_CATEGORIES,
   parentHandle: string | null = null,
   depth = 0
 ): FlattenedMedusaCategory[] {

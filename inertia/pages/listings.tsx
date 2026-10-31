@@ -11,10 +11,15 @@ import {
   Badge,
   MonoBadge,
   RowAction,
+  MultiCurrencyPriceStack,
+  MultiCurrencyPriceInput,
   STATUS_TONES,
-  money,
+  convertToLocale,
+  resolvePriceMoney,
+  type PriceMoney,
   type Row,
 } from '~/lib/ui'
+import type React from 'react'
 import { useState, useMemo } from 'react'
 import {
   Globe,
@@ -41,23 +46,25 @@ type SkuGroup = {
   brandName: string
   categoryName: string
   retailPrice: number
+  prices?: PriceMoney[]
   stockOnHand: number
   platforms: Row[]
 }
 
 type Props = {
   channelListings?: Row[]
-  skuGroups?: SkuGroup[]
+  skuGroups?: any
   products?: Row[]
   brands?: Row[]
   categories?: Row[]
   sellerAccounts?: Row[]
-  savedViews?: Row[]
-  catalogConfig?: any
   salesChannels?: Row[]
   orders?: Row[]
   orderLineItems?: Row[]
   financeCategories?: Row[]
+  savedViews?: Row[]
+  catalogConfig?: any
+  [key: string]: any
 }
 
 const PLATFORM_BADGES: Record<
@@ -102,7 +109,7 @@ export default function Listings({
   const [priceMultiplier, setPriceMultiplier] = useState<string>('1.0')
   const [assignBrandToProduct, setAssignBrandToProduct] = useState(true)
 
-  // Complete 4-Section Edit ChannelListing Modal state (all ChannelListing columns)
+  // Complete Edit ChannelListing Modal state (including multi-currency prices array)
   const [editingListing, setEditingListing] = useState<Row | null>(null)
   const [editForm, setEditForm] = useState({
     externalListingId: '',
@@ -114,6 +121,7 @@ export default function Listings({
     channelDescription: '',
     currencyCode: 'USD',
     listedPrice: '229.99',
+    prices: [] as PriceMoney[],
     allocatedQuantity: '25',
     listingStatus: 'active',
     publicationStatus: 'published',
@@ -144,6 +152,7 @@ export default function Listings({
             brandName: String((p.brand as any)?.name ?? 'Brand-Agnostic'),
             categoryName: String((p.category as any)?.name ?? 'Outerwear'),
             retailPrice: Number(v.retailPrice ?? 0),
+            prices: Array.isArray(v.prices) ? (v.prices as PriceMoney[]) : undefined,
             stockOnHand: Number(v.stockOnHand ?? 0),
             platforms: [],
           })
@@ -162,6 +171,7 @@ export default function Listings({
           brandName: String(l.brandName ?? 'Artisan Hide'),
           categoryName: String(l.categoryName ?? 'Outerwear'),
           retailPrice: Number(l.listedPrice ?? 0),
+          prices: Array.isArray(l.prices) ? (l.prices as PriceMoney[]) : undefined,
           stockOnHand: Number(l.allocatedQuantity ?? 0),
           platforms: [],
         })
@@ -282,6 +292,18 @@ export default function Listings({
 
   const openEditModal = (listing: Row) => {
     setEditingListing(listing)
+    const cur = String(listing.currencyCode ?? 'USD').toUpperCase()
+    const baseAmt = Number(listing.listedPrice ?? 229.99)
+    const existingPrices: PriceMoney[] = Array.isArray(listing.prices)
+      ? (listing.prices as PriceMoney[])
+      : Array.isArray(listing.price)
+        ? (listing.price as PriceMoney[])
+        : [
+            { currency_code: cur, amount: baseAmt },
+            { currency_code: 'INR', amount: Number((baseAmt * 83.5).toFixed(2)) },
+            { currency_code: 'EUR', amount: Number((baseAmt * 0.92).toFixed(2)) },
+          ]
+
     setEditForm({
       externalListingId: String(listing.externalListingId ?? ''),
       externalVariantId: String(listing.externalVariantId ?? ''),
@@ -290,8 +312,9 @@ export default function Listings({
       channelCategoryId: String(listing.channelCategoryId ?? ''),
       channelTitle: String(listing.channelTitle ?? listing.productTitle ?? ''),
       channelDescription: String(listing.channelDescription ?? ''),
-      currencyCode: String(listing.currencyCode ?? 'USD'),
-      listedPrice: String(listing.listedPrice ?? 229.99),
+      currencyCode: cur,
+      listedPrice: String(baseAmt),
+      prices: existingPrices,
       allocatedQuantity: String(listing.allocatedQuantity ?? 25),
       listingStatus: String(listing.listingStatus ?? 'active'),
       publicationStatus: String(listing.publicationStatus ?? 'published'),
@@ -321,6 +344,7 @@ export default function Listings({
           channelDescription: editForm.channelDescription,
           currencyCode: editForm.currencyCode,
           listedPrice: Number(editForm.listedPrice),
+          prices: editForm.prices,
           allocatedQuantity: Number(editForm.allocatedQuantity),
           listingStatus: editForm.listingStatus,
           publicationStatus: editForm.publicationStatus,
@@ -330,7 +354,7 @@ export default function Listings({
       if (data.ok || data.success) {
         setBanner({
           tone: 'success',
-          message: `Updated listing ${editForm.externalListingId} (${editForm.externalSku}).`,
+          message: `Updated listing ${editForm.externalListingId} (${editForm.externalSku}) and synced ${editForm.prices.length} multi-currency ChannelListingPrice records.`,
         })
         setEditingListing(null)
         router.reload()
@@ -408,6 +432,8 @@ export default function Listings({
         brandName: l.brandName,
         productTitle: l.productTitle,
         listedPrice: l.listedPrice,
+        listedPriceMoney: l.listedPriceMoney,
+        prices: l.prices ?? l.price,
         allocatedQuantity: l.allocatedQuantity,
         listingStatus: l.listingStatus,
         syncStatus: l.syncStatus,
@@ -422,8 +448,8 @@ export default function Listings({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Platform Listings Studio (/listings)"
-        description="View generated e-commerce listings grouped by Variant SKU across Medusa Website, Amazon SP-API, eBay Inventory API, and Etsy Open API v3. Inspect transformed JSON payloads and publish per SKU or per platform."
+        title="Platform Listings Studio (/listing)"
+        description="View generated e-commerce listings grouped by Variant SKU across Medusa Website, Amazon SP-API, eBay Inventory API, and Etsy Open API v3 with multi-currency ChannelListingPrice arrays."
         icon={Globe}
         badge={`${skuGroups.length} SKUs · ${channelListings.length} platform listings · ${syncedCount} synced`}
         actions={
@@ -526,7 +552,7 @@ export default function Listings({
       {/* Filter & View Switcher Toolbar + Card-Based SKU Listings */}
       <PageSection
         title="Multi-Platform Listings Grouped by SKU"
-        description="Each SKU card groups its generated Medusa Website, Amazon, eBay, and Etsy listings together with one-click 'Publish on Platform' and JSON download."
+        description="Each SKU card groups its generated Medusa Website, Amazon, eBay, and Etsy listings together with multi-currency ChannelListingPrice badges, one-click 'Publish on Platform', and JSON download."
       >
         <div className="space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 rounded-2xl border border-card-border bg-muted/25 p-3.5">
@@ -630,7 +656,10 @@ export default function Listings({
                         <div className="text-xs text-muted-foreground mr-2">
                           Base Retail:{' '}
                           <strong className="text-price-current">
-                            {money('USD', group.retailPrice)}
+                            {convertToLocale({
+                              amount: group.retailPrice,
+                              currency_code: 'USD',
+                            })}
                           </strong>{' '}
                           · Stock: <strong>{group.stockOnHand}</strong>
                         </div>
@@ -683,6 +712,18 @@ export default function Listings({
                             variant: 'neutral',
                           }
                           const isSynced = listing.syncStatus === 'synced'
+                          const lCur = String(listing.currencyCode ?? 'USD')
+                          const lPrices: PriceMoney[] = Array.isArray(listing.prices)
+                            ? (listing.prices as PriceMoney[])
+                            : Array.isArray(listing.price)
+                              ? (listing.price as PriceMoney[])
+                              : [
+                                  resolvePriceMoney(
+                                    listing.listedPriceMoney ?? listing.listedPrice,
+                                    lCur
+                                  ),
+                                ]
+
                           return (
                             <div
                               key={String(listing.id)}
@@ -703,22 +744,21 @@ export default function Listings({
                                 <div className="font-mono text-xs font-bold text-foreground break-all">
                                   ID: {String(listing.externalListingId)}
                                 </div>
-                                <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
-                                  <div>
-                                    Price:{' '}
-                                    <strong className="text-price-current">
-                                      {money(
-                                        String(listing.currencyCode ?? 'USD'),
-                                        listing.listedPrice
-                                      )}
-                                    </strong>
+                                <div className="space-y-1.5 pt-1">
+                                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>Multi-Currency Prices:</span>
+                                    <span>
+                                      Qty:{' '}
+                                      <strong className="text-foreground">
+                                        {String(listing.allocatedQuantity)}
+                                      </strong>
+                                    </span>
                                   </div>
-                                  <div>
-                                    Qty:{' '}
-                                    <strong className="text-foreground">
-                                      {String(listing.allocatedQuantity)}
-                                    </strong>
-                                  </div>
+                                  <MultiCurrencyPriceStack
+                                    prices={lPrices}
+                                    primaryCurrency={lCur}
+                                    maxBadges={4}
+                                  />
                                 </div>
                                 {listing.publishedUrl && (
                                   <div className="text-[11px] font-mono text-success truncate">
@@ -775,7 +815,7 @@ export default function Listings({
                     <th className="py-3.5 px-4">Platform</th>
                     <th className="py-3.5 px-4">External Listing ID</th>
                     <th className="py-3.5 px-4">Product & Brand</th>
-                    <th className="py-3.5 px-4">Price & Qty</th>
+                    <th className="py-3.5 px-4">Multi-Currency Prices & Qty</th>
                     <th className="py-3.5 px-4">Status / Sync</th>
                     <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
@@ -787,6 +827,10 @@ export default function Listings({
                       label: platKey.toUpperCase(),
                       variant: 'neutral',
                     }
+                    const lCur = String(l.currencyCode ?? 'USD')
+                    const lPrices: PriceMoney[] = Array.isArray(l.prices)
+                      ? (l.prices as PriceMoney[])
+                      : [resolvePriceMoney(l.listedPriceMoney ?? l.listedPrice, lCur)]
                     return (
                       <tr key={String(l.id)} className="hover:bg-muted/20">
                         <td className="py-3 px-4 font-mono font-bold text-foreground">
@@ -803,10 +847,12 @@ export default function Listings({
                           <div className="text-muted-foreground">Brand: {String(l.brandName)}</div>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="font-extrabold text-price-current">
-                            {money(String(l.currencyCode ?? 'USD'), l.listedPrice)}
-                          </div>
-                          <div className="text-muted-foreground">
+                          <MultiCurrencyPriceStack
+                            prices={lPrices}
+                            primaryCurrency={lCur}
+                            maxBadges={4}
+                          />
+                          <div className="text-muted-foreground mt-1">
                             Qty: {String(l.allocatedQuantity)}
                           </div>
                         </td>
@@ -870,7 +916,7 @@ export default function Listings({
           MODAL 1: GENERATE MULTI-PLATFORM LISTINGS FROM PRODUCTS + BRAND
          ===================================================================== */}
       {generateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between border-b border-divider px-6 py-4 bg-muted/30">
               <div>
@@ -878,8 +924,8 @@ export default function Listings({
                   Generate Multi-Platform Listings
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Link Products & Variants with a Brand and run platform transformers for Medusa,
-                  Amazon, eBay, and Etsy.
+                  Link Products & Variants with a Brand and run platform transformers (including
+                  multi-currency ChannelListingPrice arrays) for Medusa, Amazon, eBay, and Etsy.
                 </p>
               </div>
               <button
@@ -1016,10 +1062,10 @@ export default function Listings({
       )}
 
       {/* =====================================================================
-          MODAL 2: COMPLETE EDIT CHANNEL LISTING MODAL (ALL DB COLUMNS)
+          MODAL 2: COMPLETE EDIT CHANNEL LISTING MODAL (WITH MULTI-CURRENCY PRICES)
          ===================================================================== */}
       {editingListing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-xs p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
           <form
             onSubmit={handleSaveListingEdit}
             className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
@@ -1070,12 +1116,12 @@ export default function Listings({
                   onChange={(e) => setEditForm({ ...editForm, channelCategoryId: e.target.value })}
                 />
                 <AppInput
-                  label="Currency Code"
+                  label="Primary Currency Code"
                   value={editForm.currencyCode}
                   onChange={(e) => setEditForm({ ...editForm, currencyCode: e.target.value })}
                 />
                 <AppInput
-                  label="Listed Price ($)"
+                  label="Primary Listed Price"
                   type="number"
                   step="0.01"
                   value={editForm.listedPrice}
@@ -1109,6 +1155,27 @@ export default function Listings({
                     { value: 'failed', label: 'failed' },
                   ]}
                 />
+                <div className="sm:col-span-2">
+                  <MultiCurrencyPriceInput
+                    label="Multi-Currency Listing Prices (ChannelListingPrice)"
+                    value={editForm.prices}
+                    onChange={(nextPrices) => {
+                      const primary =
+                        nextPrices.find((p) => p.currency_code === editForm.currencyCode) ??
+                        nextPrices[0]
+                      setEditForm({
+                        ...editForm,
+                        prices: nextPrices,
+                        ...(primary
+                          ? {
+                              currencyCode: primary.currency_code,
+                              listedPrice: String(primary.amount),
+                            }
+                          : {}),
+                      })
+                    }}
+                  />
+                </div>
                 <div className="sm:col-span-2">
                   <AppInput
                     label="Channel Title Override"
@@ -1197,9 +1264,22 @@ export default function Listings({
               <div>
                 <strong>Brand:</strong> {String(inspectListing.brandName)}
               </div>
-              <div>
-                <strong>Listed Price:</strong>{' '}
-                {money(String(inspectListing.currencyCode ?? 'USD'), inspectListing.listedPrice)}
+              <div className="col-span-2">
+                <strong className="block mb-1">Multi-Currency Prices (ChannelListingPrice):</strong>
+                <MultiCurrencyPriceStack
+                  prices={
+                    Array.isArray(inspectListing.prices)
+                      ? (inspectListing.prices as PriceMoney[])
+                      : [
+                          resolvePriceMoney(
+                            inspectListing.listedPriceMoney ?? inspectListing.listedPrice,
+                            String(inspectListing.currencyCode ?? 'USD')
+                          ),
+                        ]
+                  }
+                  primaryCurrency={String(inspectListing.currencyCode ?? 'USD')}
+                  maxBadges={6}
+                />
               </div>
               <div>
                 <strong>Sync Status:</strong> {String(inspectListing.syncStatus)}

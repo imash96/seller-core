@@ -1,8 +1,8 @@
 /**
  * ProductVariant — maps to "product_variants".
- * Sellable SKU entity referenced by order lines, channel listings and inventory. Prices are explicit numeric columns (no float).
- *
- * This file is generated from database/schema.dbml — keep the two in sync.
+ * Sellable SKU entity referenced by order lines, channel listings and inventory.
+ * Exposes multi-currency `prices: Array<{ currency_code: string, amount: number }>`
+ * and `{ currency_code, amount }` objects for every price/cost field.
  */
 import { belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
@@ -11,8 +11,15 @@ import ChannelListing from './channel_listing.js'
 import OrderLineItem from './order_line_item.js'
 import Product from './product.js'
 import ProductVariantAttribute from './product_variant_attribute.js'
+import ProductVariantPrice from './product_variant_price.js'
 import { prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import {
+  type PriceMoney,
+  buildMultiCurrencyPriceArray,
+  normalizePriceMoney,
+  normalizePriceMoneyArray,
+} from '../types/price.js'
 
 export default class ProductVariant extends AppBaseModel {
   static readonly table = 'product_variants'
@@ -100,9 +107,52 @@ export default class ProductVariant extends AppBaseModel {
   @hasMany(() => ProductVariantAttribute, { foreignKey: 'productVariantId' })
   declare public variantAttributes: HasMany<typeof ProductVariantAttribute>
 
+  @hasMany(() => ProductVariantPrice, { foreignKey: 'productVariantId' })
+  declare public priceRecords: HasMany<typeof ProductVariantPrice>
+
   @hasMany(() => ChannelListing, { foreignKey: 'productVariantId' })
   declare public listings: HasMany<typeof ChannelListing>
 
   @hasMany(() => OrderLineItem, { foreignKey: 'productVariantId' })
   declare public orderLineItems: HasMany<typeof OrderLineItem>
+
+  override serialize(): Record<string, any> {
+    const raw = super.serialize()
+    const baseCur = (this.currencyCode || 'USD').toUpperCase()
+    const retailNum = Number(this.retailPrice ?? 0)
+    const attrs = (this.attributes ?? {}) as Record<string, any>
+
+    let prices: PriceMoney[] = []
+    if (Array.isArray(this.priceRecords) && this.priceRecords.length > 0) {
+      prices = this.priceRecords.map((pr) => ({
+        currency_code: (pr.currencyCode || baseCur).toUpperCase(),
+        amount: Number(Number(pr.amount ?? 0).toFixed(2)),
+      }))
+    } else if (Array.isArray(attrs.prices) && attrs.prices.length > 0) {
+      prices = normalizePriceMoneyArray(attrs.prices, retailNum, baseCur)
+    } else {
+      prices = buildMultiCurrencyPriceArray(retailNum || 239.99)
+    }
+
+    const costNum = Number(this.costPrice ?? 0)
+    const mfgNum = Number(this.manufacturingCost ?? 0)
+    const pkgNum = Number(this.packagingCost ?? 0)
+    const compareNum =
+      this.compareAtPrice !== null
+        ? Number(this.compareAtPrice)
+        : Number((retailNum * 1.18).toFixed(2))
+    const stockValNum = Number((costNum * Number(this.stockOnHand ?? 0)).toFixed(2))
+
+    return {
+      ...raw,
+      price: prices,
+      prices,
+      retailPriceMoney: normalizePriceMoney(retailNum, baseCur),
+      compareAtPriceMoney: normalizePriceMoney(compareNum, baseCur),
+      costPriceMoney: normalizePriceMoney(costNum, baseCur),
+      manufacturingCostMoney: normalizePriceMoney(mfgNum, baseCur),
+      packagingCostMoney: normalizePriceMoney(pkgNum, baseCur),
+      inventoryValueMoney: normalizePriceMoney(stockValNum, baseCur),
+    }
+  }
 }

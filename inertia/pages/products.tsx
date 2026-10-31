@@ -13,8 +13,11 @@ import {
   SavedViewsBar,
   Badge,
   MonoBadge,
+  MultiCurrencyPriceStack,
   STATUS_TONES,
-  money,
+  convertToLocale,
+  resolvePriceMoney,
+  type PriceMoney,
   type Row,
 } from '~/lib/ui'
 import { useState, useMemo } from 'react'
@@ -59,12 +62,12 @@ const PLATFORMS = [
 ] as const
 
 export default function Products({
-  products = [],
-  brands = [],
-  categories = [],
-  sellerAccounts = [],
-  channelListings = [],
-  savedViews = [],
+  products,
+  brands,
+  categories,
+  sellerAccounts,
+  channelListings,
+  savedViews,
 }: Props) {
   const [createProductOpen, setCreateProductOpen] = useState(false)
   const [editProductRow, setEditProductRow] = useState<Row | null>(null)
@@ -222,7 +225,7 @@ export default function Products({
       } else {
         setBanner({
           tone: 'success',
-          message: `Linked "${convertModalProduct.title}" with Brand "${data.brandName}" and generated ${data.channelListingsUpserted} platform listings across ${(data.platforms ?? selectedPlatforms).join(', ').toUpperCase()}. View & publish them in /listings!`,
+          message: `Linked "${convertModalProduct.title}" with Brand "${data.brandName}" and generated ${data.channelListingsUpserted} platform listings across ${(data.platforms ?? selectedPlatforms).join(', ').toUpperCase()}. View & publish them in /listing!`,
         })
         setConvertModalProduct(null)
         router.reload()
@@ -269,22 +272,22 @@ export default function Products({
     <div className="space-y-6">
       <PageHeader
         title="Products, Variants, Brands & Categories (/products)"
-        description="Click any Product Card to open its Slide-Over Detail & Variants Drawer, or click 'Convert to Listing' to link a Brand and generate multi-platform listings."
+        description="Click any Product Card to open its Slide-Over Detail & Multi-Currency Variants Drawer, or click 'Convert to Listing' to link a Brand and generate multi-platform listings."
         icon={Box}
         badge={`${products.length} products · ${variantRows.length} variants · ${flatListings.length} listings`}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             <AppButton
-              label="← Catalog (/catalogs)"
+              label="← Catalog (/catalog)"
               variant="secondary"
               size="sm"
-              onClick={() => router.visit('/catalogs')}
+              onClick={() => router.visit('/catalog')}
             />
             <AppButton
-              label="Listings (/listings) →"
+              label="Listings (/listing) →"
               variant="secondary"
               size="sm"
-              onClick={() => router.visit('/listings')}
+              onClick={() => router.visit('/listing')}
             />
             <AppButton
               label="+ Brand"
@@ -381,10 +384,10 @@ export default function Products({
               {banner.tone === 'success' && (
                 <button
                   type="button"
-                  onClick={() => router.visit('/listings')}
+                  onClick={() => router.visit('/listing')}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-primary underline cursor-pointer"
                 >
-                  <span>Open /listings to review & publish by SKU</span>
+                  <span>Open /listing to review & publish by SKU</span>
                   <ExternalLink className="h-3.5 w-3.5" />
                 </button>
               )}
@@ -404,8 +407,8 @@ export default function Products({
           SECTION 1: CARD-BASED PRODUCT LIST (CLICK OPENS VARIANT DRAWER)
          ===================================================================== */}
       <PageSection
-        title="Generated Products (Click Any Card to Inspect Details & Variants)"
-        description="Products converted from /catalog start brand-agnostic. Click any card to open the Product & Variants Drawer, or click 'Convert to Listing' to associate a Brand and generate platform listings."
+        title="Generated Products (Click Any Card to Inspect Details & Multi-Currency Variants)"
+        description="Products converted from /catalog carry multi-currency ProductPrice & ProductVariantPrice arrays (USD, INR, EUR, GBP, CAD, MXN). Click any card to inspect variants or convert to listings."
         actions={
           <div className="flex items-center gap-2">
             <AppButton
@@ -478,10 +481,10 @@ export default function Products({
               </p>
               <div className="flex items-center justify-center gap-2">
                 <AppButton
-                  label="Convert from /catalogs"
+                  label="Convert from /catalog"
                   variant="secondary"
                   size="sm"
-                  onClick={() => router.visit('/catalogs')}
+                  onClick={() => router.visit('/catalog')}
                 />
                 <AppButton
                   label="+ Create Product"
@@ -511,9 +514,14 @@ export default function Products({
                         },
                       ]
 
-                const prices = pVariants.map((v) => Number(v.retailPrice ?? 0)).filter((n) => n > 0)
-                const minPrice = prices.length ? Math.min(...prices) : 0
-                const maxPrice = prices.length ? Math.max(...prices) : 0
+                const productPrices: PriceMoney[] = Array.isArray(product.prices)
+                  ? (product.prices as PriceMoney[])
+                  : Array.isArray(product.price)
+                    ? (product.price as PriceMoney[])
+                    : Array.isArray(pVariants[0]?.prices)
+                      ? (pVariants[0].prices as PriceMoney[])
+                      : []
+
                 const totalStock = pVariants.reduce((sum, v) => sum + Number(v.stockOnHand ?? 0), 0)
                 const brandName = (product.brand as any)?.name
                 const catName = (product.category as any)?.name ?? 'Uncategorized'
@@ -561,32 +569,35 @@ export default function Products({
                         )}
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-divider text-xs">
-                        <div>
-                          <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                            Variants
-                          </span>
-                          <span className="font-extrabold text-foreground">
-                            {pVariants.length} SKUs
-                          </span>
+                      <div className="pt-3 border-t border-divider space-y-2.5 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              Variants
+                            </span>
+                            <span className="font-extrabold text-foreground">
+                              {pVariants.length} SKUs
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              Total Stock
+                            </span>
+                            <span className="font-extrabold text-foreground tabular-nums">
+                              {totalStock} units
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                            Tier Price
+
+                        <div className="rounded-xl border border-divider bg-muted/20 p-2.5">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                            Multi-Currency Prices (ProductPrice)
                           </span>
-                          <span className="font-extrabold text-price-current tabular-nums">
-                            {minPrice === maxPrice
-                              ? money('USD', minPrice)
-                              : `${money('USD', minPrice)}–${money('USD', maxPrice)}`}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                            Total Stock
-                          </span>
-                          <span className="font-extrabold text-foreground tabular-nums">
-                            {totalStock} units
-                          </span>
+                          <MultiCurrencyPriceStack
+                            prices={productPrices}
+                            primaryCurrency="USD"
+                            maxBadges={5}
+                          />
                         </div>
                       </div>
                     </div>
@@ -905,6 +916,20 @@ export default function Products({
                 </p>
               </div>
               <div className="sm:col-span-2">
+                <span className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">
+                  Parent Product Multi-Currency Prices (ProductPrice)
+                </span>
+                <MultiCurrencyPriceStack
+                  prices={
+                    Array.isArray(inspectProduct.prices)
+                      ? (inspectProduct.prices as PriceMoney[])
+                      : []
+                  }
+                  primaryCurrency="USD"
+                  maxBadges={6}
+                />
+              </div>
+              <div className="sm:col-span-2">
                 <span className="text-[10px] font-bold uppercase text-muted-foreground block">
                   SEO Description
                 </span>
@@ -938,51 +963,62 @@ export default function Products({
                     <tr>
                       <th className="py-2.5 px-3.5">Variant SKU</th>
                       <th className="py-2.5 px-3.5">Title (Color / Size)</th>
-                      <th className="py-2.5 px-3.5">Retail Price</th>
+                      <th className="py-2.5 px-3.5">Multi-Currency Prices</th>
                       <th className="py-2.5 px-3.5">Cost</th>
                       <th className="py-2.5 px-3.5">Stock</th>
                       <th className="py-2.5 px-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-divider">
-                    {((inspectProduct.variants as Row[]) ?? []).map((v) => (
-                      <tr key={String(v.id)} className="hover:bg-muted/20">
-                        <td className="py-2.5 px-3.5">
-                          <MonoBadge text={String(v.sku)} />
-                        </td>
-                        <td className="py-2.5 px-3.5 font-medium text-foreground">
-                          {String(v.title)}
-                        </td>
-                        <td className="py-2.5 px-3.5 font-extrabold text-price-current tabular-nums">
-                          {money(String(v.currencyCode ?? 'USD'), v.retailPrice)}
-                        </td>
-                        <td className="py-2.5 px-3.5 text-muted-foreground tabular-nums">
-                          {money(String(v.currencyCode ?? 'USD'), v.costPrice)}
-                        </td>
-                        <td className="py-2.5 px-3.5 font-bold tabular-nums">
-                          {String(v.stockOnHand)}
-                        </td>
-                        <td className="py-2.5 px-3.5 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <AppButton
-                              label="Adjust"
-                              variant="secondary"
-                              size="xs"
-                              onClick={() => {
-                                setInspectProduct(null)
-                                setEditStockRow(v)
-                              }}
+                    {((inspectProduct.variants as Row[]) ?? []).map((v) => {
+                      const vCur = String(v.currencyCode ?? 'USD')
+                      const costMoney = resolvePriceMoney(v.costPriceMoney ?? v.costPrice, vCur)
+                      const vPrices = Array.isArray(v.prices)
+                        ? (v.prices as PriceMoney[])
+                        : [resolvePriceMoney(v.retailPriceMoney ?? v.retailPrice, vCur)]
+                      return (
+                        <tr key={String(v.id)} className="hover:bg-muted/20">
+                          <td className="py-2.5 px-3.5">
+                            <MonoBadge text={String(v.sku)} />
+                          </td>
+                          <td className="py-2.5 px-3.5 font-medium text-foreground">
+                            {String(v.title)}
+                          </td>
+                          <td className="py-2.5 px-3.5">
+                            <MultiCurrencyPriceStack
+                              prices={vPrices}
+                              primaryCurrency={vCur}
+                              maxBadges={4}
                             />
-                            <RowAction
-                              action={`/variants/${v.id}/delete`}
-                              label="Delete"
-                              variant="ghost"
-                              confirmText={`Delete variant ${v.sku}?`}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="py-2.5 px-3.5 text-muted-foreground tabular-nums">
+                            {convertToLocale(costMoney)}
+                          </td>
+                          <td className="py-2.5 px-3.5 font-bold tabular-nums">
+                            {String(v.stockOnHand)}
+                          </td>
+                          <td className="py-2.5 px-3.5 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <AppButton
+                                label="Adjust"
+                                variant="secondary"
+                                size="xs"
+                                onClick={() => {
+                                  setInspectProduct(null)
+                                  setEditStockRow(v)
+                                }}
+                              />
+                              <RowAction
+                                action={`/variants/${v.id}/delete`}
+                                label="Delete"
+                                variant="ghost"
+                                confirmText={`Delete variant ${v.sku}?`}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -995,7 +1031,7 @@ export default function Products({
           MODAL: CONVERT PRODUCT TO PLATFORM LISTINGS (BRAND + MULTI-PLATFORM)
          ===================================================================== */}
       {convertModalProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden">
             <div className="flex items-start justify-between border-b border-divider px-6 py-4 bg-muted/30">
               <div>
@@ -1011,7 +1047,8 @@ export default function Products({
                 </h2>
                 <p className="text-xs text-muted-foreground">
                   Associate <strong>{String(convertModalProduct.title)}</strong> with a Brand and
-                  generate platform-specific listings for Medusa Website, Amazon, eBay, and Etsy.
+                  generate platform-specific listings (with multi-currency ChannelListingPrice
+                  arrays) for Medusa Website, Amazon, eBay, and Etsy.
                 </p>
               </div>
               <button
@@ -1156,8 +1193,8 @@ export default function Products({
       <FormModal
         isOpen={createProductOpen}
         onOpenChange={setCreateProductOpen}
-        title="Create Product (Complete Specification)"
-        subtitle="Create a parent product with multi-length titles, taxonomy linkage, physical dimensions, and default variant SKU."
+        title="Create Product (Complete Specification + Multi-Currency Prices)"
+        subtitle="Create a parent product with multi-length titles, taxonomy linkage, physical dimensions, default variant SKU, and multi-currency ProductPrice & ProductVariantPrice records."
         submitLabel="Create Product"
         action="/products"
         fields={[
@@ -1252,13 +1289,13 @@ export default function Products({
           },
           {
             name: 'currencyCode',
-            label: 'Currency',
+            label: 'Primary Currency',
             default: 'USD',
             section: '3. Default Variant Pricing & Stock',
           },
           {
             name: 'retailPrice',
-            label: 'Retail price',
+            label: 'Primary Retail price',
             kind: 'number',
             required: true,
             section: '3. Default Variant Pricing & Stock',
@@ -1292,6 +1329,13 @@ export default function Products({
             name: 'weightGrams',
             label: 'Weight (grams)',
             kind: 'number',
+            section: '3. Default Variant Pricing & Stock',
+          },
+          {
+            name: 'pricesJson',
+            label: 'Multi-Currency Price Array (ProductPrice & ProductVariantPrice)',
+            kind: 'prices',
+            fullWidth: true,
             section: '3. Default Variant Pricing & Stock',
           },
           {
@@ -1344,6 +1388,9 @@ export default function Products({
                 status: String(editProductRow.status ?? 'active'),
                 brandId: String(editProductRow.brandId ?? ''),
                 categoryId: String(editProductRow.categoryId ?? ''),
+                pricesJson: JSON.stringify(
+                  Array.isArray(editProductRow.prices) ? editProductRow.prices : []
+                ),
               }
             : undefined
         }
@@ -1389,6 +1436,13 @@ export default function Products({
             kind: 'select',
             section: '2. Classification & Status',
             options: PRODUCT_STATUS.map((s) => ({ value: s, label: s })),
+          },
+          {
+            name: 'pricesJson',
+            label: 'Multi-Currency Price Array (ProductPrice)',
+            kind: 'prices',
+            fullWidth: true,
+            section: '2. Classification & Status',
           },
           {
             name: 'shortDescription',
@@ -1438,33 +1492,39 @@ export default function Products({
           { name: 'mpn', label: 'MPN', section: '1. Variant Identity' },
           { name: 'asin', label: 'Amazon ASIN', section: '1. Variant Identity' },
           {
+            name: 'currencyCode',
+            label: 'Primary Currency',
+            default: 'USD',
+            section: '2. Pricing & Stock',
+          },
+          {
             name: 'retailPrice',
-            label: 'Retail price ($)',
+            label: 'Primary Retail price',
             kind: 'number',
             required: true,
             section: '2. Pricing & Stock',
           },
           {
             name: 'compareAtPrice',
-            label: 'Compare-at price ($)',
+            label: 'Compare-at price',
             kind: 'number',
             section: '2. Pricing & Stock',
           },
           {
             name: 'costPrice',
-            label: 'Cost price (COGS $)',
+            label: 'Cost price (COGS)',
             kind: 'number',
             section: '2. Pricing & Stock',
           },
           {
             name: 'manufacturingCost',
-            label: 'Manufacturing cost ($)',
+            label: 'Manufacturing cost',
             kind: 'number',
             section: '2. Pricing & Stock',
           },
           {
             name: 'packagingCost',
-            label: 'Packaging cost ($)',
+            label: 'Packaging cost',
             kind: 'number',
             section: '2. Pricing & Stock',
           },
@@ -1480,6 +1540,13 @@ export default function Products({
             label: 'Reorder alert threshold',
             kind: 'number',
             default: '10',
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'pricesJson',
+            label: 'Multi-Currency Price Array (ProductVariantPrice)',
+            kind: 'prices',
+            fullWidth: true,
             section: '2. Pricing & Stock',
           },
           {
@@ -1500,7 +1567,7 @@ export default function Products({
       <FormModal
         isOpen={globalAddVariantOpen}
         onOpenChange={setGlobalAddVariantOpen}
-        title="Add Variant SKU"
+        title="Add Variant SKU (with Multi-Currency Prices)"
         submitLabel="Create Variant"
         action="/products/placeholder/variants"
         actionFor={(v) => `/products/${v.productId}/variants`}
@@ -1528,18 +1595,19 @@ export default function Products({
           },
           { name: 'asin', label: 'Amazon ASIN', section: '1. Parent Product & SKU' },
           {
+            name: 'currencyCode',
+            label: 'Primary Currency',
+            default: 'USD',
+            section: '2. Pricing & Stock',
+          },
+          {
             name: 'retailPrice',
-            label: 'Retail price ($)',
+            label: 'Primary Retail price',
             kind: 'number',
             required: true,
             section: '2. Pricing & Stock',
           },
-          {
-            name: 'costPrice',
-            label: 'Cost price ($)',
-            kind: 'number',
-            section: '2. Pricing & Stock',
-          },
+          { name: 'costPrice', label: 'Cost price', kind: 'number', section: '2. Pricing & Stock' },
           {
             name: 'stockOnHand',
             label: 'Stock on hand',
@@ -1552,6 +1620,13 @@ export default function Products({
             label: 'Reorder point',
             kind: 'number',
             default: '10',
+            section: '2. Pricing & Stock',
+          },
+          {
+            name: 'pricesJson',
+            label: 'Multi-Currency Price Array (ProductVariantPrice)',
+            kind: 'prices',
+            fullWidth: true,
             section: '2. Pricing & Stock',
           },
           {
@@ -1574,20 +1649,31 @@ export default function Products({
         onOpenChange={(o) => {
           if (!o) setEditStockRow(null)
         }}
-        title={`Adjust Stock & Price — ${editStockRow?.sku ?? ''}`}
-        submitLabel="Update Stock & Price"
+        title={`Adjust Stock & Multi-Currency Prices — ${editStockRow?.sku ?? ''}`}
+        submitLabel="Update Stock & Prices"
         action={editStockRow ? `/variants/${editStockRow.id}/stock` : '/variants/placeholder/stock'}
         initialValues={
           editStockRow
             ? {
                 stockOnHand: String(editStockRow.stockOnHand ?? 0),
+                currencyCode: String(editStockRow.currencyCode ?? 'USD'),
                 retailPrice: String(editStockRow.retailPrice ?? 0),
+                pricesJson: JSON.stringify(
+                  Array.isArray(editStockRow.prices) ? editStockRow.prices : []
+                ),
               }
             : undefined
         }
         fields={[
           { name: 'stockOnHand', label: 'Stock on hand', kind: 'number', required: true },
-          { name: 'retailPrice', label: 'Retail price ($)', kind: 'number', required: true },
+          { name: 'currencyCode', label: 'Primary Currency Code', default: 'USD' },
+          { name: 'retailPrice', label: 'Primary Retail price', kind: 'number', required: true },
+          {
+            name: 'pricesJson',
+            label: 'Multi-Currency Price Array (ProductVariantPrice)',
+            kind: 'prices',
+            fullWidth: true,
+          },
         ]}
       />
 
@@ -1608,7 +1694,7 @@ export default function Products({
       />
 
       <FormModal
-        isOpen={!!editBrandRow}
+        isOpen={editBrandRow !== null}
         onOpenChange={(o) => {
           if (!o) setEditBrandRow(null)
         }}

@@ -77,13 +77,13 @@ const COST_BUCKETS = [
 ]
 
 export default function Finance({
-  financialAccounts = [],
-  creditCards = [],
-  financialTransactions = [],
-  financeCategories = [],
-  sellerAccounts = [],
-  orders = [],
-  savedViews = [],
+  financialAccounts,
+  creditCards,
+  financialTransactions,
+  financeCategories,
+  sellerAccounts,
+  orders,
+  savedViews,
 }: Props) {
   const [createAccountOpen, setCreateAccountOpen] = useState(false)
   const [editAccountRow, setEditAccountRow] = useState<Row | null>(null)

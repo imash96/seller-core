@@ -21,6 +21,7 @@ import {
   SyncJobStatus,
   OutboxEventStatus,
 } from '../enums/index.js'
+import { PriceService } from './price_service.js'
 import { generateEntityId } from '../utils/generate_entity_id.js'
 import { normalizeEmail, normalizePhone, computeAddressFingerprint } from '../utils/identity.js'
 
@@ -32,12 +33,14 @@ export interface OrderLineInput {
   variantTitle?: string | null
   asin?: string | null
   quantityOrdered: number
+  currencyCode?: string
   unitPrice: number
   discountAmount?: number
   taxAmount?: number
   shippingAmount?: number
   unitCostAmount?: number
   marketplaceFeeAmount?: number
+  fieldCurrencyOverrides?: Record<string, string>
 }
 
 export interface CreateOrderInput {
@@ -54,7 +57,9 @@ export interface CreateOrderInput {
   reportingCurrencyCode?: string
   exchangeRate?: number
   shippingCostAmount?: number
+  shippingCostCurrencyCode?: string
   paymentProcessingFeesAmount?: number
+  fieldCurrencyOverrides?: Record<string, string>
   buyerNotes?: string | null
   internalNotes?: string | null
   orderedAt?: string
@@ -88,9 +93,11 @@ function roundMoney(value: number): number {
 export class OrderService {
   /**
    * Creates a normalized order with line items, customer identity resolution,
-   * repeat-customer detection, inventory reservation, and P&L calculation inside a transaction.
+   * repeat-customer detection, inventory reservation, P&L calculation,
+   * and per-field `OrderPrice` + `OrderLineItemPrice` records inside a transaction.
    */
   static async createOrder(input: CreateOrderInput): Promise<Order> {
+    await PriceService.ensurePriceTables()
     if (!input.lines || input.lines.length === 0) {
       throw new Error('VALIDATION_ERROR: An order must contain at least one line item.')
     }
@@ -203,6 +210,7 @@ export class OrderService {
       const preparedLines: Array<{
         lineModel: OrderLineItem
         variantToReserve: ProductVariant | null
+        fieldCurrencyOverrides?: Record<string, string>
       }> = []
 
       for (const lineInput of input.lines) {
@@ -266,7 +274,7 @@ export class OrderService {
         lineModel.quantityFulfilled = 0
         lineModel.quantityReturned = 0
         lineModel.quantityCancelled = 0
-        lineModel.currencyCode = currencyCode
+        lineModel.currencyCode = (lineInput.currencyCode || currencyCode).toUpperCase()
         lineModel.unitPrice = unitPrice.toFixed(2)
         lineModel.discountAmount = lineDiscount.toFixed(2)
         lineModel.taxAmount = lineTax.toFixed(2)
@@ -277,7 +285,11 @@ export class OrderService {
         lineModel.refundedAmount = '0.00'
         lineModel.fulfillmentStatus = FulfillmentStatus.UNFULFILLED
 
-        preparedLines.push({ lineModel, variantToReserve: variant })
+        preparedLines.push({
+          lineModel,
+          variantToReserve: variant,
+          fieldCurrencyOverrides: lineInput.fieldCurrencyOverrides,
+        })
       }
 
       const totalAmount = roundMoney(
@@ -340,11 +352,30 @@ export class OrderService {
       order.confirmedAt = DateTime.now()
       await order.save()
 
-      // 5. Save OrderLineItems & reserve stock on ProductVariant
-      for (const { lineModel, variantToReserve } of preparedLines) {
+      // Save per-field OrderPrice records ({ currency_code, amount })
+      const orderFieldCurOverrides: Record<string, string> = {
+        ...(input.fieldCurrencyOverrides ?? {}),
+      }
+      if (input.shippingCostCurrencyCode) {
+        orderFieldCurOverrides.shipping_cost_amount = input.shippingCostCurrencyCode.toUpperCase()
+      }
+      await PriceService.syncOrderPrices({
+        order,
+        fieldCurrencyOverrides: orderFieldCurOverrides,
+        trx,
+      })
+
+      // 5. Save OrderLineItems, OrderLineItemPrices & reserve stock on ProductVariant
+      for (const { lineModel, variantToReserve, fieldCurrencyOverrides } of preparedLines) {
         lineModel.useTransaction(trx)
         lineModel.orderId = order.id
         await lineModel.save()
+
+        await PriceService.syncOrderLineItemPrices({
+          lineItem: lineModel,
+          fieldCurrencyOverrides,
+          trx,
+        })
 
         if (variantToReserve) {
           variantToReserve.useTransaction(trx)
@@ -437,10 +468,6 @@ export class OrderService {
     })
   }
 
-  /**
-   * Bulk order import with batch job tracking, idempotency key deduplication,
-   * source-account-scoped external_order_id duplicate prevention, and per-record error reporting.
-   */
   static async importBulkOrders(input: {
     userId: string
     actorUserId?: string
@@ -458,7 +485,6 @@ export class OrderService {
       throw new Error('BATCH_LIMIT_EXCEEDED: Bulk import supports at most 500 orders per batch.')
     }
 
-    // Check if this batch idempotencyKey was already processed for this user
     const existingJob = await SyncJob.query()
       .where('userId', input.userId)
       .andWhere('idempotencyKey', input.idempotencyKey)
@@ -504,7 +530,6 @@ export class OrderService {
       try {
         const effectiveSellerAccountId = rawOrder.sellerAccountId ?? input.sellerAccountId ?? null
 
-        // Duplicate check 1: (seller_account_id, external_order_id)
         if (effectiveSellerAccountId && rawOrder.externalOrderId) {
           const duplicateExternal = await Order.query()
             .where('userId', input.userId)
@@ -518,7 +543,6 @@ export class OrderService {
           }
         }
 
-        // Duplicate check 2: (user_id, order_number)
         if (rawOrder.orderNumber) {
           const duplicateOrderNum = await Order.query()
             .where('userId', input.userId)
