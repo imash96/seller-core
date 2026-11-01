@@ -11,6 +11,14 @@ export interface ApiDefinition {
     destroy: typeof routes['session.destroy']
   }
   dashboard: typeof routes['dashboard']
+  organizations: {
+    index: typeof routes['organizations.index']
+    store: typeof routes['organizations.store']
+    members: {
+      store: typeof routes['organizations.members.store']
+      delete: typeof routes['organizations.members.delete']
+    }
+  }
   pages: {
     orders: typeof routes['pages.orders']
     customers: typeof routes['pages.customers']
@@ -147,6 +155,8 @@ export interface ApiDefinition {
   }
   financialTransactions: {
     store: typeof routes['financial_transactions.store']
+    reconcile: typeof routes['financial_transactions.reconcile']
+    reverseReconciliation: typeof routes['financial_transactions.reverse_reconciliation']
     void: typeof routes['financial_transactions.void']
   }
   tasks: {

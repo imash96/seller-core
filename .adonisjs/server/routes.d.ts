@@ -8,6 +8,10 @@ export type ScannedRoutes = {
     'session.create': { paramsTuple?: []; params?: {} }
     'session.store': { paramsTuple?: []; params?: {} }
     'dashboard': { paramsTuple?: []; params?: {} }
+    'organizations.index': { paramsTuple?: []; params?: {} }
+    'organizations.store': { paramsTuple?: []; params?: {} }
+    'organizations.members.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'organizations.members.delete': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'membershipId': ParamValue} }
     'pages.orders': { paramsTuple?: []; params?: {} }
     'pages.customers': { paramsTuple?: []; params?: {} }
     'pages.catalogs': { paramsTuple?: []; params?: {} }
@@ -100,6 +104,8 @@ export type ScannedRoutes = {
     'finance_categories.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'finance_categories.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'financial_transactions.store': { paramsTuple?: []; params?: {} }
+    'financial_transactions.reconcile': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'financial_transactions.reverse_reconciliation': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'financial_transactions.void': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'tasks.store': { paramsTuple?: []; params?: {} }
     'tasks.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -123,10 +129,34 @@ export type ScannedRoutes = {
     'admin.users.module_access': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.entitlements.toggle': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
   }
+  GET: {
+    'store.product_categories': { paramsTuple?: []; params?: {} }
+    'session.create': { paramsTuple?: []; params?: {} }
+    'dashboard': { paramsTuple?: []; params?: {} }
+    'organizations.index': { paramsTuple?: []; params?: {} }
+    'pages.orders': { paramsTuple?: []; params?: {} }
+    'pages.customers': { paramsTuple?: []; params?: {} }
+    'pages.catalogs': { paramsTuple?: []; params?: {} }
+    'pages.products': { paramsTuple?: []; params?: {} }
+    'pages.listings': { paramsTuple?: []; params?: {} }
+    'pages.inventory': { paramsTuple?: []; params?: {} }
+    'pages.accounts': { paramsTuple?: []; params?: {} }
+    'pages.shipments': { paramsTuple?: []; params?: {} }
+    'pages.returns': { paramsTuple?: []; params?: {} }
+    'pages.claims': { paramsTuple?: []; params?: {} }
+    'pages.finance': { paramsTuple?: []; params?: {} }
+    'pages.tasks': { paramsTuple?: []; params?: {} }
+    'pages.import': { paramsTuple?: []; params?: {} }
+    'pages.audit': { paramsTuple?: []; params?: {} }
+    'pages.address_cleanup': { paramsTuple?: []; params?: {} }
+    'pages.tools_address_cleanup': { paramsTuple?: []; params?: {} }
+    'pages.admin': { paramsTuple?: []; params?: {} }
+  }
   HEAD: {
     'store.product_categories': { paramsTuple?: []; params?: {} }
     'session.create': { paramsTuple?: []; params?: {} }
     'dashboard': { paramsTuple?: []; params?: {} }
+    'organizations.index': { paramsTuple?: []; params?: {} }
     'pages.orders': { paramsTuple?: []; params?: {} }
     'pages.customers': { paramsTuple?: []; params?: {} }
     'pages.catalogs': { paramsTuple?: []; params?: {} }
@@ -147,30 +177,11 @@ export type ScannedRoutes = {
   }
   OPTIONS: {
   }
-  GET: {
-    'store.product_categories': { paramsTuple?: []; params?: {} }
-    'session.create': { paramsTuple?: []; params?: {} }
-    'dashboard': { paramsTuple?: []; params?: {} }
-    'pages.orders': { paramsTuple?: []; params?: {} }
-    'pages.customers': { paramsTuple?: []; params?: {} }
-    'pages.catalogs': { paramsTuple?: []; params?: {} }
-    'pages.products': { paramsTuple?: []; params?: {} }
-    'pages.listings': { paramsTuple?: []; params?: {} }
-    'pages.inventory': { paramsTuple?: []; params?: {} }
-    'pages.accounts': { paramsTuple?: []; params?: {} }
-    'pages.shipments': { paramsTuple?: []; params?: {} }
-    'pages.returns': { paramsTuple?: []; params?: {} }
-    'pages.claims': { paramsTuple?: []; params?: {} }
-    'pages.finance': { paramsTuple?: []; params?: {} }
-    'pages.tasks': { paramsTuple?: []; params?: {} }
-    'pages.import': { paramsTuple?: []; params?: {} }
-    'pages.audit': { paramsTuple?: []; params?: {} }
-    'pages.address_cleanup': { paramsTuple?: []; params?: {} }
-    'pages.tools_address_cleanup': { paramsTuple?: []; params?: {} }
-    'pages.admin': { paramsTuple?: []; params?: {} }
-  }
   POST: {
     'session.store': { paramsTuple?: []; params?: {} }
+    'organizations.store': { paramsTuple?: []; params?: {} }
+    'organizations.members.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'organizations.members.delete': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'membershipId': ParamValue} }
     'session.destroy': { paramsTuple?: []; params?: {} }
     'orders.store': { paramsTuple?: []; params?: {} }
     'orders.bulk_import': { paramsTuple?: []; params?: {} }
@@ -246,6 +257,8 @@ export type ScannedRoutes = {
     'finance_categories.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'finance_categories.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'financial_transactions.store': { paramsTuple?: []; params?: {} }
+    'financial_transactions.reconcile': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'financial_transactions.reverse_reconciliation': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'financial_transactions.void': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'tasks.store': { paramsTuple?: []; params?: {} }
     'tasks.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }

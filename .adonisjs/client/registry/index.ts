@@ -30,6 +30,30 @@ const routes = {
     tokens: [[0,"dashboard"]],
     types: placeholder as Registry['dashboard']['types'],
   },
+  'organizations.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/organizations',
+    tokens: [[0,"organizations"]],
+    types: placeholder as Registry['organizations.index']['types'],
+  },
+  'organizations.store': {
+    methods: ["POST"],
+    pattern: '/organizations',
+    tokens: [[0,"organizations"]],
+    types: placeholder as Registry['organizations.store']['types'],
+  },
+  'organizations.members.store': {
+    methods: ["POST"],
+    pattern: '/organizations/:id/members',
+    tokens: [[0,"organizations"],[1,"id"],[0,"members"]],
+    types: placeholder as Registry['organizations.members.store']['types'],
+  },
+  'organizations.members.delete': {
+    methods: ["POST"],
+    pattern: '/organizations/:id/members/:membershipId/delete',
+    tokens: [[0,"organizations"],[1,"id"],[0,"members"],[1,"membershipId"],[0,"delete"]],
+    types: placeholder as Registry['organizations.members.delete']['types'],
+  },
   'pages.orders': {
     methods: ["GET","HEAD"],
     pattern: '/orders',
@@ -581,6 +605,18 @@ const routes = {
     pattern: '/financial-transactions',
     tokens: [[0,"financial-transactions"]],
     types: placeholder as Registry['financial_transactions.store']['types'],
+  },
+  'financial_transactions.reconcile': {
+    methods: ["POST"],
+    pattern: '/financial-transactions/:id/reconcile',
+    tokens: [[0,"financial-transactions"],[1,"id"],[0,"reconcile"]],
+    types: placeholder as Registry['financial_transactions.reconcile']['types'],
+  },
+  'financial_transactions.reverse_reconciliation': {
+    methods: ["POST"],
+    pattern: '/financial-transactions/:id/reconciliation/reverse',
+    tokens: [[0,"financial-transactions"],[1,"id"],[0,"reconciliation"],[0,"reverse"]],
+    types: placeholder as Registry['financial_transactions.reverse_reconciliation']['types'],
   },
   'financial_transactions.void': {
     methods: ["POST"],

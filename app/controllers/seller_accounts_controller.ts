@@ -63,25 +63,33 @@ export default class SellerAccountsController {
 
   async updateSellerAccount({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const payload = await request.validateUsing(updateSellerAccountValidator)
-    const account = await SellerAccount.query()
-      .where('id', params.id)
-      .andWhere('userId', user.id)
-      .firstOrFail()
-    account.merge(payload)
-    await account.save()
-    session.flash('success', `Seller account "${account.accountName}" updated.`)
+    try {
+      const payload = await request.validateUsing(updateSellerAccountValidator)
+      const account = await SellerAccount.query()
+        .where('id', params.id)
+        .andWhere('userId', user.id)
+        .firstOrFail()
+      account.merge(payload)
+      await account.save()
+      session.flash('success', `Seller account "${account.accountName}" updated.`)
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to update seller account.')
+    }
     return response.redirect().back()
   }
 
   async deleteSellerAccount({ auth, params, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const account = await SellerAccount.query()
-      .where('id', params.id)
-      .andWhere('userId', user.id)
-      .firstOrFail()
-    await account.delete()
-    session.flash('success', 'Seller account disconnected and removed.')
+    try {
+      const account = await SellerAccount.query()
+        .where('id', params.id)
+        .andWhere('userId', user.id)
+        .firstOrFail()
+      await account.delete()
+      session.flash('success', 'Seller account disconnected and removed.')
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to delete seller account.')
+    }
     return response.redirect().back()
   }
 

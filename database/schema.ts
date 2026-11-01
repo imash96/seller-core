@@ -829,6 +829,51 @@ export class FinancialTransactionSchema extends BaseModel {
   declare vendorOrPayer: string | null
 }
 
+export class ManualReconciliationSchema extends BaseModel {
+  static $columns = [
+    'currencyCode',
+    'financialTransactionId',
+    'id',
+    'notes',
+    'observedAmount',
+    'previousStatus',
+    'reconciledAt',
+    'reconciledByUserId',
+    'reversalReason',
+    'reversedAt',
+    'reversedByUserId',
+    'sourceReference',
+    'userId',
+  ] as const
+  $columns = ManualReconciliationSchema.$columns
+  @column()
+  declare currencyCode: string
+  @column()
+  declare financialTransactionId: string
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare notes: string | null
+  @column()
+  declare observedAmount: string
+  @column()
+  declare previousStatus: string
+  @column.dateTime()
+  declare reconciledAt: DateTime
+  @column()
+  declare reconciledByUserId: string
+  @column()
+  declare reversalReason: string | null
+  @column.dateTime()
+  declare reversedAt: DateTime | null
+  @column()
+  declare reversedByUserId: string | null
+  @column()
+  declare sourceReference: string
+  @column()
+  declare userId: string
+}
+
 export class MarketplaceClaimSchema extends BaseModel {
   static $columns = [
     'claimNumber',
@@ -1319,6 +1364,53 @@ export class OrderSchema extends BaseModel {
   declare updatedAt: DateTime
   @column()
   declare userId: string
+}
+
+export class OrganizationMembershipSchema extends BaseModel {
+  static $columns = [
+    'addedByUserId',
+    'createdAt',
+    'id',
+    'isAdmin',
+    'organizationId',
+    'roleId',
+    'updatedAt',
+    'userId',
+  ] as const
+  $columns = OrganizationMembershipSchema.$columns
+  @column()
+  declare addedByUserId: string | null
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare isAdmin: boolean
+  @column()
+  declare organizationId: string
+  @column()
+  declare roleId: string | null
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+  @column()
+  declare userId: string
+}
+
+export class OrganizationSchema extends BaseModel {
+  static $columns = ['createdAt', 'id', 'isPersonal', 'name', 'ownerUserId', 'updatedAt'] as const
+  $columns = OrganizationSchema.$columns
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare isPersonal: boolean
+  @column()
+  declare name: string
+  @column()
+  declare ownerUserId: string
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
 }
 
 export class OutboxEventSchema extends BaseModel {
@@ -2269,6 +2361,19 @@ export class SellerAccountSchema extends BaseModel {
   declare userId: string
 }
 
+export class SessionSchema extends BaseModel {
+  static $columns = ['data', 'expiresAt', 'id', 'userId'] as const
+  $columns = SessionSchema.$columns
+  @column()
+  declare data: string
+  @column.dateTime()
+  declare expiresAt: DateTime
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare userId: string | null
+}
+
 export class ShipmentItemSchema extends BaseModel {
   static $columns = [
     'createdAt',
@@ -2427,7 +2532,7 @@ export class ShippingInvoiceLineSchema extends BaseModel {
   @column()
   declare description: string | null
   @column()
-  declare expectedAmount: string
+  declare expectedAmount: string | null
   @column({ isPrimary: true })
   declare id: string
   @column()
@@ -2443,7 +2548,7 @@ export class ShippingInvoiceLineSchema extends BaseModel {
   @column()
   declare userId: string
   @column()
-  declare varianceAmount: string
+  declare varianceAmount: string | null
 }
 
 export class ShippingInvoiceSchema extends BaseModel {

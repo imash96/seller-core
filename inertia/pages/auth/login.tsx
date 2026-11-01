@@ -1,6 +1,4 @@
 import { Form } from '@adonisjs/inertia/react'
-import { usePage } from '@inertiajs/react'
-import { Banner } from '@astryxdesign/core/Banner'
 import { Button } from '@astryxdesign/core/Button'
 import AuthLayout from '~/layouts/auth'
 import { useState } from 'react'
@@ -12,9 +10,6 @@ import { VStack } from '@astryxdesign/core'
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const page = usePage() as any
-  const flash = (page.flash ?? page.props?.flash) as
-    { error?: string; success?: string } | undefined
 
   return (
     <AuthLayout
@@ -22,11 +17,6 @@ export default function Login() {
       subtitle="Multi-channel e-commerce operations, carrier reconciliation & financial P&L suite."
     >
       <div className="space-y-5">
-        {flash?.error && (
-          <Banner status="error" title="Authentication notice" description={flash.error} />
-        )}
-        {flash?.success && <Banner status="success" title="Success" description={flash.success} />}
-
         <div className="p-3.5 rounded-xl bg-muted/50 border border-border space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge variant="info" label="Admin-provisioned accounts only" />

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { Theme } from '@astryxdesign/core'
 import { themes, defaultThemeSlug } from '~/app/astryx_themes'
+import { getCookie } from '~/lib/cookies'
 
 export type ThemeMode = 'light' | 'dark'
 
@@ -24,10 +25,7 @@ function detectInitialTheme(propTheme?: ThemeMode): ThemeMode {
     if (el.classList.contains('dark') || el.getAttribute('data-theme') === 'dark') {
       return 'dark'
     }
-    const cookieMatch = document.cookie
-      .split('; ')
-      .find((row) => row.startsWith('app_theme='))
-      ?.split('=')[1]
+    const cookieMatch = getCookie('app_theme')
     if (cookieMatch === 'dark' || cookieMatch === 'light') {
       return cookieMatch
     }

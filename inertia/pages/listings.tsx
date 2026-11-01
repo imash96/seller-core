@@ -1,4 +1,5 @@
 import { router } from '@inertiajs/react'
+import { getCsrfToken } from '~/lib/cookies'
 import {
   PageHeader,
   PageSection,
@@ -130,12 +131,6 @@ export default function Listings({
 
   const [inspectListing, setInspectListing] = useState<Row | null>(null)
 
-  const getCsrfToken = () =>
-    document.cookie
-      .split('; ')
-      .find((row) => row.startsWith('XSRF-TOKEN='))
-      ?.split('=')[1] ?? ''
-
   const skuGroups: SkuGroup[] = useMemo(() => {
     if (serverSkuGroups && serverSkuGroups.length > 0) return serverSkuGroups
     const map = new Map<string, SkuGroup>()
@@ -236,11 +231,12 @@ export default function Listings({
     setBusyKey(`pub-${listing.id}`)
     setBanner(null)
     try {
+      const csrf = getCsrfToken()
       const res = await fetch(`/channel-listings/${listing.id}/publish`, {
         method: 'POST',
         headers: {
-          'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          Accept: 'application/json',
+          ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
         },
       })
       const data = await res.json()
@@ -255,6 +251,11 @@ export default function Listings({
         })
         router.reload()
       }
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        message: err instanceof Error ? err.message : 'Network error publishing listing.',
+      })
     } finally {
       setBusyKey(null)
     }
@@ -264,12 +265,13 @@ export default function Listings({
     setBusyKey(`sku-${sku}`)
     setBanner(null)
     try {
+      const csrf = getCsrfToken()
       const res = await fetch('/channel-listings/publish-sku', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
         },
         body: JSON.stringify({ sku }),
       })
@@ -285,6 +287,11 @@ export default function Listings({
         })
         router.reload()
       }
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        message: err instanceof Error ? err.message : 'Network error publishing SKU group.',
+      })
     } finally {
       setBusyKey(null)
     }
@@ -327,12 +334,13 @@ export default function Listings({
     if (!editingListing) return
     setBusyKey(`edit-${editingListing.id}`)
     try {
+      const csrf = getCsrfToken()
       const res = await fetch(`/channel-listings/${editingListing.id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
         },
         body: JSON.stringify({
           externalListingId: editForm.externalListingId,
@@ -358,7 +366,14 @@ export default function Listings({
         })
         setEditingListing(null)
         router.reload()
+      } else {
+        setBanner({ tone: 'error', message: data.error ?? 'Failed to update listing.' })
       }
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        message: err instanceof Error ? err.message : 'Network error updating listing.',
+      })
     } finally {
       setBusyKey(null)
     }
@@ -372,12 +387,13 @@ export default function Listings({
     setBusyKey('gen-listings')
     setBanner(null)
     try {
+      const csrf = getCsrfToken()
       const res = await fetch('/catalogs/generate-listings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
         },
         body: JSON.stringify({
           brandId: selectedBrandId,
@@ -402,6 +418,11 @@ export default function Listings({
         setGenerateModalOpen(false)
         router.reload()
       }
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        message: err instanceof Error ? err.message : 'Network error generating listings.',
+      })
     } finally {
       setBusyKey(null)
     }

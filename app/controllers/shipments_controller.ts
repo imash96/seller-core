@@ -110,12 +110,16 @@ export default class ShipmentsController {
 
   async deleteShipment({ auth, params, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    await Shipment.query().where('userId', user.id).where('id', params.id).firstOrFail()
-    // Removing a shipment would orphan fulfillment quantities and financial records.
-    session.flash(
-      'error',
-      'Shipments cannot be deleted after allocation. Update the status instead.'
-    )
+    try {
+      await Shipment.query().where('userId', user.id).where('id', params.id).firstOrFail()
+      // Removing a shipment would orphan fulfillment quantities and financial records.
+      session.flash(
+        'error',
+        'Shipments cannot be deleted after allocation. Update the status instead.'
+      )
+    } catch {
+      session.flash('error', 'Shipment not found.')
+    }
     return response.redirect().back()
   }
 

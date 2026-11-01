@@ -538,6 +538,10 @@ export default class ProductsController {
       } else {
         throw new Error('Provide a catalog JSON file or JSON text.')
       }
+
+      if (!catalogPayload || typeof catalogPayload !== 'object') {
+        throw new Error('Catalog payload must be a non-null object.')
+      }
     } catch (err: any) {
       const msg = `Invalid Catalog JSON syntax: ${err.message || 'Check JSON structure.'}`
       if (wantsJson(request)) {
@@ -750,7 +754,11 @@ export default class ProductsController {
     try {
       let rawPreview = request.input('preview') as any
       if (typeof rawPreview === 'string') {
-        rawPreview = JSON.parse(rawPreview)
+        try {
+          rawPreview = JSON.parse(rawPreview)
+        } catch {
+          rawPreview = null
+        }
       }
       let preview: GeneratedProductPreview
       if (!rawPreview || typeof rawPreview !== 'object') {
@@ -771,13 +779,15 @@ export default class ProductsController {
           priceTier: rawPreview.priceTier || rawPreview.priceTierCode || '01',
           prices: normalizePriceMoneyArray(rawPreview.prices, 239.99),
           variants: Array.isArray(rawPreview.variants)
-            ? rawPreview.variants.map((v: any) => ({
-                ...v,
-                sizeValue: v.sizeValue || v.sizeCode || 'M',
-                sizeKey: v.sizeKey || v.sizeLabel || 'Medium',
-                prices: normalizePriceMoneyArray(v.prices, Number(v.retailPrice ?? 239.99)),
-                included: v.included !== false,
-              }))
+            ? rawPreview.variants
+                .filter((v: any) => v && typeof v === 'object')
+                .map((v: any) => ({
+                  ...v,
+                  sizeValue: v.sizeValue || v.sizeCode || 'M',
+                  sizeKey: v.sizeKey || v.sizeLabel || 'Medium',
+                  prices: normalizePriceMoneyArray(v.prices, Number(v.retailPrice ?? 239.99)),
+                  included: v.included !== false,
+                }))
             : [],
         }
       }

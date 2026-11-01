@@ -158,76 +158,84 @@ export default class OrdersController {
 
   async updateOrderStatus({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const status = request.input('status')
-    const order = await Order.query()
-      .where('userId', user.id)
-      .andWhere('id', params.id)
-      .firstOrFail()
+    try {
+      const status = request.input('status')
+      const order = await Order.query()
+        .where('userId', user.id)
+        .andWhere('id', params.id)
+        .firstOrFail()
 
-    if (
-      !Object.values(OrderStatus).includes(status) ||
-      status === OrderStatus.DELIVERED ||
-      order.status === OrderStatus.DELIVERED
-    ) {
-      session.flash('error', 'Invalid status. Mark shipments delivered to complete an order.')
-      return response.redirect().back()
+      if (
+        !Object.values(OrderStatus).includes(status) ||
+        status === OrderStatus.DELIVERED ||
+        order.status === OrderStatus.DELIVERED
+      ) {
+        session.flash('error', 'Invalid status. Mark shipments delivered to complete an order.')
+        return response.redirect().back()
+      }
+      const prevStatus = order.status
+      order.status = status
+      if (status === OrderStatus.CANCELLED) {
+        order.cancelledAt = DateTime.now()
+      }
+      await order.save()
+
+      await RbacService.recordAudit({
+        actorUserId: user.id,
+        userId: user.id,
+        action: 'order.status_updated',
+        entityType: 'order',
+        entityId: order.id,
+        beforeState: { status: prevStatus },
+        afterState: { status },
+        ipAddress: request.ip(),
+      })
+
+      await OrderStatusChanged.dispatch({
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        userId: user.id,
+        fromStatus: prevStatus,
+        toStatus: status,
+        actorUserId: user.id,
+        requestId: request.id(),
+      })
+
+      session.flash('success', `Order ${order.orderNumber} updated to ${status}.`)
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to update order status.')
     }
-    const prevStatus = order.status
-    order.status = status
-    if (status === OrderStatus.CANCELLED) {
-      order.cancelledAt = DateTime.now()
-    }
-    await order.save()
-
-    await RbacService.recordAudit({
-      actorUserId: user.id,
-      userId: user.id,
-      action: 'order.status_updated',
-      entityType: 'order',
-      entityId: order.id,
-      beforeState: { status: prevStatus },
-      afterState: { status },
-      ipAddress: request.ip(),
-    })
-
-    await OrderStatusChanged.dispatch({
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      userId: user.id,
-      fromStatus: prevStatus,
-      toStatus: status,
-      actorUserId: user.id,
-      requestId: request.id(),
-    })
-
-    session.flash('success', `Order ${order.orderNumber} updated to ${status}.`)
     return response.redirect().back()
   }
 
   async deleteOrder({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const order = await Order.query()
-      .where('userId', user.id)
-      .andWhere('id', params.id)
-      .firstOrFail()
+    try {
+      const order = await Order.query()
+        .where('userId', user.id)
+        .andWhere('id', params.id)
+        .firstOrFail()
 
-    const snapshot = order.serialize()
-    order.status = OrderStatus.CANCELLED
-    order.cancelledAt = DateTime.now()
-    await order.save()
+      const snapshot = order.serialize()
+      order.status = OrderStatus.CANCELLED
+      order.cancelledAt = DateTime.now()
+      await order.save()
 
-    await RbacService.recordAudit({
-      actorUserId: user.id,
-      userId: user.id,
-      action: 'order.cancelled',
-      entityType: 'order',
-      entityId: order.id,
-      beforeState: snapshot,
-      afterState: { status: OrderStatus.CANCELLED },
-      ipAddress: request.ip(),
-    })
+      await RbacService.recordAudit({
+        actorUserId: user.id,
+        userId: user.id,
+        action: 'order.cancelled',
+        entityType: 'order',
+        entityId: order.id,
+        beforeState: snapshot,
+        afterState: { status: OrderStatus.CANCELLED },
+        ipAddress: request.ip(),
+      })
 
-    session.flash('success', `Order ${order.orderNumber} cancelled.`)
+      session.flash('success', `Order ${order.orderNumber} cancelled.`)
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to cancel order.')
+    }
     return response.redirect().back()
   }
 
@@ -242,8 +250,29 @@ export default class OrdersController {
           request.input('jsonPayload') ||
           '[]'
       )
-      const parsed = JSON.parse(rawJson)
-      const items = Array.isArray(parsed) ? parsed : [parsed]
+      let parsed: any
+      try {
+        parsed = JSON.parse(rawJson)
+      } catch {
+        session.flash('error', 'Bulk import failed: Invalid JSON format.')
+        return response.redirect().back()
+      }
+
+      const rawItems = Array.isArray(parsed)
+        ? parsed
+        : parsed && typeof parsed === 'object'
+          ? [parsed]
+          : []
+      const items = rawItems.filter((item: any) => item && typeof item === 'object')
+
+      if (items.length === 0) {
+        session.flash(
+          'error',
+          'Bulk import failed: No valid order records found in the provided payload.'
+        )
+        return response.redirect().back()
+      }
+
       const normalizedOrders = items.map((item: any, idx: number) => ({
         orderNumber: String(item.orderNumber || `IMP-${Date.now()}-${idx + 1}`),
         externalOrderId: item.externalOrderId ? String(item.externalOrderId) : null,

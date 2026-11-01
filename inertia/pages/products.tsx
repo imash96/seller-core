@@ -1,4 +1,5 @@
 import { router } from '@inertiajs/react'
+import { getCsrfToken } from '~/lib/cookies'
 import {
   PageHeader,
   PageSection,
@@ -162,12 +163,6 @@ export default function Products({
     })
   }, [products, statusFilter, brandFilter, categoryFilter, searchQuery])
 
-  const getCsrfToken = () =>
-    document.cookie
-      .split('; ')
-      .find((row) => row.startsWith('XSRF-TOKEN='))
-      ?.split('=')[1] ?? ''
-
   const openConvertToListingModal = (product: Row) => {
     setConvertModalProduct(product)
     if (product.brandId) {
@@ -200,12 +195,13 @@ export default function Products({
     setConvertingListing(true)
     setBanner(null)
     try {
+      const csrf = getCsrfToken()
       const res = await fetch('/catalogs/generate-listings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
         },
         body: JSON.stringify({
           brandId: selectedBrandId,
@@ -227,7 +223,7 @@ export default function Products({
       } else {
         setBanner({
           tone: 'success',
-          message: `Linked "${convertModalProduct.title}" with Brand "${data.brandName}" and generated ${data.channelListingsUpserted} platform listings across ${(data.platforms ?? selectedPlatforms).join(', ').toUpperCase()}. View & publish them in /listing!`,
+          message: `Linked "${convertModalProduct.title}" with Brand "${data.brandName}" and generated ${data.channelListingsUpserted} platform listings across ${(data.platforms ?? selectedPlatforms).join(', ').toUpperCase()}. View & publish them in /listings!`,
         })
         setConvertModalProduct(null)
         router.reload()
@@ -246,12 +242,13 @@ export default function Products({
     setSyncingCategories(true)
     setBanner(null)
     try {
+      const csrf = getCsrfToken()
       const res = await fetch('/catalogs/sync-categories', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
         },
         body: JSON.stringify({}),
       })
@@ -262,7 +259,17 @@ export default function Products({
           message: data.message || `Synced ${data.totalCategories} Medusa product categories.`,
         })
         router.reload()
+      } else {
+        setBanner({
+          tone: 'error',
+          message: data.error ?? 'Failed to sync Medusa categories.',
+        })
       }
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        message: err instanceof Error ? err.message : 'Network error syncing categories.',
+      })
     } finally {
       setSyncingCategories(false)
     }

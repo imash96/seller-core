@@ -2,6 +2,7 @@ import { Stack, VStack, HStack } from '@astryxdesign/core/Stack'
 import { Table, proportional } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
 import { router } from '@inertiajs/react'
+import { getCsrfToken } from '~/lib/cookies'
 import {
   PageHeader,
   PageSection,
@@ -285,12 +286,6 @@ export default function Catalogs({
     })
   }, [catalogItems, genderFilter, categoryFilter, typeFilter, statusFilter, searchQuery])
 
-  const getCsrfToken = () =>
-    document.cookie
-      .split('; ')
-      .find((row) => row.startsWith('XSRF-TOKEN='))
-      ?.split('=')[1] ?? ''
-
   const openCreateModal = () => {
     setEditingCatalogItem(null)
     const nextNum = catalogItems.length + 1
@@ -453,7 +448,7 @@ export default function Catalogs({
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          'X-XSRF-TOKEN': getCsrfToken(),
         },
         body: JSON.stringify({
           ...formState,
@@ -492,11 +487,12 @@ export default function Catalogs({
     setBusyId(`del-${item.id}`)
     setBanner(null)
     try {
+      const csrf = getCsrfToken()
       const res = await fetch(`/catalog-items/${item.id}/delete`, {
         method: 'POST',
         headers: {
-          'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          Accept: 'application/json',
+          ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
         },
       })
       const data = await res.json()
@@ -507,7 +503,14 @@ export default function Catalogs({
         })
         if (detailDrawerItem?.id === item.id) setDetailDrawerItem(null)
         router.reload()
+      } else {
+        setBanner({ tone: 'error', message: data.error ?? 'Failed to delete catalog item.' })
       }
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        message: err instanceof Error ? err.message : 'Network error deleting catalog item.',
+      })
     } finally {
       setBusyId(null)
     }
@@ -517,12 +520,13 @@ export default function Catalogs({
     setBusyId('sync-cat')
     setBanner(null)
     try {
+      const csrf = getCsrfToken()
       const res = await fetch('/catalogs/sync-categories', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
         },
         body: JSON.stringify({ source }),
       })
@@ -538,6 +542,11 @@ export default function Catalogs({
       } else {
         setBanner({ tone: 'error', message: data.error ?? 'Category sync failed.' })
       }
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        message: err instanceof Error ? err.message : 'Network error syncing categories.',
+      })
     } finally {
       setBusyId(null)
     }
@@ -553,7 +562,7 @@ export default function Catalogs({
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          'X-XSRF-TOKEN': getCsrfToken(),
         },
         body: JSON.stringify({
           catalogPayload: parsed,
@@ -598,7 +607,7 @@ export default function Catalogs({
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          'X-XSRF-TOKEN': getCsrfToken(),
         },
         body: JSON.stringify({
           brandId: listingBrand,
@@ -645,7 +654,7 @@ export default function Catalogs({
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          'X-XSRF-TOKEN': getCsrfToken(),
         },
       })
       const data = await res.json()
@@ -745,7 +754,7 @@ export default function Catalogs({
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+          'X-XSRF-TOKEN': getCsrfToken(),
         },
         body: JSON.stringify({
           preview: previewData,

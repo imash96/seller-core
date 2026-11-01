@@ -56,22 +56,26 @@ export default class ToolsController {
 
   async updateTask({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const payload = await request.validateUsing(updateTaskValidator)
-    const task = await TasksReminder.query()
-      .where('id', params.id)
-      .andWhere('userId', user.id)
-      .firstOrFail()
-    if (payload.title !== undefined) task.title = payload.title
-    if (payload.description !== undefined) task.description = payload.description
-    if (payload.taskType !== undefined) task.taskType = payload.taskType
-    if (payload.priority !== undefined) task.priority = payload.priority
-    if (payload.status !== undefined) {
-      task.status = payload.status
-      if (payload.status === 'completed') task.completedAt = DateTime.now()
+    try {
+      const payload = await request.validateUsing(updateTaskValidator)
+      const task = await TasksReminder.query()
+        .where('id', params.id)
+        .andWhere('userId', user.id)
+        .firstOrFail()
+      if (payload.title !== undefined) task.title = payload.title
+      if (payload.description !== undefined) task.description = payload.description
+      if (payload.taskType !== undefined) task.taskType = payload.taskType
+      if (payload.priority !== undefined) task.priority = payload.priority
+      if (payload.status !== undefined) {
+        task.status = payload.status
+        if (payload.status === 'completed') task.completedAt = DateTime.now()
+      }
+      if (payload.dueAt !== undefined) task.dueAt = DateTime.fromISO(payload.dueAt)
+      await task.save()
+      session.flash('success', 'Task updated.')
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to update task.')
     }
-    if (payload.dueAt !== undefined) task.dueAt = DateTime.fromISO(payload.dueAt)
-    await task.save()
-    session.flash('success', 'Task updated.')
     return response.redirect().back()
   }
 
@@ -81,27 +85,35 @@ export default class ToolsController {
 
   async completeTask({ auth, params, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const task = await TasksReminder.query()
-      .where('userId', user.id)
-      .andWhere('id', params.id)
-      .firstOrFail()
+    try {
+      const task = await TasksReminder.query()
+        .where('userId', user.id)
+        .andWhere('id', params.id)
+        .firstOrFail()
 
-    task.status = TaskStatus.COMPLETED
-    task.completedAt = DateTime.now()
-    await task.save()
+      task.status = TaskStatus.COMPLETED
+      task.completedAt = DateTime.now()
+      await task.save()
 
-    session.flash('success', `Task "${task.title}" marked completed.`)
+      session.flash('success', `Task "${task.title}" marked completed.`)
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to complete task.')
+    }
     return response.redirect().back()
   }
 
   async deleteTask({ auth, params, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const task = await TasksReminder.query()
-      .where('id', params.id)
-      .andWhere('userId', user.id)
-      .firstOrFail()
-    await task.delete()
-    session.flash('success', 'Task deleted.')
+    try {
+      const task = await TasksReminder.query()
+        .where('id', params.id)
+        .andWhere('userId', user.id)
+        .firstOrFail()
+      await task.delete()
+      session.flash('success', 'Task deleted.')
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to delete task.')
+    }
     return response.redirect().back()
   }
 
@@ -117,34 +129,42 @@ export default class ToolsController {
       return response.redirect().back()
     }
 
-    await SavedView.updateOrCreate(
-      { userId: user.id, moduleKey, name },
-      {
-        userId: user.id,
-        moduleKey,
-        name,
-        isDefault: request.input('isDefault') === 'true' || request.input('isDefault') === true,
-        filters: { status: request.input('filterStatus', 'all') },
-        sortConfig: { field: 'created_at', direction: 'desc' },
-        columnsConfig: ['order_number', 'status', 'total_amount', 'net_profit_amount'],
-      }
-    )
+    try {
+      await SavedView.updateOrCreate(
+        { userId: user.id, moduleKey, name },
+        {
+          userId: user.id,
+          moduleKey,
+          name,
+          isDefault: request.input('isDefault') === 'true' || request.input('isDefault') === true,
+          filters: { status: request.input('filterStatus', 'all') },
+          sortConfig: { field: 'created_at', direction: 'desc' },
+          columnsConfig: ['order_number', 'status', 'total_amount', 'net_profit_amount'],
+        }
+      )
 
-    session.flash('success', `Saved View "${name}" created for module ${moduleKey}.`)
+      session.flash('success', `Saved View "${name}" created for module ${moduleKey}.`)
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to save view.')
+    }
     return response.redirect().back()
   }
 
   async deleteSavedView({ auth, params, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const view = await SavedView.query()
-      .where('userId', user.id)
-      .andWhere('id', params.id)
-      .firstOrFail()
-    const resource = SAVED_VIEW_RESOURCES[view.moduleKey]
-    if (!resource || !(await RbacService.hasPermission(user, `${resource}.read`, resource)))
-      return response.forbidden({ error: 'Access to this saved view module is required.' })
-    await view.delete()
-    session.flash('success', `Saved view "${view.name}" removed.`)
+    try {
+      const view = await SavedView.query()
+        .where('userId', user.id)
+        .andWhere('id', params.id)
+        .firstOrFail()
+      const resource = SAVED_VIEW_RESOURCES[view.moduleKey]
+      if (!resource || !(await RbacService.hasPermission(user, `${resource}.read`, resource)))
+        return response.forbidden({ error: 'Access to this saved view module is required.' })
+      await view.delete()
+      session.flash('success', `Saved view "${view.name}" removed.`)
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to delete saved view.')
+    }
     return response.redirect().back()
   }
 

@@ -51,10 +51,13 @@ export function MultiCurrencyPriceInput({
         try {
           const parsed = JSON.parse(raw)
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.map((p: any) => ({
-              currency_code: String(p.currency_code || p.currencyCode || 'USD').toUpperCase(),
-              amount: Number(p.amount ?? p.price ?? 0) || 0,
-            }))
+            const valid = parsed
+              .filter((p: any) => p && typeof p === 'object')
+              .map((p: any) => ({
+                currency_code: String(p.currency_code || p.currencyCode || 'USD').toUpperCase(),
+                amount: Number(p.amount ?? p.price ?? 0) || 0,
+              }))
+            if (valid.length > 0) return valid
           }
         } catch {
           // Fallback below

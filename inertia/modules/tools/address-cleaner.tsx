@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { router } from '@inertiajs/react'
+import { getCsrfToken } from '~/lib/cookies'
 import {
   MapPin,
   Download,
@@ -64,23 +65,19 @@ export function AddressCleanerModule() {
     setLoading(true)
 
     try {
-      const xsrfCookie = document.cookie
-        .split('; ')
-        .find((row) => row.startsWith('XSRF-TOKEN='))
-        ?.split('=')[1]
+      const csrf = getCsrfToken()
 
       const response = await fetch('/api/tools/address-clean', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          ...(xsrfCookie ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrfCookie) } : {}),
+          ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
         },
         body: JSON.stringify({ rawText }),
       })
 
       const data = await response.json()
-      console.log(data)
       if (!response.ok) {
         throw new Error(data.error || 'Failed to clean addresses')
       }
@@ -137,16 +134,13 @@ export function AddressCleanerModule() {
     // Fallback: request binary `.docx` stream from `/api/tools/address-clean/docx`
     setDownloadingDocx(true)
     try {
-      const xsrfCookie = document.cookie
-        .split('; ')
-        .find((row) => row.startsWith('XSRF-TOKEN='))
-        ?.split('=')[1]
+      const csrf = getCsrfToken()
 
       const response = await fetch('/api/tools/address-clean/docx', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(xsrfCookie ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrfCookie) } : {}),
+          ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
         },
         body: JSON.stringify({ rawText, addresses: result.addresses }),
       })

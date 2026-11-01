@@ -110,25 +110,29 @@ export default class CustomersController {
 
   async deleteCustomer({ auth, params, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const customer = await Customer.query()
-      .where('userId', user.id)
-      .andWhere('id', params.id)
-      .firstOrFail()
+    try {
+      const customer = await Customer.query()
+        .where('userId', user.id)
+        .andWhere('id', params.id)
+        .firstOrFail()
 
-    const orderCount = await Order.query()
-      .where('userId', user.id)
-      .andWhere('customerId', customer.id)
-      .count('* as total')
-    if (Number(orderCount[0].$extras.total) > 0) {
-      session.flash(
-        'error',
-        `Cannot delete customer "${customer.fullName}" because they have historical orders. Use Merge instead.`
-      )
-      return response.redirect().back()
+      const orderCount = await Order.query()
+        .where('userId', user.id)
+        .andWhere('customerId', customer.id)
+        .count('* as total')
+      if (Number(orderCount[0].$extras.total) > 0) {
+        session.flash(
+          'error',
+          `Cannot delete customer "${customer.fullName}" because they have historical orders. Use Merge instead.`
+        )
+        return response.redirect().back()
+      }
+
+      await customer.delete()
+      session.flash('success', `Customer "${customer.fullName}" removed.`)
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to delete customer.')
     }
-
-    await customer.delete()
-    session.flash('success', `Customer "${customer.fullName}" removed.`)
     return response.redirect().back()
   }
 
@@ -206,21 +210,25 @@ export default class CustomersController {
 
   async reviewRiskSignal({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const signal = await CustomerRiskSignal.query()
-      .where('userId', user.id)
-      .andWhere('id', params.id)
-      .firstOrFail()
+    try {
+      const signal = await CustomerRiskSignal.query()
+        .where('userId', user.id)
+        .andWhere('id', params.id)
+        .firstOrFail()
 
-    const reviewStatus = request.input('reviewStatus', RiskReviewStatus.RESOLVED)
-    const reviewNotes = request.input('reviewNotes', 'Reviewed by operations team.')
+      const reviewStatus = request.input('reviewStatus', RiskReviewStatus.RESOLVED)
+      const reviewNotes = request.input('reviewNotes', 'Reviewed by operations team.')
 
-    signal.reviewStatus = reviewStatus
-    signal.reviewNotes = reviewNotes
-    signal.reviewedByUserId = user.id
-    signal.reviewedAt = DateTime.now()
-    await signal.save()
+      signal.reviewStatus = reviewStatus
+      signal.reviewNotes = reviewNotes
+      signal.reviewedByUserId = user.id
+      signal.reviewedAt = DateTime.now()
+      await signal.save()
 
-    session.flash('success', `Risk signal marked as ${reviewStatus}.`)
+      session.flash('success', `Risk signal marked as ${reviewStatus}.`)
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to review risk signal.')
+    }
     return response.redirect().back()
   }
 }

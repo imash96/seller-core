@@ -98,78 +98,88 @@ export default class ReturnsController {
 
   async updateReturnStatus({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const rma = await ReturnRequest.query()
-      .where('userId', user.id)
-      .andWhere('id', params.id)
-      .firstOrFail()
+    try {
+      const rma = await ReturnRequest.query()
+        .where('userId', user.id)
+        .andWhere('id', params.id)
+        .firstOrFail()
 
-    const status = String(request.input('status', 'received'))
-    const normalizedCond = normalizeReturnItemCondition(request.input('itemCondition'))
-    rma.status = status
-    if (normalizedCond) {
-      rma.itemCondition = normalizedCond
-    }
-    if (request.input('resolutionType')) {
-      rma.resolutionType = String(request.input('resolutionType'))
-    }
-    if (
-      request.input('quantityApproved') !== undefined &&
-      request.input('quantityApproved') !== ''
-    ) {
-      rma.quantityApproved = Math.max(0, Number(request.input('quantityApproved')))
-    }
-    if (
-      request.input('quantityReceived') !== undefined &&
-      request.input('quantityReceived') !== ''
-    ) {
-      rma.quantityReceived = Math.max(0, Number(request.input('quantityReceived')))
-    }
-    if (request.input('refundAmount') !== undefined && request.input('refundAmount') !== '') {
-      rma.refundAmount = Math.max(0, Number(request.input('refundAmount'))).toFixed(2)
-    }
-    if (
-      request.input('restockingFeeAmount') !== undefined &&
-      request.input('restockingFeeAmount') !== ''
-    ) {
-      rma.restockingFeeAmount = Math.max(0, Number(request.input('restockingFeeAmount'))).toFixed(2)
-    }
-    if (
-      request.input('returnShippingCost') !== undefined &&
-      request.input('returnShippingCost') !== ''
-    ) {
-      rma.returnShippingCost = Math.max(0, Number(request.input('returnShippingCost'))).toFixed(2)
-    }
-    if (request.input('returnCarrier') !== undefined) {
-      rma.returnCarrier = String(request.input('returnCarrier')).trim() || null
-    }
-    if (request.input('returnTrackingNumber') !== undefined) {
-      rma.returnTrackingNumber = String(request.input('returnTrackingNumber')).trim() || null
-    }
-    if (request.input('internalNotes') !== undefined) {
-      rma.internalNotes = String(request.input('internalNotes')).trim() || null
-    }
-    if (status === 'received') {
-      rma.receivedAt = DateTime.now()
-      if (!rma.quantityReceived) {
-        rma.quantityReceived = rma.quantityRequested
+      const status = String(request.input('status', 'received'))
+      const normalizedCond = normalizeReturnItemCondition(request.input('itemCondition'))
+      rma.status = status
+      if (normalizedCond) {
+        rma.itemCondition = normalizedCond
       }
-    } else if (status === 'closed') {
-      rma.closedAt = DateTime.now()
-    }
-    await rma.save()
+      if (request.input('resolutionType')) {
+        rma.resolutionType = String(request.input('resolutionType'))
+      }
+      if (
+        request.input('quantityApproved') !== undefined &&
+        request.input('quantityApproved') !== ''
+      ) {
+        rma.quantityApproved = Math.max(0, Number(request.input('quantityApproved')))
+      }
+      if (
+        request.input('quantityReceived') !== undefined &&
+        request.input('quantityReceived') !== ''
+      ) {
+        rma.quantityReceived = Math.max(0, Number(request.input('quantityReceived')))
+      }
+      if (request.input('refundAmount') !== undefined && request.input('refundAmount') !== '') {
+        rma.refundAmount = Math.max(0, Number(request.input('refundAmount'))).toFixed(2)
+      }
+      if (
+        request.input('restockingFeeAmount') !== undefined &&
+        request.input('restockingFeeAmount') !== ''
+      ) {
+        rma.restockingFeeAmount = Math.max(0, Number(request.input('restockingFeeAmount'))).toFixed(
+          2
+        )
+      }
+      if (
+        request.input('returnShippingCost') !== undefined &&
+        request.input('returnShippingCost') !== ''
+      ) {
+        rma.returnShippingCost = Math.max(0, Number(request.input('returnShippingCost'))).toFixed(2)
+      }
+      if (request.input('returnCarrier') !== undefined) {
+        rma.returnCarrier = String(request.input('returnCarrier')).trim() || null
+      }
+      if (request.input('returnTrackingNumber') !== undefined) {
+        rma.returnTrackingNumber = String(request.input('returnTrackingNumber')).trim() || null
+      }
+      if (request.input('internalNotes') !== undefined) {
+        rma.internalNotes = String(request.input('internalNotes')).trim() || null
+      }
+      if (status === 'received') {
+        rma.receivedAt = DateTime.now()
+        if (!rma.quantityReceived) {
+          rma.quantityReceived = rma.quantityRequested
+        }
+      } else if (status === 'closed') {
+        rma.closedAt = DateTime.now()
+      }
+      await rma.save()
 
-    session.flash('success', `RMA ${rma.rmaNumber} updated to ${status}.`)
+      session.flash('success', `RMA ${rma.rmaNumber} updated to ${status}.`)
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to update return request.')
+    }
     return response.redirect().back()
   }
 
   async deleteReturn({ auth, params, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const rma = await ReturnRequest.query()
-      .where('userId', user.id)
-      .andWhere('id', params.id)
-      .firstOrFail()
-    await rma.delete()
-    session.flash('success', `RMA ${rma.rmaNumber} deleted.`)
+    try {
+      const rma = await ReturnRequest.query()
+        .where('userId', user.id)
+        .andWhere('id', params.id)
+        .firstOrFail()
+      await rma.delete()
+      session.flash('success', `RMA ${rma.rmaNumber} deleted.`)
+    } catch (err: any) {
+      session.flash('error', err.message || 'Failed to delete return request.')
+    }
     return response.redirect().back()
   }
 

@@ -2,6 +2,7 @@ import app from '@adonisjs/core/services/app'
 import { type HttpContext, ExceptionHandler } from '@adonisjs/core/http'
 import type { StatusPageRange, StatusPageRenderer } from '@adonisjs/core/types/http'
 import { errors as bouncerErrors } from '@adonisjs/bouncer'
+import { errors as lucidErrors } from '@adonisjs/lucid'
 
 export default class HttpExceptionHandler extends ExceptionHandler {
   /**
@@ -59,6 +60,30 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       }
 
       return super.handle(error, ctx)
+    }
+
+    if (
+      error instanceof lucidErrors.E_ROW_NOT_FOUND ||
+      (error as any)?.code === 'E_ROW_NOT_FOUND'
+    ) {
+      const wantsJson = ctx.request.header('accept')?.includes('application/json')
+      const isInertia =
+        typeof (ctx.request as any).isInertiaRequest === 'function'
+          ? (ctx.request as any).isInertiaRequest()
+          : !!ctx.request.header('x-inertia')
+
+      if (wantsJson && !isInertia) {
+        return ctx.response.status(404).send({ ok: false, error: 'Resource not found' })
+      }
+
+      const referer = ctx.request.header('referer')
+      if (referer && isInertia) {
+        const session: any = (ctx as any).session
+        if (session && typeof session.flash === 'function') {
+          session.flash('error', 'The requested item was not found or has been deleted.')
+        }
+        return ctx.response.redirect().back()
+      }
     }
 
     return super.handle(error, ctx)

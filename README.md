@@ -252,13 +252,6 @@ runner applies migrations and may roll them back at teardown; it also writes tes
 A missing test database or migration failure now fails the run rather than silently
 skipping integration tests.
 
-Browser tests use Playwright Chromium and require its OS dependencies. Install with
-`corepack pnpm exec playwright install --with-deps chromium` in a supported environment.
-Alternatively set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to a compatible Chromium executable;
-the custom-executable launcher disables Chromium's sandbox and should only be used in an
-isolated test environment. The browser tests currently cover order entry at mobile and
-desktop widths and a mobile finance category/ledger flow, not the entire application.
-
 ```sh
 TEST_DATABASE_URL=postgres://user:password@localhost:5432/seller_core_test pnpm test
 ```

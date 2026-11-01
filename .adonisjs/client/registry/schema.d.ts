@@ -59,6 +59,58 @@ export interface Registry {
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/dashboard_controller').default['index']>>>
     }
   }
+  'organizations.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/organizations'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/organizations_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/organizations_controller').default['index']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/organizations_controller').default['index']>>>
+    }
+  }
+  'organizations.store': {
+    methods: ["POST"]
+    pattern: '/organizations'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/organizations_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/organizations_controller').default['store']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/organizations_controller').default['store']>>>
+    }
+  }
+  'organizations.members.store': {
+    methods: ["POST"]
+    pattern: '/organizations/:id/members'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/organizations_controller').default['upsertMember']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/organizations_controller').default['upsertMember']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/organizations_controller').default['upsertMember']>>>
+    }
+  }
+  'organizations.members.delete': {
+    methods: ["POST"]
+    pattern: '/organizations/:id/members/:membershipId/delete'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { id: ParamValue; membershipId: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/organizations_controller').default['removeMember']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/organizations_controller').default['removeMember']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/organizations_controller').default['removeMember']>>>
+    }
+  }
   'pages.orders': {
     methods: ["GET","HEAD"]
     pattern: '/orders'
@@ -1253,6 +1305,32 @@ export interface Registry {
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['storeFinancialTransaction']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['storeFinancialTransaction']>>> | { status: 422; response: { errors: SimpleError[] } }
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['storeFinancialTransaction']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'financial_transactions.reconcile': {
+    methods: ["POST"]
+    pattern: '/financial-transactions/:id/reconcile'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['reconcileTransaction']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['reconcileTransaction']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['reconcileTransaction']>>>
+    }
+  }
+  'financial_transactions.reverse_reconciliation': {
+    methods: ["POST"]
+    pattern: '/financial-transactions/:id/reconciliation/reverse'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['reverseReconciliation']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['reverseReconciliation']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['reverseReconciliation']>>>
     }
   }
   'financial_transactions.void': {
