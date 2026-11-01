@@ -381,10 +381,12 @@ export default function Listings({
         },
         body: JSON.stringify({
           brandId: selectedBrandId,
+          persistChannelListings: true,
           platforms: selectedPlatforms,
           platform: selectedPlatforms[0] ?? 'medusa',
           productIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
-          sellerAccountId: selectedSellerAccountId || undefined,
+          sellerAccountId:
+            selectedPlatforms.length === 1 ? selectedSellerAccountId || undefined : undefined,
           assignBrandToProduct,
           priceMultiplier: Number(priceMultiplier) || 1.0,
         }),
@@ -552,7 +554,7 @@ export default function Listings({
       {/* Filter & View Switcher Toolbar + Card-Based SKU Listings */}
       <PageSection
         title="Multi-Platform Listings Grouped by SKU"
-        description="Each SKU card groups its generated Medusa Website, Amazon, eBay, and Etsy listings together with multi-currency ChannelListingPrice badges, one-click 'Publish on Platform', and JSON download."
+        description="Each SKU card groups its generated Medusa Website, Amazon, eBay, and Etsy listings together with multi-currency ChannelListingPrice badges, draft exports and JSON download. Marketplace publishing is not configured."
       >
         <div className="space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 rounded-2xl border border-card-border bg-muted/25 p-3.5">
@@ -664,6 +666,7 @@ export default function Listings({
                           · Stock: <strong>{group.stockOnHand}</strong>
                         </div>
                         <AppButton
+                          disabled
                           label={
                             busyKey === `sku-${group.sku}`
                               ? 'Publishing All...'
@@ -769,6 +772,7 @@ export default function Listings({
 
                               <div className="flex items-center gap-1.5 flex-wrap pt-2.5 border-t border-divider">
                                 <AppButton
+                                  disabled
                                   label={
                                     busyKey === `pub-${listing.id}`
                                       ? 'Publishing...'
@@ -871,6 +875,7 @@ export default function Listings({
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <AppButton
+                              disabled
                               label={
                                 busyKey === `pub-${l.id}` ? 'Publishing...' : 'Publish on Platform'
                               }
@@ -1145,11 +1150,13 @@ export default function Listings({
                   ]}
                 />
                 <AppSelect
-                  label="Publication Status"
+                  disabled
+                  label="Publication Status (marketplace integration not configured)"
                   value={editForm.publicationStatus}
                   onChange={(e) => setEditForm({ ...editForm, publicationStatus: e.target.value })}
                   options={[
                     { value: 'published', label: 'published' },
+                    { value: 'unpublished', label: 'unpublished' },
                     { value: 'draft', label: 'draft' },
                     { value: 'queued', label: 'queued' },
                     { value: 'failed', label: 'failed' },
@@ -1241,6 +1248,7 @@ export default function Listings({
                 }
               />
               <AppButton
+                disabled
                 label="Publish on Platform Now"
                 variant="primary"
                 size="sm"

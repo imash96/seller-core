@@ -63,7 +63,7 @@ export const createOrderValidator = vine.create({
   shippingCountryCode: vine.string().fixedLength(2).toUpperCase().optional(),
   sku: vine.string().trim().minLength(1).maxLength(120),
   itemTitle: vine.string().trim().minLength(1).maxLength(255),
-  quantityOrdered: vine.number().min(1),
+  quantityOrdered: vine.number().withoutDecimals().min(1),
   unitPrice: vine.number().min(0),
   unitCostAmount: vine.number().min(0).optional(),
   taxAmount: vine.number().min(0).optional(),
@@ -86,7 +86,7 @@ export const createShipmentValidator = vine.create({
   carrierName: vine.string().trim().minLength(2).maxLength(150),
   serviceLevel: vine.string().trim().optional(),
   trackingNumber: vine.string().trim().optional(),
-  quantityShipped: vine.number().min(1),
+  quantityShipped: vine.number().withoutDecimals().min(1),
   lengthCm: vine.number().min(1).optional(),
   widthCm: vine.number().min(1).optional(),
   heightCm: vine.number().min(1).optional(),
@@ -149,7 +149,7 @@ export const createReturnRequestValidator = vine.create({
   resolutionType: vine
     .enum(['refund', 'partial_refund', 'replacement', 'store_credit', 'rejected'] as const)
     .optional(),
-  quantityRequested: vine.number().min(1),
+  quantityRequested: vine.number().withoutDecimals().min(1),
   restockingFeeAmount: vine.number().min(0).optional(),
   customerComments: vine.string().trim().optional(),
 })
@@ -170,9 +170,9 @@ export const createCreditCardValidator = vine.create({
   brandName: vine.string().trim().minLength(2).maxLength(64),
   issuerBank: vine.string().trim().optional(),
   cardholderName: vine.string().trim().minLength(2).maxLength(150),
-  last4Digits: vine.string().fixedLength(4),
-  expMonth: vine.number().min(1).max(12),
-  expYear: vine.number().min(2025).max(2045),
+  last4Digits: vine.string().regex(/^\d{4}$/),
+  expMonth: vine.number().withoutDecimals().min(1).max(12),
+  expYear: vine.number().withoutDecimals().min(2000).max(2100),
   currencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
   creditLimit: vine.number().min(0).optional(),
   currentBalance: vine.number().min(0).optional(),
@@ -211,6 +211,7 @@ export const createFinancialTransactionValidator = vine.create({
   taxAmount: vine.number().min(0).optional(),
   transactionDate: vine.string().trim(),
   financialAccountId: objectId().optional().nullable(),
+  financeCategoryId: objectId().optional().nullable(),
   creditCardId: objectId().optional().nullable(),
   sellerAccountId: objectId().optional().nullable(),
   orderId: objectId().optional().nullable(),
@@ -276,6 +277,7 @@ export const updateFinancialAccountValidator = vine.create({
 
 export const updateCreditCardValidator = vine.create({
   cardLabel: vine.string().trim().minLength(2).maxLength(150).optional(),
+  currentBalance: vine.number().min(0).optional(),
   creditLimit: vine.number().min(0).optional(),
   minimumPaymentDue: vine.number().min(0).optional(),
   nextPaymentDueDate: vine.string().trim().optional().nullable(),

@@ -37,13 +37,13 @@ export default class ShippingInvoiceLine extends AppBaseModel {
   declare public currencyCode: string
 
   @column({ columnName: 'expected_amount' })
-  declare public expectedAmount: string
+  declare public expectedAmount: string | null
 
   @column({ columnName: 'billed_amount' })
   declare public billedAmount: string
 
   @column({ columnName: 'variance_amount' })
-  declare public varianceAmount: string
+  declare public varianceAmount: string | null
 
   @column({ columnName: 'allow_duplicate_charge' })
   declare public allowDuplicateCharge: boolean

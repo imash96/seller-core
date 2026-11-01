@@ -61,7 +61,10 @@ export const NAVIGATION: NavSection[] = [
   },
   {
     title: 'People',
-    items: [{ href: '/customers', label: 'Customers & Risk', icon: Users }],
+    items: [
+      { href: '/customers', label: 'Customers & Risk', icon: Users },
+      { href: '/organizations', label: 'Organizations (setup)', icon: Building2 },
+    ],
   },
   {
     title: 'Finance',

@@ -17,13 +17,13 @@ export default class CustomersController {
     const [customers, riskSignals, savedViews] = await Promise.all([
       Customer.query()
         .where('userId', user.id)
-        .preload('addresses')
-        .preload('riskSignals')
+        .preload('addresses', (q) => q.where('userId', user.id))
+        .preload('riskSignals', (q) => q.where('userId', user.id))
         .orderBy('createdAt', 'desc')
         .limit(100),
       CustomerRiskSignal.query()
         .where('userId', user.id)
-        .preload('customer')
+        .preload('customer', (q) => q.where('userId', user.id))
         .orderBy('createdAt', 'desc')
         .limit(50),
       WorkspaceLookupService.savedViewsFor(user.id, 'customers'),
@@ -66,7 +66,7 @@ export default class CustomersController {
         countryCode: payload.countryCode || 'US',
         phone: payload.phone ?? null,
         isDefault: true,
-        isVerified: true,
+        isVerified: false,
       })
     }
 

@@ -112,7 +112,7 @@ export function normalizePriceMoneyArray(
         .trim()
         .toUpperCase()
       const amt = Number(obj.amount ?? obj.price ?? 0)
-      if (!code || Number.isNaN(amt) || amt < 0) continue
+      if (!code || !Number.isFinite(amt) || amt < 0) continue
       seen.set(code, {
         currency_code: code,
         amount: Number(amt.toFixed(2)),

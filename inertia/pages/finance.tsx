@@ -1,3 +1,5 @@
+import { Text } from '@astryxdesign/core/Text'
+import { HStack } from '@astryxdesign/core/HStack'
 import {
   PageHeader,
   PageSection,
@@ -36,6 +38,12 @@ type Props = {
   salesChannels: Row[]
   orderLineItems: Row[]
   savedViews?: Row[]
+  financeAccess: {
+    household: { read: boolean; create: boolean; update: boolean; delete: boolean }
+    creditCardsRead: boolean
+    creditCardsCreate: boolean
+    canReconcile: boolean
+  }
 }
 
 const ACCOUNT_TYPES = [
@@ -84,6 +92,7 @@ export default function Finance({
   sellerAccounts,
   orders,
   savedViews,
+  financeAccess,
 }: Props) {
   const [createAccountOpen, setCreateAccountOpen] = useState(false)
   const [editAccountRow, setEditAccountRow] = useState<Row | null>(null)
@@ -92,24 +101,68 @@ export default function Finance({
   const [createTxOpen, setCreateTxOpen] = useState(false)
   const [createCatOpen, setCreateCatOpen] = useState(false)
   const [editCatRow, setEditCatRow] = useState<Row | null>(null)
+  const [matchRow, setMatchRow] = useState<Row | null>(null)
+  const [reverseRow, setReverseRow] = useState<Row | null>(null)
 
   const stats = useMemo(() => {
-    const totalBalances = financialAccounts.reduce(
-      (acc, a) => acc + Number(a.currentBalance ?? 0),
-      0
-    )
-    const totalCardLimit = creditCards.reduce((acc, c) => acc + Number(c.creditLimit ?? 0), 0)
+    const totalBalances = financialAccounts
+      .filter((a) => a.currencyCode === 'USD')
+      .reduce((acc, a) => acc + Number(a.currentBalance ?? 0), 0)
+    const totalCardLimit = creditCards
+      .filter((c) => c.currencyCode === 'USD')
+      .reduce((acc, c) => acc + Number(c.creditLimit ?? 0), 0)
     const businessTxTotal = financialTransactions
-      .filter((t) => t.dataClassification === 'business' && t.status !== 'voided')
+      .filter(
+        (t) =>
+          t.dataClassification === 'business' &&
+          t.status !== 'voided' &&
+          t.reportingCurrencyCode === 'USD'
+      )
       .reduce((acc, t) => acc + Number(t.reportingAmount ?? t.originalAmount ?? 0), 0)
     return { totalBalances, totalCardLimit, businessTxTotal }
   }, [financialAccounts, creditCards, financialTransactions])
 
+  const ledgerActions = (row: Row) => {
+    const permitted =
+      financeAccess.canReconcile &&
+      (row.dataClassification !== 'household_personal' || financeAccess.household.update)
+    if (!permitted) return <Text type="supporting">Read only</Text>
+    if (row.status === 'reconciled')
+      return row.manualReconciliation ? (
+        <AppButton variant="secondary" size="xs" onClick={() => setReverseRow(row)}>
+          Reverse match
+        </AppButton>
+      ) : (
+        <Text type="supporting">Legacy match</Text>
+      )
+    if (row.status === 'voided') return <Text type="supporting">Voided</Text>
+    return (
+      <HStack gap={2} wrap="wrap">
+        {['posted', 'settled'].includes(String(row.status)) && (
+          <AppButton variant="secondary" size="xs" onClick={() => setMatchRow(row)}>
+            Match
+          </AppButton>
+        )}
+        <AppButton
+          variant="ghost"
+          size="xs"
+          icon={Ban}
+          onClick={() => {
+            if (window.confirm(`Void transaction ${row.referenceNumber}?`))
+              router.post(`/financial-transactions/${row.id}/void`, {}, { preserveScroll: true })
+          }}
+        >
+          Void
+        </AppButton>
+      </HStack>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Finance, PCI-Safe Cards & Multi-Currency Ledger"
-        description="Manage bank/clearing accounts, tokenized credit cards (last 4 digits only), and Business vs. Household ledger entries."
+        title="Finance & Multi-Currency Ledger"
+        description="Manage accounts, card metadata and local ledger entries. No payment or card-vault integration is connected."
         icon={CreditCard}
         badge={`${financialAccounts.length} accounts · ${creditCards.length} cards · ${financialTransactions.length} tx`}
         actions={
@@ -122,14 +175,16 @@ export default function Finance({
             >
               Category
             </AppButton>
-            <AppButton
-              variant="secondary"
-              size="sm"
-              icon={CreditCard}
-              onClick={() => setCreateCardOpen(true)}
-            >
-              Credit Card
-            </AppButton>
+            {financeAccess.creditCardsCreate && (
+              <AppButton
+                variant="secondary"
+                size="sm"
+                icon={CreditCard}
+                onClick={() => setCreateCardOpen(true)}
+              >
+                Credit Card
+              </AppButton>
+            )}
             <AppButton
               variant="secondary"
               size="sm"
@@ -150,6 +205,15 @@ export default function Finance({
         }
       />
 
+      {(!financeAccess.household.read || !financeAccess.creditCardsRead) && (
+        <Text type="supporting" as="p">
+          Some finance data is restricted by your permissions and is not included in these totals.
+        </Text>
+      )}
+      <Text type="supporting" as="p">
+        Summaries show USD records only; the ledger is limited to the 100 most recent entries.
+        Ledger postings do not move or reconcile money.
+      </Text>
       <TopStatusBar
         columns={4}
         items={[
@@ -157,7 +221,7 @@ export default function Finance({
             id: 'account-balances',
             label: 'Financial Account Balances',
             value: money('USD', stats.totalBalances),
-            hint: `${financialAccounts.length} checking / clearing accounts`,
+            hint: 'USD accounts only',
             icon: Landmark,
             tone: 'primary',
           },
@@ -165,7 +229,9 @@ export default function Finance({
             id: 'pci-cards',
             label: 'Registered Credit Cards',
             value: creditCards.length,
-            hint: `Combined limit: ${money('USD', stats.totalCardLimit)}`,
+            hint: financeAccess.creditCardsRead
+              ? `USD limit: ${money('USD', stats.totalCardLimit)}`
+              : 'Card data restricted',
             icon: CreditCard,
             tone: 'info',
           },
@@ -173,7 +239,7 @@ export default function Finance({
             id: 'business-ledger',
             label: 'Business Ledger Volume',
             value: money('USD', stats.businessTxTotal),
-            hint: `${financialTransactions.length} ledger entries`,
+            hint: 'Latest entries reporting in USD',
             icon: DollarSign,
             tone: 'success',
           },
@@ -216,7 +282,9 @@ export default function Finance({
             default: 'business',
             options: [
               { value: 'business', label: 'Business' },
-              { value: 'household_personal', label: 'Household / personal' },
+              ...(financeAccess.household.create
+                ? [{ value: 'household_personal', label: 'Household / personal' }]
+                : []),
             ],
           },
           { name: 'currentBalance', label: 'Opening Balance', kind: 'number', default: '0' },
@@ -277,7 +345,9 @@ export default function Finance({
             kind: 'select',
             options: [
               { value: 'business', label: 'Business' },
-              { value: 'household_personal', label: 'Household / personal' },
+              ...(financeAccess.household.update
+                ? [{ value: 'household_personal', label: 'Household / personal' }]
+                : []),
             ],
           },
           { name: 'currentBalance', label: 'Balance', kind: 'number' },
@@ -298,8 +368,8 @@ export default function Finance({
       <FormModal
         isOpen={createCardOpen}
         onOpenChange={setCreateCardOpen}
-        title="Add Credit Card (PCI-Safe)"
-        subtitle="Stores last 4 digits and vault token reference only — never full PAN or CVV."
+        title="Add Card Metadata"
+        subtitle="Record card metadata only. No vault or payment integration is configured; never enter a full card number or CVV."
         submitLabel="Add Card"
         action="/credit-cards"
         fields={[
@@ -318,8 +388,6 @@ export default function Finance({
           { name: 'creditLimit', label: 'Credit Limit', kind: 'number' },
           { name: 'currentBalance', label: 'Current Balance', kind: 'number', default: '0' },
           { name: 'minimumPaymentDue', label: 'Minimum Payment Due', kind: 'number' },
-          { name: 'statementClosingDay', label: 'Statement Closing Day (1–31)', kind: 'number' },
-          { name: 'paymentDueDay', label: 'Payment Due Day (1–31)', kind: 'number' },
           { name: 'nextPaymentDueDate', label: 'Next Due Date', kind: 'date' },
           {
             name: 'dataClassification',
@@ -328,7 +396,9 @@ export default function Finance({
             default: 'business',
             options: [
               { value: 'business', label: 'Business' },
-              { value: 'household_personal', label: 'Household / personal' },
+              ...(financeAccess.household.create
+                ? [{ value: 'household_personal', label: 'Household / personal' }]
+                : []),
             ],
           },
           {
@@ -393,7 +463,7 @@ export default function Finance({
         isOpen={createTxOpen}
         onOpenChange={setCreateTxOpen}
         title="Record Financial Transaction"
-        subtitle="Multi-currency ledger entry with Business vs. Household segregation."
+        subtitle="Record a local ledger entry. Linked accounts, cards and categories must match its classification."
         submitLabel="Record Transaction"
         action="/financial-transactions"
         fields={[
@@ -412,7 +482,9 @@ export default function Finance({
             default: 'business',
             options: [
               { value: 'business', label: 'Business' },
-              { value: 'household_personal', label: 'Household / personal' },
+              ...(financeAccess.household.create
+                ? [{ value: 'household_personal', label: 'Household / personal' }]
+                : []),
             ],
           },
           { name: 'vendorOrPayer', label: 'Vendor / Payer' },
@@ -425,28 +497,37 @@ export default function Finance({
             name: 'financialAccountId',
             label: 'Financial Account',
             kind: 'select',
-            options: financialAccounts.map((a) => ({
-              value: String(a.id),
-              label: String(a.accountName),
-            })),
+            options: (values) =>
+              financialAccounts
+                .filter((a) => a.dataClassification === (values.dataClassification || 'business'))
+                .map((a) => ({
+                  value: String(a.id),
+                  label: `${a.accountName} (${a.dataClassification})`,
+                })),
           },
           {
             name: 'creditCardId',
             label: 'Credit Card',
             kind: 'select',
-            options: creditCards.map((c) => ({
-              value: String(c.id),
-              label: `${c.cardLabel} ··${c.last4Digits}`,
-            })),
+            options: (values) =>
+              creditCards
+                .filter((c) => c.dataClassification === (values.dataClassification || 'business'))
+                .map((c) => ({
+                  value: String(c.id),
+                  label: `${c.cardLabel} ··${c.last4Digits} (${c.dataClassification})`,
+                })),
           },
           {
             name: 'financeCategoryId',
             label: 'Finance Category',
             kind: 'select',
-            options: financeCategories.map((fc) => ({
-              value: String(fc.id),
-              label: `${fc.name} (${fc.costBucket ?? fc.categoryType})`,
-            })),
+            options: (values) =>
+              financeCategories
+                .filter((fc) => fc.dataClassification === (values.dataClassification || 'business'))
+                .map((fc) => ({
+                  value: String(fc.id),
+                  label: `${fc.name} (${fc.dataClassification})`,
+                })),
           },
           {
             name: 'sellerAccountId',
@@ -472,7 +553,6 @@ export default function Finance({
             required: true,
             fullWidth: true,
           },
-          { name: 'notes', label: 'Internal Notes', kind: 'textarea', fullWidth: true },
         ]}
       />
 
@@ -510,7 +590,9 @@ export default function Finance({
             default: 'business',
             options: [
               { value: 'business', label: 'Business' },
-              { value: 'household_personal', label: 'Household / personal' },
+              ...(financeAccess.household.create
+                ? [{ value: 'household_personal', label: 'Household / personal' }]
+                : []),
             ],
           },
           {
@@ -571,7 +653,9 @@ export default function Finance({
             kind: 'select',
             options: [
               { value: 'business', label: 'Business' },
-              { value: 'household_personal', label: 'Household / personal' },
+              ...(financeAccess.household.update
+                ? [{ value: 'household_personal', label: 'Household / personal' }]
+                : []),
             ],
           },
           {
@@ -795,7 +879,7 @@ export default function Finance({
 
       <PageSection
         title="Financial Ledger"
-        description="Void incorrect entries — historical audit trail stays intact."
+        description="Manually match a posted entry to a statement reference. This is not automatic bank verification or a payment transfer."
       >
         <ResponsiveDataView
           rows={financialTransactions}
@@ -836,27 +920,7 @@ export default function Finance({
                   : '—',
               },
             ],
-            actions:
-              String(row.status) !== 'voided' ? (
-                <AppButton
-                  variant="ghost"
-                  size="xs"
-                  icon={Ban}
-                  onClick={() => {
-                    if (window.confirm(`Void transaction ${row.referenceNumber}?`)) {
-                      router.post(
-                        `/financial-transactions/${row.id}/void`,
-                        {},
-                        { preserveScroll: true }
-                      )
-                    }
-                  }}
-                >
-                  Void
-                </AppButton>
-              ) : (
-                <span className="text-xs text-muted-foreground">Voided</span>
-              ),
+            actions: ledgerActions(row),
           })}
           columns={[
             col.text('referenceNumber', 'Reference', 130),
@@ -874,31 +938,61 @@ export default function Finance({
             col.money('reportingAmount', 'Reporting', 'reportingCurrencyCode'),
             col.text('description', 'Description', 160),
             col.date('transactionDate', 'Date'),
-            col.action('Action', (row) =>
-              String(row.status) === 'voided' ? (
-                <span className="text-xs text-muted-foreground">Voided</span>
-              ) : (
-                <AppButton
-                  variant="ghost"
-                  size="xs"
-                  icon={Ban}
-                  onClick={() => {
-                    if (window.confirm(`Void transaction ${row.referenceNumber}?`)) {
-                      router.post(
-                        `/financial-transactions/${row.id}/void`,
-                        {},
-                        { preserveScroll: true }
-                      )
-                    }
-                  }}
-                >
-                  Void
-                </AppButton>
-              )
-            ),
+            col.action('Action', ledgerActions),
           ]}
         />
       </PageSection>
+
+      <FormModal
+        isOpen={!!matchRow}
+        onOpenChange={(open) => {
+          if (!open) setMatchRow(null)
+        }}
+        title={`Manual match: ${String(matchRow?.referenceNumber ?? '')}`}
+        subtitle="Manually verify the statement yourself. Amount and currency must match exactly; this does not contact a bank or payment provider."
+        submitLabel="Record manual match"
+        action={
+          matchRow
+            ? `/financial-transactions/${matchRow.id}/reconcile`
+            : '/financial-transactions/placeholder/reconcile'
+        }
+        initialValues={
+          matchRow
+            ? {
+                observedAmount: String(matchRow.originalAmount),
+                currencyCode: String(matchRow.originalCurrencyCode),
+              }
+            : undefined
+        }
+        fields={[
+          {
+            name: 'sourceReference',
+            label: 'Statement reference',
+            required: true,
+            description: 'Must be unique among active matches in this workspace.',
+          },
+          { name: 'observedAmount', label: 'Statement amount', kind: 'number', required: true },
+          { name: 'currencyCode', label: 'Statement currency', required: true },
+          { name: 'notes', label: 'Verification notes', kind: 'textarea' },
+        ]}
+      />
+      <FormModal
+        isOpen={!!reverseRow}
+        onOpenChange={(open) => {
+          if (!open) setReverseRow(null)
+        }}
+        title={`Reverse manual match: ${String(reverseRow?.referenceNumber ?? '')}`}
+        subtitle="The match history is retained. The ledger entry returns to its prior status."
+        submitLabel="Reverse match"
+        action={
+          reverseRow
+            ? `/financial-transactions/${reverseRow.id}/reconciliation/reverse`
+            : '/financial-transactions/placeholder/reconciliation/reverse'
+        }
+        fields={[
+          { name: 'reason', label: 'Reason for reversal', kind: 'textarea', required: true },
+        ]}
+      />
 
       <PageSection
         title="Finance Categories"

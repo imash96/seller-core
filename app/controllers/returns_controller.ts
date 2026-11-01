@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon'
 import type { HttpContext } from '@adonisjs/core/http'
+import { RbacService } from '#services/rbac_service'
 import ReturnRequest from '#models/return_request'
 import RefundTransaction from '#models/refund_transaction'
 import { FulfillmentAndReturnsService } from '../services/fulfillment_and_returns_service.js'
@@ -22,21 +23,27 @@ function normalizeReturnItemCondition(raw?: unknown): string | null {
 export default class ReturnsController {
   async index({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
+    const effective = await RbacService.getEffectivePermissions(user)
+    const can = (resource: string) =>
+      RbacService.allows(user, effective, `${resource}.read`, resource)
     const [returns, refunds, savedViews, sharedLookups] = await Promise.all([
       ReturnRequest.query()
         .where('userId', user.id)
-        .preload('order')
-        .preload('orderLineItem')
-        .preload('customer')
+        .if(can('orders'), (q) =>
+          q
+            .preload('order', (r) => r.where('userId', user.id))
+            .preload('orderLineItem', (r) => r.where('userId', user.id))
+        )
+        .if(can('customers'), (q) => q.preload('customer', (r) => r.where('userId', user.id)))
         .orderBy('requestedAt', 'desc')
         .limit(100),
       RefundTransaction.query()
         .where('userId', user.id)
-        .preload('order')
+        .if(can('orders'), (q) => q.preload('order', (r) => r.where('userId', user.id)))
         .orderBy('createdAt', 'desc')
         .limit(50),
       WorkspaceLookupService.savedViewsFor(user.id, 'returns'),
-      WorkspaceLookupService.lookups(user.id),
+      WorkspaceLookupService.lookups(user),
     ])
     return inertia.render('returns', {
       ...sharedLookups,
@@ -185,7 +192,7 @@ export default class ReturnsController {
       })
       session.flash(
         'success',
-        `Refund ${refund.refundNumber} (${refund.totalRefundAmount} ${refund.currencyCode}) processed and posted to ledger.`
+        `Refund ${refund.refundNumber} (${refund.totalRefundAmount} ${refund.currencyCode}) recorded in the local ledger. No external payment was sent.`
       )
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to process refund')

@@ -190,8 +190,12 @@ export function ResponsiveDataView({
   const [pageSize, setPageSize] = useState(pageSizeOptions[0] ?? 10)
   const [viewMode, setViewMode] = useState<ViewModeOption>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('sc_view_mode') as ViewModeOption | null
-      return saved ?? defaultViewMode
+      try {
+        const saved = localStorage.getItem('sc_view_mode')
+        if (saved === 'auto' || saved === 'cards' || saved === 'table') return saved
+      } catch {
+        /* Storage can be unavailable in private browsing. */
+      }
     }
     return defaultViewMode
   })
@@ -207,7 +211,11 @@ export function ResponsiveDataView({
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('sc_view_mode', viewMode)
+      try {
+        localStorage.setItem('sc_view_mode', viewMode)
+      } catch {
+        /* Optional preference. */
+      }
     }
   }, [viewMode])
 
@@ -220,7 +228,7 @@ export function ResponsiveDataView({
   const filtered = useMemo(() => {
     let out = rows
     if (search.trim() && searchKeys.length > 0) {
-      const q = search.toLowerCase()
+      const q = search.trim().toLowerCase()
       out = out.filter((row) =>
         searchKeys.some((k) => {
           const v = row[k]
@@ -297,18 +305,18 @@ export function ResponsiveDataView({
   }
 
   return (
-    <VStack gap={4}>
+    <VStack gap={4} width="100%">
       {/* Toolbar */}
       <Card variant="muted" padding={3}>
         <VStack gap={3}>
-          {searchKeys.length > 0 ? <SearchInputBar value={search} onChange={setSearch} /> : <div />}
+          {searchKeys.length > 0 && <SearchInputBar value={search} onChange={setSearch} />}
 
-          <div className="flex items-center gap-2 flex-wrap ml-auto">
+          <Stack direction="horizontal" gap={2} wrap="wrap" hAlign="end">
             <ViewModeSwitcher value={viewMode} onChange={setViewMode} />
             {onCreateClick && createLabel && (
               <Button label={createLabel} variant="primary" size="sm" onClick={onCreateClick} />
             )}
-          </div>
+          </Stack>
         </VStack>
 
         {filterPills && filterKey && (
@@ -381,7 +389,7 @@ export function ResponsiveDataView({
           </div>
         </div>
       ) : effectiveMode === 'cards' ? (
-        <Grid columns={{ minWidth: 280, max: 3 }} gap={4}>
+        <Grid columns={{ minWidth: 200, max: 3 }} gap={4}>
           {paginated.map((row) => (
             <RecordCard
               key={String(row.id ?? JSON.stringify(row).slice(0, 24))}
@@ -404,6 +412,8 @@ export function ResponsiveDataView({
               })}
               idKey={(row: Row) => String(row.id ?? JSON.stringify(row).slice(0, 40))}
               density="compact"
+              rowIndexStart={(currentPage - 1) * pageSize + 1}
+              rowCount={sorted.length}
               dividers="rows"
               isStriped
               hasHover

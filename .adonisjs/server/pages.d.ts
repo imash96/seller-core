@@ -28,6 +28,7 @@ declare module '@adonisjs/inertia/types' {
     'inventory': ExtractProps<(typeof import('../../inertia/pages/inventory.tsx'))['default']>
     'listings': ExtractProps<(typeof import('../../inertia/pages/listings.tsx'))['default']>
     'orders': ExtractProps<(typeof import('../../inertia/pages/orders.tsx'))['default']>
+    'organizations': ExtractProps<(typeof import('../../inertia/pages/organizations.tsx'))['default']>
     'products': ExtractProps<(typeof import('../../inertia/pages/products.tsx'))['default']>
     'returns': ExtractProps<(typeof import('../../inertia/pages/returns.tsx'))['default']>
     'shipments': ExtractProps<(typeof import('../../inertia/pages/shipments.tsx'))['default']>

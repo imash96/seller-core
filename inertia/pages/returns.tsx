@@ -361,9 +361,9 @@ export default function Returns({
       <FormModal
         isOpen={createRefundOpen}
         onOpenChange={setCreateRefundOpen}
-        title="Process Refund Transaction"
-        subtitle="Refunds are capped at order total − already-refunded (over-refund guard)."
-        submitLabel="Process Refund"
+        title="Record Local Refund"
+        subtitle="Records a refund in the local ledger only. No payment is sent to the customer. Refunds are capped at the remaining order total."
+        submitLabel="Record Refund"
         action="/refunds"
         fields={[
           {
@@ -393,33 +393,6 @@ export default function Returns({
             placeholder: 'REF-2026-001',
           },
           {
-            name: 'externalRefundId',
-            label: 'External Marketplace Refund ID',
-            placeholder: 'AMZ-REF-8821',
-          },
-          {
-            name: 'status',
-            label: 'Refund Status',
-            kind: 'select',
-            default: 'processed',
-            options: [
-              { value: 'processed', label: 'Processed' },
-              { value: 'pending', label: 'Pending' },
-              { value: 'failed', label: 'Failed' },
-            ],
-          },
-          {
-            name: 'currencyCode',
-            label: 'Currency Code',
-            kind: 'select',
-            default: 'USD',
-            options: ['USD', 'EUR', 'GBP', 'CAD', 'INR', 'AED'].map((c) => ({
-              value: c,
-              label: c,
-            })),
-          },
-          { name: 'exchangeRate', label: 'Exchange Rate to USD', kind: 'number', default: '1' },
-          {
             name: 'itemsRefundAmount',
             label: 'Items Refund Amount',
             kind: 'number',
@@ -438,7 +411,6 @@ export default function Returns({
             kind: 'number',
             default: '0',
           },
-          { name: 'processedAt', label: 'Processed Date', kind: 'date' },
           { name: 'reason', label: 'Refund Reason / Notes', kind: 'textarea', fullWidth: true },
         ]}
       />

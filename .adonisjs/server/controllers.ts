@@ -12,6 +12,7 @@ export const controllers = {
   Finance: () => import('#controllers/finance_controller'),
   Operations: () => import('#controllers/operations_controller'),
   Orders: () => import('#controllers/orders_controller'),
+  Organizations: () => import('#controllers/organizations_controller'),
   Pages: () => import('#controllers/pages_controller'),
   Products: () => import('#controllers/products_controller'),
   Returns: () => import('#controllers/returns_controller'),

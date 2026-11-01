@@ -1,4 +1,5 @@
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
+import app from '@adonisjs/core/services/app'
 import { DateTime } from 'luxon'
 import User from '#models/user'
 import Role from '#models/role'
@@ -23,6 +24,7 @@ import { CatalogService } from '../../app/services/catalog_service.js'
 import { OrderService } from '../../app/services/order_service.js'
 import { FulfillmentAndReturnsService } from '../../app/services/fulfillment_and_returns_service.js'
 import { RbacService } from '../../app/services/rbac_service.js'
+import { OrganizationService } from '../../app/services/organization_service.js'
 import {
   UserStatus,
   PermissionEffect,
@@ -53,6 +55,9 @@ import {
 
 export default class MainSeeder extends BaseSeeder {
   async run() {
+    if (app.inProduction) {
+      throw new Error('The demo seeder contains known credentials and must not run in production.')
+    }
     // Idempotency guard: skip if super admin already exists
     const existingAdmin = await User.findBy('email', 'admin@sellercore.io')
     if (existingAdmin) {
@@ -72,29 +77,36 @@ export default class MainSeeder extends BaseSeeder {
       'credit_cards',
       'analytics',
       'users_rbac',
+      'tasks',
     ]
     const actions = ['read', 'create', 'update', 'delete', 'export']
 
     const permissionMap = new Map<string, Permission>()
     for (const resource of resources) {
-      const wildcardPerm = await Permission.create({
-        slug: resource,
-        resource,
-        action: '*',
-        name: `Full access to ${resource.replace(/_/g, ' ')}`,
-        description: `Full access to ${resource} module`,
-      })
+      const wildcardPerm = await Permission.updateOrCreate(
+        { resource, action: '*' },
+        {
+          slug: resource,
+          resource,
+          action: '*',
+          name: `Full access to ${resource.replace(/_/g, ' ')}`,
+          description: `Full access to ${resource} module`,
+        }
+      )
       permissionMap.set(wildcardPerm.slug, wildcardPerm)
 
       for (const action of actions) {
         const slug = `${resource}.${action}`
-        const perm = await Permission.create({
-          slug,
-          resource,
-          action,
-          name: `${action[0].toUpperCase() + action.slice(1)} ${resource.replace(/_/g, ' ')}`,
-          description: `Can ${action} records in ${resource}`,
-        })
+        const perm = await Permission.updateOrCreate(
+          { resource, action },
+          {
+            slug,
+            resource,
+            action,
+            name: `${action[0].toUpperCase() + action.slice(1)} ${resource.replace(/_/g, ' ')}`,
+            description: `Can ${action} records in ${resource}`,
+          }
+        )
         permissionMap.set(slug, perm)
       }
     }
@@ -136,9 +148,15 @@ export default class MainSeeder extends BaseSeeder {
       })
 
       if (
-        ['orders', 'customers', 'catalog', 'integrations', 'shipments', 'returns'].includes(
-          perm.resource
-        )
+        [
+          'orders',
+          'customers',
+          'catalog',
+          'integrations',
+          'shipments',
+          'returns',
+          'tasks',
+        ].includes(perm.resource)
       ) {
         await RolePermission.create({
           roleId: opsManagerRole.id,
@@ -230,6 +248,15 @@ export default class MainSeeder extends BaseSeeder {
         'analytics',
         'tasks',
       ],
+    })
+
+    // Membership setup only; shared operational data is not yet enabled.
+    // The database creates a separate personal workspace for each user automatically.
+    const demoOrg = await OrganizationService.create(adminUser, 'Demo company')
+    await OrganizationService.upsertMember(adminUser, demoOrg.id, {
+      email: secondUser.email,
+      roleId: opsManagerRole.id,
+      isAdmin: false,
     })
 
     // 4. Seed Sales Channels

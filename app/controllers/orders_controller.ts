@@ -1,11 +1,11 @@
 import { DateTime } from 'luxon'
+import { csvCell } from '../utils/csv.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import Order from '#models/order'
 import Customer from '#models/customer'
 import OrderPlaced from '#events/order_placed'
 import OrderStatusChanged from '#events/order_status_changed'
 import { OrderService } from '../services/order_service.js'
-import { PriceService } from '../services/price_service.js'
 import { RbacService } from '../services/rbac_service.js'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createOrderValidator, bulkOrderImportValidator } from '#validators/operations'
@@ -14,29 +14,51 @@ import { OrderStatus } from '../enums/index.js'
 export default class OrdersController {
   async index({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
-    await PriceService.ensurePriceTables()
+    const effective = await RbacService.getEffectivePermissions(user)
+    const can = (resource: string) =>
+      RbacService.allows(user, effective, `${resource}.read`, resource)
     const [orders, customers, savedViews, sharedLookups] = await Promise.all([
       Order.query()
         .where('userId', user.id)
-        .preload('customer', (cq) => cq.preload('riskSignals').preload('addresses'))
-        .preload('shippingAddress')
-        .preload('sellerAccount')
-        .preload('orderPrices')
+        .if(can('customers'), (q) =>
+          q
+            .preload('customer', (cq) =>
+              cq
+                .where('userId', user.id)
+                .preload('riskSignals', (r) => r.where('userId', user.id))
+                .preload('addresses', (r) => r.where('userId', user.id))
+            )
+            .preload('shippingAddress', (r) => r.where('userId', user.id))
+        )
+        .if(can('integrations'), (q) =>
+          q.preload('sellerAccount', (r) => r.where('userId', user.id))
+        )
+        .preload('orderPrices', (q) => q.where('userId', user.id))
         .preload('lineItems', (lq) =>
           lq
-            .preload('linePrices')
-            .preload('productVariant', (vq) => vq.preload('product').preload('priceRecords'))
+            .where('userId', user.id)
+            .preload('linePrices', (q) => q.where('userId', user.id))
+            .if(can('catalog'), (q) =>
+              q.preload('productVariant', (vq) =>
+                vq
+                  .where('userId', user.id)
+                  .preload('product', (r) => r.where('userId', user.id))
+                  .preload('priceRecords', (prices) => prices.where('userId', user.id))
+              )
+            )
         )
-        .preload('shipments')
+        .if(can('shipments'), (q) => q.preload('shipments', (r) => r.where('userId', user.id)))
         .orderBy('orderedAt', 'desc')
         .limit(100),
-      Customer.query()
-        .where('userId', user.id)
-        .preload('riskSignals')
-        .preload('addresses')
-        .orderBy('fullName'),
+      can('customers')
+        ? Customer.query()
+            .where('userId', user.id)
+            .preload('riskSignals', (q) => q.where('userId', user.id))
+            .preload('addresses', (q) => q.where('userId', user.id))
+            .orderBy('fullName')
+        : [],
       WorkspaceLookupService.savedViewsFor(user.id, 'orders'),
-      WorkspaceLookupService.lookups(user.id),
+      WorkspaceLookupService.lookups(user),
     ])
 
     const enrichedOrders = orders.map((o) => {
@@ -142,12 +164,17 @@ export default class OrdersController {
       .andWhere('id', params.id)
       .firstOrFail()
 
+    if (
+      !Object.values(OrderStatus).includes(status) ||
+      status === OrderStatus.DELIVERED ||
+      order.status === OrderStatus.DELIVERED
+    ) {
+      session.flash('error', 'Invalid status. Mark shipments delivered to complete an order.')
+      return response.redirect().back()
+    }
     const prevStatus = order.status
     order.status = status
-    if (status === OrderStatus.DELIVERED) {
-      order.deliveredAt = DateTime.now()
-      order.deliveryNotificationSentAt = DateTime.now()
-    } else if (status === OrderStatus.CANCELLED) {
+    if (status === OrderStatus.CANCELLED) {
       order.cancelledAt = DateTime.now()
     }
     await order.save()
@@ -275,19 +302,24 @@ export default class OrdersController {
           .filter(Boolean)
     const status = String(request.input('status', '')).trim()
 
-    if (!ids.length || !status) {
+    if (
+      !ids.length ||
+      !Object.values(OrderStatus).includes(status as any) ||
+      status === OrderStatus.DELIVERED
+    ) {
       session.flash('error', 'Select at least one order and a target status.')
       return response.redirect().back()
     }
 
     const orders = await Order.query().where('userId', user.id).whereIn('id', ids)
+    if (orders.some((order) => order.status === OrderStatus.DELIVERED)) {
+      session.flash('error', 'Delivered orders cannot be changed through bulk status updates.')
+      return response.redirect().back()
+    }
     for (const order of orders) {
       const prevStatus = order.status
       order.status = status
-      if (status === OrderStatus.DELIVERED) {
-        order.deliveredAt = DateTime.now()
-        order.deliveryNotificationSentAt = DateTime.now()
-      } else if (status === OrderStatus.CANCELLED) {
+      if (status === OrderStatus.CANCELLED) {
         order.cancelledAt = DateTime.now()
       }
       await order.save()
@@ -319,7 +351,9 @@ export default class OrdersController {
 
     const query = Order.query()
       .where('userId', user.id)
-      .preload('customer')
+      .if(await RbacService.hasPermission(user, 'customers.read', 'customers'), (q) =>
+        q.preload('customer', (r) => r.where('userId', user.id))
+      )
       .orderBy('orderedAt', 'desc')
     if (ids.length > 0) query.whereIn('id', ids)
     const orders = await query.limit(500)
@@ -341,7 +375,6 @@ export default class OrdersController {
       'net_profit_amount',
       'ordered_at',
     ]
-    const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
     const lines = [
       headers.join(','),
       ...orders.map((o) =>
@@ -362,7 +395,7 @@ export default class OrdersController {
           o.netProfitAmount,
           o.orderedAt?.toISO(),
         ]
-          .map(escape)
+          .map(csvCell)
           .join(',')
       ),
     ]

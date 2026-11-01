@@ -9,6 +9,7 @@ import ShippingInvoiceLine from '#models/shipping_invoice_line'
 import ReturnRequest from '#models/return_request'
 import RefundTransaction from '#models/refund_transaction'
 import FinancialTransaction from '#models/financial_transaction'
+import FinancialAccount from '#models/financial_account'
 import OutboxEvent from '#models/outbox_event'
 import AuditLog from '#models/audit_log'
 import {
@@ -64,9 +65,16 @@ export class FulfillmentAndReturnsService {
       const order = await Order.query({ client: trx })
         .where('userId', input.userId)
         .andWhere('id', input.orderId)
+        .forUpdate()
         .preload('lineItems')
         .firstOrFail()
 
+      if ([OrderStatus.CANCELLED, OrderStatus.DELIVERED].includes(order.status as any)) {
+        throw new Error('Cannot create a shipment for a cancelled or delivered order.')
+      }
+      if (input.status && !Object.values(ShipmentStatus).includes(input.status as any)) {
+        throw new Error('Invalid shipment status.')
+      }
       const lengthCm = input.lengthCm ?? null
       const widthCm = input.widthCm ?? null
       const heightCm = input.heightCm ?? null
@@ -104,7 +112,7 @@ export class FulfillmentAndReturnsService {
       shipment.actualInvoicedCost = '0.00'
       shipment.shippedAt = DateTime.now()
       shipment.deliveredAt = isDelivered ? DateTime.now() : null
-      shipment.deliveryNotificationSent = isDelivered
+      shipment.deliveryNotificationSent = false
       await shipment.save()
 
       const lineMap = new Map<string, OrderLineItem>()
@@ -119,7 +127,7 @@ export class FulfillmentAndReturnsService {
             `INVALID_ORDER_LINE: Line ${itemInput.orderLineItemId} does not belong to order ${order.orderNumber}`
           )
         }
-        if (itemInput.quantityShipped <= 0) {
+        if (!Number.isInteger(itemInput.quantityShipped) || itemInput.quantityShipped <= 0) {
           throw new Error('VALIDATION_ERROR: quantityShipped must be > 0')
         }
         const remaining = line.quantityOrdered - line.quantityCancelled - line.quantityFulfilled
@@ -160,10 +168,16 @@ export class FulfillmentAndReturnsService {
           ? FulfillmentStatus.PARTIALLY_FULFILLED
           : FulfillmentStatus.UNFULFILLED
 
-      if (isDelivered && allFulfilled) {
+      const undelivered = isDelivered
+        ? await Shipment.query({ client: trx })
+            .where('userId', input.userId)
+            .where('orderId', order.id)
+            .whereNot('status', ShipmentStatus.DELIVERED)
+            .first()
+        : true
+      if (isDelivered && allFulfilled && !undelivered) {
         order.status = OrderStatus.DELIVERED
         order.deliveredAt = DateTime.now()
-        order.deliveryNotificationSentAt = DateTime.now()
       } else if (allFulfilled) {
         order.status = OrderStatus.FULFILLED
         order.shippedAt = DateTime.now()
@@ -211,6 +225,90 @@ export class FulfillmentAndReturnsService {
     })
   }
 
+  /** Update one or more shipment statuses atomically, preserving split-order delivery state. */
+  static async updateShipmentStatuses(input: {
+    userId: string
+    shipmentIds: string[]
+    status: string
+  }): Promise<number> {
+    if (!Object.values(ShipmentStatus).includes(input.status as any))
+      throw new Error('Invalid shipment status.')
+    const ids = [...new Set(input.shipmentIds)]
+    if (!ids.length || ids.length > 500 || ids.some((id) => typeof id !== 'string' || !id))
+      throw new Error('Select between 1 and 500 shipments.')
+    return db.transaction(async (trx) => {
+      // Lock orders first, in stable order, matching createShipment's lock order.
+      const selected = await Shipment.query({ client: trx })
+        .where('userId', input.userId)
+        .whereIn('id', ids)
+      if (selected.length !== ids.length) throw new Error('One or more shipments were not found.')
+      const orderIds = [...new Set(selected.map((shipment) => shipment.orderId))].sort()
+      const orders = await Order.query({ client: trx })
+        .where('userId', input.userId)
+        .whereIn('id', orderIds)
+        .orderBy('id')
+        .forUpdate()
+        .preload('lineItems')
+      if (orders.length !== orderIds.length) throw new Error('Shipment order not found.')
+      const shipments = await Shipment.query({ client: trx })
+        .where('userId', input.userId)
+        .whereIn('id', ids)
+        .orderBy('id')
+        .forUpdate()
+      if (shipments.length !== ids.length) throw new Error('One or more shipments were not found.')
+      for (const shipment of shipments) {
+        if (
+          shipment.status === ShipmentStatus.DELIVERED &&
+          input.status !== ShipmentStatus.DELIVERED
+        )
+          throw new Error('Delivered shipments cannot be changed.')
+        if (shipment.status === input.status) continue
+        shipment.status = input.status
+        if (input.status === ShipmentStatus.DELIVERED) {
+          shipment.deliveredAt = DateTime.now()
+          // Queued delivery events are not evidence of a sent notification.
+          shipment.deliveryNotificationSent = false
+          const order = orders.find((item) => item.id === shipment.orderId)!
+          const event = new OutboxEvent()
+          event.useTransaction(trx)
+          event.userId = input.userId
+          event.aggregateType = 'shipments'
+          event.aggregateId = shipment.id
+          event.eventType = 'shipment.delivered.notify_customer'
+          event.idempotencyKey = `shipment.delivered:${shipment.id}`
+          event.payload = {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            shipmentId: shipment.id,
+            trackingNumber: shipment.trackingNumber,
+          }
+          event.status = OutboxEventStatus.PENDING
+          await event.save()
+        }
+        await shipment.save()
+      }
+      for (const order of orders) {
+        if (order.status === OrderStatus.CANCELLED) continue
+        const allFulfilled =
+          order.lineItems.length > 0 &&
+          order.lineItems.every(
+            (line) => line.quantityFulfilled >= line.quantityOrdered - line.quantityCancelled
+          )
+        const undelivered = await Shipment.query({ client: trx })
+          .where('userId', input.userId)
+          .where('orderId', order.id)
+          .whereNot('status', ShipmentStatus.DELIVERED)
+          .first()
+        if (allFulfilled && !undelivered && order.status !== OrderStatus.DELIVERED) {
+          order.status = OrderStatus.DELIVERED
+          order.deliveredAt = DateTime.now()
+          await order.save()
+        }
+      }
+      return shipments.length
+    })
+  }
+
   /**
    * Creates and reconciles a carrier shipping invoice with multiple charge lines.
    * Enforces unambiguous shipment + charge_type association and prevents accidental double-billing.
@@ -239,10 +337,46 @@ export class FulfillmentAndReturnsService {
       throw new Error('VALIDATION_ERROR: Shipping invoice must have at least one line item.')
     }
 
+    for (const line of input.lines) {
+      for (const amount of [line.billedAmount, line.expectedAmount]) {
+        if (
+          amount !== undefined &&
+          (!Number.isFinite(amount) ||
+            amount < 0 ||
+            amount > 999999999999 ||
+            Math.abs(amount * 100 - Math.round(amount * 100)) > 0.00001)
+        )
+          throw new Error(
+            'VALIDATION_ERROR: Invoice amounts must be non-negative with at most two decimal places.'
+          )
+      }
+      if (line.billedAmount === undefined || line.billedAmount === null)
+        throw new Error('VALIDATION_ERROR: Billed amount is required.')
+    }
+    if (
+      input.taxAmount !== undefined &&
+      (!Number.isFinite(input.taxAmount) ||
+        input.taxAmount < 0 ||
+        input.taxAmount > 999999999999 ||
+        Math.abs(input.taxAmount * 100 - Math.round(input.taxAmount * 100)) > 0.00001)
+    )
+      throw new Error('VALIDATION_ERROR: Invalid tax amount.')
+
     return await db.transaction(async (trx) => {
       const currencyCode = (input.currencyCode || 'USD').toUpperCase()
       let subtotalAmount = 0
       let totalVariance = 0
+      let hasVariance = false
+      let hasUnknownExpected = false
+
+      if (
+        input.financialAccountId &&
+        !(await FinancialAccount.query({ client: trx })
+          .where('userId', input.userId)
+          .where('id', input.financialAccountId)
+          .first())
+      )
+        throw new Error('INVALID_ACCOUNT: Financial account not found.')
 
       const invoice = new ShippingInvoice()
       invoice.useTransaction(trx)
@@ -265,11 +399,17 @@ export class FulfillmentAndReturnsService {
 
       for (const lineInput of input.lines) {
         const billed = roundMoney(lineInput.billedAmount)
-        const expected = roundMoney(lineInput.expectedAmount ?? billed)
-        const variance = roundMoney(billed - expected)
+        if (lineInput.expectedAmount === undefined || lineInput.expectedAmount === null)
+          hasUnknownExpected = true
+        const expected =
+          lineInput.expectedAmount === null || lineInput.expectedAmount === undefined
+            ? null
+            : roundMoney(lineInput.expectedAmount)
+        const variance = expected === null ? null : roundMoney(billed - expected)
 
         subtotalAmount = roundMoney(subtotalAmount + billed)
-        totalVariance = roundMoney(totalVariance + variance)
+        totalVariance = roundMoney(totalVariance + (variance ?? 0))
+        if (variance !== null && Math.abs(variance) > 0.001) hasVariance = true
 
         const invLine = new ShippingInvoiceLine()
         invLine.useTransaction(trx)
@@ -280,9 +420,9 @@ export class FulfillmentAndReturnsService {
         invLine.chargeType = lineInput.chargeType
         invLine.description = lineInput.description ?? null
         invLine.currencyCode = currencyCode
-        invLine.expectedAmount = expected.toFixed(2)
+        invLine.expectedAmount = expected?.toFixed(2) ?? null
         invLine.billedAmount = billed.toFixed(2)
-        invLine.varianceAmount = variance.toFixed(2)
+        invLine.varianceAmount = variance?.toFixed(2) ?? null
         invLine.allowDuplicateCharge = Boolean(lineInput.allowDuplicateCharge)
         await invLine.save()
 
@@ -290,6 +430,7 @@ export class FulfillmentAndReturnsService {
           const shipment = await Shipment.query({ client: trx })
             .where('userId', input.userId)
             .andWhere('id', lineInput.shipmentId)
+            .forUpdate()
             .firstOrFail()
           shipment.actualInvoicedCost = roundMoney(
             Number(shipment.actualInvoicedCost || 0) + billed
@@ -304,11 +445,35 @@ export class FulfillmentAndReturnsService {
       invoice.subtotalAmount = subtotalAmount.toFixed(2)
       invoice.totalAmount = total.toFixed(2)
       invoice.varianceAmount = totalVariance.toFixed(2)
-      invoice.reconciliationStatus =
-        Math.abs(totalVariance) > 0.001
+      invoice.reconciliationStatus = hasUnknownExpected
+        ? InvoiceReconciliationStatus.UNRECONCILED
+        : hasVariance
           ? InvoiceReconciliationStatus.VARIANCE_DETECTED
           : InvoiceReconciliationStatus.MATCHED
       await invoice.save()
+      await AuditLog.create(
+        {
+          actorUserId: input.userId,
+          userId: input.userId,
+          action: 'shipping_invoice.created',
+          entityType: 'shipping_invoices',
+          entityId: invoice.id,
+          afterState: {
+            invoiceNumber: invoice.invoiceNumber,
+            totalAmount: invoice.totalAmount,
+            reconciliationStatus: invoice.reconciliationStatus,
+            varianceAmount: invoice.varianceAmount,
+            lines: input.lines.map((line) => ({
+              shipmentId: line.shipmentId ?? null,
+              chargeType: line.chargeType,
+              expectedAmount: line.expectedAmount ?? null,
+              billedAmount: line.billedAmount,
+            })),
+          },
+          metadata: { verification: 'manual' },
+        },
+        { client: trx }
+      )
 
       return invoice
     })
@@ -329,7 +494,7 @@ export class FulfillmentAndReturnsService {
     returnShippingCost?: number
     customerComments?: string
   }): Promise<ReturnRequest> {
-    if (input.quantityRequested <= 0) {
+    if (!Number.isInteger(input.quantityRequested) || input.quantityRequested <= 0) {
       throw new Error('VALIDATION_ERROR: quantityRequested must be greater than 0.')
     }
 
@@ -337,6 +502,7 @@ export class FulfillmentAndReturnsService {
       const order = await Order.query({ client: trx })
         .where('userId', input.userId)
         .andWhere('id', input.orderId)
+        .forUpdate()
         .firstOrFail()
 
       const line = await OrderLineItem.query({ client: trx })
@@ -423,7 +589,53 @@ export class FulfillmentAndReturnsService {
       const order = await Order.query({ client: trx })
         .where('userId', input.userId)
         .andWhere('id', input.orderId)
+        .forUpdate()
         .firstOrFail()
+
+      const amounts = [
+        input.itemsRefundAmount,
+        input.shippingRefundAmount ?? 0,
+        input.taxRefundAmount ?? 0,
+        input.restockingFeeDeducted ?? 0,
+      ]
+      if (amounts.some((amount) => !Number.isFinite(amount) || amount < 0)) {
+        throw new Error('VALIDATION_ERROR: Refund amounts must be finite and non-negative.')
+      }
+      if (input.financialAccountId) {
+        await FinancialAccount.query({ client: trx })
+          .where('userId', input.userId)
+          .andWhere('id', input.financialAccountId)
+          .firstOrFail()
+      }
+      if (input.orderLineItemId) {
+        await OrderLineItem.query({ client: trx })
+          .where('userId', input.userId)
+          .andWhere('orderId', order.id)
+          .andWhere('id', input.orderLineItemId)
+          .firstOrFail()
+      }
+      const returnReq = input.returnRequestId
+        ? await ReturnRequest.query({ client: trx })
+            .where('userId', input.userId)
+            .andWhere('orderId', order.id)
+            .andWhere('id', input.returnRequestId)
+            .firstOrFail()
+        : null
+      if (
+        returnReq &&
+        (returnReq.status === ReturnStatus.REFUNDED ||
+          returnReq.status === ReturnStatus.CLOSED ||
+          returnReq.status === ReturnStatus.REJECTED)
+      ) {
+        throw new Error('INVALID_RETURN_STATUS: Return request cannot be refunded again.')
+      }
+      if (
+        returnReq &&
+        input.orderLineItemId &&
+        returnReq.orderLineItemId !== input.orderLineItemId
+      ) {
+        throw new Error('INVALID_ORDER_LINE: Return request does not match the order line.')
+      }
 
       const itemsRefund = roundMoney(input.itemsRefundAmount)
       const shippingRefund = roundMoney(input.shippingRefundAmount ?? 0)
@@ -462,11 +674,7 @@ export class FulfillmentAndReturnsService {
       refund.processedAt = DateTime.now()
       await refund.save()
 
-      if (input.returnRequestId) {
-        const returnReq = await ReturnRequest.query({ client: trx })
-          .where('userId', input.userId)
-          .andWhere('id', input.returnRequestId)
-          .firstOrFail()
+      if (returnReq) {
         returnReq.status = ReturnStatus.REFUNDED
         returnReq.refundAmount = totalRefund.toFixed(2)
         returnReq.closedAt = DateTime.now()

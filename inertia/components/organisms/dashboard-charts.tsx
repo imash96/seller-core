@@ -156,8 +156,11 @@ export function RevenueTrendChart({
 
   const getVal = (o: Row) => {
     if (mode === 'revenue') return Number(o.reportingTotalAmount ?? o.totalAmount ?? 0)
-    if (mode === 'profit') return Number(o.netProfitAmount ?? 0)
-    return Number(o.marketplaceFeesAmount ?? 0) + Number(o.paymentProcessingFeesAmount ?? 0)
+    if (mode === 'profit') return Number(o.netProfitAmount ?? 0) * Number(o.exchangeRate ?? 1)
+    return (
+      (Number(o.marketplaceFeesAmount ?? 0) + Number(o.paymentProcessingFeesAmount ?? 0)) *
+      Number(o.exchangeRate ?? 1)
+    )
   }
 
   const vals = sliced.map(getVal)
@@ -349,10 +352,22 @@ export function CreditUtilizationBars({
 }) {
   const byCard = cards.slice(0, 5)
   const businessSpend = transactions
-    .filter((t) => t.dataClassification === 'business')
+    .filter(
+      (t) =>
+        t.dataClassification === 'business' &&
+        t.status !== 'voided' &&
+        t.transactionType === 'expense' &&
+        t.reportingCurrencyCode === 'USD'
+    )
     .reduce((s, t) => s + Number(t.reportingAmount ?? 0), 0)
   const householdSpend = transactions
-    .filter((t) => t.dataClassification === 'household_personal')
+    .filter(
+      (t) =>
+        t.dataClassification === 'household_personal' &&
+        t.status !== 'voided' &&
+        t.transactionType === 'expense' &&
+        t.reportingCurrencyCode === 'USD'
+    )
     .reduce((s, t) => s + Number(t.reportingAmount ?? 0), 0)
   const totalSpend = businessSpend + householdSpend || 1
 

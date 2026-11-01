@@ -14,7 +14,6 @@ import {
 import { CategorySyncService } from './category_sync_service.js'
 import { PriceService } from './price_service.js'
 import {
-  SAMPLE_CATALOG_JSON,
   extractSequenceNumber,
   buildStructuredBaseCode,
   resolveGenderCode,
@@ -115,86 +114,13 @@ export interface GeneratedProductPreview {
   variants: GeneratedVariantPreview[]
 }
 
-let catalogTableEnsured = false
-
 export class CatalogService {
-  /**
-   * Idempotently ensures the `catalog_items` and multi-currency price tables exist in PostgreSQL.
-   */
-  static async ensureCatalogTable(): Promise<void> {
-    await PriceService.ensurePriceTables()
-    if (catalogTableEnsured) return
-    try {
-      await db.rawQuery(`
-        CREATE TABLE IF NOT EXISTS catalog_items (
-          id varchar(64) NOT NULL PRIMARY KEY,
-          user_id varchar(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          catalog_key varchar(100) NOT NULL,
-          structured_code varchar(100) NULL,
-          file_name varchar(255) NULL,
-          title varchar(255) NOT NULL,
-          title_75 varchar(255) NULL,
-          title_80 varchar(255) NULL,
-          sub_title varchar(255) NULL,
-          sub_title_125 varchar(255) NULL,
-          type varchar(100) NULL,
-          gender varchar(50) NOT NULL DEFAULT 'Men',
-          category_code varchar(20) NOT NULL DEFAULT 'CT',
-          category_name varchar(100) NOT NULL DEFAULT 'Coat',
-          product_code varchar(20) NOT NULL DEFAULT 'DC',
-          category_handle varchar(500) NULL,
-          resolved_category_id varchar(64) NULL REFERENCES product_categories(id) ON DELETE SET NULL,
-          description text NULL,
-          short_description text NULL,
-          extended_description text NULL,
-          pattern varchar(100) NULL DEFAULT 'Solid',
-          material_code varchar(20) NOT NULL DEFAULT 'NP',
-          fit_code varchar(20) NOT NULL DEFAULT 'RG',
-          price_tier varchar(10) NOT NULL DEFAULT '01',
-          attributes jsonb NOT NULL DEFAULT '{}'::jsonb,
-          images jsonb NOT NULL DEFAULT '[]'::jsonb,
-          tags jsonb NOT NULL DEFAULT '[]'::jsonb,
-          variants_spec jsonb NOT NULL DEFAULT '{}'::jsonb,
-          status varchar(50) NOT NULL DEFAULT 'draft',
-          converted_product_id varchar(64) NULL REFERENCES products(id) ON DELETE SET NULL,
-          created_at timestamptz NOT NULL DEFAULT NOW(),
-          updated_at timestamptz NOT NULL DEFAULT NOW()
-        );
-      `)
-      await db.rawQuery(
-        `CREATE UNIQUE INDEX IF NOT EXISTS uq_catalog_items_user_key ON catalog_items (user_id, catalog_key);`
-      )
-      await db.rawQuery(
-        `CREATE INDEX IF NOT EXISTS idx_catalog_items_user_filters ON catalog_items (user_id, gender, category_name, type, status);`
-      )
-      catalogTableEnsured = true
-    } catch {
-      // Ignore if running in read-only or concurrent transaction
-    }
-  }
-
   static async listCatalogItems(userId: string): Promise<CatalogItem[]> {
-    await this.ensureCatalogTable()
-    let items = await CatalogItem.query()
+    return CatalogItem.query()
       .where('userId', userId)
-      .preload('resolvedCategory')
-      .preload('convertedProduct')
+      .preload('resolvedCategory', (q) => q.where('userId', userId))
+      .preload('convertedProduct', (q) => q.where('userId', userId))
       .orderBy('catalogKey', 'asc')
-
-    if (items.length === 0) {
-      await this.saveCatalogJsonToDb({
-        userId,
-        catalogPayload: SAMPLE_CATALOG_JSON,
-        priceTier: '01',
-      })
-      items = await CatalogItem.query()
-        .where('userId', userId)
-        .preload('resolvedCategory')
-        .preload('convertedProduct')
-        .orderBy('catalogKey', 'asc')
-    }
-
-    return items
   }
 
   static async saveCatalogJsonToDb(params: {
@@ -202,9 +128,12 @@ export class CatalogService {
     catalogPayload: CatalogJsonPayload
     priceTier?: PriceTierCode
   }): Promise<{ savedCount: number; items: CatalogItem[] }> {
-    await this.ensureCatalogTable()
     const { userId, catalogPayload, priceTier = '01' } = params
-    const entries = Object.entries(catalogPayload ?? {})
+    if (!catalogPayload || typeof catalogPayload !== 'object' || Array.isArray(catalogPayload)) {
+      throw new Error('Catalog JSON must be an object keyed by SKU.')
+    }
+    const entries = Object.entries(catalogPayload)
+    if (entries.length > 500) throw new Error('Catalog import supports at most 500 entries.')
     if (entries.length === 0) {
       throw new Error('Catalog JSON payload must contain at least one SKU entry.')
     }
@@ -214,7 +143,32 @@ export class CatalogService {
       for (const [i, [catalogKey, entry]] of entries.entries() as IterableIterator<
         [number, [string, CatalogJsonEntry]]
       >) {
-        if (!entry || typeof entry !== 'object' || !entry.title) continue
+        if (
+          !catalogKey.trim() ||
+          !entry ||
+          typeof entry !== 'object' ||
+          Array.isArray(entry) ||
+          typeof entry.title !== 'string' ||
+          !entry.title.trim()
+        ) {
+          throw new Error(`Invalid catalog entry: ${catalogKey}. A non-empty title is required.`)
+        }
+        const spec = entry.varaints ?? entry.variants
+        if (spec && (typeof spec !== 'object' || Array.isArray(spec)))
+          throw new Error(`Invalid variants for ${catalogKey}.`)
+        for (const values of [spec?.color, spec?.size]) {
+          if (
+            values !== undefined &&
+            (!Array.isArray(values) ||
+              values.length === 0 ||
+              values.length > 100 ||
+              values.some((v) => typeof v !== 'string' || !v.trim()))
+          ) {
+            throw new Error(`Invalid variant values for ${catalogKey}.`)
+          }
+        }
+        if ((spec?.color?.length ?? 1) * (spec?.size?.length ?? 1) > 1000)
+          throw new Error(`Too many variants for ${catalogKey}.`)
 
         const item = await this.upsertCatalogEntryInTrx(
           userId,
@@ -269,8 +223,7 @@ export class CatalogService {
     const fileName = `${structuredCode}-${firstColor}-${leatherInfo.code}-${fitInfo.code}`
 
     const activeTier: PriceTierCode =
-      (entry.attributes?.price_tier as PriceTierCode) ||
-      (sequence === '02' || sequence === '03' ? (sequence as PriceTierCode) : defaultPriceTier)
+      (entry.attributes?.price_tier as PriceTierCode) || defaultPriceTier
 
     const q = CatalogItem.query().where('userId', userId).andWhere('catalogKey', catalogKey)
     if (trx) q.useTransaction(trx)
@@ -376,7 +329,6 @@ export class CatalogService {
     keywordsText?: string
     specialFeaturesLines?: string
   }): Promise<CatalogItem> {
-    await this.ensureCatalogTable()
     const colors = (params.colorsCsv || 'BLK,BLU')
       .split(',')
       .map((s) => s.trim().toUpperCase())
@@ -488,7 +440,6 @@ export class CatalogService {
   }
 
   static async deleteCatalogItem(userId: string, id: string): Promise<void> {
-    await this.ensureCatalogTable()
     const item = await CatalogItem.query().where('userId', userId).andWhere('id', id).firstOrFail()
     await item.delete()
   }
@@ -505,11 +456,10 @@ export class CatalogService {
     defaultStockOnHand?: number
     costRatio?: number
   }): Promise<GeneratedProductPreview> {
-    await this.ensureCatalogTable()
     const item = await CatalogItem.query()
       .where('userId', params.userId)
       .andWhere('id', params.catalogItemId)
-      .preload('resolvedCategory')
+      .preload('resolvedCategory', (q) => q.where('userId', params.userId))
       .firstOrFail()
 
     const category =
@@ -518,13 +468,27 @@ export class CatalogService {
         params.userId,
         item.categoryHandle,
         item.type,
-        item.gender
+        item.gender,
+        undefined,
+        false
       ))
 
     const activeTier: PriceTierCode = params.priceTier || (item.priceTier as PriceTierCode) || '01'
     const skuFormat: SkuFormatMode = params.skuFormat || 'standard'
     const stockOnHand = params.defaultStockOnHand ?? 25
     const costRatio = params.costRatio ?? 0.42
+    if (
+      !Number.isInteger(stockOnHand) ||
+      stockOnHand < 0 ||
+      !Number.isFinite(costRatio) ||
+      costRatio < 0
+    )
+      throw new Error('Invalid stock or cost ratio.')
+    if (
+      !['01', '02', '03'].includes(activeTier) ||
+      !['standard', 'prefixed_color', 'catalog_key'].includes(skuFormat)
+    )
+      throw new Error('Invalid price tier or SKU format.')
 
     const leatherInfo = resolveLeatherCode(
       item.attributes?.fabric || item.attributes?.material,
@@ -637,7 +601,6 @@ export class CatalogService {
     userId: string
     preview: GeneratedProductPreview
   }): Promise<{ product: Product; variantsCreated: number }> {
-    await this.ensureCatalogTable()
     const { userId, preview } = params
     const includedVariants = (preview.variants ?? []).filter((v) => v.included !== false)
     if (includedVariants.length === 0) {
@@ -649,7 +612,10 @@ export class CatalogService {
       const catalogItem = await CatalogItem.query({ client: trx })
         .where('userId', userId)
         .andWhere('id', preview.catalogItemId)
-        .first()
+        .forUpdate()
+        .firstOrFail()
+      if (catalogItem.catalogKey !== preview.catalogKey)
+        throw new Error('Catalog key does not match the selected item.')
 
       const category = preview.categoryId
         ? await db
@@ -658,6 +624,8 @@ export class CatalogService {
             .andWhere('user_id', userId)
             .first()
         : null
+
+      if (preview.categoryId && !category) throw new Error('Category not found for this user.')
 
       const cleanSlugBase = `${preview.catalogKey}-${preview.title}`
         .trim()
@@ -683,7 +651,7 @@ export class CatalogService {
       const firstVarUsd = Number(includedVariants[0]?.retailPrice ?? 239.99)
       const productPrices = normalizePriceMoneyArray(preview.prices, firstVarUsd, 'USD')
 
-      prod.brandId = null
+      if (!prod.$isPersisted) prod.brandId = null
       prod.categoryId = category ? category.id : preview.categoryId || null
       prod.skuPrefix = preview.catalogKey
       prod.title = String(preview.title).slice(0, 60)
@@ -735,7 +703,7 @@ export class CatalogService {
       })
 
       for (const [i, vPrev] of includedVariants.entries()) {
-        const retailPrice = Number(vPrev.retailPrice || 239.99)
+        const retailPrice = Number(vPrev.retailPrice ?? 239.99)
         const costPrice = Number(vPrev.costPrice ?? (retailPrice * 0.42).toFixed(2))
         const manufacturingCost = Number((costPrice * 0.85).toFixed(2))
         const packagingCost = Number((costPrice * 0.15).toFixed(2))
@@ -752,6 +720,8 @@ export class CatalogService {
           variant.userId = userId
           variant.sku = vPrev.sku.trim()
         } else {
+          if (variant.productId !== prod.id)
+            throw new Error(`SKU ${vPrev.sku} already belongs to another product.`)
           variant.useTransaction(trx)
         }
 
@@ -784,7 +754,7 @@ export class CatalogService {
         variant.manufacturingCost = manufacturingCost.toFixed(2)
         variant.packagingCost = packagingCost.toFixed(2)
         variant.stockOnHand = Math.max(0, Number(vPrev.stockOnHand ?? 25))
-        variant.stockReserved = 0
+        if (!variant.$isPersisted) variant.stockReserved = 0
         variant.reorderPoint = 5
         variant.images = Array.isArray(preview.images) ? preview.images : []
         variant.status = VariantStatus.ACTIVE
@@ -867,7 +837,6 @@ export class CatalogService {
     prices?: PriceMoney[]
     variants: VariantInput[]
   }): Promise<Product> {
-    await this.ensureCatalogTable()
     if (!input.variants || input.variants.length === 0) {
       throw new Error(
         'VALIDATION_ERROR: Product must provide at least one sellable SKU definition.'
@@ -1046,6 +1015,23 @@ export class CatalogService {
     variantsCreated: number
     products: Product[]
   }> {
+    if (params.priceTier && !['01', '02', '03'].includes(params.priceTier))
+      throw new Error('Invalid price tier.')
+    if (
+      params.skuFormat &&
+      !['standard', 'prefixed_color', 'catalog_key'].includes(params.skuFormat)
+    )
+      throw new Error('Invalid SKU format.')
+    if (
+      params.defaultStockOnHand !== undefined &&
+      (!Number.isInteger(params.defaultStockOnHand) || params.defaultStockOnHand < 0)
+    )
+      throw new Error('Invalid initial stock.')
+    if (
+      params.costRatio !== undefined &&
+      (!Number.isFinite(params.costRatio) || params.costRatio < 0)
+    )
+      throw new Error('Invalid cost ratio.')
     const { items } = await this.saveCatalogJsonToDb({
       userId: params.userId,
       catalogPayload: params.catalogPayload,

@@ -50,4 +50,7 @@ router.use([
 export const middleware = router.named({
   guest: () => import('#middleware/guest_middleware'),
   auth: () => import('#middleware/auth_middleware'),
+  superAdmin: () => import('#middleware/super_admin_middleware'),
+  catalogPermission: () => import('#middleware/catalog_permission_middleware'),
+  operationsPermission: () => import('#middleware/operations_permission_middleware'),
 })

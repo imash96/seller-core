@@ -8,7 +8,10 @@ import Order from '#models/order'
 import FinancialTransaction from '#models/financial_transaction'
 import { RbacService } from '../services/rbac_service.js'
 import { createUserValidator } from '#validators/user'
-import { UserStatus } from '../enums/index.js'
+import { UserStatus, ModuleKeys } from '../enums/index.js'
+import db from '@adonisjs/lucid/services/db'
+import AuditLog from '#models/audit_log'
+import Organization from '#models/organization'
 
 export default class AdminController {
   async index({ auth, inertia, response }: HttpContext) {
@@ -78,6 +81,8 @@ export default class AdminController {
     }
 
     const targetStatus = request.input('status', UserStatus.SUSPENDED)
+    if (!Object.values(UserStatus).includes(targetStatus))
+      return response.badRequest({ error: 'Invalid user status.' })
     try {
       if (targetStatus === UserStatus.SUSPENDED) {
         await RbacService.suspendUser(actor, params.id, 'Suspended via Admin Console', {
@@ -127,6 +132,23 @@ export default class AdminController {
       return response.redirect().back()
     }
     const target = await User.findOrFail(params.id)
+    const sharedOwner = await Organization.query()
+      .where('ownerUserId', target.id)
+      .where('isPersonal', false)
+      .first()
+    const otherMembers = await db
+      .from('organizations as o')
+      .join('organization_memberships as m', 'm.organization_id', 'o.id')
+      .where('o.owner_user_id', target.id)
+      .whereNot('m.user_id', target.id)
+      .first()
+    if (sharedOwner || otherMembers) {
+      session.flash(
+        'error',
+        'Transfer or remove company workspaces before deleting their owner. Owner transfer is not yet supported.'
+      )
+      return response.redirect().back()
+    }
     const [orderCount, txCount] = await Promise.all([
       Order.query().where('userId', target.id).count('* as total'),
       FinancialTransaction.query().where('userId', target.id).count('* as total'),
@@ -208,25 +230,41 @@ export default class AdminController {
     return response.redirect().back()
   }
 
-  async toggleModuleEntitlement({ auth, bouncer, params, response, session }: HttpContext) {
-    const user = auth.getUserOrFail()
-    if (!user.isSuperAdmin && (await bouncer.denies('manageEntitlements'))) {
-      session.flash('error', 'Bouncer: not authorized to manage entitlements.')
-      return response.redirect().back()
-    }
-    const entitlement = await ModuleEntitlement.query()
-      .where('id', params.id)
-      .andWhere((q) => {
-        if (!user.isSuperAdmin) {
-          q.where('userId', user.id)
-        }
-      })
-      .firstOrFail()
-
-    entitlement.isEnabled = !entitlement.isEnabled
-    entitlement.updatedByUserId = user.id
-    await entitlement.save()
-
+  async toggleModuleEntitlement({
+    auth,
+    bouncer,
+    params,
+    response,
+    session,
+    request,
+  }: HttpContext) {
+    const actor = auth.getUserOrFail()
+    await bouncer.authorize('manageEntitlements')
+    const entitlement = await db.transaction(async (trx) => {
+      const record = await ModuleEntitlement.query({ client: trx })
+        .where('id', params.id)
+        .forUpdate()
+        .firstOrFail()
+      const before = record.isEnabled
+      record.isEnabled = !before
+      record.updatedByUserId = actor.id
+      await record.save()
+      await AuditLog.create(
+        {
+          actorUserId: actor.id,
+          userId: record.userId,
+          action: 'rbac.entitlement_changed',
+          entityType: 'module_entitlements',
+          entityId: record.id,
+          requestId: request.id(),
+          beforeState: { isEnabled: before },
+          afterState: { isEnabled: record.isEnabled, moduleKey: record.moduleKey },
+          metadata: {},
+        },
+        { client: trx }
+      )
+      return record
+    })
     session.flash(
       'success',
       `Module "${entitlement.moduleKey}" is now ${entitlement.isEnabled ? 'ENABLED' : 'DISABLED'}.`
@@ -234,7 +272,48 @@ export default class AdminController {
     return response.redirect().back()
   }
 
-  async setModuleAccess(ctx: HttpContext) {
-    return this.toggleModuleEntitlement(ctx)
+  async setModuleAccess({ auth, bouncer, params, request, response }: HttpContext) {
+    const actor = auth.getUserOrFail()
+    await bouncer.authorize('manageEntitlements')
+    const moduleKey = String(request.input('moduleKey', ''))
+    const isEnabled = request.input('isEnabled')
+    if (
+      !ModuleKeys.includes(moduleKey as (typeof ModuleKeys)[number]) ||
+      typeof isEnabled !== 'boolean'
+    )
+      return response.badRequest({ error: 'Provide a valid moduleKey and boolean isEnabled.' })
+    await db.transaction(async (trx) => {
+      // Lock the parent even when no entitlement row exists yet.
+      await User.query({ client: trx }).where('id', params.id).forUpdate().firstOrFail()
+      const existing = await ModuleEntitlement.query({ client: trx })
+        .where('userId', params.id)
+        .where('moduleKey', moduleKey)
+        .forUpdate()
+        .first()
+      const before = existing?.isEnabled ?? null
+      const record = existing ?? new ModuleEntitlement()
+      record.useTransaction(trx)
+      record.userId = params.id
+      record.moduleKey = moduleKey
+      record.isEnabled = isEnabled
+      record.planTier = record.planTier || 'enterprise'
+      record.updatedByUserId = actor.id
+      await record.save()
+      await AuditLog.create(
+        {
+          actorUserId: actor.id,
+          userId: params.id,
+          action: 'rbac.entitlement_changed',
+          entityType: 'module_entitlements',
+          entityId: record.id,
+          requestId: request.id(),
+          beforeState: { isEnabled: before },
+          afterState: { isEnabled, moduleKey },
+          metadata: {},
+        },
+        { client: trx }
+      )
+    })
+    return response.ok({ message: `Module ${moduleKey} ${isEnabled ? 'enabled' : 'disabled'}.` })
   }
 }

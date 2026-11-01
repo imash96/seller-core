@@ -12,6 +12,36 @@ import { prepareJson } from './json_helpers.js'
 import { computeAuditChecksum } from '../utils/identity.js'
 import AppBaseModel from './base_model.js'
 
+// Historical audit rows may contain snapshots made before database-level redaction.
+function redactAuditState(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactAuditState)
+  if (!value || typeof value !== 'object') return value
+  const sensitive = new Set([
+    'password',
+    'encryptedcredentials',
+    'sessiontokenhash',
+    'vaulttokenreference',
+    'rawpayload',
+    'accesstoken',
+    'refreshtoken',
+    'clientsecret',
+    'apikey',
+    'apisecret',
+    'cardnumber',
+    'cvv',
+    'cvc',
+    'authorization',
+  ])
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      sensitive.has(key.toLowerCase().replace(/[^a-z0-9]/g, ''))
+        ? '[REDACTED]'
+        : redactAuditState(item),
+    ])
+  )
+}
+
 export default class AuditLog extends AppBaseModel {
   static readonly table = 'audit_logs'
   static readonly idPrefix = 'aud'
@@ -63,6 +93,26 @@ export default class AuditLog extends AppBaseModel {
 
   @belongsTo(() => User, { foreignKey: 'userId' })
   declare public user: BelongsTo<typeof User>
+
+  override serialize(cherryPick?: any): Record<string, any> {
+    const raw = super.serialize(cherryPick)
+    for (const key of ['beforeState', 'afterState', 'metadata']) {
+      if (key in raw) raw[key] = redactAuditState(raw[key])
+    }
+    return raw
+  }
+
+  // Audit snapshots can contain information from domains the viewer cannot read.
+  // Non-admin views receive an activity summary, never raw cross-domain payloads.
+  serializeForViewer(isSuperAdmin: boolean): Record<string, any> {
+    const raw = this.serialize()
+    if (!isSuperAdmin) {
+      delete raw.beforeState
+      delete raw.afterState
+      delete raw.metadata
+    }
+    return raw
+  }
 
   /**
    * Computes the tamper-evident SHA-256 checksum over actor/action/entity/

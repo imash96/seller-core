@@ -32,9 +32,11 @@ import {
   Activity,
 } from 'lucide-react'
 import { Grid, VStack } from '@astryxdesign/core'
+import { Text } from '@astryxdesign/core/Text'
 
 type Props = {
   kpis: DashboardKpis
+  access: Record<string, boolean>
   effectiveRbac: Record<string, any>
   orders: Row[]
   shipments: Row[]
@@ -82,6 +84,7 @@ const QUEUE_TABS = [
 export default function Dashboard(props: Props) {
   const {
     kpis,
+    access,
     orders,
     shipments,
     returnRequests,
@@ -95,7 +98,6 @@ export default function Dashboard(props: Props) {
 
   const [activeTab, setActiveTab] = useState<(typeof QUEUE_TABS)[number]['id']>('orders')
   const [channelFilter, setChannelFilter] = useState<string>('all')
-  const [currencyMode, setCurrencyMode] = useState<'reporting' | 'native'>('reporting')
 
   const filteredOrders = useMemo(() => {
     if (channelFilter === 'all') return orders
@@ -106,38 +108,23 @@ export default function Dashboard(props: Props) {
     )
   }, [orders, channelFilter])
 
-  // Dynamically recompute KPIs when a channel filter or currency mode is selected
+  // Recompute monetary KPIs for USD-reporting orders when a channel is selected.
   const activeKpis: DashboardKpis = useMemo(() => {
-    if (channelFilter === 'all' && currencyMode === 'reporting') return kpis
-    const rateOf = (o: Row) => (currencyMode === 'reporting' ? Number(o.exchangeRate || 1) : 1)
-    const gross = filteredOrders.reduce(
-      (s, o) =>
-        s +
-        (currencyMode === 'reporting'
-          ? Number(o.reportingTotalAmount || o.totalAmount || 0)
-          : Number(o.totalAmount || 0)),
-      0
-    )
-    const refunded = filteredOrders.reduce(
-      (s, o) => s + Number(o.refundedAmount || 0) * rateOf(o),
-      0
-    )
-    const fees = filteredOrders.reduce(
+    if (channelFilter === 'all') return kpis
+    const usdOrders = filteredOrders.filter((o) => o.reportingCurrencyCode === 'USD')
+    const rateOf = (o: Row) => Number(o.exchangeRate || 1)
+    const gross = usdOrders.reduce((s, o) => s + Number(o.reportingTotalAmount ?? 0), 0)
+    const refunded = usdOrders.reduce((s, o) => s + Number(o.refundedAmount || 0) * rateOf(o), 0)
+    const fees = usdOrders.reduce(
       (s, o) =>
         s +
         (Number(o.marketplaceFeesAmount || 0) + Number(o.paymentProcessingFeesAmount || 0)) *
           rateOf(o),
       0
     )
-    const cogs = filteredOrders.reduce((s, o) => s + Number(o.cogsAmount || 0) * rateOf(o), 0)
-    const ship = filteredOrders.reduce(
-      (s, o) => s + Number(o.shippingCostAmount || 0) * rateOf(o),
-      0
-    )
-    const profit = filteredOrders.reduce(
-      (s, o) => s + Number(o.netProfitAmount || 0) * rateOf(o),
-      0
-    )
+    const cogs = usdOrders.reduce((s, o) => s + Number(o.cogsAmount || 0) * rateOf(o), 0)
+    const ship = usdOrders.reduce((s, o) => s + Number(o.shippingCostAmount || 0) * rateOf(o), 0)
+    const profit = usdOrders.reduce((s, o) => s + Number(o.netProfitAmount || 0) * rateOf(o), 0)
     return {
       ...kpis,
       totalOrders: filteredOrders.length,
@@ -155,7 +142,7 @@ export default function Dashboard(props: Props) {
         (o) => o.status === 'delivered' || o.status === 'fulfilled'
       ).length,
     }
-  }, [kpis, filteredOrders, channelFilter, currencyMode])
+  }, [kpis, filteredOrders, channelFilter])
 
   const marketplaceSegments = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -230,10 +217,23 @@ export default function Dashboard(props: Props) {
     <div className="space-y-6">
       <PageHeader
         title="Executive Operations & P&L Command Center"
-        description="Real-time multi-currency order economics, carrier invoice reconciliation, risk review queues, and Business vs. Household ledger analytics."
+        description="Recent order economics, carrier invoices, risk review queues and local ledger activity."
         icon={LayoutDashboard}
-        badge={currencyMode === 'reporting' ? 'Reporting USD' : 'Native Currency'}
+        badge="Reporting USD"
       />
+
+      {Object.values(access).some((allowed) => !allowed) && (
+        <Text type="supporting" as="p">
+          Some modules are restricted. Metrics and lists reflect only accessible data; zero does not
+          necessarily mean there are no records.
+        </Text>
+      )}
+
+      <Text type="supporting" as="p">
+        Dashboard figures are based on recent records (up to 50 orders, 50 shipments, 40 returns and
+        60 ledger entries). Monetary totals include only USD reporting records or USD invoices; they
+        are not full-period financial reports.
+      </Text>
 
       {/* Top Executive Filter Bar */}
       <div className="bg-card text-card-foreground border border-border rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
@@ -255,31 +255,6 @@ export default function Dashboard(props: Props) {
               </button>
             )
           })}
-        </div>
-
-        <div className="inline-flex items-center p-0.5 rounded-xl bg-muted border border-border">
-          <button
-            type="button"
-            onClick={() => setCurrencyMode('reporting')}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-              currencyMode === 'reporting'
-                ? 'bg-card text-foreground shadow-2xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Reporting USD
-          </button>
-          <button
-            type="button"
-            onClick={() => setCurrencyMode('native')}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-              currencyMode === 'native'
-                ? 'bg-card text-foreground shadow-2xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Native Breakdown
-          </button>
         </div>
       </div>
 
@@ -380,7 +355,9 @@ export default function Dashboard(props: Props) {
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Household ledger spend:</span>
             <span className="font-semibold text-foreground tabular-nums">
-              {money('USD', activeKpis.householdExpenses)}
+              {access.householdFinance && access.finance
+                ? money('USD', activeKpis.householdExpenses)
+                : 'Restricted'}
             </span>
           </div>
         </KpiScorecard>
@@ -413,7 +390,9 @@ export default function Dashboard(props: Props) {
           description="Chronological order performance with interactive mode switcher."
           actions={<Activity className="w-4 h-4 text-primary" />}
         >
-          <RevenueTrendChart orders={filteredOrders} />
+          <RevenueTrendChart
+            orders={filteredOrders.filter((o) => o.reportingCurrencyCode === 'USD')}
+          />
         </PageSection>
 
         <PageSection

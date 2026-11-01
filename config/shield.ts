@@ -1,3 +1,4 @@
+import app from '@adonisjs/core/services/app'
 import { defineConfig } from '@adonisjs/shield'
 
 /**
@@ -7,8 +8,7 @@ import { defineConfig } from '@adonisjs/shield'
  * (registered in start/kernel.ts router.use). The middleware reads this
  * config and applies the enabled guards. No per-route opt-in needed.
  *
- * Arena note: xFrame stays disabled so the live-preview iframe can embed
- * the app; in production you would set `xFrame.enabled = true`.
+ * Development allows preview embedding; production is restricted to same-origin.
  */
 const shieldConfig = defineConfig({
   /**
@@ -27,12 +27,16 @@ const shieldConfig = defineConfig({
     reportOnly: process.env.NODE_ENV !== 'production',
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'blob:'],
+      scriptSrc: app.inProduction
+        ? ["'self'"]
+        : ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'blob:'],
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
       imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
-      connectSrc: ["'self'", 'ws:', 'wss:', 'https:'],
-      frameAncestors: ["'self'", 'https://*.e2b.app', 'https://*.arena.ai'],
+      connectSrc: app.inProduction ? ["'self'"] : ["'self'", 'ws:', 'wss:', 'https:'],
+      frameAncestors: app.inProduction
+        ? ["'self'"]
+        : ["'self'", 'https://*.e2b.app', 'https://*.arena.ai'],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],
@@ -57,19 +61,18 @@ const shieldConfig = defineConfig({
   },
 
   /**
-   * X-Frame-Options — disabled for Arena live preview iframe.
-   * In production set to `DENY` or `SAMEORIGIN`.
+   * Development permits preview frames; production permits same-origin only.
    */
   xFrame: {
-    enabled: false,
-    action: 'DENY',
+    enabled: app.inProduction,
+    action: 'SAMEORIGIN',
   },
 
   hsts: {
-    enabled: true,
+    enabled: app.inProduction,
     maxAge: '180 days',
-    includeSubDomains: true,
-    preload: true,
+    includeSubDomains: false,
+    preload: false,
   },
 
   contentTypeSniffing: {
