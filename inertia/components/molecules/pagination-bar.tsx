@@ -34,13 +34,15 @@ export function PaginationBar({
       {totalPages > 2 && (
         <div className="hidden sm:flex items-center gap-1">
           {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-            const n = i + 1 + Math.max(0, currentPage - 3)
+            const n = i + 1 + Math.max(0, Math.min(currentPage - 3, totalPages - 5))
             if (n > totalPages) return null
             const active = n === currentPage
             return (
               <button
                 key={n}
                 type="button"
+                aria-current={active ? 'page' : undefined}
+                aria-label={`Page ${n}`}
                 onClick={() => onPageChange(n)}
                 className={`min-w-8 h-8 px-2 rounded-full border text-xs transition-colors ${
                   active

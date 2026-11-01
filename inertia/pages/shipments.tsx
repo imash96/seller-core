@@ -388,12 +388,6 @@ export default function Shipments({
                           size="xs"
                           onClick={() => setCreateInvoiceOpen(true)}
                         />
-                        <RowAction
-                          action={`/shipments/${shipment.id}/delete`}
-                          label="Delete"
-                          variant="ghost"
-                          confirmText={`Delete shipment ${shipment.shipmentNumber}?`}
-                        />
                       </div>
                     </div>
                   </div>
@@ -607,8 +601,8 @@ export default function Shipments({
       <FormModal
         isOpen={createInvoiceOpen}
         onOpenChange={setCreateInvoiceOpen}
-        title="Record & Reconcile Carrier Invoice"
-        subtitle="Each shipment and charge-type pair is protected from duplicate carrier billing."
+        title="Record Carrier Invoice (local only)"
+        subtitle="An omitted expected amount remains unverified. No carrier or payment provider is contacted."
         submitLabel="Create Invoice"
         action="/carrier-invoices"
         fields={[
@@ -633,7 +627,7 @@ export default function Shipments({
             default: 'base_freight',
             options: CHARGE_TYPES.map((c) => ({ value: c, label: c.replace(/_/g, ' ') })),
           },
-          { name: 'expectedAmount', label: 'Expected amount', kind: 'number' },
+          { name: 'expectedAmount', label: 'Expected amount (optional)', kind: 'number' },
           { name: 'billedAmount', label: 'Billed amount', kind: 'number', required: true },
         ]}
       />
@@ -643,7 +637,8 @@ export default function Shipments({
         onOpenChange={(o) => {
           if (!o) setUpdateInvoiceRow(null)
         }}
-        title={`Reconcile Invoice ${String(updateInvoiceRow?.invoiceNumber ?? '')}`}
+        title={`Manual review: ${String(updateInvoiceRow?.invoiceNumber ?? '')}`}
+        subtitle="Records your report locally; no external payment or carrier verification occurs."
         submitLabel="Update Invoice"
         action={
           updateInvoiceRow
@@ -651,10 +646,21 @@ export default function Shipments({
             : '/carrier-invoices/placeholder'
         }
         initialValues={{
-          paymentStatus: String(updateInvoiceRow?.paymentStatus ?? 'paid'),
-          reconciliationStatus: String(updateInvoiceRow?.reconciliationStatus ?? 'resolved'),
+          paymentStatus: String(updateInvoiceRow?.paymentStatus ?? 'unpaid'),
+          reconciliationStatus: String(updateInvoiceRow?.reconciliationStatus ?? 'unreconciled'),
+          paidAmount: String(updateInvoiceRow?.paidAmount ?? '0'),
+          paymentReference: String(updateInvoiceRow?.paymentReference ?? ''),
+          notes: '',
         }}
         fields={[
+          {
+            name: 'paidAmount',
+            label: 'Paid amount (manually reported)',
+            kind: 'number',
+            required: true,
+          },
+          { name: 'paymentReference', label: 'Payment reference (required for paid or partial)' },
+          { name: 'notes', label: 'Review note (required)', required: true },
           {
             name: 'paymentStatus',
             label: 'Payment status',

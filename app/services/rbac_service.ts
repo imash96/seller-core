@@ -87,37 +87,35 @@ export class RbacService {
     permissionSlug: string,
     requiredModuleKey?: string
   ): Promise<boolean> {
-    if (user.status !== UserStatus.ACTIVE) {
-      return false
-    }
-
     const effective = await this.getEffectivePermissions(user)
+    return this.allows(user, effective, permissionSlug, requiredModuleKey)
+  }
 
-    // Module entitlement is checked independently of role permissions
-    if (requiredModuleKey && !user.isSuperAdmin) {
-      if (!effective.enabledModules.includes(requiredModuleKey)) {
-        return false
-      }
-    }
-
-    // Explicit deny always wins, even if wildcard or broader role exists
-    if (effective.deniedPermissions.includes(permissionSlug)) {
+  /** Evaluate an already-resolved permission set without repeating database queries. */
+  static allows(
+    user: User,
+    effective: EffectivePermissionsResult,
+    permissionSlug: string,
+    requiredModuleKey?: string
+  ): boolean {
+    if (user.status !== UserStatus.ACTIVE) return false
+    if (
+      requiredModuleKey &&
+      !user.isSuperAdmin &&
+      !effective.enabledModules.includes(requiredModuleKey)
+    )
       return false
-    }
-
-    if (user.isSuperAdmin) {
-      return true
-    }
-
     const [resource] = permissionSlug.split('.')
     if (
+      effective.deniedPermissions.includes(permissionSlug) ||
+      effective.deniedPermissions.includes(resource)
+    )
+      return false
+    if (user.isSuperAdmin) return true
+    return (
       effective.allowedPermissions.includes(permissionSlug) ||
       effective.allowedPermissions.includes(resource)
-    ) {
-      return true
-    }
-
-    return false
+    )
   }
 
   /**

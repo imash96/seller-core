@@ -42,7 +42,7 @@ export default class CreditCard extends AppBaseModel {
   @column({ columnName: 'exp_year' })
   declare public expYear: number
 
-  @column({ columnName: 'vault_token_reference' })
+  @column({ columnName: 'vault_token_reference', serializeAs: null })
   declare public vaultTokenReference: string | null
 
   @column({ columnName: 'logo_url' })

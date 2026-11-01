@@ -182,4 +182,17 @@ test.group('Catalog & SKU Modular Pipeline', () => {
       assert.typeOf(entry.attributes, 'object')
     }
   })
+  test('category sync rejects request-controlled remote endpoints', async ({ assert }) => {
+    const original = process.env.MEDUSA_BACKEND_URL
+    delete process.env.MEDUSA_BACKEND_URL
+    try {
+      await assert.rejects(
+        () => CategorySyncService.syncFromMedusaEndpoint('user', 'http://127.0.0.1:1234'),
+        /MEDUSA_URL_NOT_ALLOWED/
+      )
+    } finally {
+      if (original === undefined) delete process.env.MEDUSA_BACKEND_URL
+      else process.env.MEDUSA_BACKEND_URL = original
+    }
+  })
 })

@@ -173,6 +173,9 @@ importers:
       pino-pretty:
         specifier: ^13.2.0
         version: 13.2.0
+      playwright:
+        specifier: 1.64.1
+        version: 1.64.1
       prettier:
         specifier: ^3.9.10
         version: 3.9.10

@@ -1,4 +1,5 @@
-import { DateTime } from 'luxon'
+import db from '@adonisjs/lucid/services/db'
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 import Brand from '#models/brand'
 import Product from '#models/product'
 import type ProductVariant from '#models/product_variant'
@@ -47,14 +48,22 @@ export class ListingTransformerService {
   static async resolveOrCreateSellerAccount(
     userId: string,
     platform: ListingPlatform,
-    explicitSellerAccountId?: string | null
+    explicitSellerAccountId?: string | null,
+    trx?: TransactionClientContract
   ): Promise<SellerAccount> {
     if (explicitSellerAccountId) {
-      const found = await SellerAccount.query()
+      const found = await SellerAccount.query({ client: trx })
         .where('userId', userId)
         .andWhere('id', explicitSellerAccountId)
-        .first()
-      if (found) return found
+        .preload('salesChannel')
+        .firstOrFail()
+      const code = (found.salesChannel?.code || '').toLowerCase()
+      const valid =
+        platform === 'medusa'
+          ? ['direct', 'medusa', 'website'].some((s) => code.includes(s))
+          : code.includes(platform)
+      if (!valid) throw new Error('Seller account does not match the selected platform.')
+      return found
     }
 
     const platformCodeMap: Record<ListingPlatform, string> = {
@@ -65,27 +74,27 @@ export class ListingTransformerService {
     }
     const targetCode = platformCodeMap[platform] || 'direct'
 
-    const existingAccounts = await SellerAccount.query()
+    const existingAccounts = await SellerAccount.query({ client: trx })
       .where('userId', userId)
       .preload('salesChannel')
     const matched = existingAccounts.find(
       (sa) =>
         sa.accountName.toLowerCase().includes(platform) ||
-        sa.salesChannel?.code?.toLowerCase() === targetCode
+        sa.salesChannel?.code?.toLowerCase().includes(targetCode)
     )
     if (matched) return matched
 
-    let channel = await SalesChannel.query().where('code', targetCode).first()
+    let channel = await SalesChannel.query({ client: trx }).where('code', targetCode).first()
     if (!channel) {
-      channel = await SalesChannel.query().first()
-    }
-    if (!channel) {
-      channel = await SalesChannel.create({
-        code: targetCode,
-        name: platform.toUpperCase(),
-        channelType: platform === 'medusa' ? 'webstore' : 'marketplace',
-        isActive: true,
-      } as any)
+      channel = await SalesChannel.create(
+        {
+          code: targetCode,
+          name: platform.toUpperCase(),
+          channelType: platform === 'medusa' ? 'webstore' : 'marketplace',
+          isActive: true,
+        } as any,
+        trx ? { client: trx } : undefined
+      )
     }
 
     const labelMap: Record<ListingPlatform, string> = {
@@ -95,16 +104,19 @@ export class ListingTransformerService {
       etsy: 'Etsy Global Shop (Open API v3)',
     }
 
-    return await SellerAccount.create({
-      userId,
-      salesChannelId: channel.id,
-      accountName: labelMap[platform] || `${platform.toUpperCase()} Store`,
-      externalSellerId: `${platform.toUpperCase()}-STORE`,
-      marketplaceRegion: 'US',
-      defaultCurrency: 'USD',
-      status: 'active',
-      healthStatus: 'healthy',
-    } as any)
+    return await SellerAccount.create(
+      {
+        userId,
+        salesChannelId: channel.id,
+        accountName: labelMap[platform] || `${platform.toUpperCase()} Store`,
+        externalSellerId: `${platform.toUpperCase()}-STORE`,
+        marketplaceRegion: 'US',
+        defaultCurrency: 'USD',
+        status: 'pending_setup',
+        healthStatus: 'unknown',
+      } as any,
+      trx ? { client: trx } : undefined
+    )
   }
 
   /**
@@ -122,7 +134,6 @@ export class ListingTransformerService {
     listingsPersisted: number
     payload: Record<string, unknown>
   }> {
-    await PriceService.ensurePriceTables()
     const {
       userId,
       productIds,
@@ -131,10 +142,16 @@ export class ListingTransformerService {
       platform,
       platforms,
       sellerAccountId,
-      assignBrandToProduct = true,
-      persistChannelListings = true,
+      assignBrandToProduct = false,
+      persistChannelListings = false,
       publicationStatus = 'unpublished',
     } = params
+
+    if (publicationStatus !== 'unpublished') {
+      throw new Error(
+        'Marketplace publishing is not configured. Listings can only be saved as drafts.'
+      )
+    }
 
     const brand = await Brand.query().where('userId', userId).andWhere('id', brandId).firstOrFail()
 
@@ -160,123 +177,140 @@ export class ListingTransformerService {
       throw new Error('No products with variants found to transform into platform listings.')
     }
 
-    if (assignBrandToProduct) {
-      for (const product of products) {
-        product.brandId = brand.id
-        await product.save()
-      }
-    }
-
     const targetPlatforms: ListingPlatform[] =
-      Array.isArray(platforms) && platforms.length > 0 ? platforms : [platform]
+      Array.isArray(platforms) && platforms.length > 0 ? [...new Set(platforms)] : [platform]
+    if (targetPlatforms.some((p) => !['medusa', 'amazon', 'ebay', 'etsy'].includes(p))) {
+      throw new Error('Unsupported listing platform.')
+    }
+    if (sellerAccountId && targetPlatforms.length > 1) {
+      throw new Error('Select one platform when using a specific seller account.')
+    }
+    if (productIds?.length && products.length !== new Set(productIds).size) {
+      throw new Error('One or more selected products are unavailable or have no variants.')
+    }
 
     let listingsPersisted = 0
     let totalVariants = 0
     const payloadsByPlatform: Record<string, Record<string, unknown>> = {}
 
-    for (const plat of targetPlatforms) {
-      const platPayload = this.transformForPlatform(plat, products, brand)
-      payloadsByPlatform[plat] = platPayload
-
-      if (persistChannelListings) {
-        const sellerAccount = await this.resolveOrCreateSellerAccount(
-          userId,
-          plat,
-          targetPlatforms.length === 1 ? sellerAccountId : null
-        )
-
+    await db.transaction(async (trx) => {
+      if (assignBrandToProduct) {
         for (const product of products) {
-          const catMeta = CategorySyncService.extractCategoryMetadata(product.category)
-          const channelCatId =
-            plat === 'amazon'
-              ? (catMeta.amazon_browse_node ?? '2476517011')
-              : plat === 'ebay'
-                ? (catMeta.ebay_category_id ?? '57988')
+          product.useTransaction(trx)
+          product.brandId = brand.id
+          await product.save()
+        }
+      }
+      for (const plat of targetPlatforms) {
+        const platPayload = this.transformForPlatform(plat, products, brand)
+        payloadsByPlatform[plat] = platPayload
+
+        if (persistChannelListings) {
+          const sellerAccount = await this.resolveOrCreateSellerAccount(
+            userId,
+            plat,
+            targetPlatforms.length === 1 ? sellerAccountId : null,
+            trx
+          )
+
+          for (const product of products) {
+            const catMeta = CategorySyncService.extractCategoryMetadata(product.category)
+            const channelCatId =
+              plat === 'amazon'
+                ? (catMeta.amazon_browse_node ?? '2476517011')
+                : plat === 'ebay'
+                  ? (catMeta.ebay_category_id ?? '57988')
+                  : plat === 'etsy'
+                    ? (catMeta.etsy_taxonomy_id ?? '15834')
+                    : (catMeta.medusaId ?? product.categoryId ?? 'medusa')
+
+            const channelTitle =
+              plat === 'ebay'
+                ? product.title80 || product.title75 || product.title
                 : plat === 'etsy'
-                  ? (catMeta.etsy_taxonomy_id ?? '15834')
-                  : (catMeta.medusaId ?? product.categoryId ?? 'medusa')
+                  ? product.title75 || product.title80 || product.title
+                  : `${brand.name} ${product.title}`.slice(0, 200)
 
-          const channelTitle =
-            plat === 'ebay'
-              ? product.title80 || product.title75 || product.title
-              : plat === 'etsy'
-                ? product.title75 || product.title80 || product.title
-                : `${brand.name} ${product.title}`.slice(0, 200)
+            const channelDescription =
+              plat === 'amazon'
+                ? product.shortDescription || product.description
+                : plat === 'ebay' || plat === 'etsy'
+                  ? product.extendedDescription || product.description
+                  : product.description
 
-          const channelDescription =
-            plat === 'amazon'
-              ? product.shortDescription || product.description
-              : plat === 'ebay' || plat === 'etsy'
-                ? product.extendedDescription || product.description
-                : product.description
-
-          for (const variant of product.variants ?? []) {
-            const varPrices = resolveVariantMultiCurrencyPrices(variant)
-            const skuPayload = this.buildSingleVariantPlatformPayload(
-              plat,
-              product,
-              variant,
-              brand,
-              catMeta
-            )
-            const extId = `${plat.toUpperCase()}-${brand.slug.toUpperCase()}-${variant.sku}`
-            const existing = await ChannelListing.query()
-              .where('userId', userId)
-              .andWhere('sellerAccountId', sellerAccount.id)
-              .andWhere('productVariantId', variant.id)
-              .first()
-
-            const listing = existing ?? new ChannelListing()
-            listing.userId = userId
-            listing.sellerAccountId = sellerAccount.id
-            listing.productId = product.id
-            listing.productVariantId = variant.id
-            listing.externalListingId = existing?.externalListingId || extId
-            listing.externalVariantId = variant.sku
-            listing.externalSku = variant.sku
-            listing.channelTitle =
-              `${channelTitle} - ${(variant.attributes as any)?.color_name || ''} / ${(variant.attributes as any)?.size_key || ''}`.slice(
-                0,
-                500
+            for (const variant of product.variants ?? []) {
+              const varPrices = resolveVariantMultiCurrencyPrices(variant)
+              const skuPayload = this.buildSingleVariantPlatformPayload(
+                plat,
+                product,
+                variant,
+                brand,
+                catMeta
               )
-            listing.channelDescription = channelDescription ?? null
-            listing.channelCategoryId = String(channelCatId)
-            listing.currencyCode = varPrices[0]?.currency_code || variant.currencyCode || 'USD'
-            listing.listedPrice = Number(
-              varPrices[0]?.amount ?? variant.retailPrice ?? 239.99
-            ).toFixed(2)
-            listing.allocatedQuantity = Number(variant.stockOnHand || 25)
-            listing.listingStatus = publicationStatus === 'published' ? 'active' : 'draft'
-            listing.publicationStatus = publicationStatus
-            listing.syncStatus = publicationStatus === 'published' ? 'synced' : 'pending'
-            listing.lastSyncedAt = publicationStatus === 'published' ? DateTime.now() : null
-            listing.channelAttributes = {
-              platform: plat,
-              brandId: brand.id,
-              brandName: brand.name,
-              brandSlug: brand.slug,
-              productTitle: product.title,
-              skuPrefix: product.skuPrefix,
-              categoryHandle: catMeta.handle ?? product.category?.taxonomyPath ?? null,
-              prices: varPrices,
-              variantAttributes: variant.attributes ?? {},
-              transformedPayload: skuPayload,
+              const extId = `${plat.toUpperCase()}-${brand.slug.toUpperCase()}-${variant.sku}`
+              const existing = await ChannelListing.query({ client: trx })
+                .where('userId', userId)
+                .andWhere('sellerAccountId', sellerAccount.id)
+                .andWhere('productVariantId', variant.id)
+                .first()
+
+              if (existing?.publicationStatus === 'published') {
+                throw new Error('Cannot overwrite a published listing with a local draft.')
+              }
+              const listing = existing ?? new ChannelListing()
+              listing.useTransaction(trx)
+              listing.userId = userId
+              listing.sellerAccountId = sellerAccount.id
+              listing.productId = product.id
+              listing.productVariantId = variant.id
+              listing.externalListingId = existing?.externalListingId || extId
+              listing.externalVariantId = variant.sku
+              listing.externalSku = variant.sku
+              listing.channelTitle =
+                `${channelTitle} - ${(variant.attributes as any)?.color_name || ''} / ${(variant.attributes as any)?.size_key || ''}`.slice(
+                  0,
+                  500
+                )
+              listing.channelDescription = channelDescription ?? null
+              listing.channelCategoryId = String(channelCatId)
+              listing.currencyCode = varPrices[0]?.currency_code || variant.currencyCode || 'USD'
+              listing.listedPrice = Number(
+                varPrices[0]?.amount ?? variant.retailPrice ?? 239.99
+              ).toFixed(2)
+              listing.allocatedQuantity = Number(variant.stockOnHand ?? 0)
+              listing.listingStatus = 'draft'
+              listing.publicationStatus = publicationStatus
+              listing.syncStatus = 'pending'
+              listing.lastSyncedAt = null
+              listing.channelAttributes = {
+                platform: plat,
+                brandId: brand.id,
+                brandName: brand.name,
+                brandSlug: brand.slug,
+                productTitle: product.title,
+                skuPrefix: product.skuPrefix,
+                categoryHandle: catMeta.handle ?? product.category?.taxonomyPath ?? null,
+                prices: varPrices,
+                variantAttributes: variant.attributes ?? {},
+                transformedPayload: skuPayload,
+              }
+              await listing.save()
+
+              await PriceService.syncChannelListingPrices({
+                userId,
+                channelListingId: listing.id,
+                productVariantId: variant.id,
+                prices: varPrices,
+                priceType: 'listed',
+                trx,
+              })
+
+              listingsPersisted += 1
             }
-            await listing.save()
-
-            await PriceService.syncChannelListingPrices({
-              userId,
-              channelListingId: listing.id,
-              productVariantId: variant.id,
-              prices: varPrices,
-              priceType: 'listed',
-            })
-
-            listingsPersisted += 1
           }
         }
       }
-    }
+    })
 
     for (const p of products) {
       totalVariants += (p.variants ?? []).length
@@ -318,38 +352,13 @@ export class ListingTransformerService {
     userId: string
     listingId: string
   }): Promise<ChannelListing> {
-    const listing = await ChannelListing.query()
-      .where('userId', params.userId)
-      .andWhere('id', params.listingId)
-      .preload('product')
-      .preload('productVariant')
-      .preload('sellerAccount')
-      .preload('priceRecords')
-      .firstOrFail()
-
-    listing.listingStatus = 'active'
-    listing.publicationStatus = 'published'
-    listing.syncStatus = 'synced'
-    listing.lastSyncedAt = DateTime.now()
-    listing.lastSyncError = null
-    await listing.save()
-    return listing
+    void params
+    throw new Error('Marketplace publishing is not configured. Download the draft JSON instead.')
   }
 
   static async publishSkuAcrossPlatforms(params: { userId: string; sku: string }): Promise<number> {
-    const listings = await ChannelListing.query()
-      .where('userId', params.userId)
-      .andWhere('externalSku', params.sku)
-
-    for (const listing of listings) {
-      listing.listingStatus = 'active'
-      listing.publicationStatus = 'published'
-      listing.syncStatus = 'synced'
-      listing.lastSyncedAt = DateTime.now()
-      listing.lastSyncError = null
-      await listing.save()
-    }
-    return listings.length
+    void params
+    throw new Error('Marketplace publishing is not configured. Download the draft JSON instead.')
   }
 
   static transformForPlatform(
@@ -561,7 +570,7 @@ export class ListingTransformerService {
         handle,
         is_giftcard: false,
         discountable: true,
-        status: 'published',
+        status: 'draft',
         type: { value: product.type || 'Outerwear' },
         collection_id: product.collectionName ?? null,
         categories: product.category

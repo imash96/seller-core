@@ -32,7 +32,14 @@ const IMPORTER = (filePath: string) => {
 new Ignitor(APP_ROOT, { importer: IMPORTER })
   .tap((app) => {
     app.booting(async () => {
-      await import('#start/env')
+      const { default: env } = await import('#start/env')
+      const { validateProductionConfig } = await import('../app/utils/production_config.js')
+      validateProductionConfig({
+        nodeEnv: env.get('NODE_ENV'),
+        appKey: env.get('APP_KEY').release(),
+        appUrl: env.get('APP_URL'),
+        sessionDriver: env.get('SESSION_DRIVER'),
+      })
     })
     app.listen('SIGTERM', () => app.terminate())
     app.listenIf(app.managedByPm2, 'SIGINT', () => app.terminate())

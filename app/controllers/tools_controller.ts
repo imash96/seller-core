@@ -10,16 +10,25 @@ import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createTaskValidator, updateTaskValidator } from '#validators/operations'
 import { TaskStatus, TaskType, TaskPriority } from '../enums/index.js'
 
+const SAVED_VIEW_RESOURCES: Record<string, string> = {
+  orders: 'orders',
+  shipments: 'shipments',
+  returns: 'returns',
+  customers: 'customers',
+  products: 'catalog',
+  seller_accounts: 'integrations',
+  finance: 'finance',
+  tasks: 'tasks',
+  claims: 'orders',
+  import: 'orders',
+}
+
 export default class ToolsController {
   async tasksPage({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
     const [tasks, savedViews] = await Promise.all([
-      TasksReminder.query()
-        .where('userId', user.id)
-        .preload('creditCard')
-        .orderBy('dueAt', 'asc')
-        .limit(100),
-      WorkspaceLookupService.savedViewsFor(user.id),
+      TasksReminder.query().where('userId', user.id).orderBy('dueAt', 'asc').limit(100),
+      WorkspaceLookupService.savedViewsFor(user.id, 'tasks'),
     ])
     return inertia.render('tasks', {
       tasksReminders: tasks.map((t) => t.serialize()),
@@ -100,6 +109,9 @@ export default class ToolsController {
     const user = auth.getUserOrFail()
     const name = String(request.input('name', '')).trim()
     const moduleKey = String(request.input('moduleKey', 'orders')).trim()
+    const resource = SAVED_VIEW_RESOURCES[moduleKey]
+    if (!resource || !(await RbacService.hasPermission(user, `${resource}.read`, resource)))
+      return response.forbidden({ error: 'Access to this saved view module is required.' })
     if (!name) {
       session.flash('error', 'View name is required.')
       return response.redirect().back()
@@ -128,6 +140,9 @@ export default class ToolsController {
       .where('userId', user.id)
       .andWhere('id', params.id)
       .firstOrFail()
+    const resource = SAVED_VIEW_RESOURCES[view.moduleKey]
+    if (!resource || !(await RbacService.hasPermission(user, `${resource}.read`, resource)))
+      return response.forbidden({ error: 'Access to this saved view module is required.' })
     await view.delete()
     session.flash('success', `Saved view "${view.name}" removed.`)
     return response.redirect().back()
@@ -135,15 +150,22 @@ export default class ToolsController {
 
   async importPage({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
+    const canReadIntegrations = await RbacService.hasPermission(
+      user,
+      'integrations.read',
+      'integrations'
+    )
     const [jobs, effectiveRbac, savedViews, sharedLookups] = await Promise.all([
-      SyncJob.query()
-        .where('userId', user.id)
-        .preload('errors')
-        .orderBy('createdAt', 'desc')
-        .limit(30),
+      canReadIntegrations
+        ? SyncJob.query()
+            .where('userId', user.id)
+            .preload('errors', (q) => q.where('userId', user.id))
+            .orderBy('createdAt', 'desc')
+            .limit(30)
+        : [],
       RbacService.getEffectivePermissions(user),
       WorkspaceLookupService.savedViewsFor(user.id, 'import'),
-      WorkspaceLookupService.lookups(user.id),
+      WorkspaceLookupService.lookups(user),
     ])
     return inertia.render('import', {
       ...sharedLookups,
@@ -153,45 +175,12 @@ export default class ToolsController {
     })
   }
 
-  async uploadCatalogFile({ auth, request, response, session }: HttpContext) {
-    const user = auth.getUserOrFail()
-
-    const file = request.file('catalogFile', {
-      size: '5mb',
-      extnames: ['csv', 'xlsx', 'pdf', 'json'],
-    })
-
-    if (!file || !file.isValid) {
-      session.flash(
-        'error',
-        file?.errors?.[0]?.message ?? 'Please attach a catalog file (csv/xlsx/pdf/json, <=5mb).'
-      )
-      return response.redirect().back()
-    }
-
-    const fileName = `${user.id}_${Date.now()}_${file.clientName}`
-
-    try {
-      const notifMod = await import('#jobs/send_notification')
-      const SendNotification = notifMod.default
-      await (SendNotification as any).dispatch({
-        userId: user.id,
-        to: user.email,
-        channel: 'in_app',
-        subject: 'Catalog import queued',
-        body: `File ${file.clientName} (${file.size} bytes) received and queued for processing.`,
-        metadata: { fileName, userId: user.id, requestId: request.id() },
-      } as any)
-      session.flash(
-        'success',
-        `File ${file.clientName} accepted and queued for background processing.`
-      )
-    } catch {
-      session.flash(
-        'success',
-        `File ${file.clientName} received (${Math.round((file.size ?? 0) / 1024)}KB).`
-      )
-    }
+  async uploadCatalogFile({ auth, response, session }: HttpContext) {
+    auth.getUserOrFail()
+    session.flash(
+      'error',
+      'This upload does not process files. Use the catalog studio JSON import instead.'
+    )
     return response.redirect().back()
   }
 
@@ -207,12 +196,12 @@ export default class ToolsController {
     const user = auth.getUserOrFail()
     const logs = await AuditLog.query()
       .where((q) => q.where('userId', user.id).orWhere('actorUserId', user.id))
-      .preload('user')
-      .preload('actor')
+      .preload('user', (q) => q.if(!user.isSuperAdmin, (r) => r.where('id', user.id)))
+      .preload('actor', (q) => q.if(!user.isSuperAdmin, (r) => r.where('id', user.id)))
       .orderBy('createdAt', 'desc')
       .limit(150)
     return inertia.render('audit', {
-      auditLogs: logs.map((l) => l.serialize()),
+      auditLogs: logs.map((l) => l.serializeForViewer(user.isSuperAdmin)),
     })
   }
 }

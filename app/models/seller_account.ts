@@ -53,10 +53,10 @@ export default class SellerAccount extends AppBaseModel {
   @column({ columnName: 'health_status' })
   declare public healthStatus: string
 
-  @column({ columnName: 'encrypted_credentials' })
+  @column({ columnName: 'encrypted_credentials', serializeAs: null })
   declare public encryptedCredentials: string | null
 
-  @column({ columnName: 'credential_vault_ref' })
+  @column({ columnName: 'credential_vault_ref', serializeAs: null })
   declare public credentialVaultRef: string | null
 
   @column({ columnName: 'oauth_scopes' })

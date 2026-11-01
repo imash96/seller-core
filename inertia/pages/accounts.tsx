@@ -64,12 +64,12 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
     <div className="space-y-6">
       <PageHeader
         title="Marketplace Seller Accounts"
-        description="Connect Amazon SP-API, eBay, Etsy, and Medusa stores with AES-256-GCM encrypted API credentials."
+        description="Store account details and encrypted credentials. Marketplace connections and sync are not configured."
         icon={Building2}
-        badge={`${sellerAccounts.length} connected accounts`}
+        badge={`${sellerAccounts.length} saved accounts`}
         actions={
           <AppButton variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>
-            Connect Seller Account
+            Add Seller Account
           </AppButton>
         }
       />
@@ -79,7 +79,7 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
         items={[
           {
             id: 'total-accounts',
-            label: 'Connected Stores',
+            label: 'Saved Accounts',
             value: sellerAccounts.length,
             hint: `${salesChannels.length} sales channels`,
             icon: Building2,
@@ -87,15 +87,15 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
           },
           {
             id: 'active-accounts',
-            label: 'Active Sync',
+            label: 'Accounts Marked Active',
             value: stats.activeCount,
-            hint: 'Real-time order & inventory sync',
+            hint: 'External sync is not configured',
             icon: CheckCircle2,
             tone: 'success',
           },
           {
             id: 'healthy-accounts',
-            label: 'Healthy Credentials',
+            label: 'Accounts Marked Healthy',
             value: stats.healthyCount,
             hint: 'AES-256-GCM encrypted at rest',
             icon: ShieldCheck,
@@ -114,13 +114,13 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
-      {/* Complete Connect Seller Account Modal exposing all seller_accounts fields */}
+      {/* Complete Add Seller Account Modal exposing all seller_accounts fields */}
       <FormModal
         isOpen={createOpen}
         onOpenChange={setCreateOpen}
-        title="Connect Seller Account"
-        subtitle="Credentials are AES-256-GCM encrypted at rest — plaintext API keys are never persisted."
-        submitLabel="Connect Account"
+        title="Add Seller Account"
+        subtitle="Credentials are encrypted at rest. Saving does not verify or connect a marketplace."
+        submitLabel="Save Account"
         action="/seller-accounts"
         fields={[
           {
@@ -244,8 +244,8 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
       />
 
       <PageSection
-        title="Connected Seller Accounts"
-        description="Health, sync status, on-demand sync queue, and credential rotation per connected account."
+        title="Saved Seller Accounts"
+        description="Stored account details. Status does not verify a marketplace connection."
       >
         <ResponsiveDataView
           rows={sellerAccounts}
@@ -257,7 +257,7 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
             { value: 'auth_expired', label: 'Auth expired' },
             { value: 'suspended', label: 'Suspended' },
           ]}
-          createLabel="+ Connect Account"
+          createLabel="+ Save Account"
           onCreateClick={() => setCreateOpen(true)}
           toCard={(row) => ({
             title: String(row.accountName),
@@ -278,6 +278,7 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
                   variant="outline"
                   size="xs"
                   icon={RefreshCw}
+                  disabled
                   onClick={() =>
                     router.post(
                       '/import/sync-accounts',
@@ -326,6 +327,7 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
                   variant="outline"
                   size="xs"
                   icon={RefreshCw}
+                  disabled
                   onClick={() =>
                     router.post(
                       '/import/sync-accounts',

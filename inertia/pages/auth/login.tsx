@@ -3,12 +3,11 @@ import { usePage } from '@inertiajs/react'
 import { Banner } from '@astryxdesign/core/Banner'
 import { Button } from '@astryxdesign/core/Button'
 import AuthLayout from '~/layouts/auth'
-import { useState, useEffect } from 'react'
-import { ShieldCheck, Lock } from 'lucide-react'
+import { useState } from 'react'
+import { Lock } from 'lucide-react'
 import { StatusBadge } from '~/components/atoms/status-badge'
 import { PasswordField } from '~/components/molecules/password-field'
-import { DemoCredentialCard } from '~/components/molecules/demo-credential-card'
-import { Stack, VStack } from '@astryxdesign/core'
+import { VStack } from '@astryxdesign/core'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -16,27 +15,6 @@ export default function Login() {
   const page = usePage() as any
   const flash = (page.flash ?? page.props?.flash) as
     { error?: string; success?: string } | undefined
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const demo = params.get('demo')
-    if (demo === 'admin') {
-      setEmail('admin@sellercore.io')
-      setPassword('Password123!')
-    } else if (demo === 'ops') {
-      setEmail('ops@sellercore.io')
-      setPassword('Password123!')
-    }
-  }, [])
-
-  const fillAdmin = () => {
-    setEmail('admin@sellercore.io')
-    setPassword('Password123!')
-  }
-  const fillOps = () => {
-    setEmail('ops@sellercore.io')
-    setPassword('Password123!')
-  }
 
   return (
     <AuthLayout
@@ -56,37 +34,9 @@ export default function Login() {
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
             Public self-registration is disabled. Sign in with credentials provisioned by your
-            System Super Administrator or select a 1-click demo workspace below.
+            System Super Administrator.
           </p>
         </div>
-
-        {/* One-Click Demo Switcher Cards */}
-        <VStack gap={3}>
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-            <ShieldCheck className="w-4 h-4 text-primary" />
-            <span>Quick demo access — one click to populate credentials</span>
-          </div>
-          <Stack gap={3} wrap="wrap" vAlign="center" hAlign="between">
-            <DemoCredentialCard
-              roleTitle="Super Admin"
-              email="admin@sellercore.io"
-              password="Password123!"
-              variant="admin"
-              isActive={email === 'admin@sellercore.io'}
-              onSelect={fillAdmin}
-            />
-            <DemoCredentialCard
-              roleTitle="Operations Lead"
-              email="ops@sellercore.io"
-              password="Password123!"
-              variant="ops"
-              isActive={email === 'ops@sellercore.io'}
-              onSelect={fillOps}
-            />
-          </Stack>
-        </VStack>
-
-        <div className="h-px bg-border" />
 
         <Form action="/" method="post">
           {({ errors, processing }) => (

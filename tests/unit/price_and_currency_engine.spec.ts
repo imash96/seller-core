@@ -167,4 +167,12 @@ test.group('Price & Multi-Currency Engine', () => {
     assert.equal(tier01Prices.length, 6)
     assert.equal(tier01Prices.find((p) => p.currency_code === 'USD')?.amount, 239.99)
   })
+  test('normalizePriceMoneyArray rejects non-finite values', ({ assert }) => {
+    const prices = normalizePriceMoneyArray([
+      { currency_code: 'USD', amount: Infinity },
+      { currency_code: 'EUR', amount: 'Infinity' },
+      { currency_code: 'GBP', amount: 12 },
+    ])
+    assert.deepEqual(prices, [{ currency_code: 'GBP', amount: 12 }])
+  })
 })

@@ -18,6 +18,16 @@ export default class SessionController {
     const existingUser = await User.findBy('email', email)
     if (existingUser) {
       if (
+        existingUser.status === UserStatus.LOCKED &&
+        existingUser.lockedUntil &&
+        existingUser.lockedUntil <= DateTime.now()
+      ) {
+        existingUser.status = UserStatus.ACTIVE
+        existingUser.failedLoginAttempts = 0
+        existingUser.lockedUntil = null
+        await existingUser.save()
+      }
+      if (
         existingUser.lockedUntil &&
         existingUser.lockedUntil.toMillis() > DateTime.now().toMillis()
       ) {
@@ -55,6 +65,7 @@ export default class SessionController {
         expiresAt: DateTime.now().plus({ hours: 2 }),
         lastActiveAt: DateTime.now(),
       })
+      session.put('sessionRegistryToken', rawToken)
 
       await RbacService.recordAudit({
         actorUserId: user.id,
@@ -71,6 +82,11 @@ export default class SessionController {
       session.flash('success', `Welcome back, ${user.fullName}`)
       return response.redirect().toRoute('dashboard')
     } catch (error) {
+      if ((error as { code?: string }).code !== 'E_INVALID_CREDENTIALS') {
+        await auth.use('web').logout()
+        session.forget('sessionRegistryToken')
+        throw error
+      }
       if (existingUser) {
         existingUser.failedLoginAttempts = (existingUser.failedLoginAttempts || 0) + 1
         if (existingUser.failedLoginAttempts >= 5) {
@@ -96,10 +112,16 @@ export default class SessionController {
   async destroy({ auth, request, response, session }: HttpContext) {
     const user = auth.user
     if (user) {
-      await UserSession.query().where('userId', user.id).andWhere('isRevoked', false).update({
-        isRevoked: true,
-        revokedAt: DateTime.now().toSQL(),
-      })
+      const token = session.get('sessionRegistryToken')
+      if (typeof token === 'string') {
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+        await UserSession.query()
+          .where('userId', user.id)
+          .andWhere('sessionTokenHash', tokenHash)
+          .andWhere('isRevoked', false)
+          .update({ isRevoked: true, revokedAt: DateTime.now().toSQL() })
+      }
+      session.forget('sessionRegistryToken')
 
       await RbacService.recordAudit({
         actorUserId: user.id,

@@ -67,7 +67,7 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
     <div className="space-y-6">
       <PageHeader
         title="Bulk Marketplace Import & Sync Jobs"
-        description="Idempotent JSON order batch import, seller account synchronization, and per-record error diagnostics."
+        description="Idempotent JSON order batch import and per-record diagnostics. Marketplace sync is not configured."
         icon={Upload}
         badge={`${syncJobs.length} sync jobs`}
         actions={
@@ -75,6 +75,7 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
             <AppButton
               variant="secondary"
               size="sm"
+              disabled
               icon={RefreshCw}
               onClick={() => setSyncOpen(true)}
             >

@@ -44,23 +44,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
   let amazonChannel: SalesChannel
   let sellerAccountA: SellerAccount
 
-  let dbAvailable = false
-
-  group.tap((t) => {
-    t.skip(() => !dbAvailable, 'PostgreSQL database not available in current environment')
-  })
-
   group.setup(async () => {
-    try {
-      await db.rawQuery('SELECT 1')
-      dbAvailable = true
-    } catch {
-      console.warn(
-        'PostgreSQL database not reachable; skipping live integration tests in architecture_and_operations.spec.ts.'
-      )
-      return
-    }
-
     // Ensure permissions and roles exist for RBAC testing
     const pViewOrders = await Permission.updateOrCreate(
       { slug: 'orders.view' },
@@ -541,8 +525,16 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
     })
 
     await order.refresh()
+    assert.equal(order.status, 'fulfilled')
+    assert.isNull(order.deliveryNotificationSentAt)
+    await FulfillmentAndReturnsService.updateShipmentStatuses({
+      userId: merchantA.id,
+      shipmentIds: [shipment1.id],
+      status: ShipmentStatus.DELIVERED,
+    })
+    await order.refresh()
     assert.equal(order.status, 'delivered')
-    assert.isNotNull(order.deliveryNotificationSentAt)
+    assert.isNull(order.deliveryNotificationSentAt)
 
     const outbox = await OutboxEvent.query()
       .where('aggregateId', shipment2.id)
@@ -810,5 +802,182 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
     await assert.rejects(async () => {
       await db.from('audit_logs').where('id', anyLog.id).delete()
     })
+  })
+  test('duplicate variant lines preserve every inventory reservation and redact nested secrets', async ({
+    assert,
+  }) => {
+    const nonce = generateEntityId()
+    const product = await CatalogService.createProduct({
+      userId: merchantA.id,
+      title: `Reservation ${nonce}`,
+      hasVariants: false,
+      variants: [{ sku: `RES-${nonce}`, title: 'Item', retailPrice: 10, stockOnHand: 20 }],
+    })
+    await product.load('variants')
+    const variant = product.variants[0]
+    const order = await OrderService.createOrder({
+      userId: merchantA.id,
+      orderNumber: `RES-${nonce}`,
+      customer: { fullName: 'Buyer' },
+      lines: [1, 2].map((quantityOrdered) => ({
+        productVariantId: variant.id,
+        sku: variant.sku,
+        title: 'Item',
+        quantityOrdered,
+        unitPrice: 10,
+      })),
+      rawPayload: {
+        payment: { card_number: '4111111111111111' },
+        nested: [{ api_key: 'secret', safe: 'ok' }],
+      },
+    })
+    await variant.refresh()
+    assert.equal(variant.stockReserved, 3)
+    const payload = await OrderImportPayload.query().where('orderId', order.id).firstOrFail()
+    assert.deepEqual(payload.rawPayload, {
+      payment: { card_number: '[REDACTED]' },
+      nested: [{ api_key: '[REDACTED]', safe: 'ok' }],
+    })
+    assert.includeMembers(payload.redactedFields, ['payment.card_number', 'nested[0].api_key'])
+  })
+
+  test('concurrent shipments, returns and refunds cannot exceed the order limits', async ({
+    assert,
+  }) => {
+    const nonce = generateEntityId()
+    const order = await OrderService.createOrder({
+      userId: merchantA.id,
+      orderNumber: `CON-${nonce}`,
+      customer: { fullName: 'Buyer' },
+      lines: [{ sku: `CON-${nonce}`, title: 'Item', quantityOrdered: 1, unitPrice: 100 }],
+    })
+    await order.load('lineItems')
+    const line = order.lineItems[0]
+    const shipments = await Promise.allSettled(
+      [1, 2].map((n) =>
+        FulfillmentAndReturnsService.createShipment({
+          userId: merchantA.id,
+          orderId: order.id,
+          shipmentNumber: `SHP-${nonce}-${n}`,
+          carrierCode: 'ups',
+          carrierName: 'UPS',
+          items: [{ orderLineItemId: line.id, quantityShipped: 1 }],
+        })
+      )
+    )
+    assert.equal(shipments.filter((result) => result.status === 'fulfilled').length, 1)
+    assert.equal(shipments.filter((result) => result.status === 'rejected').length, 1)
+    const shipmentsFailure = shipments.find(
+      (result) => result.status === 'rejected'
+    ) as PromiseRejectedResult
+    assert.match(shipmentsFailure.reason.message, /OVER_FULFILLMENT/)
+    await line.refresh()
+    assert.equal(line.quantityFulfilled, 1)
+
+    const returns = await Promise.allSettled(
+      [1, 2].map((n) =>
+        FulfillmentAndReturnsService.createReturnRequest({
+          userId: merchantA.id,
+          orderId: order.id,
+          orderLineItemId: line.id,
+          rmaNumber: `RMA-${nonce}-${n}`,
+          returnReason: ReturnReason.DEFECTIVE,
+          quantityRequested: 1,
+        })
+      )
+    )
+    assert.equal(returns.filter((result) => result.status === 'fulfilled').length, 1)
+    assert.equal(returns.filter((result) => result.status === 'rejected').length, 1)
+    const returnsFailure = returns.find(
+      (result) => result.status === 'rejected'
+    ) as PromiseRejectedResult
+    assert.match(returnsFailure.reason.message, /OVER_RETURN_LIMIT/)
+
+    const refunds = await Promise.allSettled(
+      [1, 2].map((n) =>
+        FulfillmentAndReturnsService.processRefund({
+          userId: merchantA.id,
+          orderId: order.id,
+          refundNumber: `REF-${nonce}-${n}`,
+          itemsRefundAmount: 70,
+        })
+      )
+    )
+    assert.equal(refunds.filter((result) => result.status === 'fulfilled').length, 1)
+    assert.equal(refunds.filter((result) => result.status === 'rejected').length, 1)
+    const refundsFailure = refunds.find(
+      (result) => result.status === 'rejected'
+    ) as PromiseRejectedResult
+    assert.match(refundsFailure.reason.message, /DOUBLE_REFUND_PREVENTED/)
+    await order.refresh()
+    assert.equal(Number(order.refundedAmount), 70)
+  })
+
+  test('refunds reject unrelated and already refunded returns and invalid amounts', async ({
+    assert,
+  }) => {
+    const nonce = generateEntityId()
+    const createOrder = (suffix: string) =>
+      OrderService.createOrder({
+        userId: merchantA.id,
+        orderNumber: `LINK-${nonce}-${suffix}`,
+        customer: { fullName: 'Buyer' },
+        lines: [
+          { sku: `LINK-${nonce}-${suffix}`, title: 'Item', quantityOrdered: 2, unitPrice: 100 },
+        ],
+      })
+    const order = await createOrder('A')
+    const other = await createOrder('B')
+    await order.load('lineItems')
+    await other.load('lineItems')
+    const rma = await FulfillmentAndReturnsService.createReturnRequest({
+      userId: merchantA.id,
+      orderId: order.id,
+      orderLineItemId: order.lineItems[0].id,
+      rmaNumber: `RMA-${nonce}`,
+      returnReason: ReturnReason.DEFECTIVE,
+      quantityRequested: 1,
+    })
+    const refund = { userId: merchantA.id, refundNumber: `REF-${nonce}`, itemsRefundAmount: 50 }
+    await assert.rejects(() =>
+      FulfillmentAndReturnsService.processRefund({
+        ...refund,
+        orderId: other.id,
+        returnRequestId: rma.id,
+      })
+    )
+    await assert.rejects(() =>
+      FulfillmentAndReturnsService.processRefund({
+        ...refund,
+        orderId: order.id,
+        orderLineItemId: other.lineItems[0].id,
+      })
+    )
+    await assert.rejects(
+      () =>
+        FulfillmentAndReturnsService.processRefund({
+          ...refund,
+          orderId: order.id,
+          shippingRefundAmount: -1,
+        }),
+      /VALIDATION_ERROR/
+    )
+    await FulfillmentAndReturnsService.processRefund({
+      ...refund,
+      orderId: order.id,
+      returnRequestId: rma.id,
+    })
+    await assert.rejects(
+      () =>
+        FulfillmentAndReturnsService.processRefund({
+          ...refund,
+          refundNumber: `REF2-${nonce}`,
+          orderId: order.id,
+          returnRequestId: rma.id,
+        }),
+      /INVALID_RETURN_STATUS/
+    )
+    await order.lineItems[0].refresh()
+    assert.equal(order.lineItems[0].quantityReturned, 1)
   })
 })

@@ -1,3 +1,6 @@
+import { Stack, VStack, HStack } from '@astryxdesign/core/Stack'
+import { Table, proportional } from '@astryxdesign/core/Table'
+import { Text } from '@astryxdesign/core/Text'
 import { router } from '@inertiajs/react'
 import {
   PageHeader,
@@ -129,6 +132,8 @@ export default function Catalogs({
   catalogItems = [],
   categories = [],
   products = [],
+  brands = [],
+  sellerAccounts = [],
   modularConfig,
   sampleCatalogJson = {},
 }: Props) {
@@ -145,6 +150,18 @@ export default function Catalogs({
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const [importJsonModalOpen, setImportJsonModalOpen] = useState(false)
+  const [importTier, setImportTier] = useState('01')
+  const [importSkuFormat, setImportSkuFormat] = useState('standard')
+  const [importStock, setImportStock] = useState('25')
+  const [listingBrand, setListingBrand] = useState('')
+  const [listingPlatform, setListingPlatform] = useState('medusa')
+  const [listingAccount, setListingAccount] = useState('')
+  const [listingProductIds, setListingProductIds] = useState<string[]>([])
+  const [assignDefaultBrand, setAssignDefaultBrand] = useState(false)
+  const [listingPreview, setListingPreview] = useState<{
+    filename: string
+    payload: unknown
+  } | null>(null)
   const [catalogJsonText, setCatalogJsonText] = useState<string>(() =>
     JSON.stringify(sampleCatalogJson, null, 2)
   )
@@ -496,7 +513,7 @@ export default function Catalogs({
     }
   }
 
-  const handleSyncCategories = async () => {
+  const handleSyncCategories = async (source: 'configured' | 'built-in' = 'configured') => {
     setBusyId('sync-cat')
     setBanner(null)
     try {
@@ -507,7 +524,7 @@ export default function Catalogs({
           'Accept': 'application/json',
           'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ source }),
       })
       const data = await res.json()
       if (data.ok || data.success) {
@@ -540,7 +557,10 @@ export default function Catalogs({
         },
         body: JSON.stringify({
           catalogPayload: parsed,
-          convertImmediately: false,
+          priceTier: importTier,
+          skuFormat: importSkuFormat,
+          defaultStockOnHand: Number(importStock),
+          convertImmediately: true,
         }),
       })
       const data = await res.json()
@@ -560,6 +580,56 @@ export default function Catalogs({
       setBanner({
         tone: 'error',
         message: err instanceof Error ? err.message : 'Invalid JSON syntax.',
+      })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const handleGenerateListings = async (persist: boolean) => {
+    if (!listingBrand) {
+      setBanner({ tone: 'error', message: 'Select a brand first.' })
+      return
+    }
+    setBusyId('listing-generator')
+    try {
+      const res = await fetch('/catalogs/generate-listings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-XSRF-TOKEN': decodeURIComponent(getCsrfToken()),
+        },
+        body: JSON.stringify({
+          brandId: listingBrand,
+          platform: listingPlatform,
+          productIds: listingProductIds,
+          sellerAccountId: listingAccount || undefined,
+          assignBrandToProduct: persist && assignDefaultBrand,
+          persistChannelListings: persist,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Listing generation failed.')
+      setListingPreview({ filename: data.filename, payload: data.payload })
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(data.payload, null, 2)], { type: 'application/json' })
+      )
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = data.filename
+      anchor.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setBanner({
+        tone: 'success',
+        message: persist
+          ? `Saved ${data.listingsPersisted} draft listings; download is ready.`
+          : 'Preview generated without changing products or listings.',
+      })
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        message: err instanceof Error ? err.message : 'Listing generation failed.',
       })
     } finally {
       setBusyId(null)
@@ -728,7 +798,14 @@ export default function Catalogs({
               size="sm"
               icon={RefreshCw}
               loading={busyId === 'sync-cat'}
-              onClick={handleSyncCategories}
+              onClick={() => handleSyncCategories()}
+            />
+            <AppButton
+              label="Sync built-in taxonomy"
+              variant="secondary"
+              size="sm"
+              loading={busyId === 'sync-cat'}
+              onClick={() => handleSyncCategories('built-in')}
             />
             <AppButton
               label="Import Catalog JSON"
@@ -753,6 +830,161 @@ export default function Catalogs({
           </div>
         }
       />
+
+      <PageSection
+        title="Catalog-to-listing pipeline"
+        description="Sync categories, import and convert your catalog, then generate listing drafts."
+      >
+        <VStack gap={4} width="100%">
+          <Text type="supporting">
+            1. Sync the server-configured Medusa endpoint or bundled taxonomy. 2. Import JSON. 3.
+            Review the variant matrix below. 4. Select a brand and export listing drafts.
+          </Text>
+          <Accordion>
+            <AccordionItem title={`Synced category taxonomy (${categories.length})`}>
+              <Table
+                data={categories}
+                idKey={(row: Row) => String(row.id)}
+                density="compact"
+                textOverflow="truncate"
+                columns={[
+                  {
+                    key: 'name',
+                    header: 'Category',
+                    width: proportional(1),
+                    renderCell: (row: Row) => String(row.name ?? ''),
+                  },
+                  {
+                    key: 'taxonomyPath',
+                    header: 'Handle',
+                    width: proportional(2),
+                    renderCell: (row: Row) => String(row.taxonomyPath || row.slug || ''),
+                  },
+                  {
+                    key: 'taxonomy',
+                    header: 'Platform taxonomy',
+                    width: proportional(2),
+                    renderCell: (row: Row) => {
+                      const raw = row.attributesSchema
+                      const m = (Array.isArray(raw) ? raw[0] : raw)?.metadata ?? {}
+                      return (
+                        [
+                          'amazon_browse_node',
+                          'ebay_category_id',
+                          'etsy_taxonomy_id',
+                          'google_product_category_id',
+                        ]
+                          .map((key) => m[key])
+                          .filter(Boolean)
+                          .join(' / ') || '—'
+                      )
+                    },
+                  },
+                ]}
+              />
+            </AccordionItem>
+          </Accordion>
+          <Text type="body" weight="semibold">
+            4. Brand and listing export
+          </Text>
+          <Stack direction="horizontal" gap={3} wrap="wrap">
+            <AppSelect
+              label="Brand"
+              value={listingBrand}
+              onChange={(e) => setListingBrand(e.target.value)}
+              options={[
+                { value: '', label: 'Select a brand' },
+                ...brands.map((brand) => ({ value: String(brand.id), label: String(brand.name) })),
+              ]}
+            />
+            <AppSelect
+              label="Platform"
+              value={listingPlatform}
+              onChange={(e) => {
+                setListingPlatform(e.target.value)
+                setListingAccount('')
+              }}
+              options={[
+                { value: 'medusa', label: 'Medusa Website' },
+                { value: 'amazon', label: 'Amazon SP-API' },
+                { value: 'ebay', label: 'eBay Inventory API' },
+                { value: 'etsy', label: 'Etsy Open API v3' },
+              ]}
+            />
+            <AppSelect
+              label="Seller account (optional)"
+              value={listingAccount}
+              onChange={(e) => setListingAccount(e.target.value)}
+              options={[
+                { value: '', label: 'Use a matching account' },
+                ...sellerAccounts.map((account) => ({
+                  value: String(account.id),
+                  label: String(account.accountName),
+                })),
+              ]}
+            />
+          </Stack>
+          <Text type="supporting">
+            Select products below, or leave all unchecked to use all products with variants.
+          </Text>
+          <Stack direction="horizontal" wrap="wrap" gap={3}>
+            {products.map((product) => (
+              <Stack as="label" direction="horizontal" gap={1} key={String(product.id)}>
+                <input
+                  type="checkbox"
+                  checked={listingProductIds.includes(String(product.id))}
+                  onChange={(e) =>
+                    setListingProductIds((ids) =>
+                      e.target.checked
+                        ? [...ids, String(product.id)]
+                        : ids.filter((id) => id !== String(product.id))
+                    )
+                  }
+                />
+                <Text type="body" size="sm">
+                  {String(product.title)}
+                </Text>
+              </Stack>
+            ))}
+          </Stack>
+          <Stack as="label" direction="horizontal" gap={2}>
+            <input
+              type="checkbox"
+              checked={assignDefaultBrand}
+              onChange={(e) => setAssignDefaultBrand(e.target.checked)}
+            />
+            <Text type="body" size="sm">
+              Also set as default product brand when saving
+            </Text>
+          </Stack>
+          <HStack gap={2} wrap="wrap">
+            <AppButton
+              label="Preview & Download Listing JSON"
+              variant="secondary"
+              size="sm"
+              loading={busyId === 'listing-generator'}
+              onClick={() => handleGenerateListings(false)}
+            />
+            <AppButton
+              label="Save draft listings & Download"
+              variant="primary"
+              size="sm"
+              loading={busyId === 'listing-generator'}
+              onClick={() => handleGenerateListings(true)}
+            />
+          </HStack>
+          {listingPreview && (
+            <VStack gap={2} isScrollable>
+              <Text type="body" weight="semibold">
+                {listingPreview.filename}
+              </Text>
+              <pre className="overflow-auto whitespace-pre-wrap break-words text-xs">
+                {JSON.stringify(listingPreview.payload, null, 2)}
+              </pre>
+            </VStack>
+          )}
+        </VStack>
+      </PageSection>
 
       {/* Top Interactive Status Bar */}
       <TopStatusBar
@@ -1936,12 +2168,42 @@ export default function Catalogs({
                   />
                 </label>
                 <AppButton
-                  label="Reset to Sample 4-SKU Catalog"
+                  label="Load Sample Catalog"
                   variant="ghost"
                   size="xs"
                   onClick={() => setCatalogJsonText(JSON.stringify(sampleCatalogJson, null, 2))}
                 />
               </div>
+              <Stack direction="horizontal" gap={3} wrap="wrap">
+                <AppSelect
+                  label="Price tier"
+                  value={importTier}
+                  onChange={(e) => setImportTier(e.target.value)}
+                  options={['01', '02', '03'].map((tier) => ({
+                    value: tier,
+                    label: `Tier ${tier}`,
+                  }))}
+                />
+                <AppSelect
+                  label="SKU format"
+                  value={importSkuFormat}
+                  onChange={(e) => setImportSkuFormat(e.target.value)}
+                  options={[
+                    { value: 'standard', label: 'Standard' },
+                    { value: 'prefixed_color', label: 'Color-prefixed' },
+                    { value: 'catalog_key', label: 'Catalog key' },
+                  ]}
+                />
+                <AppInput
+                  id="catalog-import-stock"
+                  label="Initial stock per variant"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={importStock}
+                  onChange={(e) => setImportStock(e.target.value)}
+                />
+              </Stack>
               <textarea
                 rows={14}
                 value={catalogJsonText}
@@ -1958,7 +2220,7 @@ export default function Catalogs({
                 onClick={() => setImportJsonModalOpen(false)}
               />
               <AppButton
-                label={busyId === 'import-json' ? 'Importing...' : 'Save Catalog SKUs to Database'}
+                label={busyId === 'import-json' ? 'Importing...' : 'Import & Convert Catalog'}
                 variant="primary"
                 size="sm"
                 loading={busyId === 'import-json'}

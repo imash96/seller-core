@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises'
-import { DateTime } from 'luxon'
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import Brand from '#models/brand'
@@ -8,6 +7,7 @@ import Product from '#models/product'
 import ProductVariant from '#models/product_variant'
 import ChannelListing from '#models/channel_listing'
 import SellerAccount from '#models/seller_account'
+import { RbacService } from '#services/rbac_service'
 import { CatalogService, type GeneratedProductPreview } from '../services/catalog_service.js'
 import { CategorySyncService } from '../services/category_sync_service.js'
 import { ListingTransformerService } from '../services/listing_transformer_service.js'
@@ -54,28 +54,38 @@ export default class ProductsController {
    */
   async index({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
-    await PriceService.ensurePriceTables()
+    const canReadIntegrations = await RbacService.hasPermission(
+      user,
+      'integrations.read',
+      'integrations'
+    )
     const [products, channelListings, savedViews, sharedLookups] = await Promise.all([
       Product.query()
         .where('userId', user.id)
-        .preload('brand')
-        .preload('category')
-        .preload('priceRecords')
+        .preload('brand', (q) => q.where('userId', user.id))
+        .preload('category', (q) => q.where('userId', user.id))
+        .preload('priceRecords', (q) => q.where('userId', user.id))
         .preload('variants', (q) =>
-          q.preload('variantAttributes').preload('priceRecords').preload('listings')
+          q
+            .where('userId', user.id)
+            .preload('variantAttributes', (r) => r.where('userId', user.id))
+            .preload('priceRecords', (r) => r.where('userId', user.id))
+            .preload('listings', (r) => r.where('userId', user.id))
         )
         .orderBy('createdAt', 'desc')
         .limit(100),
       ChannelListing.query()
         .where('userId', user.id)
-        .preload('product')
-        .preload('productVariant')
-        .preload('sellerAccount')
-        .preload('priceRecords')
+        .preload('product', (q) => q.where('userId', user.id))
+        .preload('productVariant', (q) => q.where('userId', user.id))
+        .if(canReadIntegrations, (q) =>
+          q.preload('sellerAccount', (r) => r.where('userId', user.id))
+        )
+        .preload('priceRecords', (q) => q.where('userId', user.id))
         .orderBy('createdAt', 'desc')
         .limit(200),
       WorkspaceLookupService.savedViewsFor(user.id, 'products'),
-      WorkspaceLookupService.lookups(user.id),
+      WorkspaceLookupService.lookups(user),
     ])
     return inertia.render('products', {
       ...sharedLookups,
@@ -92,28 +102,38 @@ export default class ProductsController {
    */
   async inventoryPage({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
-    await PriceService.ensurePriceTables()
+    const canReadIntegrations = await RbacService.hasPermission(
+      user,
+      'integrations.read',
+      'integrations'
+    )
     const [products, channelListings, savedViews, sharedLookups] = await Promise.all([
       Product.query()
         .where('userId', user.id)
-        .preload('brand')
-        .preload('category')
-        .preload('priceRecords')
+        .preload('brand', (q) => q.where('userId', user.id))
+        .preload('category', (q) => q.where('userId', user.id))
+        .preload('priceRecords', (q) => q.where('userId', user.id))
         .preload('variants', (q) =>
-          q.preload('variantAttributes').preload('priceRecords').preload('listings')
+          q
+            .where('userId', user.id)
+            .preload('variantAttributes', (r) => r.where('userId', user.id))
+            .preload('priceRecords', (r) => r.where('userId', user.id))
+            .preload('listings', (r) => r.where('userId', user.id))
         )
         .orderBy('createdAt', 'desc')
         .limit(100),
       ChannelListing.query()
         .where('userId', user.id)
-        .preload('product')
-        .preload('productVariant')
-        .preload('sellerAccount')
-        .preload('priceRecords')
+        .preload('product', (q) => q.where('userId', user.id))
+        .preload('productVariant', (q) => q.where('userId', user.id))
+        .if(canReadIntegrations, (q) =>
+          q.preload('sellerAccount', (r) => r.where('userId', user.id))
+        )
+        .preload('priceRecords', (q) => q.where('userId', user.id))
         .orderBy('createdAt', 'desc')
         .limit(200),
       WorkspaceLookupService.savedViewsFor(user.id, 'products'),
-      WorkspaceLookupService.lookups(user.id),
+      WorkspaceLookupService.lookups(user),
     ])
     return inertia.render('inventory', {
       ...sharedLookups,
@@ -128,29 +148,39 @@ export default class ProductsController {
    */
   async catalogsPage({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
-    await PriceService.ensurePriceTables()
+    const canReadIntegrations = await RbacService.hasPermission(
+      user,
+      'integrations.read',
+      'integrations'
+    )
     const [catalogItems, products, channelListings, savedViews, sharedLookups] = await Promise.all([
       CatalogService.listCatalogItems(user.id),
       Product.query()
         .where('userId', user.id)
-        .preload('brand')
-        .preload('category')
-        .preload('priceRecords')
+        .preload('brand', (q) => q.where('userId', user.id))
+        .preload('category', (q) => q.where('userId', user.id))
+        .preload('priceRecords', (q) => q.where('userId', user.id))
         .preload('variants', (q) =>
-          q.preload('variantAttributes').preload('priceRecords').preload('listings')
+          q
+            .where('userId', user.id)
+            .preload('variantAttributes', (r) => r.where('userId', user.id))
+            .preload('priceRecords', (r) => r.where('userId', user.id))
+            .preload('listings', (r) => r.where('userId', user.id))
         )
         .orderBy('createdAt', 'desc')
         .limit(100),
       ChannelListing.query()
         .where('userId', user.id)
-        .preload('product')
-        .preload('productVariant')
-        .preload('sellerAccount')
-        .preload('priceRecords')
+        .preload('product', (q) => q.where('userId', user.id))
+        .preload('productVariant', (q) => q.where('userId', user.id))
+        .if(canReadIntegrations, (q) =>
+          q.preload('sellerAccount', (r) => r.where('userId', user.id))
+        )
+        .preload('priceRecords', (q) => q.where('userId', user.id))
         .orderBy('createdAt', 'desc')
         .limit(200),
       WorkspaceLookupService.savedViewsFor(user.id, 'products'),
-      WorkspaceLookupService.lookups(user.id),
+      WorkspaceLookupService.lookups(user),
     ])
 
     const enrichedCatalogItems = catalogItems.map((c) => {
@@ -248,28 +278,45 @@ export default class ProductsController {
    */
   async listingsPage({ auth, inertia }: HttpContext) {
     const user = auth.getUserOrFail()
-    await PriceService.ensurePriceTables()
+    const canReadIntegrations = await RbacService.hasPermission(
+      user,
+      'integrations.read',
+      'integrations'
+    )
     const [products, channelListings, savedViews, sharedLookups] = await Promise.all([
       Product.query()
         .where('userId', user.id)
-        .preload('brand')
-        .preload('category')
-        .preload('priceRecords')
+        .preload('brand', (q) => q.where('userId', user.id))
+        .preload('category', (q) => q.where('userId', user.id))
+        .preload('priceRecords', (q) => q.where('userId', user.id))
         .preload('variants', (q) =>
-          q.preload('variantAttributes').preload('priceRecords').preload('listings')
+          q
+            .where('userId', user.id)
+            .preload('variantAttributes', (r) => r.where('userId', user.id))
+            .preload('priceRecords', (r) => r.where('userId', user.id))
+            .preload('listings', (r) => r.where('userId', user.id))
         )
         .orderBy('createdAt', 'desc')
         .limit(100),
       ChannelListing.query()
         .where('userId', user.id)
-        .preload('product', (q) => q.preload('brand').preload('category'))
-        .preload('productVariant', (vq) => vq.preload('priceRecords'))
-        .preload('sellerAccount', (q) => q.preload('salesChannel'))
-        .preload('priceRecords')
+        .preload('product', (q) =>
+          q
+            .where('userId', user.id)
+            .preload('brand', (r) => r.where('userId', user.id))
+            .preload('category', (r) => r.where('userId', user.id))
+        )
+        .preload('productVariant', (vq) =>
+          vq.where('userId', user.id).preload('priceRecords', (q) => q.where('userId', user.id))
+        )
+        .if(canReadIntegrations, (q) =>
+          q.preload('sellerAccount', (r) => r.where('userId', user.id).preload('salesChannel'))
+        )
+        .preload('priceRecords', (q) => q.where('userId', user.id))
         .orderBy('createdAt', 'desc')
         .limit(300),
       WorkspaceLookupService.savedViewsFor(user.id, 'products'),
-      WorkspaceLookupService.lookups(user.id),
+      WorkspaceLookupService.lookups(user),
     ])
 
     const enrichedListings = channelListings.map((c) => {
@@ -376,10 +423,48 @@ export default class ProductsController {
   /**
    * Stage 1 Endpoint: Medusa-compatible `GET /store/product-categories`
    */
-  async medusaCategoriesEndpoint({ response }: HttpContext) {
-    return response.json({
-      product_categories: CategorySyncService.getBuiltInMedusaCategories(),
-    })
+  async medusaCategoriesEndpoint({ response, auth }: HttpContext) {
+    const tree = structuredClone(CategorySyncService.getBuiltInMedusaCategories())
+    if (auth.user) {
+      const categories = await ProductCategory.query()
+        .where('userId', auth.user.id)
+        .orderBy('sortOrder')
+      const byHandle = new Map<string, (typeof tree)[number]>()
+      const index = (nodes: typeof tree) => {
+        for (const node of nodes) {
+          byHandle.set(node.handle, node)
+          if (node.category_children) index(node.category_children)
+        }
+      }
+      index(tree)
+      const builtInHandles = new Set(byHandle.keys())
+      const byId = new Map(categories.map((category) => [category.id, category]))
+      for (const category of categories) {
+        if (byHandle.has(category.slug)) continue
+        const meta = CategorySyncService.extractCategoryMetadata(category)
+        const { medusaId, handle, mpath, ...metadata } = meta
+        byHandle.set(category.slug, {
+          id: medusaId ?? category.id,
+          name: category.name,
+          handle: handle ?? category.slug,
+          mpath,
+          rank: category.sortOrder,
+          is_active: category.isActive,
+          metadata,
+          category_children: [],
+        })
+      }
+      for (const category of categories) {
+        // Built-in entries are already present in the cloned tree.
+        if (builtInHandles.has(category.slug)) continue
+        const node = byHandle.get(category.slug)!
+        const parent = category.parentCategoryId && byId.get(category.parentCategoryId)
+        const parentNode = parent && byHandle.get(parent.slug)
+        const siblings = parentNode ? (parentNode.category_children ??= []) : tree
+        if (!siblings.some((entry) => entry.handle === node.handle)) siblings.push(node)
+      }
+    }
+    return response.json({ product_categories: tree })
   }
 
   /**
@@ -392,7 +477,8 @@ export default class ProductsController {
     try {
       const { syncedCount, source } = await CategorySyncService.syncFromMedusaEndpoint(
         user.id,
-        medusaBaseUrl
+        medusaBaseUrl,
+        request.input('source') === 'built-in' ? 'built-in' : 'configured'
       )
       const msg = `Synced ${syncedCount} hierarchical Medusa categories from ${source}.`
       if (wantsJson(request)) {
@@ -430,6 +516,12 @@ export default class ProductsController {
       extnames: ['json'],
     })
 
+    if (uploadedFile && !uploadedFile.isValid) {
+      const msg = 'Catalog file must be a JSON file no larger than 10 MB.'
+      if (wantsJson(request)) return response.badRequest({ ok: false, error: msg })
+      session.flash('error', msg)
+      return response.redirect().back()
+    }
     if (!rawJsonText && uploadedFile && uploadedFile.tmpPath) {
       rawJsonText = await fs.readFile(uploadedFile.tmpPath, 'utf-8')
     }
@@ -444,7 +536,7 @@ export default class ProductsController {
       } else if (rawJsonText) {
         catalogPayload = JSON.parse(rawJsonText) as CatalogJsonPayload
       } else {
-        catalogPayload = SAMPLE_CATALOG_JSON
+        throw new Error('Provide a catalog JSON file or JSON text.')
       }
     } catch (err: any) {
       const msg = `Invalid Catalog JSON syntax: ${err.message || 'Check JSON structure.'}`
@@ -458,9 +550,10 @@ export default class ProductsController {
     const priceTier = (String(request.input('priceTier', '01')).trim() || '01') as PriceTierCode
     const skuFormat = (String(request.input('skuFormat', 'standard')).trim() ||
       'standard') as SkuFormatMode
-    const defaultStockOnHand = Math.max(0, Number(request.input('defaultStockOnHand', 25)) || 25)
+    const defaultStockOnHand = Number(request.input('defaultStockOnHand', 25))
     const convertImmediately =
-      request.input('convertImmediately') === true || request.input('convertImmediately') === 'true'
+      request.input('convertImmediately') !== false &&
+      request.input('convertImmediately') !== 'false'
 
     try {
       const result = await CatalogService.importCatalogJson({
@@ -615,7 +708,7 @@ export default class ProductsController {
       PriceTierCode | undefined
     const skuFormat = (String(request.input('skuFormat', '')).trim() || undefined) as
       SkuFormatMode | undefined
-    const defaultStockOnHand = Number(request.input('defaultStockOnHand', 25)) || 25
+    const defaultStockOnHand = Number(request.input('defaultStockOnHand', 25))
 
     try {
       const preview = await CatalogService.buildProductPreviewFromCatalogItem({
@@ -666,12 +759,12 @@ export default class ProductsController {
           catalogItemId: params.id,
           priceTier: request.input('priceTier') as PriceTierCode,
           skuFormat: request.input('skuFormat') as SkuFormatMode,
-          defaultStockOnHand: Number(request.input('defaultStockOnHand', 25)) || 25,
+          defaultStockOnHand: Number(request.input('defaultStockOnHand', 25)),
         })
       } else {
         preview = {
           ...rawPreview,
-          catalogItemId: rawPreview.catalogItemId || params.id,
+          catalogItemId: params.id,
           catalogKey: rawPreview.catalogKey || rawPreview.skuKey || 'SKU1',
           structuredCode: rawPreview.structuredCode || rawPreview.structuredBaseCode || 'MCTDC01',
           type: rawPreview.type || rawPreview.productType || 'Duster Coat',
@@ -740,11 +833,11 @@ export default class ProductsController {
 
     const sellerAccountId = String(request.input('sellerAccountId', '')).trim() || null
     const assignBrandToProduct =
-      request.input('assignBrandToProduct') !== false &&
-      request.input('assignBrandToProduct') !== 'false'
+      request.input('assignBrandToProduct') === true ||
+      request.input('assignBrandToProduct') === 'true'
     const persistChannelListings =
-      request.input('persistChannelListings') !== false &&
-      request.input('persistChannelListings') !== 'false'
+      request.input('persistChannelListings') === true ||
+      request.input('persistChannelListings') === 'true'
 
     const rawProductIds = request.input('productIds')
     const productIds: string[] = Array.isArray(rawProductIds)
@@ -890,11 +983,10 @@ export default class ProductsController {
    */
   async updateChannelListing({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    await PriceService.ensurePriceTables()
     const listing = await ChannelListing.query()
       .where('userId', user.id)
       .andWhere('id', params.id)
-      .preload('priceRecords')
+      .preload('priceRecords', (q) => q.where('userId', user.id))
       .firstOrFail()
 
     if (request.input('channelTitle') !== undefined) {
@@ -933,12 +1025,14 @@ export default class ProductsController {
     if (request.input('listingStatus') !== undefined) {
       listing.listingStatus = String(request.input('listingStatus')).trim()
     }
-    if (request.input('publicationStatus') !== undefined) {
-      listing.publicationStatus = String(request.input('publicationStatus')).trim()
-      if (listing.publicationStatus === 'published') {
-        listing.syncStatus = 'synced'
-        listing.lastSyncedAt = DateTime.now()
-      }
+    if (
+      request.input('publicationStatus') !== undefined &&
+      String(request.input('publicationStatus')).trim() !== listing.publicationStatus
+    ) {
+      const message = 'Publication status cannot be changed without a marketplace integration.'
+      if (wantsJson(request)) return response.badRequest({ ok: false, error: message })
+      session.flash('error', message)
+      return response.redirect().back()
     }
 
     const rawPrices = request.input('prices') ?? request.input('pricesJson')
@@ -1038,7 +1132,6 @@ export default class ProductsController {
 
   async updateProduct({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    await PriceService.ensurePriceTables()
     const payload = await request.validateUsing(updateProductValidator)
     const product = await Product.query()
       .where('id', params.id)
@@ -1083,7 +1176,6 @@ export default class ProductsController {
 
   async storeVariant({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    await PriceService.ensurePriceTables()
     const payload = await request.validateUsing(createVariantValidator)
     const product = await Product.query()
       .where('id', params.id)
@@ -1144,7 +1236,6 @@ export default class ProductsController {
 
   async updateVariantStock({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    await PriceService.ensurePriceTables()
     const variant = await ProductVariant.query()
       .where('userId', user.id)
       .andWhere('id', params.id)
@@ -1322,7 +1413,6 @@ export default class ProductsController {
 
   async storeChannelListing({ auth, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    await PriceService.ensurePriceTables()
     const productVariantId = String(request.input('productVariantId', '')).trim()
     const sellerAccountId = String(request.input('sellerAccountId', '')).trim()
     const channelSku = String(request.input('channelSku', '')).trim()
@@ -1332,7 +1422,7 @@ export default class ProductsController {
     const variant = await ProductVariant.query()
       .where('userId', user.id)
       .andWhere('id', productVariantId)
-      .preload('priceRecords')
+      .preload('priceRecords', (q) => q.where('userId', user.id))
       .firstOrFail()
     const sellerAccount = await SellerAccount.query()
       .where('userId', user.id)
@@ -1357,11 +1447,11 @@ export default class ProductsController {
       currencyCode: lPrices[0]?.currency_code || sellerAccount.defaultCurrency || 'USD',
       listedPrice: (lPrices[0]?.amount ?? effPrice).toFixed(2),
       allocatedQuantity: Number(request.input('allocatedQuantity', variant.stockOnHand)),
-      listingStatus: 'active',
-      publicationStatus: 'published',
-      syncStatus: 'synced',
+      listingStatus: 'draft',
+      publicationStatus: 'unpublished',
+      syncStatus: 'pending',
       channelAttributes: { prices: lPrices },
-      lastSyncedAt: DateTime.now(),
+      lastSyncedAt: null,
     })
 
     await PriceService.syncChannelListingPrices({

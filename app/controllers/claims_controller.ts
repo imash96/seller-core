@@ -2,6 +2,7 @@ import { DateTime } from 'luxon'
 import type { HttpContext } from '@adonisjs/core/http'
 import MarketplaceClaim from '#models/marketplace_claim'
 import Order from '#models/order'
+import SellerAccount from '#models/seller_account'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 
 export default class ClaimsController {
@@ -10,11 +11,11 @@ export default class ClaimsController {
     const [claims, savedViews, sharedLookups] = await Promise.all([
       MarketplaceClaim.query()
         .where('userId', user.id)
-        .preload('order')
+        .preload('order', (q) => q.where('userId', user.id))
         .orderBy('createdAt', 'desc')
         .limit(100),
       WorkspaceLookupService.savedViewsFor(user.id, 'claims'),
-      WorkspaceLookupService.lookups(user.id),
+      WorkspaceLookupService.lookups(user),
     ])
     return inertia.render('claims', {
       ...sharedLookups,
@@ -38,6 +39,16 @@ export default class ClaimsController {
       const sellerLiabilityAmount = Number(request.input('sellerLiabilityAmount', 0))
       const sellerAccountId =
         String(request.input('sellerAccountId', '')).trim() || order.sellerAccountId
+      if (sellerAccountId) {
+        const seller = await SellerAccount.query()
+          .where('userId', user.id)
+          .where('id', sellerAccountId)
+          .first()
+        if (!seller || (order.sellerAccountId && order.sellerAccountId !== seller.id))
+          return response.badRequest({
+            error: 'Seller account must belong to this user and match the order.',
+          })
+      }
       const respondByAt = request.input('respondByAt')
       const status = String(request.input('status', 'under_review'))
 

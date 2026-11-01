@@ -209,10 +209,12 @@ export default function Products({
         },
         body: JSON.stringify({
           brandId: selectedBrandId,
+          persistChannelListings: true,
           platforms: selectedPlatforms,
           platform: selectedPlatforms[0],
           productIds: [String(convertModalProduct.id)],
-          sellerAccountId: selectedSellerAccountId || undefined,
+          sellerAccountId:
+            selectedPlatforms.length === 1 ? selectedSellerAccountId || undefined : undefined,
           priceMultiplier: Number(priceMultiplier) || 1.0,
         }),
       })

@@ -44,6 +44,11 @@ export function SmartForm({
   const handleFieldChange = (name: string, nextVal: string) => {
     setValues((prev) => {
       const next = { ...prev, [name]: nextVal }
+      if (name === 'dataClassification' && prev[name] !== nextVal) {
+        for (const key of ['financialAccountId', 'creditCardId', 'financeCategoryId']) {
+          if (key in next) next[key] = ''
+        }
+      }
       if (name === 'orderId') {
         next.orderLineItemId = ''
       }
@@ -164,6 +169,11 @@ export function FormModal({
   const handleFieldChange = (name: string, nextVal: string) => {
     setValues((prev) => {
       const next = { ...prev, [name]: nextVal }
+      if (name === 'dataClassification' && prev[name] !== nextVal) {
+        for (const key of ['financialAccountId', 'creditCardId', 'financeCategoryId']) {
+          if (key in next) next[key] = ''
+        }
+      }
       if (name === 'orderId' && prev.orderId !== nextVal && 'orderLineItemId' in next) {
         next.orderLineItemId = ''
       }

@@ -14,7 +14,7 @@ export default class SellerAccountsController {
         .preload('salesChannel')
         .orderBy('createdAt', 'desc'),
       WorkspaceLookupService.savedViewsFor(user.id, 'seller_accounts'),
-      WorkspaceLookupService.lookups(user.id),
+      WorkspaceLookupService.lookups(user),
     ])
     return inertia.render('accounts', {
       ...sharedLookups,
@@ -38,21 +38,22 @@ export default class SellerAccountsController {
       account.externalSellerId = payload.externalSellerId
       account.marketplaceRegion = payload.marketplaceRegion.toUpperCase()
       account.defaultCurrency = payload.defaultCurrency.toUpperCase()
-      account.status = SellerAccountStatus.ACTIVE
-      account.healthStatus = HealthStatus.HEALTHY
+      account.status = SellerAccountStatus.PENDING_SETUP
+      account.healthStatus = HealthStatus.UNKNOWN
       account.rateLimitRpm = payload.rateLimitRpm ?? 60
-      account.setPlainCredentials({
-        apiKey: payload.apiKey ?? 'encrypted-key',
-        apiSecret: payload.apiSecret ?? 'encrypted-secret',
-        rotatedAt: DateTime.now().toISO(),
-      })
-      account.lastCredentialRotatedAt = DateTime.now()
-      account.lastSyncedAt = DateTime.now()
+      if (payload.apiKey || payload.apiSecret) {
+        account.setPlainCredentials({
+          apiKey: payload.apiKey ?? '',
+          apiSecret: payload.apiSecret ?? '',
+          rotatedAt: DateTime.now().toISO(),
+        })
+        account.lastCredentialRotatedAt = DateTime.now()
+      }
       await account.save()
 
       session.flash(
         'success',
-        `Seller Account "${account.accountName}" connected with AES-256-GCM encrypted credentials.`
+        `Seller Account "${account.accountName}" saved with encrypted credentials; connection and sync are not configured.`
       )
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to connect seller account')
@@ -84,42 +85,9 @@ export default class SellerAccountsController {
     return response.redirect().back()
   }
 
-  async queueSellerSync({ auth, request, response, session }: HttpContext) {
-    const user = auth.getUserOrFail()
-    const sellerAccountId = String(request.input('sellerAccountId', '')).trim()
-    if (!sellerAccountId) {
-      session.flash('error', 'sellerAccountId is required.')
-      return response.redirect().back()
-    }
-
-    try {
-      const account = await SellerAccount.query()
-        .where('userId', user.id)
-        .andWhere('id', sellerAccountId)
-        .firstOrFail()
-      account.lastSyncedAt = DateTime.now()
-      await account.save()
-
-      try {
-        const syncMod = await import('#jobs/sync_seller_account')
-        const SyncSellerAccount = syncMod.default
-        await (SyncSellerAccount as any).dispatch({
-          userId: user.id,
-          sellerAccountId: account.id,
-          salesChannelId: account.salesChannelId,
-          requestId: request.id(),
-        } as any)
-      } catch {
-        // Fallback when queue table is inactive
-      }
-
-      session.flash(
-        'success',
-        `Sync queued for ${account.accountName}. Track progress under Sync Jobs.`
-      )
-    } catch (err: any) {
-      session.flash('error', `Could not enqueue sync: ${err.message}`)
-    }
+  async queueSellerSync({ auth, response, session }: HttpContext) {
+    auth.getUserOrFail()
+    session.flash('error', 'Marketplace account sync is not configured. No sync was performed.')
     return response.redirect().back()
   }
 }

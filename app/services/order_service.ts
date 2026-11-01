@@ -90,6 +90,38 @@ function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
+/** Redact credentials at every depth before the payload reaches storage or audit triggers. */
+function redactPayload(value: unknown, fields: string[], path = ''): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item, index) => redactPayload(item, fields, `${path}[${index}]`))
+  }
+  if (value && typeof value === 'object') {
+    const sensitiveKeys = new Set([
+      'cardnumber',
+      'cvv',
+      'cvc',
+      'accesstoken',
+      'refreshtoken',
+      'clientsecret',
+      'password',
+      'apikey',
+      'apisecret',
+      'authorization',
+    ])
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => {
+        const field = path ? `${path}.${key}` : key
+        if (sensitiveKeys.has(key.toLowerCase().replace(/[^a-z0-9]/g, ''))) {
+          fields.push(field)
+          return [key, '[REDACTED]']
+        }
+        return [key, redactPayload(item, fields, field)]
+      })
+    )
+  }
+  return value
+}
+
 export class OrderService {
   /**
    * Creates a normalized order with line items, customer identity resolution,
@@ -97,7 +129,6 @@ export class OrderService {
    * and per-field `OrderPrice` + `OrderLineItemPrice` records inside a transaction.
    */
   static async createOrder(input: CreateOrderInput): Promise<Order> {
-    await PriceService.ensurePriceTables()
     if (!input.lines || input.lines.length === 0) {
       throw new Error('VALIDATION_ERROR: An order must contain at least one line item.')
     }
@@ -213,8 +244,9 @@ export class OrderService {
         fieldCurrencyOverrides?: Record<string, string>
       }> = []
 
+      const variantsById = new Map<string, ProductVariant>()
       for (const lineInput of input.lines) {
-        if (lineInput.quantityOrdered <= 0) {
+        if (!Number.isInteger(lineInput.quantityOrdered) || lineInput.quantityOrdered <= 0) {
           throw new Error(
             `VALIDATION_ERROR: Line SKU ${lineInput.sku} must have quantityOrdered > 0`
           )
@@ -230,12 +262,23 @@ export class OrderService {
           variant = await ProductVariant.query({ client: trx })
             .where('userId', input.userId)
             .andWhere('id', lineInput.productVariantId)
+            .forUpdate()
             .first()
         } else if (lineInput.sku) {
           variant = await ProductVariant.query({ client: trx })
             .where('userId', input.userId)
             .andWhere('sku', lineInput.sku)
+            .forUpdate()
             .first()
+        }
+
+        if (lineInput.productVariantId && !variant) {
+          throw new Error('INVALID_PRODUCT_VARIANT: Product variant not found for this user.')
+        }
+        if (variant) {
+          const cached = variantsById.get(variant.id)
+          if (cached) variant = cached
+          else variantsById.set(variant.id, variant)
         }
 
         const qty = Number(lineInput.quantityOrdered)
@@ -392,20 +435,8 @@ export class OrderService {
         if (byteLength > 262144) {
           throw new Error('PAYLOAD_TOO_LARGE: Raw marketplace order payload exceeds 256 KB limit.')
         }
-        const sanitized = { ...input.rawPayload }
         const redactedFields: string[] = []
-        for (const sensitiveKey of [
-          'cardNumber',
-          'cvv',
-          'accessToken',
-          'clientSecret',
-          'password',
-        ]) {
-          if (sensitiveKey in sanitized) {
-            sanitized[sensitiveKey] = '[REDACTED]'
-            redactedFields.push(sensitiveKey)
-          }
-        }
+        const sanitized = redactPayload(input.rawPayload, redactedFields) as Record<string, unknown>
         const payloadRecord = new OrderImportPayload()
         payloadRecord.useTransaction(trx)
         payloadRecord.userId = input.userId

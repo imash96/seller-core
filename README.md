@@ -33,7 +33,7 @@
 
 ## ✨ What's in the Box
 
-This starter kit is designed to help you build production-ready single-page applications with React and Inertia.js. It combines the modern DX of React with the simplicity of traditional server-side routing, giving you the best of both worlds.
+This application is built on a starter kit for single-page applications with React and Inertia.js. It is not yet production-ready. It combines the modern DX of React with the simplicity of traditional server-side routing, giving you the best of both worlds.
 
 ### 🎯 Core Features
 
@@ -157,6 +157,111 @@ This command will:
 - Configure your database
 - Configure Inertia with React
 - Run migrations
+
+### Security upgrade for existing installations
+
+Run `node ace migration:run` before serving the upgraded application. The credential
+migration re-encrypts legacy seller credentials using `APP_KEY`; do not change the
+key between deployments. Previous versions used a publicly predictable key, so
+**rotate all marketplace credentials stored by earlier versions**, even after the
+migration. Historical audit logs and backups may still contain old ciphertext or
+other secrets and must be protected and reviewed separately. Existing logins are
+invalidated and users must sign in again. The bundled demo seeder is blocked in
+production; remove or reset any previously seeded demo accounts.
+
+Remote category sync uses only the server-configured `MEDUSA_BACKEND_URL`; request
+URLs cannot override it. Redirects are rejected.
+
+### Operational readiness and integration limits
+
+This repository is **not yet production-ready**. The current fulfillment workflow
+supports split shipments, local return/refund accounting and downloadable CSV exports.
+A local refund record does not send money to a customer. Delivery notifications are
+queued in the outbox; no delivery provider is configured, so queued does not mean sent.
+
+Marketplace publishing and account synchronization are not connected. Publish and sync
+actions are disabled or rejected rather than reporting simulated success. Existing
+published/synced records predate this safeguard and should be independently verified.
+The catalog studio generates drafts; its marketplace payloads have not been verified
+against official APIs. The legacy file upload route does not process files and directs
+users to the catalog studio JSON importer instead.
+
+Order, shipment, return, task and finance routes require their respective per-action RBAC
+permission and module entitlement. Catalog, customer and integration routes also have
+permission checks; shared lookups and dashboard domain queries are filtered. Household
+accounts, cards, categories and ledger records additionally require the corresponding
+`household_finance` permission and entitlement. Household mutations require both read
+and the relevant action permission. Grant the module entitlement explicitly when needed.
+Non-admin audit views omit snapshots. Financial links must belong to the same tenant and
+classification; legacy mismatched links should be reviewed. New card records contain
+metadata only, not a vault token; posting a ledger entry does not move money. Manual ledger
+matches require finance read and update (plus household read and update for household
+entries), compare the original amount and currency exactly, retain an audit trail and
+can be reversed. Statement references are user-entered evidence, not bank verification.
+Concurrent active matches and duplicate references are rejected; reverse a match before
+voiding its ledger entry.
+
+Carrier invoice comparisons require expected amounts: unknown estimates remain null and
+unreconciled, and opposing line discrepancies cannot cancel into a match. Invoice payment
+and resolution updates are manually reported, require a review note and (for paid/partial)
+a payment reference; they do not contact a carrier or payment processor. Invoice deletion
+is disabled to preserve allocation history. Previously created invoice statuses may have
+been automatically matched or paid by older code; review them against independent evidence.
+Existing deployments must explicitly grant the new `tasks` role permissions and module
+entitlement; the migration registers permissions but does not expand existing roles.
+
+Dashboard summaries cover recent records, not full-period reporting, and USD monetary
+totals exclude other reporting currencies. A full authorization and tenant-isolation
+review is still required. Before deploying, complete external integrations, broader
+end-to-end coverage, background/outbox delivery, deployment-specific security review, observability,
+backups, dependency and security review, and externally verified financial reconciliation. Do not use demo
+data or credentials in production.
+
+### Deployment checklist (not a production-readiness certification)
+
+- Use PostgreSQL, back it up and test restoration before applying migrations; run
+  `node ace migration:run` before starting each release. Catalog and price tables are
+  migration-managed, not created during HTTP requests. If a separately managed `sessions`
+  table already exists, reconcile its schema and migration state before upgrading.
+- Use a securely generated, unique `APP_KEY` (keep it stable for encrypted seller
+  credentials), a public HTTPS `APP_URL`, and `SESSION_DRIVER=cookie` or `database`.
+  The production HTTP entrypoint rejects obviously weak keys, non-HTTPS URLs and
+  unsupported session stores; simple heuristics cannot prove a secret is random.
+  Store secrets outside source control. Rotate any credentials encrypted with the old
+  public key, including any exposed in logs or backups.
+- Terminate HTTPS at a trusted proxy, configure trusted proxy headers appropriately,
+  restrict database access and require TLS when traffic crosses untrusted networks.
+  Check cookie, CSRF, CORS, CSP, health checks and the complete login flow on the actual
+  deployment domain before rollout. Production CSP restricts scripts and network
+  connections to same-origin and frames to same-origin; inline styles remain allowed.
+  Development permits Arena preview framing and the Vite development connection.
+- `/health/live` reports process liveness; `/health/ready` checks database connectivity
+  with a two-second response timeout. These do not check migrations, queues, integrations,
+  background delivery, or business correctness; monitor those separately. Restrict probe
+  access at the infrastructure layer if desired.
+- Set up access logging/alerts without secrets, rate limits at the edge, database and
+  queue monitoring, retention policies and recovery procedures. No worker delivers
+  outbox messages yet. No claim here substitutes for a security assessment.
+
+### Running the tests safely
+
+The suite includes PostgreSQL integration tests. Set `TEST_DATABASE_URL` to a **dedicated,
+disposable** PostgreSQL database, separate from development and production. The test
+runner applies migrations and may roll them back at teardown; it also writes test data.
+`DATABASE_URL` and the other application environment variables must still be configured.
+A missing test database or migration failure now fails the run rather than silently
+skipping integration tests.
+
+Browser tests use Playwright Chromium and require its OS dependencies. Install with
+`corepack pnpm exec playwright install --with-deps chromium` in a supported environment.
+Alternatively set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to a compatible Chromium executable;
+the custom-executable launcher disables Chromium's sandbox and should only be used in an
+isolated test environment. The browser tests currently cover order entry at mobile and
+desktop widths and a mobile finance category/ledger flow, not the entire application.
+
+```sh
+TEST_DATABASE_URL=postgres://user:password@localhost:5432/seller_core_test pnpm test
+```
 
 ### Start Developing
 
@@ -331,7 +436,7 @@ This starter kit embraces the **modern full-stack** approach to web development:
 - **Type Safety Everywhere** - TypeScript across frontend and backend with Tuyau integration
 - **Convention Over Configuration** - Sensible defaults, escape hatches when you need them
 - **Developer Experience** - Hot reload, great error messages, instant feedback
-- **Production Ready** - Security, validation, and testing built-in
+- **Security foundations** - Security, validation, and tests require deployment-specific review
 
 ### Why Inertia.js?
 
@@ -354,3 +459,30 @@ This starter kit is open-sourced software licensed under the [MIT license](LICEN
 <div align="center">
   <sub>Built with ❤️ by the AdonisJS team</sub>
 </div>
+
+### Organization setup (incomplete: shared data access is not enabled)
+
+Migration `0054` introduces organizations and membership setup without changing any
+existing `user_id`-owned data. It creates a separate personal organization for every
+existing and newly created user; users with identical company names are never merged.
+Existing per-user roles and entitlements remain in force. The setup page lets organization
+administrators and platform super administrators manage membership for already-provisioned
+active users and record an intended existing role. Membership changes are audited.
+
+**This is not yet a shared tenant implementation.** Selecting or switching organizations
+is unavailable; membership and recorded roles do not grant access to operational records,
+and platform super administrators cannot yet browse other users' operational data via an
+organization context. Household data remains under its existing user-scoped controls, but
+this does not yet implement the requested super-admin exception. Do not present membership
+setup as collaboration or rely on it as a complete SaaS tenancy boundary.
+
+To finish shared workspaces safely, business records and their unique indexes must be
+migrated to explicit organization ownership while retaining creator `user_id`; every
+controller, service, background job, export, relationship and nested preload must use a
+verified active organization context. Roles and module entitlements must be evaluated in
+that context, with owner-only household finance access and the explicit super-admin
+exception. Add a workspace selector, secure organization/member provisioning and revocation,
+and integration tests for cross-organization access, concurrent updates, private records,
+migrations, and all operational domains before enabling sharing. Existing data must remain
+in each user's separate personal organization unless explicitly moved by an authorized,
+audited operation.

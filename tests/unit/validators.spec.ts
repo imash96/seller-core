@@ -142,6 +142,11 @@ test.group('VineJS Request Validators', () => {
       'quantityOrdered'
     )
 
+    await assertValidationFails(
+      () => createOrderValidator.validate({ ...validOrder, quantityOrdered: 1.5 }),
+      'quantityOrdered'
+    )
+
     // Missing customerFullName
     await assertValidationFails(
       async () =>
@@ -308,6 +313,11 @@ test.group('VineJS Request Validators', () => {
       'last4Digits'
     )
 
+    await assertValidationFails(
+      async () => createCreditCardValidator.validate({ ...validCard, last4Digits: 'ABCD' }),
+      'last4Digits'
+    )
+
     // expMonth out of range (> 12)
     await assertValidationFails(
       async () =>
@@ -318,12 +328,12 @@ test.group('VineJS Request Validators', () => {
       'expMonth'
     )
 
-    // expYear in the past (< 2025)
+    // expYear outside the supported metadata range
     await assertValidationFails(
       async () =>
         createCreditCardValidator.validate({
           ...validCard,
-          expYear: 2020,
+          expYear: 2101,
         }),
       'expYear'
     )

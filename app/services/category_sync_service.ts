@@ -136,19 +136,41 @@ export class CategorySyncService {
    */
   static async syncFromMedusaEndpoint(
     userId: string,
-    medusaBaseUrl?: string | null
+    medusaBaseUrl?: string | null,
+    sourceMode: 'configured' | 'built-in' = 'configured'
   ): Promise<{ syncedCount: number; source: string }> {
     let tree: MedusaProductCategory[] = PRODUCT_CATEGORIES
     let source = 'built-in data-category.ts (/store/product-categories)'
 
-    const cleanUrl = (medusaBaseUrl ?? process.env.MEDUSA_BACKEND_URL ?? '').trim()
-    if (cleanUrl && /^https?:\/\//i.test(cleanUrl)) {
+    // Remote targets must be configured by the server operator, not by the request.
+    // Otherwise any signed-in user could make the server call internal services (SSRF).
+    const configuredUrl = (process.env.MEDUSA_BACKEND_URL ?? '').trim().replace(/\/+$/, '')
+    const requestedUrl = (medusaBaseUrl ?? '').trim().replace(/\/+$/, '')
+    if (requestedUrl && requestedUrl !== configuredUrl) {
+      throw new Error('MEDUSA_URL_NOT_ALLOWED: Configure the endpoint on the server.')
+    }
+    const cleanUrl = sourceMode === 'built-in' ? '' : configuredUrl
+    if (cleanUrl) {
+      const parsed = new URL(cleanUrl)
+      if (
+        !['http:', 'https:'].includes(parsed.protocol) ||
+        parsed.username ||
+        parsed.password ||
+        parsed.search ||
+        parsed.hash
+      ) {
+        throw new Error(
+          'MEDUSA_URL_INVALID: Configure a valid HTTP(S) endpoint without credentials or query parameters.'
+        )
+      }
       const endpoint = cleanUrl.endsWith('/store/product-categories')
         ? cleanUrl
         : `${cleanUrl.replace(/\/+$/, '')}/store/product-categories`
       try {
         const res = await fetch(endpoint, {
           headers: { Accept: 'application/json' },
+          redirect: 'error',
+          signal: AbortSignal.timeout(10000),
         })
         if (res.ok) {
           const json = (await res.json()) as any
@@ -196,14 +218,12 @@ export class CategorySyncService {
       if (trx) existingQuery.useTransaction(trx)
       let cat = await existingQuery.first()
 
-      const attributesPayload = [
-        {
-          medusaId: node.id ?? null,
-          handle,
-          mpath: node.mpath ?? null,
-          metadata: node.metadata ?? {},
-        },
-      ]
+      const attributesPayload = {
+        medusaId: node.id ?? null,
+        handle,
+        mpath: node.mpath ?? null,
+        metadata: node.metadata ?? {},
+      }
 
       if (!cat) {
         cat = new ProductCategory()
@@ -242,7 +262,8 @@ export class CategorySyncService {
     categoryHandle?: string | null,
     productType?: string | null,
     gender?: string | null,
-    trx?: TransactionClientContract
+    trx?: TransactionClientContract,
+    seedIfMissing = true
   ): Promise<ProductCategory | null> {
     const loadCategories = async () => {
       const q = ProductCategory.query().where('userId', userId)
@@ -252,7 +273,7 @@ export class CategorySyncService {
 
     let categories = await loadCategories()
     const hasMedusaHandles = categories.some((c) => (c.taxonomyPath ?? c.slug).includes('/'))
-    if (categories.length === 0 || !hasMedusaHandles) {
+    if (seedIfMissing && (categories.length === 0 || !hasMedusaHandles)) {
       await this.upsertCategoryTree(userId, PRODUCT_CATEGORIES, null, trx)
       categories = await loadCategories()
     }
@@ -325,6 +346,6 @@ export class CategorySyncService {
       }
     }
 
-    return categories[0] ?? null
+    return null
   }
 }
