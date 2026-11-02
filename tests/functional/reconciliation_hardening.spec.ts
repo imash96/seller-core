@@ -10,6 +10,7 @@ import { ManualReconciliationService } from '#services/manual_reconciliation_ser
 import { FulfillmentAndReturnsService } from '#services/fulfillment_and_returns_service'
 import { CatalogService } from '#services/catalog_service'
 import ProductCategory from '#models/product_category'
+import { money } from '../../app/types/price.js'
 
 async function makeUser(email: string, isSuperAdmin = true) {
   return User.create({
@@ -29,9 +30,8 @@ async function makeTx(user: User, referenceNumber: string, dataClassification = 
     transactionType: 'expense',
     dataClassification,
     description: 'Expense',
-    originalAmount: '10.00',
-    reportingAmount: '10.00',
-    originalCurrencyCode: 'USD',
+    originalAmount: money(10, 'USD'),
+    reportingAmount: money(10, 'USD'),
     status: 'posted',
     transactionDate: DateTime.fromISO('2026-01-01'),
   })
@@ -176,7 +176,8 @@ test.group('Reconciliation hardening', () => {
         { chargeType: 'fuel_surcharge', billedAmount: 5, expectedAmount: 10 },
       ],
     })
-    assert.equal(Number(offset.varianceAmount), 0)
+    assert.equal(offset.varianceTotal.amount, 0)
+    assert.equal(offset.varianceTotal.currency_code, 'USD')
     assert.equal(offset.reconciliationStatus, 'variance_detected')
     await assert.rejects(
       () =>

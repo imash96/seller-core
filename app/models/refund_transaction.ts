@@ -11,11 +11,21 @@ import FinancialAccount from './financial_account.js'
 import Order from './order.js'
 import OrderLineItem from './order_line_item.js'
 import ReturnRequest from './return_request.js'
+import { prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import type { PriceMoney } from '../types/price.js'
 
 export default class RefundTransaction extends AppBaseModel {
   static readonly table = 'refund_transactions'
   static readonly idPrefix = 'ref'
+
+  static override readonly moneyColumns = [
+    'itemsRefundTotal',
+    'shippingRefundTotal',
+    'taxRefundTotal',
+    'restockingFeeTotal',
+    'grandRefundTotal',
+  ] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -41,23 +51,20 @@ export default class RefundTransaction extends AppBaseModel {
   @column({ columnName: 'status' })
   declare public status: string
 
-  @column({ columnName: 'currency_code' })
-  declare public currencyCode: string
+  @column({ columnName: 'items_refund_total', prepare: prepareJson })
+  declare public itemsRefundTotal: PriceMoney
 
-  @column({ columnName: 'items_refund_amount' })
-  declare public itemsRefundAmount: string
+  @column({ columnName: 'shipping_refund_total', prepare: prepareJson })
+  declare public shippingRefundTotal: PriceMoney
 
-  @column({ columnName: 'shipping_refund_amount' })
-  declare public shippingRefundAmount: string
+  @column({ columnName: 'tax_refund_total', prepare: prepareJson })
+  declare public taxRefundTotal: PriceMoney
 
-  @column({ columnName: 'tax_refund_amount' })
-  declare public taxRefundAmount: string
+  @column({ columnName: 'restocking_fee_total', prepare: prepareJson })
+  declare public restockingFeeTotal: PriceMoney
 
-  @column({ columnName: 'restocking_fee_deducted' })
-  declare public restockingFeeDeducted: string
-
-  @column({ columnName: 'total_refund_amount' })
-  declare public totalRefundAmount: string
+  @column({ columnName: 'grand_refund_total', prepare: prepareJson })
+  declare public grandRefundTotal: PriceMoney
 
   @column({ columnName: 'reason' })
   declare public reason: string | null

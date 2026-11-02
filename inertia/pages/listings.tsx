@@ -146,7 +146,11 @@ export default function Listings({
             variantTitle: String(v.title),
             brandName: String((p.brand as any)?.name ?? 'Brand-Agnostic'),
             categoryName: String((p.category as any)?.name ?? 'Outerwear'),
-            retailPrice: Number(v.retailPrice ?? 0),
+            retailPrice: Number(
+              (Array.isArray(v.prices) ? (v.prices as PriceMoney[]) : []).find(
+                (price) => price.currency_code === 'USD'
+              )?.amount ?? 0
+            ),
             prices: Array.isArray(v.prices) ? (v.prices as PriceMoney[]) : undefined,
             stockOnHand: Number(v.stockOnHand ?? 0),
             platforms: [],
@@ -165,7 +169,7 @@ export default function Listings({
           variantTitle: String(l.variantTitle ?? sku),
           brandName: String(l.brandName ?? 'Artisan Hide'),
           categoryName: String(l.categoryName ?? 'Outerwear'),
-          retailPrice: Number(l.listedPrice ?? 0),
+          retailPrice: resolvePriceMoney(l.listedPriceMoney ?? l.listedPrice).amount,
           prices: Array.isArray(l.prices) ? (l.prices as PriceMoney[]) : undefined,
           stockOnHand: Number(l.allocatedQuantity ?? 0),
           platforms: [],

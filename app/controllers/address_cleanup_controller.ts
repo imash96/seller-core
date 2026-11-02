@@ -3,6 +3,7 @@ import Customer from '#models/customer'
 import CustomerAddress from '#models/customer_address'
 import { CleanAdd } from '../services/address_cleanup_service.js'
 import { RbacService } from '../services/rbac_service.js'
+import { money } from '../types/price.js'
 
 export default class AddressCleanupController {
   async index({ auth, inertia }: HttpContext) {
@@ -141,11 +142,9 @@ export default class AddressCleanupController {
         userId: user.id,
         fullName: name,
         phone: phone && phone !== '000-000-0000' ? phone : null,
-        preferredCurrency: user.defaultCurrency || 'USD',
         riskLevel: 'low',
         ordersCount: 0,
-        totalSpent: '0.00',
-        isRepeatCustomer: false,
+        totalSpent: money(0, user.defaultCurrency || 'USD'),
         riskScore: 0,
         metadata: { source: 'address_cleanup_tool' },
       })

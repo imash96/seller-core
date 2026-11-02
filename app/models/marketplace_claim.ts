@@ -6,28 +6,25 @@
  */
 import { belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import type Customer from './customer.js'
+import type SellerAccount from './seller_account.js'
 import type { DateTime } from 'luxon'
-import Customer from './customer.js'
 import Order from './order.js'
-import SellerAccount from './seller_account.js'
 import { prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import type { PriceMoney } from '../types/price.js'
 
 export default class MarketplaceClaim extends AppBaseModel {
   static readonly table = 'marketplace_claims'
   static readonly idPrefix = 'mcl'
+
+  static override readonly moneyColumns = ['disputedTotal', 'sellerLiabilityTotal'] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
 
   @column({ columnName: 'order_id' })
   declare public orderId: string
-
-  @column({ columnName: 'seller_account_id' })
-  declare public sellerAccountId: string | null
-
-  @column({ columnName: 'customer_id' })
-  declare public customerId: string | null
 
   @column({ columnName: 'claim_number' })
   declare public claimNumber: string
@@ -41,14 +38,11 @@ export default class MarketplaceClaim extends AppBaseModel {
   @column({ columnName: 'status' })
   declare public status: string
 
-  @column({ columnName: 'currency_code' })
-  declare public currencyCode: string
+  @column({ columnName: 'disputed_total', prepare: prepareJson })
+  declare public disputedTotal: PriceMoney
 
-  @column({ columnName: 'disputed_amount' })
-  declare public disputedAmount: string
-
-  @column({ columnName: 'seller_liability_amount' })
-  declare public sellerLiabilityAmount: string
+  @column({ columnName: 'seller_liability_total', prepare: prepareJson })
+  declare public sellerLiabilityTotal: PriceMoney
 
   @column({ columnName: 'reason' })
   declare public reason: string | null
@@ -71,9 +65,20 @@ export default class MarketplaceClaim extends AppBaseModel {
   @belongsTo(() => Order, { foreignKey: 'orderId' })
   declare public order: BelongsTo<typeof Order>
 
-  @belongsTo(() => SellerAccount, { foreignKey: 'sellerAccountId' })
-  declare public sellerAccount: BelongsTo<typeof SellerAccount>
+  /** Marketplace account and customer are derived from the order. */
+  get sellerAccountId(): string | null {
+    return this.order?.sellerAccountId ?? null
+  }
 
-  @belongsTo(() => Customer, { foreignKey: 'customerId' })
-  declare public customer: BelongsTo<typeof Customer>
+  get customerId(): string | null {
+    return this.order?.customerId ?? null
+  }
+
+  get customer(): Customer | undefined {
+    return this.order?.customer ?? undefined
+  }
+
+  get sellerAccount(): SellerAccount | undefined {
+    return this.order?.sellerAccount ?? undefined
+  }
 }

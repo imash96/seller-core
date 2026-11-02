@@ -30,17 +30,8 @@ export default class CatalogItem extends AppBaseModel {
   @column({ columnName: 'title' })
   declare public title: string
 
-  @column({ columnName: 'title_75' })
-  declare public title75: string | null
-
-  @column({ columnName: 'title_80' })
-  declare public title80: string | null
-
   @column({ columnName: 'sub_title' })
   declare public subTitle: string | null
-
-  @column({ columnName: 'sub_title_125' })
-  declare public subTitle125: string | null
 
   @column({ columnName: 'type' })
   declare public type: string | null
@@ -48,41 +39,21 @@ export default class CatalogItem extends AppBaseModel {
   @column({ columnName: 'gender' })
   declare public gender: string
 
-  @column({ columnName: 'category_code' })
-  declare public categoryCode: string
-
-  @column({ columnName: 'category_name' })
-  declare public categoryName: string
-
-  @column({ columnName: 'product_code' })
-  declare public productCode: string
-
-  @column({ columnName: 'category_handle' })
-  declare public categoryHandle: string | null
-
   @column({ columnName: 'resolved_category_id' })
   declare public resolvedCategoryId: string | null
 
   @column({ columnName: 'description' })
   declare public description: string | null
 
-  @column({ columnName: 'short_description' })
-  declare public shortDescription: string | null
-
-  @column({ columnName: 'extended_description' })
-  declare public extendedDescription: string | null
-
   @column({ columnName: 'pattern' })
   declare public pattern: string | null
 
-  @column({ columnName: 'material_code' })
-  declare public materialCode: string
-
-  @column({ columnName: 'fit_code' })
-  declare public fitCode: string
-
   @column({ columnName: 'price_tier' })
   declare public priceTier: string
+
+  /** USD-only base price resolved from `priceTier` (no currency_code column). */
+  @column({ columnName: 'base_price_usd' })
+  declare public basePriceUsd: string
 
   @column({ columnName: 'attributes', prepare: prepareJson })
   declare public attributes: any

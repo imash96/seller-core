@@ -23,6 +23,13 @@ import {
   updateFinancialAccountValidator,
 } from '#validators/operations'
 import { CreditCardStatus, FinancialTransactionStatus } from '../enums/index.js'
+import {
+  amountOf,
+  currencyOf,
+  money,
+  normalizeCurrencyCode,
+  normalizePriceMoney,
+} from '../types/price.js'
 
 export default class FinanceController {
   private async checkClassification(
@@ -128,9 +135,11 @@ export default class FinanceController {
     }
 
     const type = String(request.input('accountType', 'bank_checking'))
-    const currency = String(request.input('currencyCode', 'USD')).toUpperCase()
+    const currency = normalizeCurrencyCode(request.input('currencyCode'), 'USD')
     const last4 = request.input('accountNumberLast4')
-    const balance = Number(request.input('currentBalance', 0))
+    // Balances are self-contained PriceMoney so an account can never lose its currency.
+    const currentBalance = normalizePriceMoney(request.input('currentBalance') ?? 0, currency)
+    const balance = amountOf(currentBalance)
     if (
       ![
         'bank_checking',
@@ -156,8 +165,7 @@ export default class FinanceController {
       dataClassification: classification,
       institutionName: request.input('institutionName') || null,
       accountNumberLast4: request.input('accountNumberLast4') || null,
-      currencyCode: currency,
-      currentBalance: balance.toFixed(2),
+      currentBalance,
       isActive:
         request.input('isActive') !== undefined
           ? request.input('isActive') === 'true' || request.input('isActive') === true
@@ -201,7 +209,8 @@ export default class FinanceController {
       (newCurrency && !/^[A-Za-z]{3}$/.test(String(newCurrency))) ||
       (newLast4 && !/^\d{4}$/.test(String(newLast4))) ||
       (payload.currentBalance !== undefined &&
-        (!Number.isFinite(payload.currentBalance) || Math.abs(payload.currentBalance) >= 1e12))
+        (!Number.isFinite(amountOf(payload.currentBalance)) ||
+          Math.abs(amountOf(payload.currentBalance)) >= 1e12))
     ) {
       return response.badRequest({ error: 'Invalid account details.' })
     }
@@ -216,11 +225,11 @@ export default class FinanceController {
     if (request.input('dataClassification')) {
       account.dataClassification = classification
     }
-    if (request.input('currencyCode')) {
-      account.currencyCode = String(request.input('currencyCode')).toUpperCase()
-    }
     if (payload.currentBalance !== undefined)
-      account.currentBalance = Number(payload.currentBalance).toFixed(2)
+      account.currentBalance = normalizePriceMoney(
+        payload.currentBalance,
+        currencyOf(account.currentBalance)
+      )
     if (payload.isActive !== undefined) account.isActive = payload.isActive
     await account.save()
     session.flash('success', `Financial account "${account.accountName}" updated.`)
@@ -273,6 +282,9 @@ export default class FinanceController {
       return response.badRequest({ error: 'Invalid seller account.' })
     }
 
+    const cardCurrency = normalizeCurrencyCode(payload.currencyCode, 'USD')
+    const cardMoney = (value: unknown) => normalizePriceMoney(value ?? 0, cardCurrency)
+
     const card = await db.transaction(async (trx) => {
       const createdCard = await CreditCard.create(
         {
@@ -285,11 +297,10 @@ export default class FinanceController {
           expMonth: payload.expMonth,
           expYear: payload.expYear,
           vaultTokenReference: null,
-          currencyCode: payload.currencyCode || 'USD',
-          creditLimit: (payload.creditLimit ?? 0).toFixed(2),
-          currentBalance: (payload.currentBalance ?? 0).toFixed(2),
-          statementBalance: (payload.currentBalance ?? 0).toFixed(2),
-          minimumPaymentDue: (payload.minimumPaymentDue ?? 0).toFixed(2),
+          creditLimit: cardMoney(payload.creditLimit ?? 0),
+          currentBalance: cardMoney(payload.currentBalance ?? 0),
+          statementBalance: cardMoney(payload.currentBalance ?? 0),
+          minimumPaymentDue: cardMoney(payload.minimumPaymentDue ?? 0),
           nextPaymentDueDate: payload.nextPaymentDueDate
             ? DateTime.fromISO(payload.nextPaymentDueDate)
             : null,
@@ -333,11 +344,18 @@ export default class FinanceController {
     if (payload.nextPaymentDueDate && !DateTime.fromISO(payload.nextPaymentDueDate).isValid)
       return response.badRequest({ error: 'Invalid due date.' })
     if (payload.cardLabel !== undefined) card.cardLabel = payload.cardLabel
-    if (payload.creditLimit !== undefined) card.creditLimit = String(payload.creditLimit)
+    if (payload.creditLimit !== undefined)
+      card.creditLimit = normalizePriceMoney(payload.creditLimit, currencyOf(card.creditLimit))
     if (payload.currentBalance !== undefined)
-      card.currentBalance = payload.currentBalance.toFixed(2)
+      card.currentBalance = normalizePriceMoney(
+        payload.currentBalance,
+        currencyOf(card.currentBalance)
+      )
     if (payload.minimumPaymentDue !== undefined) {
-      card.minimumPaymentDue = String(payload.minimumPaymentDue)
+      card.minimumPaymentDue = normalizePriceMoney(
+        payload.minimumPaymentDue,
+        currencyOf(card.minimumPaymentDue)
+      )
     }
     if (payload.nextPaymentDueDate !== undefined) {
       card.nextPaymentDueDate = payload.nextPaymentDueDate
@@ -434,8 +452,18 @@ export default class FinanceController {
       }
     }
     const exchangeRate = Number(payload.exchangeRate ?? 1.0)
-    const originalAmount = Number(payload.originalAmount)
-    const reportingAmount = Math.round(originalAmount * exchangeRate * 100) / 100
+    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+      return response.badRequest({ error: 'Exchange rate must be strictly positive.' })
+    }
+    const originalAmount = normalizePriceMoney(
+      payload.originalAmount,
+      normalizeCurrencyCode(payload.originalCurrencyCode, 'USD')
+    )
+    if (amountOf(originalAmount) <= 0) {
+      return response.badRequest({ error: 'Original amount must be strictly positive.' })
+    }
+    const reportingCurrency = normalizeCurrencyCode(payload.reportingCurrencyCode, 'USD')
+    const reportingAmount = money(amountOf(originalAmount) * exchangeRate, reportingCurrency)
 
     const tx = await FinancialTransaction.create({
       userId: user.id,
@@ -450,12 +478,10 @@ export default class FinanceController {
       status: FinancialTransactionStatus.POSTED,
       description: payload.description,
       vendorOrPayer: payload.vendorOrPayer ?? null,
-      originalCurrencyCode: payload.originalCurrencyCode || 'USD',
-      originalAmount: originalAmount.toFixed(2),
+      originalAmount,
       exchangeRate: exchangeRate.toFixed(8),
-      reportingCurrencyCode: payload.reportingCurrencyCode || 'USD',
-      reportingAmount: reportingAmount.toFixed(2),
-      taxAmount: Number(payload.taxAmount ?? 0).toFixed(2),
+      reportingAmount,
+      taxTotal: normalizePriceMoney(payload.taxTotal ?? 0, originalAmount.currency_code),
       transactionDate: DateTime.fromISO(payload.transactionDate),
       conversionDate: DateTime.fromISO(payload.transactionDate),
       metadata: {},
@@ -463,7 +489,7 @@ export default class FinanceController {
 
     session.flash(
       'success',
-      `Ledger entry ${tx.referenceNumber} (${tx.originalAmount} ${tx.originalCurrencyCode} -> ${tx.reportingAmount} ${tx.reportingCurrencyCode}) posted.`
+      `Ledger entry ${tx.referenceNumber} (${amountOf(tx.originalAmount)} ${currencyOf(tx.originalAmount)} -> ${amountOf(tx.reportingAmount)} ${currencyOf(tx.reportingAmount)}) posted.`
     )
     return response.redirect().back()
   }

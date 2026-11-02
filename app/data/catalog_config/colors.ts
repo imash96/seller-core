@@ -44,6 +44,30 @@ export const COLOR_CODES: Record<string, ColorCodeEntry> = {
   MCL: { colorMap: 'Multicolor', colorName: 'Multicolor' },
 }
 
+/**
+ * Resolves the colour code/map from a *name* (the value stored in
+ * `product_variants.attributes.color`), falling back to code matching so both
+ * representations keep working.
+ */
+export function resolveColorInfoFromValue(value: string): {
+  code: string
+  colorMap: string
+  colorName: string
+} {
+  const clean = (value ?? '').trim()
+  if (!clean) return { code: 'BLK', colorMap: 'Black', colorName: 'Black' }
+  const direct = COLOR_CODES[clean.toUpperCase()]
+  if (direct)
+    return { code: clean.toUpperCase(), colorMap: direct.colorMap, colorName: direct.colorName }
+  const match = Object.entries(COLOR_CODES).find(
+    ([, entry]) =>
+      entry.colorName.toLowerCase() === clean.toLowerCase() ||
+      entry.colorMap.toLowerCase() === clean.toLowerCase()
+  )
+  if (match) return { code: match[0], colorMap: match[1].colorMap, colorName: match[1].colorName }
+  return { code: clean.toUpperCase(), colorMap: clean, colorName: clean }
+}
+
 export function resolveColorInfo(colorCode: string): {
   code: string
   colorMap: string

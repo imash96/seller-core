@@ -141,9 +141,53 @@ export default class extends BaseSchema {
     this.schema.raw(`DO $$ BEGIN
       CREATE TYPE outbox_event_status AS ENUM ('pending', 'processing', 'published', 'failed', 'dead_letter');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`)
+
+    // Canonical money validation helpers — every JSONB monetary column is
+    // checked at the database engine level, not only in application code.
+    // PriceMoney: { "currency_code": "USD", "amount": 12.34 }
+    // NOTE: the `?` JSONB key-existence operator is written as `\\?` because
+    // knex treats a bare `?` as a bind placeholder.
+    this.schema
+      .raw(`CREATE OR REPLACE FUNCTION is_valid_price_money(val jsonb, allow_negative boolean DEFAULT false)
+RETURNS boolean LANGUAGE sql IMMUTABLE STRICT AS $$
+  SELECT jsonb_typeof(val) = 'object'
+    AND (val \\? 'currency_code')
+    AND (val \\? 'amount')
+    AND jsonb_typeof(val->'currency_code') = 'string'
+    AND (val->>'currency_code') ~ '^[A-Z]{3}$'
+    AND jsonb_typeof(val->'amount') = 'number'
+    AND (allow_negative OR (val->>'amount')::numeric >= 0);
+$$`)
+
+    // MedusaJS v2 prices array: [{ currency_code, amount, compare_at_amount?, ... }]
+    this.schema.raw(`CREATE OR REPLACE FUNCTION is_valid_medusa_prices_array(val jsonb)
+RETURNS boolean LANGUAGE sql IMMUTABLE STRICT AS $$
+  SELECT jsonb_typeof(val) = 'array'
+    AND NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements(val) AS elem
+      WHERE NOT is_valid_price_money(elem, false)
+    );
+$$`)
+
+    // Money-bearing breakdown arrays (order line tax_lines / adjustments):
+    // [{ ..., total: { currency_code, amount } }] where `amount_key` names the
+    // PriceMoney property for that array.
+    this.schema
+      .raw(`CREATE OR REPLACE FUNCTION is_valid_money_entry_array(val jsonb, amount_key text)
+RETURNS boolean LANGUAGE sql IMMUTABLE STRICT AS $$
+  SELECT jsonb_typeof(val) = 'array'
+    AND NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements(val) AS elem
+      WHERE jsonb_typeof(elem) <> 'object'
+        OR NOT is_valid_price_money(elem -> amount_key, false)
+    );
+$$`)
   }
 
   async down() {
+    this.schema.raw('DROP FUNCTION IF EXISTS is_valid_money_entry_array(jsonb, text)')
+    this.schema.raw('DROP FUNCTION IF EXISTS is_valid_medusa_prices_array(jsonb)')
+    this.schema.raw('DROP FUNCTION IF EXISTS is_valid_price_money(jsonb, boolean)')
     this.schema.raw('DROP TYPE IF EXISTS outbox_event_status')
     this.schema.raw('DROP TYPE IF EXISTS task_status')
     this.schema.raw('DROP TYPE IF EXISTS task_priority')

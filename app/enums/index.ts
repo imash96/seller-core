@@ -161,6 +161,35 @@ export const OrderSourceType = {
 } as const
 export type OrderSourceTypeValue = (typeof OrderSourceType)[keyof typeof OrderSourceType]
 
+/**
+ * Who fulfils the order. MFN = merchant fulfilled, AFN/FBA = Amazon fulfilled,
+ * FBM = merchant fulfilled but shipped by Amazon logistics, 3PL = outsourced
+ * warehouse, direct = own webstore / POS sale.
+ */
+export const FulfillmentChannel = {
+  MFN: 'MFN',
+  AFN: 'AFN',
+  FBA: 'FBA',
+  FBM: 'FBM',
+  THIRD_PARTY_LOGISTICS: '3PL',
+  DIRECT: 'direct',
+} as const
+export type FulfillmentChannelValue = (typeof FulfillmentChannel)[keyof typeof FulfillmentChannel]
+
+/**
+ * Sales-tax collection model for an order.
+ * `marketplace_facilitator` = the marketplace is the deemed seller and collects
+ * and remits tax (Amazon/eBay/Etsy Marketplace Facilitator Tax), so the tax is
+ * withheld from the seller's payout and booked in
+ * `marketplace_withheld_tax_total`.
+ */
+export const TaxCollectionModel = {
+  MARKETPLACE_FACILITATOR: 'marketplace_facilitator',
+  SELLER: 'seller',
+  NONE: 'none',
+} as const
+export type TaxCollectionModelValue = (typeof TaxCollectionModel)[keyof typeof TaxCollectionModel]
+
 export const OrderStatus = {
   DRAFT: 'draft',
   PENDING: 'pending',

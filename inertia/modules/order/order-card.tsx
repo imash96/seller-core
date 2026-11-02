@@ -112,7 +112,7 @@ export function OrderCard({
   const netProfitMoney = resolvePriceMoney(order.netProfitMoney ?? order.netProfitAmount, currency)
   const customerLtvMoney = resolvePriceMoney(
     customer.totalSpentMoney ?? customer.totalSpent,
-    String(customer.preferredCurrency || currency)
+    currency
   )
 
   return (
@@ -181,7 +181,7 @@ export function OrderCard({
                     #{String(order.orderNumber)}
                   </button>
                   <StatusBadge
-                    label={String(order.marketplaceCode || 'direct').toUpperCase()}
+                    label={String(order.channelCode || 'direct').toUpperCase()}
                     variant="purple"
                   />
                   <StatusBadge
@@ -192,6 +192,15 @@ export function OrderCard({
                     label={`Pay: ${String(order.paymentStatus ?? 'paid')}`}
                     variant={STATUS_TONES[String(order.paymentStatus)] ?? 'info'}
                   />
+                  {order.fulfillmentChannel && (
+                    <StatusBadge
+                      label={`Fulfil: ${String(order.fulfillmentChannel)}`}
+                      variant="info"
+                    />
+                  )}
+                  {order.taxCollectionModel === 'marketplace_facilitator' && (
+                    <StatusBadge label="Tax: Marketplace" variant="warning" />
+                  )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                   <span className="inline-flex items-center gap-1">
@@ -199,7 +208,15 @@ export function OrderCard({
                     {formatDate(order.orderedAt)}
                   </span>
                   {order.externalOrderId && (
-                    <span className="font-mono">Ext: {String(order.externalOrderId)}</span>
+                    <span className="font-mono">
+                      Ext: {String(order.externalDisplayId || order.externalOrderId)}
+                    </span>
+                  )}
+                  {order.latestShipAt && (
+                    <span className="inline-flex items-center gap-1">
+                      <Truck className="w-3.5 h-3.5" />
+                      Ship by {formatDate(order.latestShipAt)}
+                    </span>
                   )}
                   {firstShipment?.trackingNumber && (
                     <span className="inline-flex items-center gap-1 text-primary font-mono">

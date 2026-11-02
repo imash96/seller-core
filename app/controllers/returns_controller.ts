@@ -7,6 +7,7 @@ import { FulfillmentAndReturnsService } from '../services/fulfillment_and_return
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createReturnRequestValidator, createRefundValidator } from '#validators/operations'
 import { ReturnItemCondition } from '../enums/index.js'
+import { amountOf, currencyOf, normalizePriceMoney } from '../types/price.js'
 
 const VALID_RETURN_CONDITIONS = new Set<string>(Object.values(ReturnItemCondition))
 
@@ -31,10 +32,15 @@ export default class ReturnsController {
         .where('userId', user.id)
         .if(can('orders'), (q) =>
           q
-            .preload('order', (r) => r.where('userId', user.id))
+            .preload('order', (r) =>
+              r
+                .where('userId', user.id)
+                .if(can('customers'), (oq) =>
+                  oq.preload('customer', (cr) => cr.where('userId', user.id))
+                )
+            )
             .preload('orderLineItem', (r) => r.where('userId', user.id))
         )
-        .if(can('customers'), (q) => q.preload('customer', (r) => r.where('userId', user.id)))
         .orderBy('requestedAt', 'desc')
         .limit(100),
       RefundTransaction.query()
@@ -66,7 +72,9 @@ export default class ReturnsController {
         returnReason: payload.returnReason,
         resolutionType: payload.resolutionType,
         quantityRequested: payload.quantityRequested,
-        restockingFeeAmount: payload.restockingFeeAmount ?? 0,
+        restockingFeeAmount: payload.restockingFeeTotal ?? 0,
+        returnShippingCost: payload.returnShippingCost ?? 0,
+        returnCostCurrencyCode: payload.returnCostCurrencyCode,
         customerComments: payload.customerComments,
       })
 
@@ -125,22 +133,30 @@ export default class ReturnsController {
       ) {
         rma.quantityReceived = Math.max(0, Number(request.input('quantityReceived')))
       }
-      if (request.input('refundAmount') !== undefined && request.input('refundAmount') !== '') {
-        rma.refundAmount = Math.max(0, Number(request.input('refundAmount'))).toFixed(2)
+      // RMA money fields keep their own currency code; amounts are never bare numbers.
+      if (request.input('refundTotal') !== undefined && request.input('refundTotal') !== '') {
+        rma.refundTotal = normalizePriceMoney(
+          request.input('refundTotal'),
+          currencyOf(rma.refundTotal)
+        )
       }
       if (
-        request.input('restockingFeeAmount') !== undefined &&
-        request.input('restockingFeeAmount') !== ''
+        request.input('restockingFeeTotal') !== undefined &&
+        request.input('restockingFeeTotal') !== ''
       ) {
-        rma.restockingFeeAmount = Math.max(0, Number(request.input('restockingFeeAmount'))).toFixed(
-          2
+        rma.restockingFeeTotal = normalizePriceMoney(
+          request.input('restockingFeeTotal'),
+          currencyOf(rma.restockingFeeTotal)
         )
       }
       if (
         request.input('returnShippingCost') !== undefined &&
         request.input('returnShippingCost') !== ''
       ) {
-        rma.returnShippingCost = Math.max(0, Number(request.input('returnShippingCost'))).toFixed(2)
+        rma.returnShippingCost = normalizePriceMoney(
+          request.input('returnShippingCost'),
+          currencyOf(rma.returnShippingCost)
+        )
       }
       if (request.input('returnCarrier') !== undefined) {
         rma.returnCarrier = String(request.input('returnCarrier')).trim() || null
@@ -194,15 +210,15 @@ export default class ReturnsController {
         orderId: payload.orderId,
         returnRequestId: payload.returnRequestId ?? null,
         refundNumber: payload.refundNumber,
-        itemsRefundAmount: payload.itemsRefundAmount,
-        shippingRefundAmount: payload.shippingRefundAmount ?? 0,
-        taxRefundAmount: payload.taxRefundAmount ?? 0,
-        restockingFeeDeducted: payload.restockingFeeDeducted ?? 0,
+        itemsRefundTotal: payload.itemsRefundTotal,
+        shippingRefundTotal: payload.shippingRefundTotal ?? 0,
+        taxRefundTotal: payload.taxRefundTotal ?? 0,
+        restockingFeeTotal: payload.restockingFeeTotal ?? 0,
         reason: payload.reason,
       })
       session.flash(
         'success',
-        `Refund ${refund.refundNumber} (${refund.totalRefundAmount} ${refund.currencyCode}) recorded in the local ledger. No external payment was sent.`
+        `Refund ${refund.refundNumber} (${amountOf(refund.grandRefundTotal)} ${currencyOf(refund.grandRefundTotal)}) recorded in the local ledger. No external payment was sent.`
       )
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to process refund')

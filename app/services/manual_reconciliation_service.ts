@@ -5,6 +5,13 @@ import ManualReconciliation from '#models/manual_reconciliation'
 import AuditLog from '#models/audit_log'
 import type User from '#models/user'
 import { FinanceAccessService } from '#services/finance_access_service'
+import {
+  type PriceMoney,
+  amountOf,
+  currencyOf,
+  money,
+  normalizeCurrencyCode,
+} from '../types/price.js'
 
 export class ReconciliationError extends Error {
   constructor(
@@ -35,9 +42,7 @@ export class ManualReconciliationService {
     requestId?: string
   }) {
     const reference = String(input.reference ?? '').trim()
-    const currency = String(input.currency ?? '')
-      .trim()
-      .toUpperCase()
+    const currency = normalizeCurrencyCode(input.currency, 'XXX')
     const notes = String(input.notes ?? '').trim()
     if (
       reference.length < 2 ||
@@ -48,7 +53,8 @@ export class ManualReconciliationService {
       throw new ReconciliationError(
         'Provide a valid statement reference, currency and notes (up to 2000 characters).'
       )
-    const amount = normalizeAmount(input.amount)
+    // The observed statement amount is its own self-contained PriceMoney object.
+    const observedAmount: PriceMoney = money(normalizeAmount(input.amount), currency)
     const household = await FinanceAccessService.permissions(input.user)
     try {
       return await db.transaction(async (trx) => {
@@ -63,8 +69,8 @@ export class ManualReconciliationService {
         if (!['posted', 'settled'].includes(tx.status))
           throw new ReconciliationError('Only posted or settled transactions can be matched.', 409)
         if (
-          normalizeAmount(tx.originalAmount) !== amount ||
-          tx.originalCurrencyCode.toUpperCase() !== currency
+          normalizeAmount(amountOf(tx.originalAmount)) !== normalizeAmount(observedAmount.amount) ||
+          currencyOf(tx.originalAmount).toUpperCase() !== observedAmount.currency_code
         )
           throw new ReconciliationError(
             'Statement amount and currency must exactly match the original ledger entry.',
@@ -75,8 +81,7 @@ export class ManualReconciliationService {
             userId: input.user.id,
             financialTransactionId: tx.id,
             sourceReference: reference,
-            observedAmount: amount,
-            currencyCode: currency,
+            observedAmount,
             notes: notes || null,
             previousStatus: tx.status,
             reconciledByUserId: input.user.id,
@@ -100,8 +105,7 @@ export class ManualReconciliationService {
               status: tx.status,
               reconciliationId: match.id,
               sourceReference: reference,
-              amount,
-              currency,
+              observedAmount,
             },
             metadata: { verification: 'manual' },
           },

@@ -20,26 +20,156 @@ import {
   SyncJobType,
   SyncJobStatus,
   OutboxEventStatus,
+  FulfillmentChannel,
+  type FulfillmentChannelValue,
+  TaxCollectionModel,
+  type TaxCollectionModelValue,
 } from '../enums/index.js'
-import { PriceService } from './price_service.js'
 import { generateEntityId } from '../utils/generate_entity_id.js'
+import {
+  OrderSyncNormalizerService,
+  OrderSyncNormalizationError,
+  assertPayloadSize,
+  type MarketplacePlatform,
+} from './order_sync_normalizer_service.js'
 import { normalizeEmail, normalizePhone, computeAddressFingerprint } from '../utils/identity.js'
+import {
+  type AdjustmentEntry,
+  type PriceMoney,
+  type TaxLineEntry,
+  amountOf,
+  currencyOf,
+  money,
+  normalizeCurrencyCode,
+  normalizeMoneyEntryArray,
+  normalizePriceMoney,
+  roundMoney,
+  sumMoney,
+  sumMoneyEntries,
+} from '../types/price.js'
+
+/** Money-ish input: a self-contained PriceMoney object or a number + currency. */
+export type MoneyLike = PriceMoney | number | string | null | undefined
+
+/** Coerces any money-ish input into a PriceMoney in `fallbackCurrency`. */
+function toMoney(value: MoneyLike, fallbackCurrency: string): PriceMoney {
+  return normalizePriceMoney(value ?? 0, fallbackCurrency)
+}
+
+/** Parses an ISO timestamp from a platform payload, tolerating invalid values. */
+function toDateTimeOrNull(value: string | null | undefined): DateTime | null {
+  if (!value) return null
+  const parsed = DateTime.fromISO(String(value))
+  return parsed.isValid ? parsed : null
+}
+
+export type FulfillmentChannelCode = FulfillmentChannelValue
+
+/** A tax line as accepted on input: the total may be a bare number in order currency. */
+export type TaxLineInput = Omit<TaxLineEntry, 'total'> & { total: MoneyLike }
+
+/** An adjustment as accepted on input: the amount may be a bare number. */
+export type AdjustmentInput = Omit<AdjustmentEntry, 'amount'> & { amount: MoneyLike }
+
+/** A raw marketplace payload queued for import; the platform is auto-detected. */
+export interface BulkImportPayload {
+  /** Omit to let the normalizer detect Amazon / eBay / Etsy / MedusaJS. */
+  platform?: MarketplacePlatform | 'unknown'
+  payload: unknown
+  /** Amazon SP-API `getOrderItems` response (taxes/prices live per line item). */
+  orderItemsPayload?: unknown
+  sellerAccountId?: string | null
+  sellerAccount?: {
+    id: string
+    defaultCurrency: string
+    marketplaceRegion: string
+    externalSellerId: string
+  } | null
+}
+
+type NormalizedImportOrder = Omit<CreateOrderInput, 'userId' | 'syncJobId' | 'actorUserId'>
+
+/** One importable record after normalization (or straight from canonical JSON). */
+interface ImportEntry {
+  index: number
+  platform: MarketplacePlatform | 'seller_core' | 'unknown'
+  externalRecordId: string | null
+  rawExcerpt: Record<string, unknown>
+  payload?: unknown
+  order?: NormalizedImportOrder
+}
+
+/** Best-effort external identity used for `sync_job_errors.external_record_id`. */
+function extractExternalRecordId(payload: unknown): string | null {
+  const body = payload as Record<string, any> | null
+  if (!body || typeof body !== 'object') return null
+  const order = (body.payload?.Orders?.[0] ??
+    body.orders?.[0] ??
+    body.receipt ??
+    body.order ??
+    body) as Record<string, any>
+  return (
+    order?.AmazonOrderId ??
+    order?.amazonOrderId ??
+    order?.orderId ??
+    order?.receipt_id ??
+    order?.receiptId ??
+    order?.id ??
+    order?.externalOrderId ??
+    null
+  )
+}
+
+/** Trimmed raw payload stored on `sync_job_errors` for replay/debugging. */
+function buildRawExcerpt(payload: unknown): Record<string, unknown> {
+  const json = JSON.stringify(asRecord(payload) ?? {})
+  return { excerpt: json.length > 2000 ? `${json.slice(0, 2000)}…` : json }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
 
 export interface OrderLineInput {
   productVariantId?: string | null
+  channelListingId?: string | null
+  /** Amazon OrderItemId / eBay lineItemId / Etsy transaction_id / Medusa LineItem.id */
   externalOrderLineId?: string | null
+  /** Amazon ASIN / eBay legacyItemId / Etsy listing_id / Medusa product_id */
+  externalListingId?: string | null
+  /** Etsy product_id or offering_id / Medusa variant_id / eBay SKU */
+  externalVariantId?: string | null
   sku: string
   title: string
   variantTitle?: string | null
-  asin?: string | null
   quantityOrdered: number
-  currencyCode?: string
-  unitPrice: number
-  discountAmount?: number
-  taxAmount?: number
-  shippingAmount?: number
-  unitCostAmount?: number
-  marketplaceFeeAmount?: number
+  /** Item unit price. A bare number is denominated in the order currency. */
+  unitPrice: MoneyLike
+  /** Order-level discount applied to this line (not a promotion). */
+  discountTotal?: MoneyLike
+  /** Marketing promotion / coupon total for this line. */
+  promotionTotal?: MoneyLike
+  /** Item tax for this line. */
+  taxTotal?: MoneyLike
+  /** Shipping charged to the buyer for this line. */
+  shippingTotal?: MoneyLike
+  /** Shipping discount applied to this line. */
+  shippingDiscountTotal?: MoneyLike
+  /** Tax charged on shipping for this line. */
+  shippingTaxTotal?: MoneyLike
+  /** Unit landed cost (COGS). May be booked in a different currency. */
+  unitCost?: MoneyLike
+  marketplaceFee?: MoneyLike
+  fulfillmentChannel?: FulfillmentChannelCode
+  /** Jurisdiction tax breakdown; its total becomes `tax_total` when omitted. */
+  taxLines?: TaxLineInput[]
+  /** Promotion / coupon breakdown; its total becomes `promotion_total` when omitted. */
+  adjustments?: AdjustmentInput[]
+  /** Etsy personalization, Amazon GiftWrapLevel, Medusa metadata, … */
+  customAttributes?: Record<string, any>
+  /** Per-field currency overrides, e.g. `{ unit_cost: 'INR' }` (snake_case keys). */
   fieldCurrencyOverrides?: Record<string, string>
 }
 
@@ -48,17 +178,58 @@ export interface CreateOrderInput {
   actorUserId?: string
   sellerAccountId?: string | null
   orderNumber: string
+  /** Amazon AmazonOrderId / eBay orderId / Etsy receipt_id / Medusa order.id. */
   externalOrderId?: string | null
+  /** Human-facing platform number (Medusa display_id, eBay legacyOrderId…). */
+  externalDisplayId?: string | null
   sourceType?: string
+  /**
+   * Detected marketplace/platform (amazon, ebay, etsy, medusa, website…).
+   *
+   * Orders have no `marketplace_code` column — the channel is derived through
+   * `seller_account_id → sales_channels.code`. The detected platform is kept in
+   * `channel_metadata.platform` so imports without a seller account stay traceable.
+   */
   marketplaceCode?: string
   status?: string
   paymentStatus?: string
+  /** Currency of the marketplace transaction (revenue-side fields). */
   currencyCode?: string
+  /** Currency used for the `reporting_total` P&L roll-up. */
   reportingCurrencyCode?: string
   exchangeRate?: number
-  shippingCostAmount?: number
+  fulfillmentChannel?: FulfillmentChannelCode
+  /** Amazon MarketplaceId / eBay marketplace id / Etsy shop_id / Medusa region_id. */
+  marketplaceSiteId?: string | null
+  /** marketplace_facilitator | seller | none — inferred when omitted. */
+  taxCollectionModel?: TaxCollectionModelValue
+  /** Platform flags: isPrime, isBusinessOrder, etsyIsGift, medusaRegionId, … */
+  channelMetadata?: Record<string, any>
+  /** Platform-authoritative order totals (fall back to the line sums). */
+  subtotal?: MoneyLike
+  discountTotal?: MoneyLike
+  taxTotal?: MoneyLike
+  shippingTotal?: MoneyLike
+  shippingTaxTotal?: MoneyLike
+  grandTotal?: MoneyLike
+  cogsTotal?: MoneyLike
+  /** Shipping cost paid to the carrier; may be in a different currency. */
+  shippingCostTotal?: MoneyLike
   shippingCostCurrencyCode?: string
-  paymentProcessingFeesAmount?: number
+  paymentProcessingFeesTotal?: MoneyLike
+  marketplaceFeesTotal?: MoneyLike
+  promotionsTotal?: MoneyLike
+  shippingDiscountTotal?: MoneyLike
+  /** Tax withheld and remitted by the marketplace (facilitator tax). */
+  marketplaceWithheldTaxTotal?: MoneyLike
+  /** Only the seller collects tax; marketplaces may remit on the seller's behalf. */
+  taxCollectedByMarketplace?: boolean
+  /** Promised ship window (Amazon Earliest/LatestShipDate, Etsy estimated_ship_on). */
+  earliestShipAt?: string | null
+  latestShipAt?: string | null
+  /** Promised delivery window (Amazon LatestDeliveryDate, eBay estimated delivery). */
+  earliestDeliveryAt?: string | null
+  latestDeliveryAt?: string | null
   fieldCurrencyOverrides?: Record<string, string>
   buyerNotes?: string | null
   internalNotes?: string | null
@@ -84,10 +255,6 @@ export interface CreateOrderInput {
   lines: OrderLineInput[]
   rawPayload?: Record<string, unknown> | null
   syncJobId?: string | null
-}
-
-function roundMoney(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 /** Redact credentials at every depth before the payload reaches storage or audit triggers. */
@@ -125,13 +292,33 @@ function redactPayload(value: unknown, fields: string[], path = ''): unknown {
 export class OrderService {
   /**
    * Creates a normalized order with line items, customer identity resolution,
-   * repeat-customer detection, inventory reservation, P&L calculation,
-   * and per-field `OrderPrice` + `OrderLineItemPrice` records inside a transaction.
+   * repeat-customer detection, inventory reservation, P&L calculation and
+   * self-contained `PriceMoney` objects on every monetary column.
+   *
+   * Every amount keeps its own currency code, so a USD marketplace order can
+   * carry an INR carrier cost and INR COGS without lossy conversion.
    */
   static async createOrder(input: CreateOrderInput): Promise<Order> {
     if (!input.lines || input.lines.length === 0) {
       throw new Error('VALIDATION_ERROR: An order must contain at least one line item.')
     }
+    if (!input.orderNumber || !input.orderNumber.trim()) {
+      throw new Error('VALIDATION_ERROR: An order number is required.')
+    }
+
+    const currency = normalizeCurrencyCode(input.currencyCode, 'USD')
+    const reportingCurrency = normalizeCurrencyCode(input.reportingCurrencyCode, 'USD')
+    const exchangeRate = Number(input.exchangeRate ?? 1.0)
+    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+      throw new Error('VALIDATION_ERROR: exchangeRate must be strictly positive.')
+    }
+    const fieldOverrides = input.fieldCurrencyOverrides ?? {}
+    const currencyFor = (field: string, fallback = currency) =>
+      normalizeCurrencyCode(fieldOverrides[field], fallback)
+    const shippingCostCurrency = normalizeCurrencyCode(
+      input.shippingCostCurrencyCode ?? fieldOverrides.shipping_cost_total,
+      currency
+    )
 
     return await db.transaction(async (trx) => {
       // 1. Resolve or create customer scoped to user_id
@@ -181,10 +368,8 @@ export class OrderService {
         customer.proxyEmail = input.customer.proxyEmail ?? null
         customer.phone = input.customer.phone ?? null
         customer.normalizedPhone = normPhone
-        customer.preferredCurrency = (input.currencyCode || 'USD').toUpperCase()
         customer.ordersCount = 0
-        customer.totalSpent = '0.00'
-        customer.isRepeatCustomer = false
+        customer.totalSpent = money(0, reportingCurrency)
         customer.riskLevel = 'low'
         customer.riskScore = 0
         customer.metadata = {}
@@ -224,34 +409,34 @@ export class OrderService {
       }
 
       // 3. Calculate line-item and order-level financials
-      const currencyCode = (input.currencyCode || 'USD').toUpperCase()
-      const reportingCurrencyCode = (input.reportingCurrencyCode || 'USD').toUpperCase()
-      const exchangeRate = Number(input.exchangeRate ?? 1.0)
-      if (exchangeRate <= 0) {
-        throw new Error('VALIDATION_ERROR: exchangeRate must be strictly positive.')
-      }
-
-      let subtotalAmount = 0
-      let discountAmount = 0
-      let taxAmount = 0
-      let shippingChargedAmount = 0
-      let marketplaceFeesAmount = 0
-      let cogsAmount = 0
-
       const preparedLines: Array<{
         lineModel: OrderLineItem
         variantToReserve: ProductVariant | null
-        fieldCurrencyOverrides?: Record<string, string>
       }> = []
 
       const variantsById = new Map<string, ProductVariant>()
+      let subtotal = money(0, currency)
+      let lineDiscounts = money(0, currency)
+      let linePromotions = money(0, currency)
+      let lineTaxes = money(0, currency)
+      let lineShipping = money(0, currency)
+      let lineShippingDiscounts = money(0, currency)
+      let lineShippingTaxes = money(0, currency)
+      let lineBreakdown: Array<{
+        tax: PriceMoney
+        shippingTax: PriceMoney
+        cogs: PriceMoney
+        marketplaceFee: PriceMoney
+      }> = []
+
       for (const lineInput of input.lines) {
         if (!Number.isInteger(lineInput.quantityOrdered) || lineInput.quantityOrdered <= 0) {
           throw new Error(
             `VALIDATION_ERROR: Line SKU ${lineInput.sku} must have quantityOrdered > 0`
           )
         }
-        if (lineInput.unitPrice < 0) {
+        const unitPrice = toMoney(lineInput.unitPrice, currency)
+        if (amountOf(unitPrice) < 0) {
           throw new Error(
             `VALIDATION_ERROR: Line SKU ${lineInput.sku} cannot have negative unitPrice`
           )
@@ -282,75 +467,239 @@ export class OrderService {
         }
 
         const qty = Number(lineInput.quantityOrdered)
-        const unitPrice = roundMoney(Number(lineInput.unitPrice))
-        const lineDiscount = roundMoney(Number(lineInput.discountAmount ?? 0))
-        const lineTax = roundMoney(Number(lineInput.taxAmount ?? 0))
-        const lineShipping = roundMoney(Number(lineInput.shippingAmount ?? 0))
-        const lineTotal = roundMoney(qty * unitPrice - lineDiscount + lineTax + lineShipping)
-
-        const fallbackUnitCost = variant
-          ? Number(variant.costPrice || 0) +
-            Number(variant.manufacturingCost || 0) +
-            Number(variant.packagingCost || 0)
-          : 0
-        const unitCost = roundMoney(Number(lineInput.unitCostAmount ?? fallbackUnitCost))
-        const lineMarketplaceFee = roundMoney(
-          Number(lineInput.marketplaceFeeAmount ?? roundMoney(qty * unitPrice * 0.12))
+        // Platform breakdowns are stored verbatim; their totals feed the money
+        // columns unless the payload already supplied an explicit total.
+        const taxLines = normalizeMoneyEntryArray<TaxLineEntry>(
+          lineInput.taxLines,
+          'total',
+          currency
+        )
+        const adjustments = normalizeMoneyEntryArray<AdjustmentEntry>(
+          lineInput.adjustments,
+          'amount',
+          currency
+        )
+        const lineDiscount = toMoney(lineInput.discountTotal ?? 0, currency)
+        const linePromotion = toMoney(
+          lineInput.promotionTotal ?? sumMoneyEntries(adjustments, 'amount', currency),
+          currency
+        )
+        const lineTax = toMoney(
+          lineInput.taxTotal ?? sumMoneyEntries(taxLines, 'total', currency),
+          currency
+        )
+        const lineShippingAmount = toMoney(lineInput.shippingTotal ?? 0, currency)
+        const lineShippingDiscount = toMoney(lineInput.shippingDiscountTotal ?? 0, currency)
+        const lineShippingTax = toMoney(lineInput.shippingTaxTotal ?? 0, currency)
+        const lineSubtotalAmount = roundMoney(qty * amountOf(unitPrice))
+        const lineSubtotal = money(lineSubtotalAmount, unitPrice.currency_code)
+        const lineGrand = money(
+          lineSubtotalAmount -
+            amountOf(lineDiscount) -
+            amountOf(linePromotion) +
+            amountOf(lineTax) +
+            amountOf(lineShippingAmount) -
+            amountOf(lineShippingDiscount) +
+            amountOf(lineShippingTax),
+          unitPrice.currency_code
         )
 
-        subtotalAmount = roundMoney(subtotalAmount + qty * unitPrice)
-        discountAmount = roundMoney(discountAmount + lineDiscount)
-        taxAmount = roundMoney(taxAmount + lineTax)
-        shippingChargedAmount = roundMoney(shippingChargedAmount + lineShipping)
-        marketplaceFeesAmount = roundMoney(marketplaceFeesAmount + lineMarketplaceFee)
-        cogsAmount = roundMoney(cogsAmount + qty * unitCost)
+        // COGS may be booked in a different currency (e.g. INR warehouse cost).
+        const fallbackUnitCost = variant ? variant.landedUnitCostAmount : 0
+        const unitCost =
+          lineInput.unitCost !== undefined && lineInput.unitCost !== null
+            ? toMoney(lineInput.unitCost, currencyFor('unit_cost'))
+            : money(fallbackUnitCost, variant?.costPrice?.currency_code ?? currency)
+        const marketplaceFee =
+          lineInput.marketplaceFee !== undefined && lineInput.marketplaceFee !== null
+            ? toMoney(lineInput.marketplaceFee, currencyFor('marketplace_fee'))
+            : money(lineSubtotalAmount * 0.12, unitPrice.currency_code)
+
+        subtotal = money(amountOf(subtotal) + lineSubtotalAmount, subtotal.currency_code)
+        lineDiscounts = money(
+          amountOf(lineDiscounts) + amountOf(lineDiscount),
+          lineDiscounts.currency_code
+        )
+        linePromotions = money(
+          amountOf(linePromotions) + amountOf(linePromotion),
+          linePromotions.currency_code
+        )
+        lineTaxes = money(amountOf(lineTaxes) + amountOf(lineTax), lineTaxes.currency_code)
+        lineShipping = money(
+          amountOf(lineShipping) + amountOf(lineShippingAmount),
+          lineShipping.currency_code
+        )
+        lineShippingDiscounts = money(
+          amountOf(lineShippingDiscounts) + amountOf(lineShippingDiscount),
+          lineShippingDiscounts.currency_code
+        )
+        lineShippingTaxes = money(
+          amountOf(lineShippingTaxes) + amountOf(lineShippingTax),
+          lineShippingTaxes.currency_code
+        )
+        lineBreakdown.push({
+          tax: lineTax,
+          shippingTax: lineShippingTax,
+          cogs: money(amountOf(unitCost) * qty, unitCost.currency_code),
+          marketplaceFee,
+        })
 
         const lineModel = new OrderLineItem()
         lineModel.userId = input.userId
         lineModel.productVariantId = variant?.id ?? null
+        lineModel.channelListingId = lineInput.channelListingId ?? null
         lineModel.externalOrderLineId = lineInput.externalOrderLineId ?? null
+        // ASIN doubles as the Amazon external listing id when no explicit value is sent.
+        lineModel.externalListingId = lineInput.externalListingId ?? variant?.asin ?? null
+        lineModel.externalVariantId = lineInput.externalVariantId ?? null
         lineModel.sku = lineInput.sku
         lineModel.title = lineInput.title
         lineModel.variantTitle = lineInput.variantTitle ?? variant?.title ?? null
-        lineModel.asin = lineInput.asin ?? variant?.asin ?? null
         lineModel.quantityOrdered = qty
         lineModel.quantityFulfilled = 0
         lineModel.quantityReturned = 0
         lineModel.quantityCancelled = 0
-        lineModel.currencyCode = (lineInput.currencyCode || currencyCode).toUpperCase()
-        lineModel.unitPrice = unitPrice.toFixed(2)
-        lineModel.discountAmount = lineDiscount.toFixed(2)
-        lineModel.taxAmount = lineTax.toFixed(2)
-        lineModel.shippingAmount = lineShipping.toFixed(2)
-        lineModel.lineTotalAmount = lineTotal.toFixed(2)
-        lineModel.unitCostAmount = unitCost.toFixed(2)
-        lineModel.marketplaceFeeAmount = lineMarketplaceFee.toFixed(2)
-        lineModel.refundedAmount = '0.00'
+        lineModel.fulfillmentChannel =
+          lineInput.fulfillmentChannel ?? input.fulfillmentChannel ?? FulfillmentChannel.MFN
+        lineModel.taxLines = taxLines
+        lineModel.adjustments = adjustments
+        lineModel.customAttributes = lineInput.customAttributes ?? {}
+        lineModel.unitPrice = unitPrice
+        lineModel.subtotal = lineSubtotal
+        lineModel.discountTotal = lineDiscount
+        lineModel.promotionTotal = linePromotion
+        lineModel.taxTotal = lineTax
+        lineModel.shippingTotal = lineShippingAmount
+        lineModel.shippingDiscountTotal = lineShippingDiscount
+        lineModel.shippingTaxTotal = lineShippingTax
+        lineModel.grandTotal = lineGrand
+        lineModel.unitCost = unitCost
+        lineModel.marketplaceFee = marketplaceFee
+        lineModel.refundedTotal = money(0, unitPrice.currency_code)
         lineModel.fulfillmentStatus = FulfillmentStatus.UNFULFILLED
 
-        preparedLines.push({
-          lineModel,
-          variantToReserve: variant,
-          fieldCurrencyOverrides: lineInput.fieldCurrencyOverrides,
-        })
+        preparedLines.push({ lineModel, variantToReserve: variant })
       }
 
-      const totalAmount = roundMoney(
-        subtotalAmount - discountAmount + taxAmount + shippingChargedAmount
+      // Order-level totals: a marketplace payload is authoritative for what the
+      // buyer was charged; the line sums are the fallback for manual orders.
+      const pick = (value: MoneyLike | undefined, fallback: PriceMoney) =>
+        value === undefined || value === null ? fallback : toMoney(value, fallback.currency_code)
+
+      const subtotalMoney = pick(input.subtotal, subtotal)
+      const discountMoney = pick(input.discountTotal, lineDiscounts)
+      const promotionMoney = pick(input.promotionsTotal, linePromotions)
+      const shippingMoney = pick(input.shippingTotal, lineShipping)
+      const shippingDiscountMoney = pick(input.shippingDiscountTotal, lineShippingDiscounts)
+      const taxMoney = pick(input.taxTotal, lineTaxes)
+      const shippingTaxMoney = pick(input.shippingTaxTotal, lineShippingTaxes)
+      const cogsTotal = pick(
+        input.cogsTotal,
+        sumMoney(
+          lineBreakdown.map((line) => line.cogs),
+          currency
+        )
       )
-      const shippingCostAmount = roundMoney(Number(input.shippingCostAmount ?? 0))
-      const paymentProcessingFeesAmount = roundMoney(
-        Number(input.paymentProcessingFeesAmount ?? roundMoney(totalAmount * 0.029))
+
+      // grand_total = subtotal - discount - promotion + shipping - shipping_discount + tax + shipping_tax
+      const formulaGrandTotal = money(
+        amountOf(subtotalMoney) -
+          amountOf(discountMoney) -
+          amountOf(promotionMoney) +
+          amountOf(shippingMoney) -
+          amountOf(shippingDiscountMoney) +
+          amountOf(taxMoney) +
+          amountOf(shippingTaxMoney),
+        currency
       )
-      const netSales = roundMoney(subtotalAmount - discountAmount + shippingChargedAmount)
-      const netProceedsAmount = roundMoney(
-        totalAmount - marketplaceFeesAmount - paymentProcessingFeesAmount
+      const grandTotal = pick(input.grandTotal, formulaGrandTotal)
+
+      const shippingCostTotal = toMoney(input.shippingCostTotal ?? 0, shippingCostCurrency)
+      const marketplaceFeesTotal = toMoney(
+        input.marketplaceFeesTotal ??
+          sumMoney(
+            lineBreakdown.map((line) => line.marketplaceFee),
+            currency
+          ),
+        currency
       )
-      const grossProfitAmount = roundMoney(netSales - cogsAmount - shippingCostAmount)
-      const netProfitAmount = roundMoney(
-        netProceedsAmount - cogsAmount - shippingCostAmount - taxAmount
+      const paymentProcessingFeesTotal = toMoney(
+        input.paymentProcessingFeesTotal ?? roundMoney(amountOf(grandTotal) * 0.029),
+        currency
       )
-      const reportingTotalAmount = roundMoney(totalAmount * exchangeRate)
+
+      // Marketplace Facilitator Tax: Amazon/eBay/Etsy collect and remit the tax and
+      // withhold it from the payout, so it is booked as withheld, not as income.
+      const taxCollectionModel: TaxCollectionModelValue =
+        input.taxCollectionModel ??
+        (input.taxCollectedByMarketplace
+          ? TaxCollectionModel.MARKETPLACE_FACILITATOR
+          : TaxCollectionModel.SELLER)
+      const withheldTaxFallback =
+        taxCollectionModel === TaxCollectionModel.MARKETPLACE_FACILITATOR
+          ? money(amountOf(taxMoney) + amountOf(shippingTaxMoney), currency)
+          : money(0, currency)
+      const marketplaceWithheldTaxTotal = pick(
+        input.marketplaceWithheldTaxTotal,
+        withheldTaxFallback
+      )
+
+      // Keep the platform total and any formula drift auditable instead of losing it.
+      const channelMetadata: Record<string, any> = { ...(input.channelMetadata ?? {}) }
+      const detectedPlatform = input.marketplaceCode?.trim()
+      // With a seller account the channel is derived from it; only a direct import
+      // without one needs the detected platform recorded for traceability.
+      if (
+        detectedPlatform &&
+        detectedPlatform !== 'direct' &&
+        !input.sellerAccountId &&
+        !channelMetadata.platform
+      ) {
+        channelMetadata.platform = detectedPlatform
+      }
+      if (input.grandTotal !== undefined && input.grandTotal !== null) {
+        const difference = roundMoney(amountOf(grandTotal) - amountOf(formulaGrandTotal))
+        channelMetadata.platformGrandTotal = grandTotal
+        if (Math.abs(difference) > 0.01) {
+          channelMetadata.totalsMismatch = {
+            formulaGrandTotal,
+            platformGrandTotal: grandTotal,
+            difference: money(difference, currency),
+          }
+        }
+      }
+
+      // Only same-currency values are netted together; mixed-currency costs keep
+      // their own currency code and are excluded from the primary-currency P&L.
+      const inGrandCurrency = (value: PriceMoney, fallbackAmount = 0) =>
+        value.currency_code === grandTotal.currency_code ? amountOf(value) : fallbackAmount
+
+      const netSales =
+        amountOf(subtotalMoney) -
+        amountOf(discountMoney) -
+        amountOf(promotionMoney) +
+        amountOf(shippingMoney) -
+        amountOf(shippingDiscountMoney)
+      // A fresh order starts with no refunds; net proceeds still mirror
+      // recomputeProfitability() so the formula lives in exactly one shape.
+      const refundedTotal = money(0, currency)
+      const netProceeds = roundMoney(
+        amountOf(grandTotal) -
+          inGrandCurrency(marketplaceFeesTotal) -
+          inGrandCurrency(paymentProcessingFeesTotal) -
+          inGrandCurrency(refundedTotal)
+      )
+      const grossProfit = roundMoney(
+        netSales - inGrandCurrency(cogsTotal) - inGrandCurrency(shippingCostTotal)
+      )
+      const netProfit = roundMoney(
+        netProceeds -
+          inGrandCurrency(cogsTotal) -
+          inGrandCurrency(shippingCostTotal) -
+          inGrandCurrency(taxMoney) -
+          inGrandCurrency(shippingTaxMoney)
+      )
+      const reportingTotal = money(amountOf(grandTotal) * exchangeRate, reportingCurrency)
 
       // 4. Create Order header
       const order = new Order()
@@ -363,62 +712,63 @@ export class OrderService {
       order.syncJobId = input.syncJobId ?? null
       order.orderNumber = input.orderNumber
       order.externalOrderId = input.externalOrderId ?? null
+      order.externalDisplayId = input.externalDisplayId ?? null
+      order.marketplaceSiteId = input.marketplaceSiteId ?? null
       order.sourceType = input.sourceType || OrderSourceType.MANUAL
-      order.marketplaceCode = input.marketplaceCode || 'direct'
       order.status = input.status || OrderStatus.CONFIRMED
       order.paymentStatus = input.paymentStatus || OrderPaymentStatus.PAID
       order.fulfillmentStatus = FulfillmentStatus.UNFULFILLED
       order.syncStatus = input.externalOrderId
         ? EntitySyncStatus.SYNCED
         : EntitySyncStatus.NOT_APPLICABLE
-      order.currencyCode = currencyCode
-      order.reportingCurrencyCode = reportingCurrencyCode
+      // Default to MFN (merchant fulfilled); a platform AFN/FBA line overrides it.
+      const derivedChannel =
+        input.fulfillmentChannel ??
+        (preparedLines.some(
+          (line) =>
+            line.lineModel.fulfillmentChannel === FulfillmentChannel.AFN ||
+            line.lineModel.fulfillmentChannel === FulfillmentChannel.FBA
+        )
+          ? FulfillmentChannel.AFN
+          : FulfillmentChannel.MFN)
+      order.fulfillmentChannel = derivedChannel
+      order.taxCollectionModel = taxCollectionModel
+      order.channelMetadata = channelMetadata
       order.exchangeRate = exchangeRate.toFixed(8)
-      order.subtotalAmount = subtotalAmount.toFixed(2)
-      order.discountAmount = discountAmount.toFixed(2)
-      order.taxAmount = taxAmount.toFixed(2)
-      order.shippingChargedAmount = shippingChargedAmount.toFixed(2)
-      order.totalAmount = totalAmount.toFixed(2)
-      order.marketplaceFeesAmount = marketplaceFeesAmount.toFixed(2)
-      order.paymentProcessingFeesAmount = paymentProcessingFeesAmount.toFixed(2)
-      order.shippingCostAmount = shippingCostAmount.toFixed(2)
-      order.cogsAmount = cogsAmount.toFixed(2)
-      order.refundedAmount = '0.00'
-      order.netProceedsAmount = netProceedsAmount.toFixed(2)
-      order.grossProfitAmount = grossProfitAmount.toFixed(2)
-      order.netProfitAmount = netProfitAmount.toFixed(2)
-      order.reportingTotalAmount = reportingTotalAmount.toFixed(2)
+      order.subtotal = subtotalMoney
+      order.discountTotal = discountMoney
+      order.promotionTotal = promotionMoney
+      order.shippingTotal = shippingMoney
+      order.shippingDiscountTotal = shippingDiscountMoney
+      order.taxTotal = taxMoney
+      order.shippingTaxTotal = shippingTaxMoney
+      order.marketplaceWithheldTaxTotal = marketplaceWithheldTaxTotal
+      order.grandTotal = grandTotal
+      order.marketplaceFeesTotal = marketplaceFeesTotal
+      order.paymentProcessingFeesTotal = paymentProcessingFeesTotal
+      order.shippingCostTotal = shippingCostTotal
+      order.cogsTotal = cogsTotal
+      order.refundedTotal = refundedTotal
+      order.netProceeds = money(netProceeds, currency)
+      order.grossProfit = money(grossProfit, currency)
+      order.netProfit = money(netProfit, currency)
+      order.reportingTotal = reportingTotal
       order.shippingAddressSnapshot = input.shippingAddress ?? null
       order.buyerNotes = input.buyerNotes ?? null
       order.internalNotes = input.internalNotes ?? null
       order.orderedAt = input.orderedAt ? DateTime.fromISO(input.orderedAt) : DateTime.now()
       order.confirmedAt = DateTime.now()
+      order.earliestShipAt = toDateTimeOrNull(input.earliestShipAt)
+      order.latestShipAt = toDateTimeOrNull(input.latestShipAt)
+      order.earliestDeliveryAt = toDateTimeOrNull(input.earliestDeliveryAt)
+      order.latestDeliveryAt = toDateTimeOrNull(input.latestDeliveryAt)
       await order.save()
 
-      // Save per-field OrderPrice records ({ currency_code, amount })
-      const orderFieldCurOverrides: Record<string, string> = {
-        ...(input.fieldCurrencyOverrides ?? {}),
-      }
-      if (input.shippingCostCurrencyCode) {
-        orderFieldCurOverrides.shipping_cost_amount = input.shippingCostCurrencyCode.toUpperCase()
-      }
-      await PriceService.syncOrderPrices({
-        order,
-        fieldCurrencyOverrides: orderFieldCurOverrides,
-        trx,
-      })
-
-      // 5. Save OrderLineItems, OrderLineItemPrices & reserve stock on ProductVariant
-      for (const { lineModel, variantToReserve, fieldCurrencyOverrides } of preparedLines) {
+      // 5. Save OrderLineItems and reserve stock on ProductVariant
+      for (const { lineModel, variantToReserve } of preparedLines) {
         lineModel.useTransaction(trx)
         lineModel.orderId = order.id
         await lineModel.save()
-
-        await PriceService.syncOrderLineItemPrices({
-          lineItem: lineModel,
-          fieldCurrencyOverrides,
-          trx,
-        })
 
         if (variantToReserve) {
           variantToReserve.useTransaction(trx)
@@ -441,8 +791,6 @@ export class OrderService {
         payloadRecord.useTransaction(trx)
         payloadRecord.userId = input.userId
         payloadRecord.orderId = order.id
-        payloadRecord.syncJobId = input.syncJobId ?? null
-        payloadRecord.sellerAccountId = input.sellerAccountId ?? null
         payloadRecord.payloadHash = crypto.createHash('sha256').update(serialized).digest('hex')
         payloadRecord.payloadSizeBytes = byteLength
         payloadRecord.rawPayload = sanitized
@@ -450,12 +798,11 @@ export class OrderService {
         await payloadRecord.save()
       }
 
-      // 7. Update customer repeat-purchase stats
+      // 7. Update customer repeat-purchase stats (reporting currency)
       const newOrdersCount = (customer.ordersCount || 0) + 1
-      const newTotalSpent = roundMoney(Number(customer.totalSpent || 0) + reportingTotalAmount)
+      const previousSpent = normalizePriceMoney(customer.totalSpent, reportingCurrency)
       customer.ordersCount = newOrdersCount
-      customer.totalSpent = newTotalSpent.toFixed(2)
-      customer.isRepeatCustomer = newOrdersCount > 1
+      customer.totalSpent = sumMoney([previousSpent, reportingTotal], reportingCurrency)
       if (!customer.firstOrderAt) {
         customer.firstOrderAt = order.orderedAt
       }
@@ -473,8 +820,10 @@ export class OrderService {
       outbox.payload = {
         orderId: order.id,
         orderNumber: order.orderNumber,
-        totalAmount: order.totalAmount,
-        currencyCode: order.currencyCode,
+        externalOrderId: order.externalOrderId,
+        grandTotal: order.grandTotal,
+        fulfillmentChannel: order.fulfillmentChannel,
+        taxCollectionModel: order.taxCollectionModel,
       }
       outbox.status = OutboxEventStatus.PENDING
       await outbox.save()
@@ -489,8 +838,11 @@ export class OrderService {
       audit.afterState = {
         orderNumber: order.orderNumber,
         externalOrderId: order.externalOrderId,
-        totalAmount: order.totalAmount,
-        currencyCode: order.currencyCode,
+        externalDisplayId: order.externalDisplayId,
+        grandTotal: order.grandTotal,
+        reportingTotal: order.reportingTotal,
+        fulfillmentChannel: order.fulfillmentChannel,
+        taxCollectionModel: order.taxCollectionModel,
       }
       audit.metadata = { sourceType: order.sourceType }
       await audit.save()
@@ -499,20 +851,88 @@ export class OrderService {
     })
   }
 
+  /**
+   * Recomputes `net_proceeds`, `gross_profit` and `net_profit` from the order's
+   * stored PriceMoney columns. Used after refunds, shipments and invoice lines so
+   * profitability can never drift from the recorded amounts.
+   */
+  static recomputeProfitability(order: Order): Order {
+    const grand = order.grandTotal
+    const currency = currencyOf(grand)
+    const inCurrency = (value: PriceMoney | undefined) =>
+      value && value.currency_code === currency ? amountOf(value) : 0
+
+    const netSales =
+      amountOf(order.subtotal) -
+      amountOf(order.discountTotal) -
+      amountOf(order.promotionTotal) +
+      amountOf(order.shippingTotal) -
+      amountOf(order.shippingDiscountTotal)
+
+    const netProceeds = roundMoney(
+      amountOf(grand) -
+        inCurrency(order.marketplaceFeesTotal) -
+        inCurrency(order.paymentProcessingFeesTotal) -
+        inCurrency(order.refundedTotal)
+    )
+    order.netProceeds = money(netProceeds, currency)
+    order.grossProfit = money(
+      netSales - inCurrency(order.cogsTotal) - inCurrency(order.shippingCostTotal),
+      currency
+    )
+    order.netProfit = money(
+      netProceeds -
+        inCurrency(order.cogsTotal) -
+        inCurrency(order.shippingCostTotal) -
+        inCurrency(order.taxTotal) -
+        inCurrency(order.shippingTaxTotal),
+      currency
+    )
+    const exchangeRate = Number(order.exchangeRate || 1) || 1
+    order.reportingTotal = money(
+      amountOf(grand) * exchangeRate,
+      currencyOf(order.reportingTotal, currency)
+    )
+    return order
+  }
+
+  /**
+   * Bulk import entry point for both canonical Seller Core JSON and raw
+   * marketplace payloads.
+   *
+   * Each entry in `payloads` has its platform auto-detected
+   * (Amazon SP-API / eBay Fulfillment / Etsy v3 / MedusaJS v2) and is normalized
+   * through `OrderSyncNormalizerService`; entries in `orders` are treated as
+   * already-canonical. Per-record failures are captured in `sync_job_errors`
+   * instead of aborting the batch, and the whole batch is idempotent per
+   * `(userId, idempotencyKey)`.
+   */
   static async importBulkOrders(input: {
     userId: string
     actorUserId?: string
     sellerAccountId?: string | null
     idempotencyKey: string
     correlationId?: string
-    orders: Array<Omit<CreateOrderInput, 'userId' | 'syncJobId'>>
+    reportingCurrencyCode?: string
+    exchangeRate?: number
+    /** Already-canonical orders (Seller Core JSON shape). */
+    orders?: Array<Omit<CreateOrderInput, 'userId' | 'syncJobId'>>
+    /** Raw marketplace payloads; the platform is auto-detected when not supplied. */
+    payloads?: BulkImportPayload[]
   }): Promise<{
     job: SyncJob
     createdOrderIds: string[]
     duplicateOrderNumbers: string[]
     errors: SyncJobError[]
   }> {
-    if (input.orders.length > 500) {
+    const canonicalOrders = input.orders ?? []
+    const rawPayloads = input.payloads ?? []
+    const totalRecords = canonicalOrders.length + rawPayloads.length
+
+    if (totalRecords === 0) {
+      throw new Error('VALIDATION_ERROR: Bulk import requires at least one order or payload.')
+    }
+    if (totalRecords > 500) {
       throw new Error('BATCH_LIMIT_EXCEEDED: Bulk import supports at most 500 orders per batch.')
     }
 
@@ -541,7 +961,7 @@ export class OrderService {
       status: SyncJobStatus.RUNNING,
       idempotencyKey: input.idempotencyKey,
       correlationId: input.correlationId ?? generateEntityId(),
-      totalRecords: input.orders.length,
+      totalRecords,
       processedRecords: 0,
       succeededRecords: 0,
       failedRecords: 0,
@@ -554,18 +974,108 @@ export class OrderService {
     const duplicateOrderNumbers: string[] = []
     const recordedErrors: SyncJobError[] = []
 
-    for (let idx = 0; idx < input.orders.length; idx++) {
-      const rawOrder = input.orders[idx]
+    /** Records a per-record failure without aborting the batch. */
+    const recordFailure = async (entry: ImportEntry, err: unknown) => {
+      job.failedRecords += 1
+      job.processedRecords += 1
+      const message = err instanceof Error ? err.message : 'Unknown import error'
+      const code =
+        err instanceof OrderSyncNormalizationError
+          ? err.code
+          : err instanceof Error && err.message.startsWith('VALIDATION_ERROR')
+            ? 'IMPORT_VALIDATION_ERROR'
+            : 'IMPORT_VALIDATION_OR_CONSTRAINT_ERROR'
+      const jobErr = await SyncJobError.create({
+        syncJobId: job.id,
+        userId: input.userId,
+        recordIndex: entry.index,
+        externalRecordId: entry.externalRecordId,
+        errorCode: code,
+        errorMessage: message,
+        fieldErrors: [],
+        rawExcerpt: entry.rawExcerpt,
+        isResolved: false,
+      })
+      recordedErrors.push(jobErr)
+    }
+
+    // Normalize every raw payload up-front so detection/normalization failures are
+    // reported against their own record index rather than the first insert error.
+    const entries: ImportEntry[] = []
+    const normalizationFailures: Array<{ entry: ImportEntry; error: unknown }> = []
+
+    for (const [index, raw] of rawPayloads.entries()) {
+      const detection =
+        raw.platform ?? OrderSyncNormalizerService.detectPayloadPlatform(raw.payload)
+      const entry: ImportEntry = {
+        index,
+        platform: detection,
+        externalRecordId: extractExternalRecordId(raw.payload) ?? `payload-index-${index}`,
+        rawExcerpt: buildRawExcerpt(raw.payload),
+        payload: raw.payload,
+      }
+      entries.push(entry)
+      // Canonical Seller Core JSON needs no normalization; it is already typed.
+      if (detection === 'seller_core') {
+        entry.order = raw.payload as NormalizedImportOrder
+        continue
+      }
+      try {
+        assertPayloadSize(raw.payload)
+        const normalized = OrderSyncNormalizerService.normalizeOrderPayload(raw.payload, {
+          platform: detection,
+          orderItemsPayload: raw.orderItemsPayload,
+          context: {
+            sellerAccount: raw.sellerAccount ?? null,
+            reportingCurrencyCode: input.reportingCurrencyCode,
+            exchangeRate: input.exchangeRate,
+          },
+        })
+        entry.order = OrderSyncNormalizerService.toCreateOrderInput(normalized, {
+          userId: input.userId,
+          actorUserId: input.actorUserId ?? input.userId,
+          sellerAccountId: raw.sellerAccountId ?? input.sellerAccountId ?? null,
+          reportingCurrencyCode: input.reportingCurrencyCode,
+          exchangeRate: input.exchangeRate,
+          rawPayload: asRecord(raw.payload),
+        })
+      } catch (err) {
+        normalizationFailures.push({ entry, error: err })
+      }
+    }
+
+    for (const [offset, canonical] of canonicalOrders.entries()) {
+      entries.push({
+        index: rawPayloads.length + offset,
+        platform: 'seller_core',
+        externalRecordId: canonical.externalOrderId ?? canonical.orderNumber ?? null,
+        rawExcerpt: {
+          orderNumber: canonical.orderNumber ?? null,
+          externalOrderId: canonical.externalOrderId ?? null,
+        },
+        order: canonical as NormalizedImportOrder,
+      })
+    }
+
+    for (const failure of normalizationFailures) {
+      await recordFailure(failure.entry, failure.error)
+    }
+
+    for (const entry of entries) {
+      if (!entry.order) continue
+      const orderInput = entry.order
       job.processedRecords += 1
 
       try {
-        const effectiveSellerAccountId = rawOrder.sellerAccountId ?? input.sellerAccountId ?? null
+        const effectiveSellerAccountId = orderInput.sellerAccountId ?? input.sellerAccountId ?? null
 
-        if (effectiveSellerAccountId && rawOrder.externalOrderId) {
+        // Idempotency: the marketplace identity wins over the local order number,
+        // so re-importing the same Amazon order never creates a duplicate.
+        if (effectiveSellerAccountId && orderInput.externalOrderId) {
           const duplicateExternal = await Order.query()
             .where('userId', input.userId)
             .andWhere('sellerAccountId', effectiveSellerAccountId)
-            .andWhere('externalOrderId', rawOrder.externalOrderId)
+            .andWhere('externalOrderId', orderInput.externalOrderId)
             .first()
           if (duplicateExternal) {
             job.skippedDuplicates += 1
@@ -574,10 +1084,10 @@ export class OrderService {
           }
         }
 
-        if (rawOrder.orderNumber) {
+        if (orderInput.orderNumber) {
           const duplicateOrderNum = await Order.query()
             .where('userId', input.userId)
-            .andWhere('orderNumber', rawOrder.orderNumber)
+            .andWhere('orderNumber', orderInput.orderNumber)
             .first()
           if (duplicateOrderNum) {
             job.skippedDuplicates += 1
@@ -587,34 +1097,21 @@ export class OrderService {
         }
 
         const created = await this.createOrder({
-          ...rawOrder,
+          ...orderInput,
           userId: input.userId,
           actorUserId: input.actorUserId ?? input.userId,
           sellerAccountId: effectiveSellerAccountId,
-          sourceType: rawOrder.sourceType || OrderSourceType.MARKETPLACE_IMPORT,
+          sourceType: orderInput.sourceType || OrderSourceType.MARKETPLACE_IMPORT,
+          reportingCurrencyCode: orderInput.reportingCurrencyCode ?? input.reportingCurrencyCode,
+          exchangeRate: orderInput.exchangeRate ?? input.exchangeRate,
           syncJobId: job.id,
-          rawPayload: rawOrder.rawPayload ?? (rawOrder as unknown as Record<string, unknown>),
+          rawPayload: orderInput.rawPayload ?? entry.rawExcerpt,
         })
 
         createdOrderIds.push(created.id)
         job.succeededRecords += 1
-      } catch (err: any) {
-        job.failedRecords += 1
-        const jobErr = await SyncJobError.create({
-          syncJobId: job.id,
-          userId: input.userId,
-          recordIndex: idx,
-          externalRecordId: rawOrder?.externalOrderId ?? rawOrder?.orderNumber ?? null,
-          errorCode: 'IMPORT_VALIDATION_OR_CONSTRAINT_ERROR',
-          errorMessage: err?.message || 'Unknown import error',
-          fieldErrors: {},
-          rawExcerpt: {
-            orderNumber: rawOrder?.orderNumber,
-            externalOrderId: rawOrder?.externalOrderId,
-          },
-          isResolved: false,
-        })
-        recordedErrors.push(jobErr)
+      } catch (err) {
+        await recordFailure(entry, err)
       }
     }
 
@@ -628,6 +1125,7 @@ export class OrderService {
     job.errorSummary = {
       failedCount: job.failedRecords,
       skippedDuplicatesCount: job.skippedDuplicates,
+      normalizationFailures: normalizationFailures.length,
     }
     await job.save()
 

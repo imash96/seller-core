@@ -9,7 +9,8 @@ import type PaymentReconciled from '#events/payment_reconciled'
  */
 export default class UpdateSellerMetrics {
   async handle(event: InstanceType<typeof PaymentReconciled>) {
-    const { userId, amount, currencyCode } = event.payload
+    const { userId, amount } = event.payload
+    const currencyCode = amount.currency_code
 
     try {
       // Example: touch a materialized counter (stub — real table would be seller_metrics)

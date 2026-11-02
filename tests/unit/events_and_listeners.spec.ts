@@ -15,7 +15,7 @@ test.group('Domain Events & Listeners', () => {
       userId: 'usr_01K5ZQ7T9V0M8ZK5N7YQ2W4X6B',
       customerId: 'cus_01K5ZQ7T9V0M8ZK5N7YQ2W4X6C',
       currencyCode: 'USD',
-      totalAmount: '289.99',
+      grandTotal: { currency_code: 'USD', amount: 289.99 },
       marketplaceCode: 'amazon',
       sellerAccountId: 'sacc_01K5ZQ7T9V0M8ZK5N7YQ2W4X6D',
       requestId: 'req_01K5ZQ7T9V0M8ZK5N7YQ2W4X6E',
@@ -24,7 +24,8 @@ test.group('Domain Events & Listeners', () => {
     const event = new OrderPlaced(payload)
     assert.deepEqual(event.payload, payload)
     assert.equal(event.payload.orderId, 'ord_01K5ZQ7T9V0M8ZK5N7YQ2W4X6A')
-    assert.equal(event.payload.totalAmount, '289.99')
+    assert.deepEqual(event.payload.grandTotal, { currency_code: 'USD', amount: 289.99 })
+    assert.equal(event.payload.grandTotal.currency_code, event.payload.currencyCode)
   })
 
   test('OrderStatusChanged event tracks state transitions and acting user', ({ assert }) => {
@@ -83,13 +84,12 @@ test.group('Domain Events & Listeners', () => {
       financialTransactionId: 'ftx_01K5ZQ7T9V0M8ZK5N7YQ2W4X6H',
       userId: 'usr_01K5ZQ7T9V0M8ZK5N7YQ2W4X6B',
       status: 'settled',
-      amount: '1240.50',
-      currencyCode: 'USD',
+      amount: { currency_code: 'USD', amount: 1240.5 },
     }
 
     const event = new PaymentReconciled(payload)
     assert.equal(event.payload.status, 'settled')
-    assert.equal(event.payload.amount, '1240.50')
+    assert.deepEqual(event.payload.amount, { currency_code: 'USD', amount: 1240.5 })
   })
 
   test('UserOnboarded event contains user identity and authorizer information', ({ assert }) => {
@@ -116,7 +116,7 @@ test.group('Domain Events & Listeners', () => {
       userId: 'usr_123',
       customerId: 'cus_123',
       currencyCode: 'USD',
-      totalAmount: '100.00',
+      grandTotal: { currency_code: 'USD', amount: 100 },
       marketplaceCode: 'direct',
       sellerAccountId: null,
     })

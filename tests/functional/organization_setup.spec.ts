@@ -10,7 +10,6 @@ async function makeUser(email: string, isSuperAdmin = false) {
   return User.create({
     email,
     fullName: 'Operator',
-    companyName: 'Same company',
     password: 'Password123!',
     status: 'active',
     isSuperAdmin,
@@ -37,6 +36,8 @@ test.group('Organization membership setup', () => {
       .where('isPersonal', true)
       .firstOrFail()
     assert.notEqual(personal.id, otherPersonal.id)
+    // Entity ids are ULID-compatible (optional lowercase prefix + 26 chars).
+    assert.match(personal.id, /^org_[0-9A-HJKMNP-TV-Z]{26}$/)
     const role = await Role.create({
       name: `Operator ${n}`,
       slug: `operator-${n}`,

@@ -82,13 +82,8 @@ type GeneratedProductPreview = {
   structuredBaseCode: string
   structuredCode?: string
   title: string
-  title75?: string
-  title80?: string
   subTitle: string
-  subTitle125?: string
   description: string
-  shortDescription: string
-  extendedDescription: string
   categoryId: string | null
   categoryName: string
   categoryHandle: string
@@ -182,17 +177,11 @@ export default function Catalogs({
     fileName: '',
     status: 'draft',
     title: '',
-    title75: '',
-    title80: '',
     subTitle: '',
-    subTitle125: '',
     productType: 'Duster Coat',
     categoryHandle: 'mens/apparel/outerwear/coats/duster-coats',
     resolvedCategoryId: '',
     genderCode: 'M',
-    categoryCode: 'CT',
-    productCode: 'DC',
-    fitCode: 'RG',
     lengthCode: 'MX',
     leatherCode: 'NP',
     priceTierCode: '01',
@@ -225,8 +214,6 @@ export default function Catalogs({
     ageGroup: 'adult',
     careInstructions: 'Professional Leather Clean Only',
     description: '',
-    shortDescription: '',
-    extendedDescription: '',
     featuresLines:
       'PREMIUM LAMBSKIN LEATHER: Crafted from supple 100% real lambskin leather\nICONIC DUSTER DESIGN & FIT: Full-length western duster silhouette\nCLASSIC BUTTON CLOSURE: Durable matte hardware with storm flap\nVERSATILE COLLAR & POCKETS: Multi-pocket interior & exterior storage',
     keywordsLines:
@@ -297,17 +284,11 @@ export default function Catalogs({
       fileName: `MJKBK${seq}-BLK-NP-SL`,
       status: 'draft',
       title: '',
-      title75: '',
-      title80: '',
       subTitle: '',
-      subTitle125: '',
       productType: 'Biker Jacket',
       categoryHandle: 'men/outerwear/jackets/biker-motorcycle',
       resolvedCategoryId: '',
       genderCode: 'M',
-      categoryCode: 'JK',
-      productCode: 'BK',
-      fitCode: 'SL',
       lengthCode: 'XX',
       leatherCode: 'NP',
       priceTierCode: '02',
@@ -340,10 +321,6 @@ export default function Catalogs({
       ageGroup: 'adult',
       careInstructions: 'Professional Leather Clean Only',
       description: 'Premium handcrafted genuine lambskin leather motorcycle jacket.',
-      shortDescription:
-        'Handcrafted 100% genuine lambskin leather biker jacket with YKK zippers and quilted lining.',
-      extendedDescription:
-        '✨ Premium Genuine Lambskin Leather — tailored for durability, comfort, and timeless moto style.',
       featuresLines:
         '100% Genuine Lambskin Leather\nHeavy-Duty YKK Zippers\nInterior & Exterior Security Pockets\nBreathable Quilted Liner',
       keywordsLines: 'biker leather jacket; mens motorcycle jacket; lambskin moto jacket',
@@ -378,17 +355,11 @@ export default function Catalogs({
       fileName: String(item.fileName ?? ''),
       status: String(item.status ?? 'draft'),
       title: String(item.title ?? ''),
-      title75: String(item.title75 ?? item.title ?? ''),
-      title80: String(item.title80 ?? item.title ?? ''),
       subTitle: String(item.subTitle ?? ''),
-      subTitle125: String(item.subTitle125 ?? item.subTitle ?? ''),
       productType: String(item.productType ?? item.type ?? 'Duster Coat'),
       categoryHandle: String(item.categoryHandle ?? 'men/outerwear/coats/duster'),
       resolvedCategoryId: String(item.resolvedCategoryId ?? ''),
       genderCode: String(item.genderCode ?? 'M'),
-      categoryCode: String(item.categoryCode ?? 'CT'),
-      productCode: String(item.productCode ?? 'DC'),
-      fitCode: String(item.fitCode ?? 'RG'),
       lengthCode: String(item.lengthCode ?? 'MX'),
       leatherCode: String(item.leatherCode ?? item.materialCode ?? 'NP'),
       priceTierCode: String(item.priceTierCode ?? item.priceTier ?? '01'),
@@ -422,8 +393,6 @@ export default function Catalogs({
       ageGroup: String(attrs.age_group ?? 'adult'),
       careInstructions: String(attrs.care_instructions ?? 'Professional Leather Clean Only'),
       description: String(item.description ?? ''),
-      shortDescription: String(item.shortDescription ?? ''),
-      extendedDescription: String(item.extendedDescription ?? ''),
       featuresLines: Array.isArray(attrs.bullets)
         ? attrs.bullets.join('\n')
         : Array.isArray(item.features)
@@ -1308,7 +1277,7 @@ export default function Catalogs({
                             {String(item.title)}
                           </div>
                           <div className="text-muted-foreground line-clamp-1 mt-0.5">
-                            {String(item.subTitle || item.shortDescription || '—')}
+                            {String(item.subTitle || '—')}
                           </div>
                           <div className="text-[11px] font-mono text-muted-foreground mt-1">
                             /{String(item.categoryHandle ?? '')}
@@ -1447,25 +1416,11 @@ export default function Catalogs({
                   1. Parent Product Metadata (Brand-Agnostic)
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
+                  <div className="md:col-span-2">
                     <AppInput
-                      label="Product Title (60c)"
+                      label="Product Title (channel caps applied at publish)"
                       value={previewData.title}
                       onChange={(e) => setPreviewData({ ...previewData, title: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <AppInput
-                      label="Title 75 (Etsy / Amazon)"
-                      value={previewData.title75 ?? previewData.title}
-                      onChange={(e) => setPreviewData({ ...previewData, title75: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <AppInput
-                      label="Title 80 (eBay)"
-                      value={previewData.title80 ?? previewData.title}
-                      onChange={(e) => setPreviewData({ ...previewData, title80: e.target.value })}
                     />
                   </div>
                   <div>
@@ -1507,22 +1462,13 @@ export default function Catalogs({
                       onChange={(e) => setPreviewData({ ...previewData, subTitle: e.target.value })}
                     />
                   </div>
-                  <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="md:col-span-3">
                     <AppTextarea
-                      label="SEO Description"
-                      rows={2}
+                      label="SEO Description (the single canonical copy)"
+                      rows={3}
                       value={previewData.description}
                       onChange={(e) =>
                         setPreviewData({ ...previewData, description: e.target.value })
-                      }
-                    />
-                    <AppTextarea
-                      label="Short Description (Amazon <=500c)"
-                      maxChars={500}
-                      rows={2}
-                      value={previewData.shortDescription}
-                      onChange={(e) =>
-                        setPreviewData({ ...previewData, shortDescription: e.target.value })
                       }
                     />
                   </div>
@@ -1765,32 +1711,12 @@ export default function Catalogs({
                       placeholder="Men's Black Lambskin Leather Duster Coat"
                     />
                   </div>
-                  <AppInput
-                    label="Title 75 (Max 75 chars — Etsy / Amazon)"
-                    maxLength={75}
-                    value={formState.title75}
-                    onChange={(e) => setFormState({ ...formState, title75: e.target.value })}
-                  />
-                  <AppInput
-                    label="Title 80 (Max 80 chars — eBay)"
-                    maxLength={80}
-                    value={formState.title80}
-                    onChange={(e) => setFormState({ ...formState, title80: e.target.value })}
-                  />
                   <div className="sm:col-span-2">
                     <AppInput
                       label="Subtitle (Max 60 chars)"
                       maxLength={60}
                       value={formState.subTitle}
                       onChange={(e) => setFormState({ ...formState, subTitle: e.target.value })}
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <AppInput
-                      label="Extended Subtitle 125 (Max 125 chars)"
-                      maxLength={125}
-                      value={formState.subTitle125}
-                      onChange={(e) => setFormState({ ...formState, subTitle125: e.target.value })}
                     />
                   </div>
                 </div>
@@ -1846,35 +1772,6 @@ export default function Catalogs({
                     ]}
                   />
                   <AppSelect
-                    label="Category Code"
-                    value={formState.categoryCode}
-                    onChange={(e) => setFormState({ ...formState, categoryCode: e.target.value })}
-                    options={[
-                      { value: 'CT', label: 'CT — Coat' },
-                      { value: 'JK', label: 'JK — Jacket' },
-                      { value: 'BZ', label: 'BZ — Blazer' },
-                      { value: 'VS', label: 'VS — Vest' },
-                      { value: 'SH', label: 'SH — Shirt' },
-                      { value: 'TS', label: 'TS — T-Shirt' },
-                      { value: 'PT', label: 'PT — Pants' },
-                      { value: 'TR', label: 'TR — Trouser' },
-                      { value: 'SR', label: 'SR — Shorts' },
-                      { value: 'SK', label: 'SK — Skirt' },
-                      { value: 'FW', label: 'FW — Footwear' },
-                      { value: 'BG', label: 'BG — Bags' },
-                      { value: 'HD', label: 'HD — Home Decor' },
-                      { value: 'AC', label: 'AC — Accessories' },
-                    ]}
-                  />
-                  <AppInput
-                    label="Product Sub-Type Code (2-Letter)"
-                    value={formState.productCode}
-                    onChange={(e) =>
-                      setFormState({ ...formState, productCode: e.target.value.toUpperCase() })
-                    }
-                    placeholder="DC, BK, CF, BM, OC..."
-                  />
-                  <AppSelect
                     label="Material / Leather Code"
                     value={formState.leatherCode}
                     onChange={(e) => setFormState({ ...formState, leatherCode: e.target.value })}
@@ -1887,18 +1784,6 @@ export default function Catalogs({
                       { value: 'CW', label: 'CW — Cowhide' },
                       { value: 'GT', label: 'GT — Goat Leather' },
                       { value: 'BF', label: 'BF — Buffalo Leather' },
-                    ]}
-                  />
-                  <AppSelect
-                    label="Fit Code"
-                    value={formState.fitCode}
-                    onChange={(e) => setFormState({ ...formState, fitCode: e.target.value })}
-                    options={[
-                      { value: 'RG', label: 'RG — Regular Fit' },
-                      { value: 'SL', label: 'SL — Slim Fit' },
-                      { value: 'RL', label: 'RL — Relaxed Fit' },
-                      { value: 'TF', label: 'TF — Tailored Fit' },
-                      { value: 'XX', label: 'XX — Not Applicable' },
                     ]}
                   />
                   <AppSelect
@@ -2078,24 +1963,6 @@ export default function Catalogs({
                     rows={3}
                     value={formState.description}
                     onChange={(e) => setFormState({ ...formState, description: e.target.value })}
-                  />
-                  <AppTextarea
-                    label="Short Description (Amazon <=500 chars)"
-                    maxChars={500}
-                    rows={3}
-                    value={formState.shortDescription}
-                    onChange={(e) =>
-                      setFormState({ ...formState, shortDescription: e.target.value })
-                    }
-                  />
-                  <AppTextarea
-                    label="Extended Description (eBay & Etsy <=3000 chars)"
-                    maxChars={3000}
-                    rows={3}
-                    value={formState.extendedDescription}
-                    onChange={(e) =>
-                      setFormState({ ...formState, extendedDescription: e.target.value })
-                    }
                   />
                   <AppTextarea
                     label="Bullet Points (1 per line)"
@@ -2323,18 +2190,6 @@ export default function Catalogs({
             <div className="rounded-xl border border-card-border bg-muted/20 p-4 space-y-2">
               <div className="font-bold text-foreground">Descriptions</div>
               <p className="text-muted-foreground">{String(detailDrawerItem.description)}</p>
-              {detailDrawerItem.shortDescription && (
-                <p className="text-muted-foreground border-t border-divider pt-2">
-                  <strong>Amazon Short Description:</strong>{' '}
-                  {String(detailDrawerItem.shortDescription)}
-                </p>
-              )}
-              {detailDrawerItem.extendedDescription && (
-                <p className="text-muted-foreground border-t border-divider pt-2">
-                  <strong>eBay / Etsy Extended Description:</strong>{' '}
-                  {String(detailDrawerItem.extendedDescription)}
-                </p>
-              )}
             </div>
 
             <div className="rounded-xl border border-card-border bg-muted/20 p-4 space-y-2">

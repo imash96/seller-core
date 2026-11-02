@@ -10,6 +10,7 @@ import { RbacService } from '../services/rbac_service.js'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createCustomerValidator, updateCustomerValidator } from '#validators/operations'
 import { RiskReviewStatus } from '../enums/index.js'
+import { amountOf, money, normalizePriceMoney } from '../types/price.js'
 
 export default class CustomersController {
   async index({ auth, inertia }: HttpContext) {
@@ -45,11 +46,9 @@ export default class CustomersController {
       email: payload.email ?? null,
       proxyEmail: payload.proxyEmail ?? null,
       phone: payload.phone ?? null,
-      preferredCurrency: payload.preferredCurrency || 'USD',
       riskLevel: payload.riskLevel || 'low',
       ordersCount: 0,
-      totalSpent: '0.00',
-      isRepeatCustomer: false,
+      totalSpent: money(0, user.defaultCurrency || 'USD'),
       riskScore: 0,
       metadata: {},
     })
@@ -178,10 +177,13 @@ export default class CustomersController {
 
       target.useTransaction(trx)
       target.ordersCount = Number(target.ordersCount || 0) + Number(source.ordersCount || 0)
-      target.totalSpent = (Number(target.totalSpent || 0) + Number(source.totalSpent || 0)).toFixed(
-        2
+      // Lifetime spend is a self-contained PriceMoney; merge into the target's currency.
+      const targetCurrency = target.totalSpent?.currency_code || user.defaultCurrency || 'USD'
+      target.totalSpent = money(
+        amountOf(normalizePriceMoney(target.totalSpent, targetCurrency)) +
+          amountOf(normalizePriceMoney(source.totalSpent, targetCurrency)),
+        targetCurrency
       )
-      target.isRepeatCustomer = target.ordersCount > 1
       await target.save()
 
       source.useTransaction(trx)

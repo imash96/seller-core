@@ -2,7 +2,7 @@ import User from '#models/user'
 import Role from '#models/role'
 import ModuleEntitlement from '#models/module_entitlement'
 import AuditLog from '#models/audit_log'
-import UserSession from '#models/user_session'
+import { SessionRegistryService } from './session_registry_service.js'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import { PermissionEffect, UserStatus } from '../enums/index.js'
@@ -245,13 +245,8 @@ export class RbacService {
       target.status = UserStatus.SUSPENDED
       await target.save()
 
-      await UserSession.query({ client: trx })
-        .where('userId', target.id)
-        .andWhere('isRevoked', false)
-        .update({
-          isRevoked: true,
-          revokedAt: DateTime.now().toSQL(),
-        })
+      // Suspension kills every live session of the user in one statement.
+      const revokedSessions = await SessionRegistryService.revokeAllForUser(target.id, trx)
 
       const audit = new AuditLog()
       audit.useTransaction(trx)
@@ -264,7 +259,7 @@ export class RbacService {
       audit.ipAddress = context?.ipAddress ?? null
       audit.beforeState = { status: previousStatus }
       audit.afterState = { status: target.status, reason }
-      audit.metadata = { sessionsRevoked: true }
+      audit.metadata = { sessionsRevoked: revokedSessions }
       await audit.save()
 
       return target

@@ -3,6 +3,7 @@ import { ListingTransformerService } from '../../app/services/listing_transforme
 import Product from '../../app/models/product.js'
 import ProductVariant from '../../app/models/product_variant.js'
 import Brand from '../../app/models/brand.js'
+import { buildMultiCurrencyPriceArray, money } from '../../app/types/price.js'
 
 test.group('Listing Transformer Service', () => {
   function createSampleData() {
@@ -34,8 +35,10 @@ test.group('Listing Transformer Service', () => {
     variant.productId = product.id
     variant.sku = 'MJKBK01-BLK-NP-SL-M'
     variant.title = "Men's Vintage Leather Biker Jacket - Black / Medium"
-    variant.retailPrice = '249.99'
-    variant.currencyCode = 'USD'
+    variant.prices = buildMultiCurrencyPriceArray(249.99)
+    variant.costPrice = money(74.5, 'USD')
+    variant.manufacturingCost = money(12, 'USD')
+    variant.packagingCost = money(3, 'USD')
     variant.stockOnHand = 50
     variant.attributes = {
       color: 'Black',

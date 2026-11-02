@@ -70,27 +70,63 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
   const [page, setPage] = useState(1)
   const pageSize = 10
 
+  // Raw marketplace payload — the importer auto-detects Amazon / eBay / Etsy /
+  // MedusaJS / canonical Seller Core JSON per record.
   const sampleJson = JSON.stringify(
     [
       {
-        orderNumber: 'AMZ-2026-901',
+        payload: {
+          Orders: [
+            {
+              AmazonOrderId: '902-8324761-1234567',
+              MarketplaceId: 'ATVPDKIKX0DER',
+              PurchaseDate: '2026-02-11T14:22:31Z',
+              OrderStatus: 'Unshipped',
+              FulfillmentChannel: 'AFN',
+              OrderTotal: { Amount: '857.83', CurrencyCode: 'USD' },
+              TaxCollection: { Model: 'MarketplaceFacilitator' },
+              LatestShipDate: '2026-02-14T23:59:59Z',
+              ShippingAddress: {
+                Name: 'Priya Nair',
+                AddressLine1: '221B Marine Drive',
+                City: 'Mumbai',
+                StateOrRegion: 'MH',
+                PostalCode: '400020',
+                CountryCode: 'IN',
+              },
+              BuyerInfo: { BuyerEmail: 'buyer@marketplace.amazon.com' },
+            },
+          ],
+        },
+        orderItemsPayload: {
+          payload: {
+            OrderItems: [
+              {
+                ASIN: 'B09ASTRYX1',
+                SellerSKU: 'MCTDC01-BLK-NP-RG-M',
+                OrderItemId: 'OI-1',
+                Title: 'Leather Duster Coat',
+                QuantityOrdered: 1,
+                ItemPrice: { Amount: '750.00', CurrencyCode: 'USD' },
+                ItemTax: { Amount: '60.00', CurrencyCode: 'USD' },
+                ShippingPrice: { Amount: '40.00', CurrencyCode: 'USD' },
+                ShippingTax: { Amount: '7.83', CurrencyCode: 'USD' },
+              },
+            ],
+          },
+        },
+      },
+      {
+        orderNumber: 'ORD-CANON-901',
         externalOrderId: 'EXT-901',
-        customerFullName: 'Jane Doe',
+        customer: { fullName: 'Jane Doe', email: 'jane@example.com' },
         currencyCode: 'USD',
         lines: [
-          {
-            sku: 'MCTDC01-BLK-NP-RG-M',
-            title: 'Leather Duster Coat',
-            quantityOrdered: 1,
-            currencyCode: 'USD',
-            unitPrice: 239.99,
-          },
           {
             sku: 'MJKBK03-BLK-NP-SL-L',
             title: 'Moto Biker Jacket',
             quantityOrdered: 1,
-            currencyCode: 'USD',
-            unitPrice: 259.99,
+            unitPrice: { currency_code: 'USD', amount: 259.99 },
           },
         ],
       },
@@ -127,7 +163,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
       if (statusFilter !== 'all' && String(o.status) !== statusFilter) return false
-      if (channelFilter !== 'all' && String(o.marketplaceCode) !== channelFilter) return false
+      if (channelFilter !== 'all' && String(o.channelCode) !== channelFilter) return false
 
       const cust = (o.customer as Row) ?? {}
       if (customerSegmentFilter === 'repeat') {
@@ -148,7 +184,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
         const hay = [
           o.orderNumber,
           o.externalOrderId,
-          o.marketplaceCode,
+          o.channelCode,
           cust.fullName,
           cust.email,
           ...((o.lineItems as Row[]) ?? []).map((li) => `${li.sku} ${li.title}`),
@@ -451,7 +487,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
             })),
           },
           {
-            name: 'marketplaceCode',
+            name: 'channelCode',
             label: 'Marketplace',
             kind: 'select',
             default: 'direct',
@@ -461,7 +497,58 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
               { value: 'amazon', label: 'Amazon' },
               { value: 'ebay', label: 'eBay' },
               { value: 'etsy', label: 'Etsy' },
+              { value: 'medusa', label: 'MedusaJS' },
             ],
+          },
+          {
+            name: 'externalDisplayId',
+            label: 'External display ID (Amazon SellerOrderId / eBay legacyOrderId)',
+            section: '1. Order & Channel',
+          },
+          {
+            name: 'marketplaceSiteId',
+            label: 'Marketplace site ID (MarketplaceId / shop_id / region_id)',
+            section: '1. Order & Channel',
+          },
+          {
+            name: 'fulfillmentChannel',
+            label: 'Fulfilment channel',
+            kind: 'select',
+            default: 'MFN',
+            section: '1. Order & Channel',
+            options: [
+              { value: 'MFN', label: 'MFN — merchant fulfilled' },
+              { value: 'AFN', label: 'AFN — Amazon fulfilled' },
+              { value: 'FBA', label: 'FBA' },
+              { value: 'FBM', label: 'FBM' },
+              { value: '3PL', label: '3PL' },
+              { value: 'direct', label: 'Direct (own webstore)' },
+            ],
+          },
+          {
+            name: 'taxCollectionModel',
+            label: 'Tax collection model',
+            kind: 'select',
+            default: 'seller',
+            section: '1. Order & Channel',
+            options: [
+              { value: 'seller', label: 'Seller remits tax' },
+              {
+                value: 'marketplace_facilitator',
+                label: 'Marketplace facilitator (Amazon/eBay/Etsy remit)',
+              },
+              { value: 'none', label: 'No tax collected' },
+            ],
+          },
+          {
+            name: 'latestShipAt',
+            label: 'Ship-by deadline (ISO 8601)',
+            section: '1. Order & Channel',
+          },
+          {
+            name: 'latestDeliveryAt',
+            label: 'Deliver-by deadline (ISO 8601)',
+            section: '1. Order & Channel',
           },
           {
             name: 'currencyCode',
@@ -543,35 +630,35 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
             section: '3. Line Item & P&L Economics',
           },
           {
-            name: 'unitCostAmount',
+            name: 'unitCost',
             label: 'Unit COGS',
             kind: 'number',
             default: '0',
             section: '3. Line Item & P&L Economics',
           },
           {
-            name: 'taxAmount',
+            name: 'taxTotal',
             label: 'Tax',
             kind: 'number',
             default: '0',
             section: '3. Line Item & P&L Economics',
           },
           {
-            name: 'discountAmount',
+            name: 'discountTotal',
             label: 'Discount',
             kind: 'number',
             default: '0',
             section: '3. Line Item & P&L Economics',
           },
           {
-            name: 'shippingChargedAmount',
+            name: 'shippingTotal',
             label: 'Shipping charged to buyer',
             kind: 'number',
             default: '0',
             section: '3. Line Item & P&L Economics',
           },
           {
-            name: 'shippingCostAmount',
+            name: 'shippingCostTotal',
             label: 'Actual shipping cost',
             kind: 'number',
             default: '0',
@@ -585,15 +672,14 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
         isOpen={bulkOpen}
         onOpenChange={setBulkOpen}
         title="Idempotent Bulk Order Import (JSON)"
-        subtitle="Deduplicates on (seller_account_id, external_order_id) and creates OrderPrice, OrderLineItemPrice, and SyncJob records."
+        subtitle="Paste raw Amazon SP-API / eBay Fulfillment / Etsy v3 / MedusaJS v2 payloads or canonical Seller Core JSON. The platform is auto-detected per record; imports dedupe on (seller_account_id, external_order_id) and record per-record failures in sync_job_errors."
         submitLabel="Run Import Batch"
         action="/orders/bulk-import"
         presetActions={[
           {
-            label: 'Load Sample Multi-Item JSON',
+            label: 'Load Sample Marketplace Payloads',
             values: {
               idempotencyKey: 'batch-orders-2026-01',
-              marketplaceCode: 'amazon',
               ordersJson: sampleJson,
             },
           },
@@ -604,19 +690,6 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
             label: 'Idempotency key',
             default: 'batch-orders-2026-01',
             required: true,
-          },
-          {
-            name: 'marketplaceCode',
-            label: 'Marketplace code',
-            kind: 'select',
-            default: 'amazon',
-            required: true,
-            options: [
-              { value: 'amazon', label: 'Amazon' },
-              { value: 'ebay', label: 'eBay' },
-              { value: 'etsy', label: 'Etsy' },
-              { value: 'direct', label: 'Direct' },
-            ],
           },
           {
             name: 'sellerAccountId',

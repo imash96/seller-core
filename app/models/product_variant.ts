@@ -1,8 +1,9 @@
 /**
  * ProductVariant — maps to "product_variants".
- * Sellable SKU entity referenced by order lines, channel listings and inventory.
- * Exposes multi-currency `prices: Array<{ currency_code: string, amount: number }>`
- * and `{ currency_code, amount }` objects for every price/cost field.
+ *
+ * Sellable SKU entity referenced by order lines, channel listings and
+ * inventory. Prices are a MedusaJS v2 multi-currency array; every cost field is
+ * a self-contained `PriceMoney` object that may be booked in its own currency.
  */
 import { belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
@@ -11,19 +12,26 @@ import ChannelListing from './channel_listing.js'
 import OrderLineItem from './order_line_item.js'
 import Product from './product.js'
 import ProductVariantAttribute from './product_variant_attribute.js'
-import ProductVariantPrice from './product_variant_price.js'
 import { prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
 import {
+  type MedusaVariantPrice,
   type PriceMoney,
-  buildMultiCurrencyPriceArray,
-  normalizePriceMoney,
-  normalizePriceMoneyArray,
+  amountOf,
+  multiplyMoney,
 } from '../types/price.js'
 
 export default class ProductVariant extends AppBaseModel {
   static readonly table = 'product_variants'
   static readonly idPrefix = 'pvar'
+
+  static override readonly moneyColumns = [
+    'costPrice',
+    'manufacturingCost',
+    'packagingCost',
+  ] as const
+
+  static override readonly priceArrayColumns = ['prices'] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -52,23 +60,18 @@ export default class ProductVariant extends AppBaseModel {
   @column({ columnName: 'attributes', prepare: prepareJson })
   declare public attributes: any
 
-  @column({ columnName: 'currency_code' })
-  declare public currencyCode: string
+  /** MedusaJS v2 multi-currency price array. */
+  @column({ columnName: 'prices', prepare: prepareJson })
+  declare public prices: MedusaVariantPrice[]
 
-  @column({ columnName: 'retail_price' })
-  declare public retailPrice: string
+  @column({ columnName: 'cost_price', prepare: prepareJson })
+  declare public costPrice: PriceMoney
 
-  @column({ columnName: 'compare_at_price' })
-  declare public compareAtPrice: string | null
+  @column({ columnName: 'manufacturing_cost', prepare: prepareJson })
+  declare public manufacturingCost: PriceMoney
 
-  @column({ columnName: 'cost_price' })
-  declare public costPrice: string
-
-  @column({ columnName: 'manufacturing_cost' })
-  declare public manufacturingCost: string
-
-  @column({ columnName: 'packaging_cost' })
-  declare public packagingCost: string
+  @column({ columnName: 'packaging_cost', prepare: prepareJson })
+  declare public packagingCost: PriceMoney
 
   @column({ columnName: 'stock_on_hand' })
   declare public stockOnHand: number
@@ -107,52 +110,34 @@ export default class ProductVariant extends AppBaseModel {
   @hasMany(() => ProductVariantAttribute, { foreignKey: 'productVariantId' })
   declare public variantAttributes: HasMany<typeof ProductVariantAttribute>
 
-  @hasMany(() => ProductVariantPrice, { foreignKey: 'productVariantId' })
-  declare public priceRecords: HasMany<typeof ProductVariantPrice>
-
   @hasMany(() => ChannelListing, { foreignKey: 'productVariantId' })
   declare public listings: HasMany<typeof ChannelListing>
 
   @hasMany(() => OrderLineItem, { foreignKey: 'productVariantId' })
   declare public orderLineItems: HasMany<typeof OrderLineItem>
 
-  override serialize(): Record<string, any> {
-    const raw = super.serialize()
-    const baseCur = (this.currencyCode || 'USD').toUpperCase()
-    const retailNum = Number(this.retailPrice ?? 0)
-    const attrs = (this.attributes ?? {}) as Record<string, any>
+  /** stock_on_hand × unit cost, in the cost currency. */
+  get inventoryValue(): PriceMoney {
+    return multiplyMoney(this.costPrice, Number(this.stockOnHand ?? 0))
+  }
 
-    let prices: PriceMoney[] = []
-    if (Array.isArray(this.priceRecords) && this.priceRecords.length > 0) {
-      prices = this.priceRecords.map((pr) => ({
-        currency_code: (pr.currencyCode || baseCur).toUpperCase(),
-        amount: Number(Number(pr.amount ?? 0).toFixed(2)),
-      }))
-    } else if (Array.isArray(attrs.prices) && attrs.prices.length > 0) {
-      prices = normalizePriceMoneyArray(attrs.prices, retailNum, baseCur)
-    } else {
-      prices = buildMultiCurrencyPriceArray(retailNum || 239.99)
-    }
+  /** Total landed unit cost = unit + manufacturing + packaging (USD basis). */
+  get landedUnitCostAmount(): number {
+    return (
+      amountOf(this.costPrice) + amountOf(this.manufacturingCost) + amountOf(this.packagingCost)
+    )
+  }
 
-    const costNum = Number(this.costPrice ?? 0)
-    const mfgNum = Number(this.manufacturingCost ?? 0)
-    const pkgNum = Number(this.packagingCost ?? 0)
-    const compareNum =
-      this.compareAtPrice !== null
-        ? Number(this.compareAtPrice)
-        : Number((retailNum * 1.18).toFixed(2))
-    const stockValNum = Number((costNum * Number(this.stockOnHand ?? 0)).toFixed(2))
-
+  override serialize(cherryPick?: any): Record<string, any> {
+    const raw = super.serialize(cherryPick)
+    const prices = Array.isArray(raw.prices) ? raw.prices : []
+    // `price` is a MedusaJS-compatible alias of the same price array — never a
+    // bare number, so no amount can be read without its currency code.
     return {
       ...raw,
-      price: prices,
       prices,
-      retailPriceMoney: normalizePriceMoney(retailNum, baseCur),
-      compareAtPriceMoney: normalizePriceMoney(compareNum, baseCur),
-      costPriceMoney: normalizePriceMoney(costNum, baseCur),
-      manufacturingCostMoney: normalizePriceMoney(mfgNum, baseCur),
-      packagingCostMoney: normalizePriceMoney(pkgNum, baseCur),
-      inventoryValueMoney: normalizePriceMoney(stockValNum, baseCur),
+      price: prices,
+      inventoryValue: multiplyMoney(raw.costPrice, Number(this.stockOnHand ?? 0)),
     }
   }
 }

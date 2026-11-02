@@ -21,12 +21,12 @@ export default class extends BaseSchema {
       table.string('carrier_code', 50).notNullable()
       table.string('carrier_name', 150).notNullable()
       table.string('invoice_number', 100).notNullable()
-      table.string('currency_code', 3).notNullable().defaultTo('USD')
-      table.decimal('subtotal_amount', 14, 2).notNullable().defaultTo(0)
-      table.decimal('tax_amount', 14, 2).notNullable().defaultTo(0)
-      table.decimal('total_amount', 14, 2).notNullable().defaultTo(0)
-      table.decimal('paid_amount', 14, 2).notNullable().defaultTo(0)
-      table.decimal('variance_amount', 14, 2).notNullable().defaultTo(0)
+      table.jsonb('subtotal_total').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('discount_total').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('tax_total').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('grand_total').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('paid_total').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('variance_total').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
       table
         .enum(
           'payment_status',
@@ -53,7 +53,22 @@ export default class extends BaseSchema {
     })
 
     this.schema.raw(
-      'ALTER TABLE shipping_invoices ADD CONSTRAINT chk_shipping_invoices_amounts_nonneg CHECK (subtotal_amount >= 0 AND tax_amount >= 0 AND total_amount >= 0 AND paid_amount >= 0)'
+      'ALTER TABLE shipping_invoices ADD CONSTRAINT chk_shipping_invoices_subtotal_total_money CHECK (is_valid_price_money(subtotal_total, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE shipping_invoices ADD CONSTRAINT chk_shipping_invoices_discount_total_money CHECK (is_valid_price_money(discount_total, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE shipping_invoices ADD CONSTRAINT chk_shipping_invoices_tax_total_money CHECK (is_valid_price_money(tax_total, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE shipping_invoices ADD CONSTRAINT chk_shipping_invoices_grand_total_money CHECK (is_valid_price_money(grand_total, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE shipping_invoices ADD CONSTRAINT chk_shipping_invoices_paid_total_money CHECK (is_valid_price_money(paid_total, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE shipping_invoices ADD CONSTRAINT chk_shipping_invoices_variance_total_money CHECK (is_valid_price_money(variance_total, true))'
     )
     this.schema.raw(
       'CREATE UNIQUE INDEX uq_shipping_invoices_user_carrier_num ON shipping_invoices (user_id, carrier_code, invoice_number)'

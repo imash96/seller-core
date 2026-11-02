@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import { Grid, VStack } from '@astryxdesign/core'
 import { Text } from '@astryxdesign/core/Text'
+import { resolvePriceMoney } from '~/lib/utils'
 
 type Props = {
   kpis: DashboardKpis
@@ -102,7 +103,7 @@ export default function Dashboard(props: Props) {
   const filteredOrders = useMemo(() => {
     if (channelFilter === 'all') return orders
     return orders.filter((o) =>
-      String(o.marketplaceCode ?? o.sellerAccountId ?? '')
+      String(o.channelCode ?? o.sellerAccountId ?? '')
         .toLowerCase()
         .includes(channelFilter.toLowerCase())
     )
@@ -113,18 +114,19 @@ export default function Dashboard(props: Props) {
     if (channelFilter === 'all') return kpis
     const usdOrders = filteredOrders.filter((o) => o.reportingCurrencyCode === 'USD')
     const rateOf = (o: Row) => Number(o.exchangeRate || 1)
-    const gross = usdOrders.reduce((s, o) => s + Number(o.reportingTotalAmount ?? 0), 0)
-    const refunded = usdOrders.reduce((s, o) => s + Number(o.refundedAmount || 0) * rateOf(o), 0)
+    // Every amount is a self-contained PriceMoney object; reporting totals are
+    // already converted to the reporting currency server-side.
+    const amount = (value: unknown) => Number(resolvePriceMoney(value, 'USD').amount || 0)
+    const gross = usdOrders.reduce((s, o) => s + amount(o.reportingTotal), 0)
+    const refunded = usdOrders.reduce((s, o) => s + amount(o.refundedTotal) * rateOf(o), 0)
     const fees = usdOrders.reduce(
       (s, o) =>
-        s +
-        (Number(o.marketplaceFeesAmount || 0) + Number(o.paymentProcessingFeesAmount || 0)) *
-          rateOf(o),
+        s + (amount(o.marketplaceFeesTotal) + amount(o.paymentProcessingFeesTotal)) * rateOf(o),
       0
     )
-    const cogs = usdOrders.reduce((s, o) => s + Number(o.cogsAmount || 0) * rateOf(o), 0)
-    const ship = usdOrders.reduce((s, o) => s + Number(o.shippingCostAmount || 0) * rateOf(o), 0)
-    const profit = usdOrders.reduce((s, o) => s + Number(o.netProfitAmount || 0) * rateOf(o), 0)
+    const cogs = usdOrders.reduce((s, o) => s + amount(o.cogsTotal) * rateOf(o), 0)
+    const ship = usdOrders.reduce((s, o) => s + amount(o.shippingCostTotal) * rateOf(o), 0)
+    const profit = usdOrders.reduce((s, o) => s + amount(o.netProfit) * rateOf(o), 0)
     return {
       ...kpis,
       totalOrders: filteredOrders.length,
@@ -147,7 +149,7 @@ export default function Dashboard(props: Props) {
   const marketplaceSegments = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const o of filteredOrders) {
-      const key = String(o.marketplaceCode ?? 'direct')
+      const key = String(o.channelCode ?? 'direct')
       counts[key] = (counts[key] ?? 0) + 1
     }
     const colors: Record<string, string> = {
@@ -458,7 +460,7 @@ export default function Dashboard(props: Props) {
                 columns={[
                   col.text('orderNumber', 'Order #', 140),
                   col.badge('status', 'Status', STATUS_TONES),
-                  col.text('marketplaceCode', 'Channel', 110),
+                  col.text('channelCode', 'Channel', 110),
                   col.money('totalAmount', 'Order Total', 'currencyCode'),
                   col.money('netProfitAmount', 'Net Profit', 'reportingCurrencyCode'),
                   col.date('orderedAt', 'Ordered At'),

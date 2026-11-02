@@ -7,13 +7,59 @@ import ChannelListing from '#models/channel_listing'
 import SellerAccount from '#models/seller_account'
 import SalesChannel from '#models/sales_channel'
 import { CategorySyncService } from './category_sync_service.js'
-import { PriceService } from './price_service.js'
 import type { ListingPlatform } from '../types/catalog_pipeline.js'
 import {
-  type PriceMoney,
+  type MedusaVariantPrice,
   buildMultiCurrencyPriceArray,
+  money,
   normalizePriceMoneyArray,
 } from '../types/price.js'
+import { resolveColorInfoFromValue, resolveSizeInfo } from '../data/catalog_config/index.js'
+
+/**
+ * Marketplace character caps applied at publish time.
+ *
+ * The product row stores one canonical `title` / `description`; every channel cap
+ * (Amazon 200, eBay 80, Etsy 140…) is applied to the generated payload instead of
+ * being persisted as a truncated duplicate column.
+ */
+const CHANNEL_TITLE_LIMITS: Partial<Record<ListingPlatform, number>> = {
+  amazon: 200,
+  ebay: 80,
+  etsy: 140,
+  medusa: 255,
+}
+
+const CHANNEL_DESCRIPTION_LIMITS: Partial<Record<ListingPlatform, number>> = {
+  amazon: 2000,
+  ebay: 3000,
+  etsy: 5000,
+  medusa: 10000,
+}
+
+/** Channel-ready title: brand-prefixed for Amazon, canonical otherwise. */
+function channelTitle(product: Product, platform: ListingPlatform, brand?: Brand): string {
+  const base =
+    platform === 'amazon' && brand ? `${brand.name} ${product.title}` : String(product.title ?? '')
+  return base.slice(0, CHANNEL_TITLE_LIMITS[platform] ?? 255)
+}
+
+/** Channel-ready description: the product's canonical description, capped. */
+function channelDescription(product: Product, platform: ListingPlatform): string {
+  return String(product.description ?? '').slice(0, CHANNEL_DESCRIPTION_LIMITS[platform] ?? 10000)
+}
+
+/** Colour name/map/code resolved from the variant's clean `color` attribute. */
+function variantColor(variant: ProductVariant) {
+  const attributes = (variant.attributes ?? {}) as Record<string, any>
+  return resolveColorInfoFromValue(String(attributes.color ?? 'Black'))
+}
+
+/** Size key/value resolved from the variant's clean `size` attribute. */
+function variantSize(variant: ProductVariant) {
+  const attributes = (variant.attributes ?? {}) as Record<string, any>
+  return resolveSizeInfo(String(attributes.size ?? 'Medium'))
+}
 
 export interface GenerateListingsParams {
   userId: string
@@ -28,20 +74,25 @@ export interface GenerateListingsParams {
   publicationStatus?: 'unpublished' | 'queued' | 'published'
 }
 
-function resolveVariantMultiCurrencyPrices(variant: ProductVariant): PriceMoney[] {
-  const retailNum = Number(variant.retailPrice || 239.99)
-  const baseCur = (variant.currencyCode || 'USD').toUpperCase()
-  if (Array.isArray(variant.priceRecords) && variant.priceRecords.length > 0) {
-    return variant.priceRecords.map((pr) => ({
-      currency_code: (pr.currencyCode || baseCur).toUpperCase(),
-      amount: Number(Number(pr.amount ?? 0).toFixed(2)),
-    }))
+/** MedusaJS v2 price array of a variant, derived from its USD price when empty. */
+function resolveVariantMultiCurrencyPrices(variant: ProductVariant): MedusaVariantPrice[] {
+  if (Array.isArray(variant.prices) && variant.prices.length > 0) {
+    return normalizePriceMoneyArray(variant.prices)
   }
-  const attrs = (variant.attributes ?? {}) as Record<string, any>
-  if (Array.isArray(attrs.prices) && attrs.prices.length > 0) {
-    return normalizePriceMoneyArray(attrs.prices, retailNum, baseCur)
-  }
-  return buildMultiCurrencyPriceArray(retailNum)
+  const fallbackUsd = Number(
+    (variant.product?.prices as MedusaVariantPrice[] | undefined)?.find(
+      (price) => price.currency_code === 'USD'
+    )?.amount ?? 239.99
+  )
+  return buildMultiCurrencyPriceArray(fallbackUsd)
+}
+
+/** USD amount of a variant price array (0 when absent). */
+function usdVariantAmount(variant: ProductVariant, prices: MedusaVariantPrice[]): number {
+  return (
+    prices.find((price) => price.currency_code === 'USD')?.amount ??
+    Number(variant.product?.prices?.[0]?.amount ?? 0)
+  )
 }
 
 export class ListingTransformerService {
@@ -158,9 +209,8 @@ export class ListingTransformerService {
     const prodQuery = Product.query()
       .where('userId', userId)
       .preload('category')
-      .preload('priceRecords')
       .preload('variants', (q) => {
-        q.preload('variantAttributes').preload('priceRecords').orderBy('createdAt', 'asc')
+        q.preload('variantAttributes').orderBy('createdAt', 'asc')
         if (Array.isArray(variantIds) && variantIds.length > 0) {
           q.whereIn('id', variantIds)
         }
@@ -224,19 +274,8 @@ export class ListingTransformerService {
                     ? (catMeta.etsy_taxonomy_id ?? '15834')
                     : (catMeta.medusaId ?? product.categoryId ?? 'medusa')
 
-            const channelTitle =
-              plat === 'ebay'
-                ? product.title80 || product.title75 || product.title
-                : plat === 'etsy'
-                  ? product.title75 || product.title80 || product.title
-                  : `${brand.name} ${product.title}`.slice(0, 200)
-
-            const channelDescription =
-              plat === 'amazon'
-                ? product.shortDescription || product.description
-                : plat === 'ebay' || plat === 'etsy'
-                  ? product.extendedDescription || product.description
-                  : product.description
+            const listingTitle = channelTitle(product, plat, brand)
+            const listingDescription = channelDescription(product, plat)
 
             for (const variant of product.variants ?? []) {
               const varPrices = resolveVariantMultiCurrencyPrices(variant)
@@ -261,22 +300,20 @@ export class ListingTransformerService {
               listing.useTransaction(trx)
               listing.userId = userId
               listing.sellerAccountId = sellerAccount.id
-              listing.productId = product.id
               listing.productVariantId = variant.id
               listing.externalListingId = existing?.externalListingId || extId
               listing.externalVariantId = variant.sku
               listing.externalSku = variant.sku
-              listing.channelTitle =
-                `${channelTitle} - ${(variant.attributes as any)?.color_name || ''} / ${(variant.attributes as any)?.size_key || ''}`.slice(
-                  0,
-                  500
-                )
-              listing.channelDescription = channelDescription ?? null
+              listing.channelTitle = `${listingTitle} - ${variantColor(variant).colorName} / ${
+                variantSize(variant).sizeKey
+              }`.slice(0, 500)
+              listing.channelDescription = listingDescription || null
               listing.channelCategoryId = String(channelCatId)
-              listing.currencyCode = varPrices[0]?.currency_code || variant.currencyCode || 'USD'
-              listing.listedPrice = Number(
-                varPrices[0]?.amount ?? variant.retailPrice ?? 239.99
-              ).toFixed(2)
+              listing.prices = varPrices
+              listing.listedPrice = money(
+                varPrices[0]?.amount ?? usdVariantAmount(variant, varPrices),
+                varPrices[0]?.currency_code ?? 'USD'
+              )
               listing.allocatedQuantity = Number(variant.stockOnHand ?? 0)
               listing.listingStatus = 'draft'
               listing.publicationStatus = publicationStatus
@@ -290,20 +327,10 @@ export class ListingTransformerService {
                 productTitle: product.title,
                 skuPrefix: product.skuPrefix,
                 categoryHandle: catMeta.handle ?? product.category?.taxonomyPath ?? null,
-                prices: varPrices,
                 variantAttributes: variant.attributes ?? {},
                 transformedPayload: skuPayload,
               }
               await listing.save()
-
-              await PriceService.syncChannelListingPrices({
-                userId,
-                channelListingId: listing.id,
-                productVariantId: variant.id,
-                prices: varPrices,
-                priceType: 'listed',
-                trx,
-              })
 
               listingsPersisted += 1
             }
@@ -389,12 +416,14 @@ export class ListingTransformerService {
     const vAttr = (variant.attributes ?? {}) as Record<string, any>
     const pMeta = (product.metadata ?? {}) as Record<string, any>
     const pAttrs = (pMeta.attributes ?? {}) as Record<string, any>
-    const colorName = String(vAttr.color_name || vAttr.color || 'Black')
-    const colorMap = String(vAttr.color_map || colorName)
-    const sizeKey = String(vAttr.size_key || vAttr.size || 'Medium')
-    const sizeVal = String(vAttr.size_value || vAttr.size_code || 'M')
-    const priceNum = Number(variant.retailPrice || 239.99)
+    const colorInfo = variantColor(variant)
+    const sizeInfo = variantSize(variant)
+    const colorName = colorInfo.colorName
+    const colorMap = colorInfo.colorMap
+    const sizeKey = sizeInfo.sizeKey
+    const sizeVal = sizeInfo.sizeValue
     const multiPrices = resolveVariantMultiCurrencyPrices(variant)
+    const priceNum = usdVariantAmount(variant, multiPrices)
     const images: string[] = Array.isArray(product.images) ? product.images : []
 
     if (platform === 'amazon') {
@@ -424,7 +453,7 @@ export class ListingTransformerService {
           variation_theme: [{ name: 'SIZE_NAME/COLOR_NAME' }],
           product_description: [
             {
-              value: (product.shortDescription || product.description || '').slice(0, 500),
+              value: channelDescription(product, 'amazon'),
               language_tag: 'en_US',
             },
           ],
@@ -459,7 +488,7 @@ export class ListingTransformerService {
           sku: variant.sku,
           condition: 'NEW',
           product: {
-            title: (product.title80 || product.title75 || product.title).slice(0, 80),
+            title: channelTitle(product, 'ebay'),
             subtitle: (product.subTitle || '').slice(0, 55) || undefined,
             brand: brand.name,
             mpn: variant.sku,
@@ -482,12 +511,9 @@ export class ListingTransformerService {
           marketplaceId: 'EBAY_US',
           format: 'FIXED_PRICE',
           categoryId: String(catMeta.ebay_category_id || '57988'),
-          listingDescription: (product.extendedDescription || product.description || '').slice(
-            0,
-            3000
-          ),
+          listingDescription: channelDescription(product, 'ebay'),
           pricingSummary: {
-            price: { currency: variant.currencyCode || 'USD', value: priceNum.toFixed(2) },
+            price: { currency: multiPrices[0]?.currency_code ?? 'USD', value: priceNum.toFixed(2) },
             multiCurrencyPrices: multiPrices,
           },
           availableQuantity: Number(variant.stockOnHand ?? 25),
@@ -501,7 +527,7 @@ export class ListingTransformerService {
         schema: 'ETSY_OPEN_API_V3',
         sku: variant.sku,
         taxonomy_id: Number(catMeta.etsy_taxonomy_id || 15834),
-        title: (product.title75 || product.title).slice(0, 140),
+        title: channelTitle(product, 'etsy'),
         brand: brand.name,
         prices: multiPrices,
         property_values: [
@@ -509,7 +535,7 @@ export class ListingTransformerService {
           { property_id: 100, property_name: 'Size', values: [sizeKey] },
         ],
         offering: {
-          price: { currency_code: variant.currencyCode || 'USD', amount: priceNum },
+          price: { currency_code: multiPrices[0]?.currency_code ?? 'USD', amount: priceNum },
           multi_currency_prices: multiPrices,
           quantity: Number(variant.stockOnHand ?? 25),
           is_enabled: true,
@@ -554,8 +580,8 @@ export class ListingTransformerService {
       const sizeSet = new Set<string>()
       for (const v of product.variants ?? []) {
         const vAttr = (v.attributes ?? {}) as Record<string, any>
-        if (vAttr.color_name || vAttr.color) colorSet.add(String(vAttr.color_name || vAttr.color))
-        if (vAttr.size_key || vAttr.size) sizeSet.add(String(vAttr.size_key || vAttr.size))
+        if (vAttr.color) colorSet.add(String(vAttr.color))
+        if (vAttr.size) sizeSet.add(String(vAttr.size))
       }
 
       const handle = `${brand.slug}-${product.skuPrefix || product.slug}-${product.title}`
@@ -565,8 +591,8 @@ export class ListingTransformerService {
 
       return {
         title: product.title,
-        subtitle: product.subTitle ?? product.subTitle125 ?? null,
-        description: product.description ?? product.shortDescription ?? '',
+        subtitle: product.subTitle ?? null,
+        description: product.description ?? '',
         handle,
         is_giftcard: false,
         discountable: true,
@@ -590,9 +616,10 @@ export class ListingTransformerService {
           { title: 'Size', values: Array.from(sizeSet) },
         ],
         variants: (product.variants ?? []).map((v) => {
-          const vAttr = (v.attributes ?? {}) as Record<string, any>
-          const colorName = String(vAttr.color_name || vAttr.color || 'Black')
-          const sizeKey = String(vAttr.size_key || vAttr.size || 'Medium')
+          const colorInfo = variantColor(v)
+          const sizeInfo = variantSize(v)
+          const colorName = colorInfo.colorName
+          const sizeKey = sizeInfo.sizeKey
           const multiPrices = resolveVariantMultiCurrencyPrices(v)
           return {
             title: `${colorName} / ${sizeKey}`,
@@ -612,12 +639,9 @@ export class ListingTransformerService {
               { option: 'Size', value: sizeKey },
             ],
             metadata: {
-              color_code: vAttr.color_code ?? 'BLK',
-              color_map: vAttr.color_map ?? colorName,
-              size_code: vAttr.size_code ?? vAttr.size_value ?? 'M',
-              size_key: sizeKey,
-              material_code: vAttr.material_code ?? 'NP',
-              fit_code: vAttr.fit_code ?? 'RG',
+              color_code: colorInfo.code,
+              color_map: colorInfo.colorMap,
+              size_code: sizeInfo.sizeValue,
             },
           }
         }),
@@ -627,11 +651,6 @@ export class ListingTransformerService {
           brand_slug: brand.slug,
           sku_prefix: product.skuPrefix,
           structured_code: meta.structuredCode ?? product.skuPrefix,
-          title_75: product.title75,
-          title_80: product.title80,
-          sub_title_125: product.subTitle125,
-          short_description: product.shortDescription,
-          extended_description: product.extendedDescription,
           pattern: meta.pattern ?? 'Solid',
           category_handle: catMeta.handle ?? meta.category_handle,
           attributes: attrs,
@@ -698,7 +717,7 @@ export class ListingTransformerService {
           variation_theme: [{ name: 'SIZE_NAME/COLOR_NAME' }],
           product_description: [
             {
-              value: (product.shortDescription || product.description || '').slice(0, 500),
+              value: channelDescription(product, 'amazon'),
               language_tag: 'en_US',
             },
           ],
@@ -731,11 +750,12 @@ export class ListingTransformerService {
           special_feature: specialFeatures.map((f) => ({ value: String(f) })),
         },
         child_variants: (product.variants ?? []).map((v) => {
-          const vAttr = (v.attributes ?? {}) as Record<string, any>
-          const colorName = String(vAttr.color_name || vAttr.color || 'Black')
-          const colorMap = String(vAttr.color_map || colorName)
-          const sizeKey = String(vAttr.size_key || vAttr.size || 'Medium')
-          const sizeVal = String(vAttr.size_value || vAttr.size_code || 'M')
+          const colorInfo = variantColor(v)
+          const sizeInfo = variantSize(v)
+          const colorName = colorInfo.colorName
+          const colorMap = colorInfo.colorMap
+          const sizeKey = sizeInfo.sizeKey
+          const sizeVal = sizeInfo.sizeValue
           const multiPrices = resolveVariantMultiCurrencyPrices(v)
 
           const imageLocators: Record<string, { media_location: string }> = {}
@@ -819,27 +839,21 @@ export class ListingTransformerService {
       const images: string[] = Array.isArray(product.images) ? product.images : []
       const groupKey = String(meta.structuredCode || product.skuPrefix || product.id)
 
-      const ebayTitle = (product.title80 || product.title75 || product.title).slice(0, 80)
-      const ebaySubtitle = (product.subTitle || product.subTitle125 || '').slice(0, 55)
-      const ebayDescription = (
-        product.extendedDescription ||
-        product.description ||
-        product.shortDescription ||
-        ''
-      ).slice(0, 3000)
+      const ebayTitle = channelTitle(product, 'ebay')
+      const ebaySubtitle = String(product.subTitle ?? '').slice(0, 55)
+      const ebayDescription = channelDescription(product, 'ebay')
 
       const colorSet = new Set<string>()
       const sizeSet = new Set<string>()
       for (const v of product.variants ?? []) {
         const vAttr = (v.attributes ?? {}) as Record<string, any>
-        if (vAttr.color_name || vAttr.color) colorSet.add(String(vAttr.color_name || vAttr.color))
-        if (vAttr.size_value || vAttr.size) sizeSet.add(String(vAttr.size_value || vAttr.size))
+        if (vAttr.color) colorSet.add(String(vAttr.color))
+        if (vAttr.size) sizeSet.add(String(vAttr.size))
       }
 
       const inventoryItems = (product.variants ?? []).map((v) => {
-        const vAttr = (v.attributes ?? {}) as Record<string, any>
-        const colorName = String(vAttr.color_name || vAttr.color || 'Black')
-        const sizeVal = String(vAttr.size_value || vAttr.size_code || 'M')
+        const colorName = variantColor(v).colorName
+        const sizeVal = variantSize(v).sizeValue
         return {
           sku: v.sku,
           locale: 'en_US',
@@ -876,8 +890,8 @@ export class ListingTransformerService {
       })
 
       const offers = (product.variants ?? []).map((v) => {
-        const priceNum = Number(v.retailPrice || 239.99)
         const multiPrices = resolveVariantMultiCurrencyPrices(v)
+        const priceNum = usdVariantAmount(v, multiPrices)
         return {
           sku: v.sku,
           marketplaceId: 'EBAY_US',
@@ -887,7 +901,7 @@ export class ListingTransformerService {
           listingDescription: ebayDescription,
           pricingSummary: {
             price: {
-              currency: v.currencyCode || 'USD',
+              currency: multiPrices[0]?.currency_code ?? 'USD',
               value: priceNum.toFixed(2),
             },
             multiCurrencyPrices: multiPrices,
@@ -952,15 +966,18 @@ export class ListingTransformerService {
         .map((m) => String(m).trim())
         .filter(Boolean)
 
-      const firstPrice = Number(product.variants?.[0]?.retailPrice ?? 239.99)
+      const firstPrice = usdVariantAmount(
+        product.variants[0],
+        resolveVariantMultiCurrencyPrices(product.variants[0])
+      )
       const totalStock = (product.variants ?? []).reduce(
         (acc, v) => acc + Number(v.stockOnHand ?? 0),
         0
       )
 
       return {
-        title: (product.title75 || product.title80 || product.title).slice(0, 140),
-        description: product.extendedDescription || product.description || '',
+        title: channelTitle(product, 'etsy'),
+        description: channelDescription(product, 'etsy'),
         price: firstPrice,
         quantity: Math.max(1, totalStock),
         who_made: 'i_did',
@@ -974,11 +991,10 @@ export class ListingTransformerService {
         brand: brand.name,
         inventory: {
           products: (product.variants ?? []).map((v) => {
-            const vAttr = (v.attributes ?? {}) as Record<string, any>
-            const colorName = String(vAttr.color_name || vAttr.color || 'Black')
-            const sizeKey = String(vAttr.size_key || vAttr.size || 'Medium')
-            const priceNum = Number(v.retailPrice || 239.99)
+            const colorName = variantColor(v).colorName
+            const sizeKey = variantSize(v).sizeKey
             const multiPrices = resolveVariantMultiCurrencyPrices(v)
+            const priceNum = usdVariantAmount(v, multiPrices)
             return {
               sku: v.sku,
               property_values: [

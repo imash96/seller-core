@@ -1,7 +1,20 @@
 /**
  * Order — maps to "orders".
- * Order header. Attaches OrderPrice records and per-field { currency_code, amount } objects
- * for every financial/amount field on the order.
+ *
+ * Order header for a multi-channel seller. Every monetary column is a
+ * self-contained `PriceMoney` JSONB object with its own `currency_code`, so one
+ * order can carry USD revenue, INR carrier cost and INR COGS side by side.
+ *
+ * Marketplace compatibility (Amazon SP-API, eBay Fulfillment API, Etsy Open API
+ * v3, MedusaJS v2):
+ *  - item taxes (`tax_total`) and shipping taxes (`shipping_tax_total`) are separate
+ *  - `marketplace_withheld_tax_total` holds marketplace-facilitator tax withheld
+ *  - discounts (`discount_total`) are distinct from promotions (`promotion_total`)
+ *  - `fulfillment_channel` records MFN / AFN / FBA / FBM / 3PL / direct fulfilment
+ *  - `tax_collection_model` records who is the deemed seller for sales tax
+ *  - `earliest_ship_at` / `latest_ship_at` / `earliest_delivery_at` /
+ *    `latest_delivery_at` hold the promised ship and delivery windows
+ *  - `channel_metadata` keeps platform flags (isPrime, etsyIsGift, medusaRegionId…)
  */
 import { belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
@@ -9,17 +22,43 @@ import type { DateTime } from 'luxon'
 import Customer from './customer.js'
 import CustomerAddress from './customer_address.js'
 import OrderLineItem from './order_line_item.js'
-import OrderPrice from './order_price.js'
 import SellerAccount from './seller_account.js'
 import Shipment from './shipment.js'
 import SyncJob from './sync_job.js'
 import { prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
-import { type PriceMoney, normalizePriceMoney } from '../types/price.js'
+import {
+  FulfillmentChannel,
+  type FulfillmentChannelValue,
+  TaxCollectionModel,
+  type TaxCollectionModelValue,
+} from '../enums/index.js'
+import { type PriceMoney, amountOf, currencyOf, sumMoney } from '../types/price.js'
 
 export default class Order extends AppBaseModel {
   static readonly table = 'orders'
   static readonly idPrefix = 'ord'
+
+  static override readonly moneyColumns = [
+    'subtotal',
+    'discountTotal',
+    'promotionTotal',
+    'shippingTotal',
+    'shippingDiscountTotal',
+    'taxTotal',
+    'shippingTaxTotal',
+    'marketplaceWithheldTaxTotal',
+    'grandTotal',
+    'marketplaceFeesTotal',
+    'paymentProcessingFeesTotal',
+    'shippingCostTotal',
+    'cogsTotal',
+    'refundedTotal',
+    'netProceeds',
+    'grossProfit',
+    'netProfit',
+    'reportingTotal',
+  ] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -42,14 +81,20 @@ export default class Order extends AppBaseModel {
   @column({ columnName: 'order_number' })
   declare public orderNumber: string
 
+  /** Amazon AmazonOrderId / eBay orderId / Etsy receipt_id / Medusa order.id. */
   @column({ columnName: 'external_order_id' })
   declare public externalOrderId: string | null
 
+  /** Human-facing platform number (Medusa display_id, eBay legacyOrderId…). */
+  @column({ columnName: 'external_display_id' })
+  declare public externalDisplayId: string | null
+
+  /** Amazon MarketplaceId / eBay marketplace id / Etsy shop_id / Medusa region_id. */
+  @column({ columnName: 'marketplace_site_id' })
+  declare public marketplaceSiteId: string | null
+
   @column({ columnName: 'source_type' })
   declare public sourceType: string
-
-  @column({ columnName: 'marketplace_code' })
-  declare public marketplaceCode: string
 
   @column({ columnName: 'status' })
   declare public status: string
@@ -63,56 +108,74 @@ export default class Order extends AppBaseModel {
   @column({ columnName: 'sync_status' })
   declare public syncStatus: string
 
-  @column({ columnName: 'currency_code' })
-  declare public currencyCode: string
+  /** MFN | AFN | FBA | FBM | 3PL | direct */
+  @column({ columnName: 'fulfillment_channel' })
+  declare public fulfillmentChannel: FulfillmentChannelValue
 
-  @column({ columnName: 'reporting_currency_code' })
-  declare public reportingCurrencyCode: string
+  /** marketplace_facilitator | seller | none */
+  @column({ columnName: 'tax_collection_model' })
+  declare public taxCollectionModel: TaxCollectionModelValue
+
+  /** Platform-specific flags (isPrime, etsyIsGift, medusaRegionId, …). */
+  @column({ columnName: 'channel_metadata', prepare: prepareJson })
+  declare public channelMetadata: Record<string, any>
 
   @column({ columnName: 'exchange_rate' })
   declare public exchangeRate: string
 
-  @column({ columnName: 'subtotal_amount' })
-  declare public subtotalAmount: string
+  @column({ columnName: 'subtotal', prepare: prepareJson })
+  declare public subtotal: PriceMoney
 
-  @column({ columnName: 'tax_amount' })
-  declare public taxAmount: string
+  @column({ columnName: 'discount_total', prepare: prepareJson })
+  declare public discountTotal: PriceMoney
 
-  @column({ columnName: 'discount_amount' })
-  declare public discountAmount: string
+  @column({ columnName: 'promotion_total', prepare: prepareJson })
+  declare public promotionTotal: PriceMoney
 
-  @column({ columnName: 'shipping_charged_amount' })
-  declare public shippingChargedAmount: string
+  @column({ columnName: 'shipping_total', prepare: prepareJson })
+  declare public shippingTotal: PriceMoney
 
-  @column({ columnName: 'total_amount' })
-  declare public totalAmount: string
+  @column({ columnName: 'shipping_discount_total', prepare: prepareJson })
+  declare public shippingDiscountTotal: PriceMoney
 
-  @column({ columnName: 'marketplace_fees_amount' })
-  declare public marketplaceFeesAmount: string
+  @column({ columnName: 'tax_total', prepare: prepareJson })
+  declare public taxTotal: PriceMoney
 
-  @column({ columnName: 'payment_processing_fees_amount' })
-  declare public paymentProcessingFeesAmount: string
+  @column({ columnName: 'shipping_tax_total', prepare: prepareJson })
+  declare public shippingTaxTotal: PriceMoney
 
-  @column({ columnName: 'shipping_cost_amount' })
-  declare public shippingCostAmount: string
+  @column({ columnName: 'marketplace_withheld_tax_total', prepare: prepareJson })
+  declare public marketplaceWithheldTaxTotal: PriceMoney
 
-  @column({ columnName: 'cogs_amount' })
-  declare public cogsAmount: string
+  @column({ columnName: 'grand_total', prepare: prepareJson })
+  declare public grandTotal: PriceMoney
 
-  @column({ columnName: 'refunded_amount' })
-  declare public refundedAmount: string
+  @column({ columnName: 'marketplace_fees_total', prepare: prepareJson })
+  declare public marketplaceFeesTotal: PriceMoney
 
-  @column({ columnName: 'net_proceeds_amount' })
-  declare public netProceedsAmount: string
+  @column({ columnName: 'payment_processing_fees_total', prepare: prepareJson })
+  declare public paymentProcessingFeesTotal: PriceMoney
 
-  @column({ columnName: 'gross_profit_amount' })
-  declare public grossProfitAmount: string
+  @column({ columnName: 'shipping_cost_total', prepare: prepareJson })
+  declare public shippingCostTotal: PriceMoney
 
-  @column({ columnName: 'net_profit_amount' })
-  declare public netProfitAmount: string
+  @column({ columnName: 'cogs_total', prepare: prepareJson })
+  declare public cogsTotal: PriceMoney
 
-  @column({ columnName: 'reporting_total_amount' })
-  declare public reportingTotalAmount: string
+  @column({ columnName: 'refunded_total', prepare: prepareJson })
+  declare public refundedTotal: PriceMoney
+
+  @column({ columnName: 'net_proceeds', prepare: prepareJson })
+  declare public netProceeds: PriceMoney
+
+  @column({ columnName: 'gross_profit', prepare: prepareJson })
+  declare public grossProfit: PriceMoney
+
+  @column({ columnName: 'net_profit', prepare: prepareJson })
+  declare public netProfit: PriceMoney
+
+  @column({ columnName: 'reporting_total', prepare: prepareJson })
+  declare public reportingTotal: PriceMoney
 
   @column({ columnName: 'shipping_address_snapshot', prepare: prepareJson })
   declare public shippingAddressSnapshot: any | null
@@ -138,8 +201,17 @@ export default class Order extends AppBaseModel {
   @column.dateTime({ columnName: 'cancelled_at' })
   declare public cancelledAt: DateTime | null
 
-  @column.dateTime({ columnName: 'delivery_notification_sent_at' })
-  declare public deliveryNotificationSentAt: DateTime | null
+  @column.dateTime({ columnName: 'earliest_ship_at' })
+  declare public earliestShipAt: DateTime | null
+
+  @column.dateTime({ columnName: 'latest_ship_at' })
+  declare public latestShipAt: DateTime | null
+
+  @column.dateTime({ columnName: 'earliest_delivery_at' })
+  declare public earliestDeliveryAt: DateTime | null
+
+  @column.dateTime({ columnName: 'latest_delivery_at' })
+  declare public latestDeliveryAt: DateTime | null
 
   @column.dateTime({ columnName: 'source_created_at' })
   declare public sourceCreatedAt: DateTime | null
@@ -171,71 +243,77 @@ export default class Order extends AppBaseModel {
   @hasMany(() => OrderLineItem, { foreignKey: 'orderId' })
   declare public lineItems: HasMany<typeof OrderLineItem>
 
-  @hasMany(() => OrderPrice, { foreignKey: 'orderId' })
-  declare public orderPrices: HasMany<typeof OrderPrice>
-
   @hasMany(() => Shipment, { foreignKey: 'orderId' })
   declare public shipments: HasMany<typeof Shipment>
 
-  override serialize(): Record<string, any> {
-    const raw = super.serialize()
-    const baseCur = (this.currencyCode || 'USD').toUpperCase()
-    const repCur = (this.reportingCurrencyCode || 'USD').toUpperCase()
+  /**
+   * Channel code, derived through `sellerAccountId → sales_channels.code`.
+   *
+   * There is deliberately no `marketplace_code` column: re-pointing a seller
+   * account at another channel must not leave stale platform strings behind.
+   * Preload `sellerAccount.salesChannel` to read it; a direct (manual) sale has no
+   * seller account and is reported as `direct`.
+   */
+  get channelCode(): string {
+    const code = (this.sellerAccount as { salesChannel?: { code?: string } } | undefined)
+      ?.salesChannel?.code
+    return typeof code === 'string' && code.length > 0 ? code : 'direct'
+  }
 
-    // Map any preloaded OrderPrice rows by field_key so each field uses its own stored currency_code
-    const byField = new Map<string, PriceMoney>()
-    if (Array.isArray(this.orderPrices)) {
-      for (const op of this.orderPrices) {
-        byField.set(op.fieldKey, {
-          currency_code: (op.currencyCode || baseCur).toUpperCase(),
-          amount: Number(Number(op.amount ?? 0).toFixed(2)),
-        })
-      }
-    }
+  /** Currency of the marketplace transaction (the grand total's currency). */
+  get currencyCode(): string {
+    return currencyOf(this.grandTotal)
+  }
 
-    const resolveField = (fieldKey: string, rawVal: unknown, fallbackCur = baseCur): PriceMoney => {
-      return byField.get(fieldKey) ?? normalizePriceMoney(rawVal, fallbackCur)
-    }
+  /** Reporting currency of the P&L roll-up. */
+  get reportingCurrencyCode(): string {
+    return currencyOf(this.reportingTotal, this.currencyCode)
+  }
 
-    const subtotalMoney = resolveField('subtotal_amount', this.subtotalAmount)
-    const taxMoney = resolveField('tax_amount', this.taxAmount)
-    const discountMoney = resolveField('discount_amount', this.discountAmount)
-    const shippingChargedMoney = resolveField('shipping_charged_amount', this.shippingChargedAmount)
-    const totalMoney = resolveField('total_amount', this.totalAmount)
-    const marketplaceFeesMoney = resolveField('marketplace_fees_amount', this.marketplaceFeesAmount)
-    const paymentProcessingFeesMoney = resolveField(
-      'payment_processing_fees_amount',
-      this.paymentProcessingFeesAmount
+  /** Net amount due from the buyer after discounts and promotions. */
+  get netSalesAmount(): number {
+    return (
+      amountOf(this.subtotal) -
+      amountOf(this.discountTotal) -
+      amountOf(this.promotionTotal) +
+      amountOf(this.shippingTotal) -
+      amountOf(this.shippingDiscountTotal)
     )
-    const shippingCostMoney = resolveField('shipping_cost_amount', this.shippingCostAmount)
-    const cogsMoney = resolveField('cogs_amount', this.cogsAmount)
-    const refundedMoney = resolveField('refunded_amount', this.refundedAmount)
-    const netProceedsMoney = resolveField('net_proceeds_amount', this.netProceedsAmount)
-    const grossProfitMoney = resolveField('gross_profit_amount', this.grossProfitAmount)
-    const netProfitMoney = resolveField('net_profit_amount', this.netProfitAmount)
-    const reportingTotalMoney = resolveField(
-      'reporting_total_amount',
-      this.reportingTotalAmount,
-      repCur
-    )
+  }
 
+  /** Facilitator + seller-collected tax actually retained on the order. */
+  get collectedTaxMoney(): PriceMoney {
+    return sumMoney([this.taxTotal, this.shippingTaxTotal], currencyOf(this.grandTotal))
+  }
+
+  /** True when the marketplace is the deemed seller and remits tax on our behalf. */
+  get isMarketplaceFacilitatedTax(): boolean {
+    return this.taxCollectionModel === TaxCollectionModel.MARKETPLACE_FACILITATOR
+  }
+
+  /** True when Amazon (AFN/FBA) or a 3PL owns inventory and shipping. */
+  get isPlatformFulfilled(): boolean {
+    return (
+      this.fulfillmentChannel === FulfillmentChannel.AFN ||
+      this.fulfillmentChannel === FulfillmentChannel.FBA ||
+      this.fulfillmentChannel === FulfillmentChannel.THIRD_PARTY_LOGISTICS
+    )
+  }
+
+  /** Latest ship-by deadline: seller commitment or promised delivery window start. */
+  get shipByDeadline(): DateTime | null {
+    return this.latestShipAt ?? this.earliestDeliveryAt ?? null
+  }
+
+  override serialize(cherryPick?: any): Record<string, any> {
+    const raw = super.serialize(cherryPick)
     return {
       ...raw,
-      subtotalMoney,
-      taxMoney,
-      discountMoney,
-      shippingChargedMoney,
-      totalMoney,
-      marketplaceFeesMoney,
-      paymentProcessingFeesMoney,
-      shippingCostMoney,
-      cogsMoney,
-      refundedMoney,
-      netProceedsMoney,
-      grossProfitMoney,
-      netProfitMoney,
-      reportingTotalMoney,
-      prices: [totalMoney, ...(repCur !== totalMoney.currency_code ? [reportingTotalMoney] : [])],
+      currencyCode: currencyOf(raw.grandTotal),
+      reportingCurrencyCode: currencyOf(raw.reportingTotal, currencyOf(raw.grandTotal)),
+      channelMetadata: raw.channelMetadata ?? {},
+      channelCode: this.channelCode,
+      shipByDeadline: this.shipByDeadline?.toISO() ?? null,
     }
   }
 }

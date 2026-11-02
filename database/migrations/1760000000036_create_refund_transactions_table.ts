@@ -46,12 +46,23 @@ export default class extends BaseSchema {
         })
         .notNullable()
         .defaultTo('processed')
-      table.string('currency_code', 3).notNullable().defaultTo('USD')
-      table.decimal('items_refund_amount', 14, 2).notNullable().defaultTo(0)
-      table.decimal('shipping_refund_amount', 14, 2).notNullable().defaultTo(0)
-      table.decimal('tax_refund_amount', 14, 2).notNullable().defaultTo(0)
-      table.decimal('restocking_fee_deducted', 14, 2).notNullable().defaultTo(0)
-      table.decimal('total_refund_amount', 14, 2).notNullable().defaultTo(0)
+      table
+        .jsonb('items_refund_total')
+        .notNullable()
+        .defaultTo('{"currency_code":"USD","amount":0}')
+      table
+        .jsonb('shipping_refund_total')
+        .notNullable()
+        .defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('tax_refund_total').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table
+        .jsonb('restocking_fee_total')
+        .notNullable()
+        .defaultTo('{"currency_code":"USD","amount":0}')
+      table
+        .jsonb('grand_refund_total')
+        .notNullable()
+        .defaultTo('{"currency_code":"USD","amount":0}')
       table.text('reason').nullable()
       table.timestamp('processed_at', { useTz: true }).nullable()
       table.timestamp('created_at', { useTz: true }).notNullable().defaultTo(this.now())
@@ -59,7 +70,19 @@ export default class extends BaseSchema {
     })
 
     this.schema.raw(
-      'ALTER TABLE refund_transactions ADD CONSTRAINT chk_refund_transactions_amounts_nonneg CHECK (items_refund_amount >= 0 AND shipping_refund_amount >= 0 AND tax_refund_amount >= 0 AND restocking_fee_deducted >= 0 AND total_refund_amount >= 0)'
+      'ALTER TABLE refund_transactions ADD CONSTRAINT chk_refund_transactions_items_refund_total_money CHECK (is_valid_price_money(items_refund_total, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE refund_transactions ADD CONSTRAINT chk_refund_transactions_shipping_refund_total_money CHECK (is_valid_price_money(shipping_refund_total, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE refund_transactions ADD CONSTRAINT chk_refund_transactions_tax_refund_total_money CHECK (is_valid_price_money(tax_refund_total, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE refund_transactions ADD CONSTRAINT chk_refund_transactions_restocking_fee_total_money CHECK (is_valid_price_money(restocking_fee_total, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE refund_transactions ADD CONSTRAINT chk_refund_transactions_grand_refund_total_money CHECK (is_valid_price_money(grand_refund_total, false))'
     )
     this.schema.raw(
       'CREATE UNIQUE INDEX uq_refund_transactions_user_number ON refund_transactions (user_id, refund_number)'

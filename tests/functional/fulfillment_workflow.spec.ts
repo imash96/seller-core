@@ -200,17 +200,17 @@ test.group('Local fulfillment HTTP workflow', () => {
       orderId: order.id,
       returnRequestId: rma.id,
       refundNumber: `REF-${nonce}`,
-      itemsRefundAmount: 10,
+      itemsRefundTotal: 10,
     })
     const refund = await RefundTransaction.query()
       .where('userId', user.id)
       .where('refundNumber', `REF-${nonce}`)
       .firstOrFail()
-    assert.equal(Number(refund.totalRefundAmount), 10)
+    assert.equal(refund.grandRefundTotal.amount, 10)
     await send('/refunds', {
       orderId: order.id,
       refundNumber: `OVER-${nonce}`,
-      itemsRefundAmount: 20,
+      itemsRefundTotal: 20,
     })
     assert.isNull(
       await RefundTransaction.query()

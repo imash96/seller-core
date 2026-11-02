@@ -4,6 +4,7 @@ import MarketplaceClaim from '#models/marketplace_claim'
 import Order from '#models/order'
 import SellerAccount from '#models/seller_account'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
+import { amountOf, currencyOf, normalizePriceMoney } from '../types/price.js'
 
 export default class ClaimsController {
   async index({ auth, inertia }: HttpContext) {
@@ -35,8 +36,15 @@ export default class ClaimsController {
 
       const claimNumber = String(request.input('claimNumber', `CLM-${Date.now()}`)).trim()
       const claimType = String(request.input('claimType', 'a_to_z_guarantee'))
-      const disputedAmount = Number(request.input('disputedAmount', order.totalAmount || 50))
-      const sellerLiabilityAmount = Number(request.input('sellerLiabilityAmount', 0))
+      // Claim amounts are self-contained PriceMoney; they may be disputed in another currency.
+      const disputedTotal = normalizePriceMoney(
+        request.input('disputedAmount') ?? amountOf(order.grandTotal) ?? 50,
+        request.input('currencyCode') || currencyOf(order.grandTotal)
+      )
+      const sellerLiabilityTotal = normalizePriceMoney(
+        request.input('sellerLiabilityAmount') ?? 0,
+        disputedTotal.currency_code
+      )
       const sellerAccountId =
         String(request.input('sellerAccountId', '')).trim() || order.sellerAccountId
       if (sellerAccountId) {
@@ -52,17 +60,16 @@ export default class ClaimsController {
       const respondByAt = request.input('respondByAt')
       const status = String(request.input('status', 'under_review'))
 
+      // The marketplace account and customer are derived through the order.
       const claim = await MarketplaceClaim.create({
         userId: user.id,
         orderId: order.id,
-        sellerAccountId: sellerAccountId || null,
         claimNumber,
         externalClaimId: request.input('externalClaimId') || claimNumber,
         claimType,
         status,
-        currencyCode: request.input('currencyCode') || order.currencyCode,
-        disputedAmount: disputedAmount.toFixed(2),
-        sellerLiabilityAmount: sellerLiabilityAmount.toFixed(2),
+        disputedTotal,
+        sellerLiabilityTotal,
         reason: request.input('reason') || 'Customer marketplace claim opened',
         evidenceSubmitted: { resolutionNotes: request.input('resolutionNotes') || null },
         respondByAt: respondByAt ? DateTime.fromISO(String(respondByAt)) : null,
@@ -97,11 +104,14 @@ export default class ClaimsController {
       }
       const disputed = request.input('disputedAmount')
       if (disputed !== undefined && disputed !== null && disputed !== '') {
-        claim.disputedAmount = Number(disputed).toFixed(2)
+        claim.disputedTotal = normalizePriceMoney(disputed, claim.disputedTotal.currency_code)
       }
       const liability = request.input('sellerLiabilityAmount')
       if (liability !== undefined && liability !== null && liability !== '') {
-        claim.sellerLiabilityAmount = Number(liability).toFixed(2)
+        claim.sellerLiabilityTotal = normalizePriceMoney(
+          liability,
+          claim.sellerLiabilityTotal.currency_code
+        )
       }
       if (request.input('reason')) {
         claim.reason = String(request.input('reason'))

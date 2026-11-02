@@ -9,11 +9,20 @@ import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import type { DateTime } from 'luxon'
 import CreditCardSellerAccount from './credit_card_seller_account.js'
 import FinancialAccount from './financial_account.js'
+import { prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import type { PriceMoney } from '../types/price.js'
 
 export default class CreditCard extends AppBaseModel {
   static readonly table = 'credit_cards'
   static readonly idPrefix = 'ccard'
+
+  static override readonly moneyColumns = [
+    'creditLimit',
+    'currentBalance',
+    'statementBalance',
+    'minimumPaymentDue',
+  ] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -48,20 +57,17 @@ export default class CreditCard extends AppBaseModel {
   @column({ columnName: 'logo_url' })
   declare public logoUrl: string | null
 
-  @column({ columnName: 'currency_code' })
-  declare public currencyCode: string
+  @column({ columnName: 'credit_limit', prepare: prepareJson })
+  declare public creditLimit: PriceMoney
 
-  @column({ columnName: 'credit_limit' })
-  declare public creditLimit: string
+  @column({ columnName: 'current_balance', prepare: prepareJson })
+  declare public currentBalance: PriceMoney
 
-  @column({ columnName: 'current_balance' })
-  declare public currentBalance: string
+  @column({ columnName: 'statement_balance', prepare: prepareJson })
+  declare public statementBalance: PriceMoney
 
-  @column({ columnName: 'statement_balance' })
-  declare public statementBalance: string
-
-  @column({ columnName: 'minimum_payment_due' })
-  declare public minimumPaymentDue: string
+  @column({ columnName: 'minimum_payment_due', prepare: prepareJson })
+  declare public minimumPaymentDue: PriceMoney
 
   @column({ columnName: 'billing_cycle_day' })
   declare public billingCycleDay: number | null

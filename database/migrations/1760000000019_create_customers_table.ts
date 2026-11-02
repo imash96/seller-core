@@ -22,9 +22,8 @@ export default class extends BaseSchema {
       table.string('proxy_email', 255).nullable()
       table.string('phone', 50).nullable()
       table.string('normalized_phone', 50).nullable()
-      table.string('preferred_currency', 3).notNullable().defaultTo('USD')
       table.integer('orders_count').notNullable().defaultTo(0)
-      table.decimal('total_spent', 14, 2).notNullable().defaultTo(0)
+      table.jsonb('total_spent').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
       table.boolean('is_repeat_customer').notNullable().defaultTo(false)
       table
         .enum('risk_level', ['low', 'medium', 'high', 'under_review', 'cleared'], {
@@ -53,7 +52,7 @@ export default class extends BaseSchema {
       'ALTER TABLE customers ADD CONSTRAINT chk_customers_orders_count_nonneg CHECK (orders_count >= 0)'
     )
     this.schema.raw(
-      'ALTER TABLE customers ADD CONSTRAINT chk_customers_total_spent_nonneg CHECK (total_spent >= 0)'
+      'ALTER TABLE customers ADD CONSTRAINT chk_customers_total_spent_money CHECK (is_valid_price_money(total_spent, false))'
     )
     this.schema.raw(
       'ALTER TABLE customers ADD CONSTRAINT chk_customers_risk_score_nonneg CHECK (risk_score >= 0)'

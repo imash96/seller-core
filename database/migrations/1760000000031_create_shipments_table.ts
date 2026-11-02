@@ -51,9 +51,16 @@ export default class extends BaseSchema {
       table.decimal('dead_weight_grams', 14, 2).nullable()
       table.decimal('volumetric_weight_grams', 14, 2).nullable()
       table.decimal('billed_weight_grams', 14, 2).nullable()
-      table.string('currency_code', 3).notNullable().defaultTo('USD')
-      table.decimal('estimated_shipping_cost', 14, 2).notNullable().defaultTo(0)
-      table.decimal('actual_invoiced_cost', 14, 2).notNullable().defaultTo(0)
+      // A carrier label can be billed in a different currency than the order.
+      table
+        .jsonb('estimated_shipping_cost')
+        .notNullable()
+        .defaultTo('{"currency_code":"USD","amount":0}')
+      table
+        .jsonb('actual_invoiced_cost')
+        .notNullable()
+        .defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('insurance_cost').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
       table.timestamp('shipped_at', { useTz: true }).nullable()
       table.timestamp('estimated_delivery_at', { useTz: true }).nullable()
       table.timestamp('delivered_at', { useTz: true }).nullable()
@@ -63,6 +70,15 @@ export default class extends BaseSchema {
       table.timestamp('updated_at', { useTz: true }).notNullable().defaultTo(this.now())
     })
 
+    this.schema.raw(
+      'ALTER TABLE shipments ADD CONSTRAINT chk_shipments_estimated_shipping_cost_money CHECK (is_valid_price_money(estimated_shipping_cost, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE shipments ADD CONSTRAINT chk_shipments_actual_invoiced_cost_money CHECK (is_valid_price_money(actual_invoiced_cost, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE shipments ADD CONSTRAINT chk_shipments_insurance_cost_money CHECK (is_valid_price_money(insurance_cost, false))'
+    )
     this.schema.raw(
       'CREATE UNIQUE INDEX uq_shipments_user_number ON shipments (user_id, shipment_number)'
     )

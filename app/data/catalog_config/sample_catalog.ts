@@ -3,19 +3,11 @@ import type { CatalogJsonPayload } from '../../types/catalog_pipeline.js'
 export const SAMPLE_CATALOG_JSON: CatalogJsonPayload = {
   SKU1: {
     title: 'Velocity Full-Length Lambskin Leather Duster Coat',
-    title75: "Men's Velocity Full-Length 100% Lambskin Leather Duster Trench Coat",
-    title80: "Men's Velocity Full-Length 100% Genuine Lambskin Leather Duster Overcoat",
     subTitle: 'Handcrafted Full-Grain Lambskin Leather Overcoat',
-    subTitle125:
-      'Handcrafted 100% Genuine Lambskin Leather Full-Length Duster Coat with Quilted Lining & Storm Tab Collar',
     type: 'Duster Coat',
     category_handle: 'mens/apparel/outerwear/coats/duster-coats',
     description:
       'Discover commanding full-length protection with the Velocity Long Duster Coat, handcrafted from 100% genuine lambskin leather with a warm quilted polyester lining and reinforced matte black hardware.',
-    shortDescription:
-      "Handcrafted 100% genuine full-grain lambskin leather men's full-length duster coat with quilted polyester lining, 4-button single-breasted closure, notch lapel collar with storm latch, and 4 secure pockets.",
-    extendedDescription:
-      '✨ COMMANDING FULL-LENGTH LEATHER DUSTER COAT ✨\n\nElevate your outerwear collection with the Velocity Long Duster Coat — meticulously handcrafted from 100% genuine lambskin leather for a supple drape and all-season durability.\n\n🧥 KEY HIGHLIGHTS:\n• 100% Genuine Lambskin Leather exterior with warm quilted polyester lining\n• Full-length ankle silhouette with rear center kick pleat for effortless movement\n• Classic 4-button single-breasted front with matte black hardware\n• Notch lapel collar with button-up throat latch (storm tab)\n• Two external waist flap pockets + two internal pockets (1 zippered, 1 open)',
     pattern: 'Solid',
     attributes: {
       material: 'Leather',
@@ -68,19 +60,11 @@ export const SAMPLE_CATALOG_JSON: CatalogJsonPayload = {
   },
   SKU2: {
     title: 'Heritage Full-Length Lambskin Leather Duster Trench',
-    title75: "Men's Heritage Full-Length 100% Lambskin Leather Duster Overcoat",
-    title80: "Men's Heritage Full-Length Genuine Lambskin Leather Duster Trench Coat",
     subTitle: 'Artisan Full-Length Leather Trench Overcoat',
-    subTitle125:
-      'Handcrafted 100% Lambskin Leather Full-Length Duster Overcoat in White & Green with Quilted Lining',
     type: 'Duster Coat',
     category_handle: 'mens/apparel/outerwear/coats/duster-coats',
     description:
       'Command attention in any season with the Heritage Full-Length Lambskin Leather Duster Trench, tailored from supple full-grain lambskin with an insulated quilted lining.',
-    shortDescription:
-      "Men's full-length 100% lambskin leather duster trench coat featuring a 4-button single-breasted front, notch lapel collar with storm throat latch, rear center vent, and 4 functional pockets.",
-    extendedDescription:
-      '🔥 HERITAGE FULL-LENGTH LAMBSKIN DUSTER TRENCH 🔥\n\nDesigned for statement style and rugged weather protection, the Heritage Duster Coat is cut from 100% genuine full-grain lambskin leather.\n\n🧥 FEATURES & CRAFTSMANSHIP:\n• Supple 100% Lambskin Leather shell + quilted polyester thermal lining\n• Ankle-length duster cut with rear kick pleat for natural stride\n• Matte black 4-button single-breasted closure\n• Notch lapel collar with convertible storm throat latch\n• 2 outer waist flap pockets + 2 interior security pockets',
     pattern: 'Solid',
     attributes: {
       material: 'Leather',
@@ -133,19 +117,11 @@ export const SAMPLE_CATALOG_JSON: CatalogJsonPayload = {
   },
   SKU3: {
     title: 'Apex Asymmetrical Cowhide Biker Motorcycle Jacket',
-    title75: "Men's Apex Asymmetrical Heavyweight Cowhide Leather Biker Moto Jacket",
-    title80: "Men's Apex Asymmetrical Genuine Cowhide Leather Motorcycle Biker Rider Jacket",
     subTitle: 'Heavyweight Full-Grain Cowhide Moto Jacket',
-    subTitle125:
-      'Handcrafted Heavyweight Cowhide Leather Asymmetrical Biker Jacket with Zippered Cuffs & Belted Waist',
     type: 'Biker/Motorcycle',
     category_handle: 'men/outerwear/jackets/biker-motorcycle',
     description:
       'Engineered for road-ready durability, the Apex Biker Jacket is crafted from heavyweight cowhide leather with asymmetrical YKK zippers and action-back shoulder gussets.',
-    shortDescription:
-      "Men's asymmetrical genuine cowhide leather biker motorcycle jacket with belted waist, zippered cuffs, quilted lining, and 5 rider pockets.",
-    extendedDescription:
-      '🏍️ APEX HEAVYWEIGHT COWHIDE BIKER JACKET 🏍️\n\nBuilt for riders and street style alike, crafted from 100% genuine cowhide leather with reinforced seams and heavy-duty hardware.',
     pattern: 'Solid',
     attributes: {
       material: 'Leather',
@@ -182,19 +158,11 @@ export const SAMPLE_CATALOG_JSON: CatalogJsonPayload = {
   },
   SKU4: {
     title: 'Valkyrie Women Slim Lambskin Cafe Racer Leather Jacket',
-    title75: "Women's Valkyrie Slim-Fit 100% Lambskin Leather Cafe Racer Moto Jacket",
-    title80: "Women's Valkyrie Tailored 100% Genuine Lambskin Leather Cafe Racer Jacket",
     subTitle: 'Supple Nappa Lambskin Minimalist Moto Jacket',
-    subTitle125:
-      'Tailored Women Slim-Fit 100% Nappa Lambskin Leather Cafe Racer Jacket with Stand Snap Collar',
     type: 'Cafe Racer',
     category_handle: 'women/outerwear/jackets/cafe-racer',
     description:
       'Streamlined and effortlessly modern, the Valkyrie Cafe Racer Jacket for women is cut from butter-soft Nappa lambskin leather with a minimalist stand snap collar.',
-    shortDescription:
-      "Women's slim-fit 100% genuine Nappa lambskin leather cafe racer jacket with stand snap collar, straight front zipper, and satin lining.",
-    extendedDescription:
-      '✨ VALKYRIE WOMEN SLIM-FIT CAFE RACER JACKET ✨\n\nTailored from buttery-soft 100% Nappa lambskin leather for a flattering, contoured silhouette.',
     pattern: 'Solid',
     attributes: {
       material: 'Leather',

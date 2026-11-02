@@ -10,11 +10,19 @@ import type { DateTime } from 'luxon'
 import Order from './order.js'
 import ShipmentItem from './shipment_item.js'
 import ShippingInvoiceLine from './shipping_invoice_line.js'
+import { prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import type { PriceMoney } from '../types/price.js'
 
 export default class Shipment extends AppBaseModel {
   static readonly table = 'shipments'
   static readonly idPrefix = 'shp'
+
+  static override readonly moneyColumns = [
+    'estimatedShippingCost',
+    'actualInvoicedCost',
+    'insuranceCost',
+  ] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -64,20 +72,22 @@ export default class Shipment extends AppBaseModel {
   @column({ columnName: 'dead_weight_grams' })
   declare public deadWeightGrams: string | null
 
+  /** Generated: (length × width × height) / 5 — read-only stored generated column. */
   @column({ columnName: 'volumetric_weight_grams' })
   declare public volumetricWeightGrams: string | null
 
+  /** Generated: greatest(dead_weight_grams, volumetric) — read-only, never assign. */
   @column({ columnName: 'billed_weight_grams' })
   declare public billedWeightGrams: string | null
 
-  @column({ columnName: 'currency_code' })
-  declare public currencyCode: string
+  @column({ columnName: 'estimated_shipping_cost', prepare: prepareJson })
+  declare public estimatedShippingCost: PriceMoney
 
-  @column({ columnName: 'estimated_shipping_cost' })
-  declare public estimatedShippingCost: string
+  @column({ columnName: 'actual_invoiced_cost', prepare: prepareJson })
+  declare public actualInvoicedCost: PriceMoney
 
-  @column({ columnName: 'actual_invoiced_cost' })
-  declare public actualInvoicedCost: string
+  @column({ columnName: 'insurance_cost', prepare: prepareJson })
+  declare public insuranceCost: PriceMoney
 
   @column.dateTime({ columnName: 'shipped_at' })
   declare public shippedAt: DateTime | null

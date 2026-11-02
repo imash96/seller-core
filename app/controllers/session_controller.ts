@@ -1,9 +1,8 @@
-import crypto from 'node:crypto'
 import { DateTime } from 'luxon'
 import User from '#models/user'
-import UserSession from '#models/user_session'
 import { loginValidator } from '#validators/user'
 import { RbacService } from '../services/rbac_service.js'
+import { SessionRegistryService } from '../services/session_registry_service.js'
 import { UserStatus } from '../enums/index.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
@@ -12,7 +11,8 @@ export default class SessionController {
     return inertia.render('auth/login', {})
   }
 
-  async store({ request, auth, response, session }: HttpContext) {
+  async store(ctx: HttpContext) {
+    const { request, auth, response, session } = ctx
     const { email, password } = await request.validateUsing(loginValidator)
 
     const existingUser = await User.findBy('email', email)
@@ -53,19 +53,10 @@ export default class SessionController {
       await user.save()
 
       await auth.use('web').login(user)
-
-      const rawToken = `${user.id}:${Date.now()}:${crypto.randomBytes(16).toString('hex')}`
-      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
-      await UserSession.create({
-        userId: user.id,
-        sessionTokenHash: tokenHash,
-        ipAddress: request.ip(),
-        userAgent: request.header('user-agent') ?? null,
-        isRevoked: false,
-        expiresAt: DateTime.now().plus({ hours: 2 }),
-        lastActiveAt: DateTime.now(),
-      })
-      session.put('sessionRegistryToken', rawToken)
+      // The guard regenerates the session id on login, so the registry is tagged
+      // afterwards: the row that revocation and auditing act on is the very row the
+      // browser's cookie points at.
+      await SessionRegistryService.tag(ctx, user.id)
 
       await RbacService.recordAudit({
         actorUserId: user.id,
@@ -84,7 +75,6 @@ export default class SessionController {
     } catch (error) {
       if ((error as { code?: string }).code !== 'E_INVALID_CREDENTIALS') {
         await auth.use('web').logout()
-        session.forget('sessionRegistryToken')
         throw error
       }
       if (existingUser) {
@@ -109,19 +99,13 @@ export default class SessionController {
     }
   }
 
-  async destroy({ auth, request, response, session }: HttpContext) {
+  async destroy(ctx: HttpContext) {
+    const { auth, request, response, session } = ctx
     const user = auth.user
     if (user) {
-      const token = session.get('sessionRegistryToken')
-      if (typeof token === 'string') {
-        const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
-        await UserSession.query()
-          .where('userId', user.id)
-          .andWhere('sessionTokenHash', tokenHash)
-          .andWhere('isRevoked', false)
-          .update({ isRevoked: true, revokedAt: DateTime.now().toSQL() })
-      }
-      session.forget('sessionRegistryToken')
+      // Kill the row the cookie points at, then drop the user tag.
+      await SessionRegistryService.revoke(session.sessionId)
+      await SessionRegistryService.untag(ctx, user.id)
 
       await RbacService.recordAudit({
         actorUserId: user.id,

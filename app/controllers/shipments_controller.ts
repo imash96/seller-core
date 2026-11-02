@@ -12,6 +12,7 @@ import { FulfillmentAndReturnsService } from '../services/fulfillment_and_return
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createShipmentValidator, createShippingInvoiceValidator } from '#validators/operations'
 import { ShipmentStatus } from '../enums/index.js'
+import { amountOf, currencyOf, money } from '../types/price.js'
 
 export default class ShipmentsController {
   async index({ auth, inertia }: HttpContext) {
@@ -66,6 +67,8 @@ export default class ShipmentsController {
         heightCm: payload.heightCm,
         deadWeightGrams: payload.deadWeightGrams,
         estimatedShippingCost: payload.estimatedShippingCost,
+        estimatedShippingCostCurrencyCode: payload.estimatedShippingCostCurrencyCode,
+        insuranceCost: payload.insuranceCost,
         status: payload.status || ShipmentStatus.IN_TRANSIT,
         items: [
           {
@@ -174,8 +177,8 @@ export default class ShipmentsController {
           shipment.carrierName,
           shipment.trackingNumber,
           shipment.status,
-          shipment.currencyCode,
-          shipment.estimatedShippingCost,
+          currencyOf(shipment.estimatedShippingCost),
+          amountOf(shipment.estimatedShippingCost),
           shipment.shippedAt?.toISO(),
           shipment.deliveredAt?.toISO(),
         ]
@@ -202,6 +205,7 @@ export default class ShipmentsController {
         carrierName: payload.carrierName,
         invoiceNumber: payload.invoiceNumber,
         currencyCode: payload.currencyCode || 'USD',
+        taxAmount: payload.taxAmount,
         invoiceDate: payload.invoiceDate,
         dueDate: payload.dueDate,
         lines: [
@@ -210,12 +214,13 @@ export default class ShipmentsController {
             chargeType: payload.chargeType,
             expectedAmount: payload.expectedAmount,
             billedAmount: payload.billedAmount,
+            taxAmount: payload.taxAmount,
           },
         ],
       })
       session.flash(
         'success',
-        `Carrier invoice ${invoice.invoiceNumber} recorded locally (${invoice.reconciliationStatus}, variance: ${invoice.varianceAmount}).`
+        `Carrier invoice ${invoice.invoiceNumber} recorded locally (${invoice.reconciliationStatus}, variance: ${amountOf(invoice.varianceTotal)} ${currencyOf(invoice.varianceTotal)}).`
       )
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to create shipping invoice')
@@ -253,7 +258,7 @@ export default class ShipmentsController {
         .first()
       if (!invoice) return { status: 404, error: 'Invoice not found.' }
       const amount = Number(amountText)
-      const total = Number(invoice.totalAmount)
+      const total = amountOf(invoice.grandTotal)
       if (
         (status === 'paid' && (amount !== total || !reference)) ||
         (status === 'partially_paid' && (amount <= 0 || amount >= total || !reference)) ||
@@ -275,7 +280,7 @@ export default class ShipmentsController {
             (line) =>
               line.expectedAmount === null ||
               line.varianceAmount === null ||
-              Number(line.varianceAmount) !== 0
+              amountOf(line.varianceAmount) !== 0
           ))
       )
         return {
@@ -286,12 +291,12 @@ export default class ShipmentsController {
       const before = {
         paymentStatus: invoice.paymentStatus,
         reconciliationStatus: invoice.reconciliationStatus,
-        paidAmount: invoice.paidAmount,
+        paidTotal: invoice.paidTotal,
         paymentReference: invoice.paymentReference,
       }
       invoice.paymentStatus = status
       invoice.reconciliationStatus = reconciliation
-      invoice.paidAmount = amount.toFixed(2)
+      invoice.paidTotal = money(amount, currencyOf(invoice.grandTotal))
       invoice.paidAt = status === 'paid' ? (invoice.paidAt ?? DateTime.now()) : null
       invoice.paymentReference = reference || null
       invoice.notes = note
@@ -308,7 +313,7 @@ export default class ShipmentsController {
           afterState: {
             paymentStatus: status,
             reconciliationStatus: reconciliation,
-            paidAmount: invoice.paidAmount,
+            paidTotal: invoice.paidTotal,
             paymentReference: invoice.paymentReference,
             notes: note,
           },

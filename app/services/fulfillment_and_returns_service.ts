@@ -26,9 +26,22 @@ import {
   DataClassification,
   OutboxEventStatus,
 } from '../enums/index.js'
+import {
+  type PriceMoney,
+  amountOf,
+  money,
+  normalizeCurrencyCode,
+  normalizeNullablePriceMoney,
+  normalizePriceMoney,
+  roundMoney,
+} from '../types/price.js'
+import { OrderService } from './order_service.js'
 
-function roundMoney(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100
+/** Money-ish input accepted by the fulfillment services. */
+type MoneyLike = PriceMoney | number | string | null | undefined
+
+function toMoney(value: MoneyLike, currency: string): PriceMoney {
+  return normalizePriceMoney(value ?? 0, currency)
 }
 
 export class FulfillmentAndReturnsService {
@@ -49,7 +62,9 @@ export class FulfillmentAndReturnsService {
     widthCm?: number
     heightCm?: number
     deadWeightGrams?: number
-    estimatedShippingCost?: number
+    estimatedShippingCost?: MoneyLike
+    estimatedShippingCostCurrencyCode?: string
+    insuranceCost?: MoneyLike
     status?: string
     items: Array<{
       orderLineItemId: string
@@ -79,14 +94,6 @@ export class FulfillmentAndReturnsService {
       const widthCm = input.widthCm ?? null
       const heightCm = input.heightCm ?? null
       const deadWeightGrams = input.deadWeightGrams ?? null
-      const volumetricWeightGrams =
-        lengthCm && widthCm && heightCm
-          ? roundMoney(((lengthCm * widthCm * heightCm) / 5000) * 1000)
-          : null
-      const billedWeightGrams =
-        deadWeightGrams && volumetricWeightGrams
-          ? Math.max(deadWeightGrams, volumetricWeightGrams)
-          : (deadWeightGrams ?? volumetricWeightGrams)
 
       const isDelivered = input.status === ShipmentStatus.DELIVERED
       const shipment = new Shipment()
@@ -104,12 +111,17 @@ export class FulfillmentAndReturnsService {
       shipment.widthCm = widthCm !== null ? widthCm.toFixed(2) : null
       shipment.heightCm = heightCm !== null ? heightCm.toFixed(2) : null
       shipment.deadWeightGrams = deadWeightGrams !== null ? deadWeightGrams.toFixed(2) : null
-      shipment.volumetricWeightGrams =
-        volumetricWeightGrams !== null ? volumetricWeightGrams.toFixed(2) : null
-      shipment.billedWeightGrams = billedWeightGrams !== null ? billedWeightGrams.toFixed(2) : null
-      shipment.currencyCode = order.currencyCode
-      shipment.estimatedShippingCost = roundMoney(input.estimatedShippingCost ?? 0).toFixed(2)
-      shipment.actualInvoicedCost = '0.00'
+      // volumetric_weight_grams / billed_weight_grams are STORED generated columns
+      // derived from the dimensions and dead weight — never assigned here.
+      // Carrier costs may be invoiced in a different currency than the order.
+      const shipmentCurrency = normalizeCurrencyCode(
+        input.estimatedShippingCostCurrencyCode,
+        order.currencyCode
+      )
+      const estimatedShippingCost = toMoney(input.estimatedShippingCost ?? 0, shipmentCurrency)
+      shipment.estimatedShippingCost = estimatedShippingCost
+      shipment.actualInvoicedCost = money(0, shipmentCurrency)
+      shipment.insuranceCost = toMoney(input.insuranceCost ?? 0, shipmentCurrency)
       shipment.shippedAt = DateTime.now()
       shipment.deliveredAt = isDelivered ? DateTime.now() : null
       shipment.deliveryNotificationSent = false
@@ -185,22 +197,16 @@ export class FulfillmentAndReturnsService {
         order.status = OrderStatus.PARTIALLY_FULFILLED
         order.shippedAt = order.shippedAt ?? DateTime.now()
       }
-      order.shippingCostAmount = roundMoney(
-        Number(order.shippingCostAmount || 0) + Number(input.estimatedShippingCost ?? 0)
-      ).toFixed(2)
-      order.grossProfitAmount = roundMoney(
-        Number(order.subtotalAmount) -
-          Number(order.discountAmount) +
-          Number(order.shippingChargedAmount) -
-          Number(order.cogsAmount) -
-          Number(order.shippingCostAmount)
-      ).toFixed(2)
-      order.netProfitAmount = roundMoney(
-        Number(order.netProceedsAmount) -
-          Number(order.cogsAmount) -
-          Number(order.shippingCostAmount) -
-          Number(order.taxAmount)
-      ).toFixed(2)
+      // Accumulate carrier cost; mixed-currency costs stay in their own currency.
+      const shippingCostTotal = normalizePriceMoney(order.shippingCostTotal, order.currencyCode)
+      order.shippingCostTotal =
+        shippingCostTotal.currency_code === estimatedShippingCost.currency_code
+          ? money(
+              amountOf(shippingCostTotal) + amountOf(estimatedShippingCost),
+              shippingCostTotal.currency_code
+            )
+          : estimatedShippingCost
+      OrderService.recomputeProfitability(order)
       await order.save()
 
       if (isDelivered) {
@@ -320,16 +326,16 @@ export class FulfillmentAndReturnsService {
     carrierName: string
     invoiceNumber: string
     currencyCode?: string
-    taxAmount?: number
+    taxAmount?: MoneyLike
     invoiceDate: string
     dueDate?: string
     lines: Array<{
       shipmentId?: string | null
-      trackingNumber?: string | null
       chargeType: string
       description?: string
-      expectedAmount?: number
-      billedAmount: number
+      expectedAmount?: MoneyLike
+      billedAmount: MoneyLike
+      taxAmount?: MoneyLike
       allowDuplicateCharge?: boolean
     }>
   }): Promise<ShippingInvoice> {
@@ -337,35 +343,33 @@ export class FulfillmentAndReturnsService {
       throw new Error('VALIDATION_ERROR: Shipping invoice must have at least one line item.')
     }
 
-    for (const line of input.lines) {
-      for (const amount of [line.billedAmount, line.expectedAmount]) {
-        if (
-          amount !== undefined &&
-          (!Number.isFinite(amount) ||
-            amount < 0 ||
-            amount > 999999999999 ||
-            Math.abs(amount * 100 - Math.round(amount * 100)) > 0.00001)
+    const assertAmount = (value: unknown, label: string) => {
+      if (value === undefined || value === null) return
+      const amount = amountOf(value)
+      if (
+        !Number.isFinite(amount) ||
+        amount < 0 ||
+        amount > 999999999999 ||
+        Math.abs(amount * 100 - Math.round(amount * 100)) > 0.00001
+      )
+        throw new Error(
+          `VALIDATION_ERROR: ${label} must be non-negative with at most two decimal places.`
         )
-          throw new Error(
-            'VALIDATION_ERROR: Invoice amounts must be non-negative with at most two decimal places.'
-          )
-      }
+    }
+    for (const line of input.lines) {
+      assertAmount(line.billedAmount, 'Invoice amount')
+      assertAmount(line.expectedAmount, 'Expected amount')
+      assertAmount(line.taxAmount, 'Line tax amount')
       if (line.billedAmount === undefined || line.billedAmount === null)
         throw new Error('VALIDATION_ERROR: Billed amount is required.')
     }
-    if (
-      input.taxAmount !== undefined &&
-      (!Number.isFinite(input.taxAmount) ||
-        input.taxAmount < 0 ||
-        input.taxAmount > 999999999999 ||
-        Math.abs(input.taxAmount * 100 - Math.round(input.taxAmount * 100)) > 0.00001)
-    )
-      throw new Error('VALIDATION_ERROR: Invalid tax amount.')
+    assertAmount(input.taxAmount, 'Invalid tax amount')
 
     return await db.transaction(async (trx) => {
-      const currencyCode = (input.currencyCode || 'USD').toUpperCase()
-      let subtotalAmount = 0
-      let totalVariance = 0
+      const currencyCode = normalizeCurrencyCode(input.currencyCode, 'USD')
+      let subtotalTotal = money(0, currencyCode)
+      let taxTotal = toMoney(input.taxAmount ?? 0, currencyCode)
+      let totalVariance = money(0, currencyCode)
       let hasVariance = false
       let hasUnknownExpected = false
 
@@ -385,12 +389,12 @@ export class FulfillmentAndReturnsService {
       invoice.carrierCode = input.carrierCode
       invoice.carrierName = input.carrierName
       invoice.invoiceNumber = input.invoiceNumber
-      invoice.currencyCode = currencyCode
-      invoice.subtotalAmount = '0.00'
-      invoice.taxAmount = roundMoney(input.taxAmount ?? 0).toFixed(2)
-      invoice.totalAmount = '0.00'
-      invoice.paidAmount = '0.00'
-      invoice.varianceAmount = '0.00'
+      invoice.subtotalTotal = money(0, currencyCode)
+      invoice.discountTotal = money(0, currencyCode)
+      invoice.taxTotal = taxTotal
+      invoice.grandTotal = money(0, currencyCode)
+      invoice.paidTotal = money(0, currencyCode)
+      invoice.varianceTotal = money(0, currencyCode)
       invoice.paymentStatus = InvoicePaymentStatus.UNPAID
       invoice.reconciliationStatus = InvoiceReconciliationStatus.UNRECONCILED
       invoice.invoiceDate = DateTime.fromISO(input.invoiceDate)
@@ -398,31 +402,36 @@ export class FulfillmentAndReturnsService {
       await invoice.save()
 
       for (const lineInput of input.lines) {
-        const billed = roundMoney(lineInput.billedAmount)
+        const billed = toMoney(lineInput.billedAmount, currencyCode)
         if (lineInput.expectedAmount === undefined || lineInput.expectedAmount === null)
           hasUnknownExpected = true
-        const expected =
-          lineInput.expectedAmount === null || lineInput.expectedAmount === undefined
-            ? null
-            : roundMoney(lineInput.expectedAmount)
-        const variance = expected === null ? null : roundMoney(billed - expected)
+        const expected = normalizeNullablePriceMoney(lineInput.expectedAmount, currencyCode)
+        const variance = expected
+          ? money(amountOf(billed) - amountOf(expected), currencyCode)
+          : null
+        const lineTax = toMoney(lineInput.taxAmount ?? 0, currencyCode)
 
-        subtotalAmount = roundMoney(subtotalAmount + billed)
-        totalVariance = roundMoney(totalVariance + (variance ?? 0))
-        if (variance !== null && Math.abs(variance) > 0.001) hasVariance = true
+        subtotalTotal = money(
+          amountOf(subtotalTotal) + amountOf(billed),
+          subtotalTotal.currency_code
+        )
+        totalVariance = money(
+          amountOf(totalVariance) + amountOf(variance),
+          totalVariance.currency_code
+        )
+        if (variance !== null && Math.abs(amountOf(variance)) > 0.001) hasVariance = true
 
         const invLine = new ShippingInvoiceLine()
         invLine.useTransaction(trx)
         invLine.userId = input.userId
         invLine.shippingInvoiceId = invoice.id
         invLine.shipmentId = lineInput.shipmentId ?? null
-        invLine.trackingNumber = lineInput.trackingNumber ?? null
         invLine.chargeType = lineInput.chargeType
         invLine.description = lineInput.description ?? null
-        invLine.currencyCode = currencyCode
-        invLine.expectedAmount = expected?.toFixed(2) ?? null
-        invLine.billedAmount = billed.toFixed(2)
-        invLine.varianceAmount = variance?.toFixed(2) ?? null
+        invLine.expectedAmount = expected
+        invLine.billedAmount = billed
+        invLine.taxAmount = lineTax
+        invLine.varianceAmount = variance
         invLine.allowDuplicateCharge = Boolean(lineInput.allowDuplicateCharge)
         await invLine.save()
 
@@ -432,19 +441,21 @@ export class FulfillmentAndReturnsService {
             .andWhere('id', lineInput.shipmentId)
             .forUpdate()
             .firstOrFail()
-          shipment.actualInvoicedCost = roundMoney(
-            Number(shipment.actualInvoicedCost || 0) + billed
-          ).toFixed(2)
+          const current = normalizePriceMoney(shipment.actualInvoicedCost, currencyCode)
+          shipment.actualInvoicedCost = money(
+            amountOf(current) + amountOf(billed),
+            current.currency_code
+          )
           await shipment.save()
         }
       }
 
-      const tax = roundMoney(input.taxAmount ?? 0)
-      const total = roundMoney(subtotalAmount + tax)
+      const total = money(amountOf(subtotalTotal) + amountOf(taxTotal), currencyCode)
 
-      invoice.subtotalAmount = subtotalAmount.toFixed(2)
-      invoice.totalAmount = total.toFixed(2)
-      invoice.varianceAmount = totalVariance.toFixed(2)
+      invoice.subtotalTotal = subtotalTotal
+      invoice.taxTotal = taxTotal
+      invoice.grandTotal = total
+      invoice.varianceTotal = totalVariance
       invoice.reconciliationStatus = hasUnknownExpected
         ? InvoiceReconciliationStatus.UNRECONCILED
         : hasVariance
@@ -460,14 +471,14 @@ export class FulfillmentAndReturnsService {
           entityId: invoice.id,
           afterState: {
             invoiceNumber: invoice.invoiceNumber,
-            totalAmount: invoice.totalAmount,
+            grandTotal: invoice.grandTotal,
             reconciliationStatus: invoice.reconciliationStatus,
-            varianceAmount: invoice.varianceAmount,
+            varianceTotal: invoice.varianceTotal,
             lines: input.lines.map((line) => ({
               shipmentId: line.shipmentId ?? null,
               chargeType: line.chargeType,
-              expectedAmount: line.expectedAmount ?? null,
-              billedAmount: line.billedAmount,
+              expectedAmount: normalizeNullablePriceMoney(line.expectedAmount, currencyCode),
+              billedAmount: toMoney(line.billedAmount, currencyCode),
             })),
           },
           metadata: { verification: 'manual' },
@@ -490,8 +501,9 @@ export class FulfillmentAndReturnsService {
     returnReason: string
     resolutionType?: string
     quantityRequested: number
-    restockingFeeAmount?: number
-    returnShippingCost?: number
+    restockingFeeAmount?: MoneyLike
+    returnShippingCost?: MoneyLike
+    returnCostCurrencyCode?: string
     customerComments?: string
   }): Promise<ReturnRequest> {
     if (!Number.isInteger(input.quantityRequested) || input.quantityRequested <= 0) {
@@ -529,8 +541,15 @@ export class FulfillmentAndReturnsService {
         )
       }
 
-      const estimatedRefund = roundMoney(
-        input.quantityRequested * Number(line.unitPrice) - Number(input.restockingFeeAmount ?? 0)
+      const orderCurrency = order.currencyCode
+      const restockingFee = toMoney(input.restockingFeeAmount ?? 0, orderCurrency)
+      const returnShippingCost = toMoney(
+        input.returnShippingCost ?? 0,
+        normalizeCurrencyCode(input.returnCostCurrencyCode, orderCurrency)
+      )
+      const estimatedRefund = money(
+        roundMoney(input.quantityRequested * amountOf(line.unitPrice) - amountOf(restockingFee)),
+        orderCurrency
       )
 
       const returnReq = new ReturnRequest()
@@ -538,7 +557,6 @@ export class FulfillmentAndReturnsService {
       returnReq.userId = input.userId
       returnReq.orderId = order.id
       returnReq.orderLineItemId = line.id
-      returnReq.customerId = order.customerId
       returnReq.rmaNumber = input.rmaNumber
       returnReq.status = ReturnStatus.AUTHORIZED
       returnReq.returnReason = input.returnReason
@@ -547,10 +565,9 @@ export class FulfillmentAndReturnsService {
       returnReq.quantityApproved = input.quantityRequested
       returnReq.quantityReceived = 0
       returnReq.restockInventory = true
-      returnReq.currencyCode = order.currencyCode
-      returnReq.returnShippingCost = roundMoney(input.returnShippingCost ?? 0).toFixed(2)
-      returnReq.restockingFeeAmount = roundMoney(input.restockingFeeAmount ?? 0).toFixed(2)
-      returnReq.refundAmount = Math.max(0, estimatedRefund).toFixed(2)
+      returnReq.returnShippingCost = returnShippingCost
+      returnReq.restockingFeeTotal = restockingFee
+      returnReq.refundTotal = money(Math.max(0, amountOf(estimatedRefund)), orderCurrency)
       returnReq.customerComments = input.customerComments ?? null
       returnReq.evidenceImages = []
       returnReq.approvalHistory = [
@@ -579,10 +596,10 @@ export class FulfillmentAndReturnsService {
     returnRequestId?: string | null
     financialAccountId?: string | null
     refundNumber: string
-    itemsRefundAmount: number
-    shippingRefundAmount?: number
-    taxRefundAmount?: number
-    restockingFeeDeducted?: number
+    itemsRefundTotal: MoneyLike
+    shippingRefundTotal?: MoneyLike
+    taxRefundTotal?: MoneyLike
+    restockingFeeTotal?: MoneyLike
     reason?: string
   }): Promise<RefundTransaction> {
     return await db.transaction(async (trx) => {
@@ -592,13 +609,14 @@ export class FulfillmentAndReturnsService {
         .forUpdate()
         .firstOrFail()
 
+      const refundCurrency = order.currencyCode
       const amounts = [
-        input.itemsRefundAmount,
-        input.shippingRefundAmount ?? 0,
-        input.taxRefundAmount ?? 0,
-        input.restockingFeeDeducted ?? 0,
+        input.itemsRefundTotal,
+        input.shippingRefundTotal ?? 0,
+        input.taxRefundTotal ?? 0,
+        input.restockingFeeTotal ?? 0,
       ]
-      if (amounts.some((amount) => !Number.isFinite(amount) || amount < 0)) {
+      if (amounts.some((amount) => !Number.isFinite(amountOf(amount)) || amountOf(amount) < 0)) {
         throw new Error('VALIDATION_ERROR: Refund amounts must be finite and non-negative.')
       }
       if (input.financialAccountId) {
@@ -637,21 +655,29 @@ export class FulfillmentAndReturnsService {
         throw new Error('INVALID_ORDER_LINE: Return request does not match the order line.')
       }
 
-      const itemsRefund = roundMoney(input.itemsRefundAmount)
-      const shippingRefund = roundMoney(input.shippingRefundAmount ?? 0)
-      const taxRefund = roundMoney(input.taxRefundAmount ?? 0)
-      const restockingFee = roundMoney(input.restockingFeeDeducted ?? 0)
-      const totalRefund = roundMoney(itemsRefund + shippingRefund + taxRefund - restockingFee)
+      const itemsRefund = toMoney(input.itemsRefundTotal, refundCurrency)
+      const shippingRefund = toMoney(input.shippingRefundTotal ?? 0, refundCurrency)
+      const taxRefund = toMoney(input.taxRefundTotal ?? 0, refundCurrency)
+      const restockingFee = toMoney(input.restockingFeeTotal ?? 0, refundCurrency)
+      const totalRefund = money(
+        roundMoney(
+          amountOf(itemsRefund) +
+            amountOf(shippingRefund) +
+            amountOf(taxRefund) -
+            amountOf(restockingFee)
+        ),
+        refundCurrency
+      )
 
-      if (totalRefund <= 0) {
-        throw new Error('VALIDATION_ERROR: totalRefundAmount must be strictly positive.')
+      if (amountOf(totalRefund) <= 0) {
+        throw new Error('VALIDATION_ERROR: grand_refund_total must be strictly positive.')
       }
 
-      const currentRefunded = roundMoney(Number(order.refundedAmount || 0))
-      const orderTotal = roundMoney(Number(order.totalAmount || 0))
-      if (roundMoney(currentRefunded + totalRefund) > orderTotal) {
+      const currentRefunded = roundMoney(amountOf(order.refundedTotal))
+      const orderTotal = roundMoney(amountOf(order.grandTotal))
+      if (roundMoney(currentRefunded + amountOf(totalRefund)) > orderTotal) {
         throw new Error(
-          `DOUBLE_REFUND_PREVENTED: Refund of ${totalRefund} exceeds remaining refundable balance of ${roundMoney(orderTotal - currentRefunded)} on order ${order.orderNumber}.`
+          `DOUBLE_REFUND_PREVENTED: Refund of ${amountOf(totalRefund)} exceeds remaining refundable balance of ${roundMoney(orderTotal - currentRefunded)} on order ${order.orderNumber}.`
         )
       }
 
@@ -664,19 +690,18 @@ export class FulfillmentAndReturnsService {
       refund.financialAccountId = input.financialAccountId ?? null
       refund.refundNumber = input.refundNumber
       refund.status = RefundStatus.PROCESSED
-      refund.currencyCode = order.currencyCode
-      refund.itemsRefundAmount = itemsRefund.toFixed(2)
-      refund.shippingRefundAmount = shippingRefund.toFixed(2)
-      refund.taxRefundAmount = taxRefund.toFixed(2)
-      refund.restockingFeeDeducted = restockingFee.toFixed(2)
-      refund.totalRefundAmount = totalRefund.toFixed(2)
+      refund.itemsRefundTotal = itemsRefund
+      refund.shippingRefundTotal = shippingRefund
+      refund.taxRefundTotal = taxRefund
+      refund.restockingFeeTotal = restockingFee
+      refund.grandRefundTotal = totalRefund
       refund.reason = input.reason ?? null
       refund.processedAt = DateTime.now()
       await refund.save()
 
       if (returnReq) {
         returnReq.status = ReturnStatus.REFUNDED
-        returnReq.refundAmount = totalRefund.toFixed(2)
+        returnReq.refundTotal = totalRefund
         returnReq.closedAt = DateTime.now()
         await returnReq.save()
 
@@ -690,36 +715,26 @@ export class FulfillmentAndReturnsService {
               line.quantityOrdered,
               (line.quantityReturned || 0) + returnReq.quantityApproved
             )
-            line.refundedAmount = roundMoney(
-              Number(line.refundedAmount || 0) + totalRefund
-            ).toFixed(2)
+            line.refundedTotal = money(
+              roundMoney(amountOf(line.refundedTotal) + amountOf(totalRefund)),
+              line.currencyCode
+            )
             await line.save()
           }
         }
       }
 
-      const updatedRefunded = roundMoney(currentRefunded + totalRefund)
-      order.refundedAmount = updatedRefunded.toFixed(2)
+      const updatedRefunded = roundMoney(currentRefunded + amountOf(totalRefund))
+      order.refundedTotal = money(updatedRefunded, refundCurrency)
       order.paymentStatus =
         updatedRefunded >= orderTotal
           ? OrderPaymentStatus.REFUNDED
           : OrderPaymentStatus.PARTIALLY_REFUNDED
-      order.netProceedsAmount = roundMoney(
-        orderTotal -
-          Number(order.marketplaceFeesAmount) -
-          Number(order.paymentProcessingFeesAmount) -
-          updatedRefunded
-      ).toFixed(2)
-      order.netProfitAmount = roundMoney(
-        Number(order.netProceedsAmount) -
-          Number(order.cogsAmount) -
-          Number(order.shippingCostAmount) -
-          Number(order.taxAmount)
-      ).toFixed(2)
+      OrderService.recomputeProfitability(order)
       await order.save()
 
       // Record in normalized financial_transactions ledger
-      const exchangeRate = Number(order.exchangeRate || 1)
+      const exchangeRate = Number(order.exchangeRate || 1) || 1
       const ledgerTx = new FinancialTransaction()
       ledgerTx.useTransaction(trx)
       ledgerTx.userId = input.userId
@@ -731,12 +746,13 @@ export class FulfillmentAndReturnsService {
       ledgerTx.dataClassification = DataClassification.BUSINESS
       ledgerTx.status = FinancialTransactionStatus.SETTLED
       ledgerTx.description = `Refund ${input.refundNumber} for Order ${order.orderNumber}`
-      ledgerTx.originalCurrencyCode = order.currencyCode
-      ledgerTx.originalAmount = totalRefund.toFixed(2)
+      ledgerTx.originalAmount = totalRefund
       ledgerTx.exchangeRate = exchangeRate.toFixed(8)
-      ledgerTx.reportingCurrencyCode = order.reportingCurrencyCode
-      ledgerTx.reportingAmount = roundMoney(totalRefund * exchangeRate).toFixed(2)
-      ledgerTx.taxAmount = taxRefund.toFixed(2)
+      ledgerTx.reportingAmount = money(
+        roundMoney(amountOf(totalRefund) * exchangeRate),
+        order.reportingCurrencyCode
+      )
+      ledgerTx.taxTotal = taxRefund
       ledgerTx.transactionDate = DateTime.now()
       ledgerTx.settledAt = DateTime.now()
       ledgerTx.metadata = { refundId: refund.id }
@@ -751,7 +767,7 @@ export class FulfillmentAndReturnsService {
       audit.entityId = refund.id
       audit.afterState = {
         refundNumber: refund.refundNumber,
-        totalRefundAmount: refund.totalRefundAmount,
+        grandRefundTotal: refund.grandRefundTotal,
         orderNumber: order.orderNumber,
       }
       audit.metadata = {}

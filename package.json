@@ -16,8 +16,11 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit && tsc --noEmit --project inertia/tsconfig.json",
     "db:migrate": "node ace migration:run",
+    "db:start": "node ./pgstart.mjs",
     "db:rollback": "node ace migration:rollback",
     "db:fresh": "node ace migration:fresh",
+    "db:schema:sync": "node ./scripts/sync_schema_dbml.mjs && node ./scripts/sync_supabase_schema.mjs",
+    "db:schema:check": "node ./scripts/sync_schema_dbml.mjs --check && node ./scripts/sync_supabase_schema.mjs --check",
     "db:refresh": "node ace migration:refresh",
     "db:seed": "node ace db:seed"
   },

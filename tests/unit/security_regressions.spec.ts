@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
 import User from '#models/user'
-import UserSession from '#models/user_session'
+import { SessionRegistryService } from '#services/session_registry_service'
 import AuditLog from '#models/audit_log'
 import SellerAccount from '#models/seller_account'
 import SalesChannel from '#models/sales_channel'
@@ -21,11 +21,13 @@ function legacyEncrypt(data: unknown) {
   return [iv, cipher.getAuthTag(), encrypted].map((part) => part.toString('base64')).join('.')
 }
 
-function fakeContext(user?: User) {
+function fakeContext(user?: User, sessionId = `sess_${crypto.randomUUID()}`) {
   const values: Record<string, any> = {}
   const flashes: Record<string, string> = {}
   let currentUser = user
+  const tagged: string[] = []
   const session = {
+    sessionId,
     put: (key: string, value: unknown) => {
       values[key] = value
     },
@@ -35,6 +37,13 @@ function fakeContext(user?: User) {
     },
     flash: (key: string, value: string) => {
       flashes[key] = value
+    },
+    tag: async (userId: string) => {
+      tagged.push(userId)
+    },
+    untag: async (userId: string) => {
+      const index = tagged.lastIndexOf(String(userId))
+      if (index >= 0) tagged.splice(index, 1)
     },
   }
   const guard = {
@@ -64,8 +73,24 @@ function fakeContext(user?: User) {
     ctx: { session, auth, response, request } as any,
     values,
     flashes,
+    sessionId,
+    taggedUserIds: tagged,
     getUser: () => currentUser,
   }
+}
+
+/** Mirrors what the Adonis database session store writes at the end of a request. */
+async function persistSession(sessionId: string, userId: string) {
+  await db
+    .table('sessions')
+    .insert({
+      id: sessionId,
+      data: 'signed-session-payload',
+      user_id: userId,
+      expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000),
+    })
+    .onConflict('id')
+    .merge(['user_id', 'expires_at', 'is_revoked', 'data'])
 }
 
 test.group('Security regressions', (group) => {
@@ -180,26 +205,32 @@ test.group('Security regressions', (group) => {
     await user.refresh()
     assert.equal(user.status, 'active')
     assert.equal(user.failedLoginAttempts, 0)
-    assert.isString(context.values.sessionRegistryToken)
+    // The session was tagged with its owner, so the registry row IS the session row.
+    assert.deepEqual(context.taggedUserIds, [user.id])
+    await persistSession(context.sessionId, user.id)
 
     const middleware = new SilentAuthMiddleware()
     await middleware.handle(context.ctx, async () => {})
     assert.isDefined(context.getUser())
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(context.values.sessionRegistryToken)
-      .digest('hex')
-    await UserSession.query().where('sessionTokenHash', tokenHash).update({ isRevoked: true })
+
+    // Revoking the session row kills the very session the browser presents.
+    await SessionRegistryService.revoke(context.sessionId)
     await middleware.handle(context.ctx, async () => {})
     assert.isUndefined(context.getUser())
 
     const other = fakeContext(user)
     other.values.password = 'ValidPassword123!'
     await controller.store(other.ctx)
+    await persistSession(other.sessionId, user.id)
     // Simulate the user provider loading the changed account on the next request.
     other.getUser()!.status = 'suspended'
     await middleware.handle(other.ctx, async () => {})
     assert.isUndefined(other.getUser())
+
+    // Suspension revokes every live session of the user in one statement.
+    const revoked = await SessionRegistryService.revokeAllForUser(user.id)
+    assert.isAtLeast(revoked, 1)
+    assert.equal(await SessionRegistryService.countActiveForUser(user.id), 0)
   })
 
   test('logout revokes only the current session', async ({ assert }) => {
@@ -209,18 +240,17 @@ test.group('Security regressions', (group) => {
     first.values.password = second.values.password = 'ValidPassword123!'
     await controller.store(first.ctx)
     await controller.store(second.ctx)
-    const firstHash = crypto
-      .createHash('sha256')
-      .update(first.values.sessionRegistryToken)
-      .digest('hex')
-    const secondHash = crypto
-      .createHash('sha256')
-      .update(second.values.sessionRegistryToken)
-      .digest('hex')
+    await persistSession(first.sessionId, user.id)
+    await persistSession(second.sessionId, user.id)
+
     await controller.destroy(first.ctx)
-    const firstSession = await UserSession.findByOrFail('sessionTokenHash', firstHash)
-    const secondSession = await UserSession.findByOrFail('sessionTokenHash', secondHash)
-    assert.isTrue(firstSession.isRevoked)
-    assert.isFalse(secondSession.isRevoked)
+
+    const rows = await db
+      .from('sessions')
+      .whereIn('id', [first.sessionId, second.sessionId])
+      .select('id', 'is_revoked')
+    const byId = new Map(rows.map((row: any) => [row.id, row.is_revoked]))
+    assert.isTrue(byId.get(first.sessionId))
+    assert.isFalse(byId.get(second.sessionId))
   })
 })

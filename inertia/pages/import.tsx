@@ -42,21 +42,50 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
   const sampleJson = JSON.stringify(
     [
       {
-        orderNumber: 'AMZ-2026-001',
-        externalOrderId: 'AMZ-EXT-001',
-        customerFullName: 'Alex Johnson',
-        customerEmail: 'alex@example.com',
-        currencyCode: 'USD',
-        exchangeRate: 1,
-        lines: [
-          {
-            sku: 'SKU-001',
-            title: 'Premium Headphones',
-            quantityOrdered: 2,
-            unitPrice: 49.99,
-            unitCostAmount: 20,
+        // Raw Amazon SP-API shape — the importer auto-detects the platform and
+        // normalizes totals, tax lines and SLA windows.
+        payload: {
+          Orders: [
+            {
+              AmazonOrderId: '902-8324761-1234567',
+              MarketplaceId: 'ATVPDKIKX0DER',
+              PurchaseDate: '2026-02-11T14:22:31Z',
+              OrderStatus: 'Unshipped',
+              FulfillmentChannel: 'AFN',
+              OrderTotal: { Amount: '124.98', CurrencyCode: 'USD' },
+              TaxCollection: { Model: 'MarketplaceFacilitator' },
+              LatestShipDate: '2026-02-14T23:59:59Z',
+              ShippingAddress: {
+                Name: 'Alex Johnson',
+                AddressLine1: '1 Market St',
+                City: 'Seattle',
+                StateOrRegion: 'WA',
+                PostalCode: '98101',
+                CountryCode: 'US',
+              },
+              BuyerInfo: { BuyerEmail: 'alex@example.com' },
+            },
+          ],
+        },
+        orderItemsPayload: {
+          payload: {
+            OrderItems: [
+              {
+                ASIN: 'B09ASTRYX1',
+                SellerSKU: 'SKU-001',
+                OrderItemId: 'OI-1',
+                Title: 'Premium Headphones',
+                QuantityOrdered: 2,
+                ItemPrice: { Amount: '99.98', CurrencyCode: 'USD' },
+                ItemTax: { Amount: '8.00', CurrencyCode: 'USD' },
+                ShippingPrice: { Amount: '17.00', CurrencyCode: 'USD' },
+                ShippingTax: { Amount: '0.00', CurrencyCode: 'USD' },
+                PromotionDiscount: { Amount: '0.00', CurrencyCode: 'USD' },
+                ShippingDiscount: { Amount: '0.00', CurrencyCode: 'USD' },
+              },
+            ],
           },
-        ],
+        },
       },
     ],
     null,
@@ -138,7 +167,7 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
         isOpen={importOpen}
         onOpenChange={setImportOpen}
         title="Run Bulk JSON Import"
-        subtitle="Idempotent: re-submitting the same key skips duplicates. One invalid record never aborts the batch."
+        subtitle="Accepts raw Amazon SP-API / eBay Fulfillment / Etsy v3 / MedusaJS v2 payloads or canonical Seller Core JSON — the platform is detected per record. Idempotent: the same key skips duplicates, and one invalid record never aborts the batch."
         submitLabel="Run Import"
         action="/orders/bulk-import"
         presetActions={[
@@ -168,12 +197,12 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
           },
           {
             name: 'ordersJson',
-            label: 'Orders JSON array',
+            label: 'Marketplace payloads or canonical orders (JSON array)',
             kind: 'textarea',
             required: true,
             fullWidth: true,
             placeholder:
-              '[{"orderNumber":"AMZ-1","externalOrderId":"X1","customerFullName":"Jane","lines":[{"sku":"A","title":"Item","quantityOrdered":1,"unitPrice":10}]}]',
+              '[{"payload":{"Orders":[{"AmazonOrderId":"902-1","FulfillmentChannel":"AFN","OrderTotal":{"Amount":"10.00","CurrencyCode":"USD"}}]},"orderItemsPayload":{"payload":{"OrderItems":[{"ASIN":"B0X","SellerSKU":"A","QuantityOrdered":1,"ItemPrice":{"Amount":"10.00","CurrencyCode":"USD"}}]}}}]',
           },
         ]}
       />
