@@ -1,3 +1,4 @@
+import { Stack } from '@astryxdesign/core/Stack'
 import {
   PageHeader,
   PageSection,
@@ -70,7 +71,7 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
   }, [claims])
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Marketplace Claims & Chargebacks"
         description="Track A-to-z Guarantee claims, INR disputes, and payment chargebacks with seller-liability exposure and response deadlines."
@@ -339,6 +340,6 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
           ]}
         />
       </PageSection>
-    </div>
+    </Stack>
   )
 }

@@ -10,6 +10,7 @@ import FinancialAccount from '#models/financial_account'
 import FinanceCategory from '#models/finance_category'
 import CreditCard from '#models/credit_card'
 import FinancialTransaction from '#models/financial_transaction'
+import { money } from '../../app/types/price.js'
 
 test.group('Household finance access over HTTP', () => {
   test('filters reads, enforces classification for mutations and validates ledger links', async ({
@@ -78,8 +79,8 @@ test.group('Household finance access over HTTP', () => {
       transactionType: 'expense',
       dataClassification: 'household_personal',
       description: 'Private transaction',
-      originalAmount: '10.00',
-      reportingAmount: '10.00',
+      originalAmount: money(10, 'USD'),
+      reportingAmount: money(10, 'USD'),
       transactionDate: DateTime.fromISO('2026-01-01'),
     })
     // Existing records can have inconsistent references; nested preloads must not leak them.
@@ -89,8 +90,8 @@ test.group('Household finance access over HTTP', () => {
       transactionType: 'expense',
       dataClassification: 'business',
       description: 'Legacy mismatch',
-      originalAmount: '10.00',
-      reportingAmount: '10.00',
+      originalAmount: money(10, 'USD'),
+      reportingAmount: money(10, 'USD'),
       transactionDate: DateTime.fromISO('2026-01-01'),
       financialAccountId: account.id,
       financeCategoryId: category.id,
@@ -101,9 +102,8 @@ test.group('Household finance access over HTTP', () => {
       transactionType: 'expense',
       dataClassification: 'business',
       description: 'Euro expense',
-      originalAmount: '90.00',
-      reportingAmount: '90.00',
-      reportingCurrencyCode: 'EUR',
+      originalAmount: money(90, 'EUR'),
+      reportingAmount: money(90, 'EUR'),
       transactionDate: DateTime.fromISO('2026-01-01'),
     })
     await FinancialTransaction.create({
@@ -112,8 +112,8 @@ test.group('Household finance access over HTTP', () => {
       transactionType: 'expense',
       dataClassification: 'business',
       description: 'Voided expense',
-      originalAmount: '50.00',
-      reportingAmount: '50.00',
+      originalAmount: money(50, 'USD'),
+      reportingAmount: money(50, 'USD'),
       status: 'voided',
       transactionDate: DateTime.fromISO('2026-01-01'),
     })
@@ -221,9 +221,8 @@ test.group('Household finance access over HTTP', () => {
       transactionType: 'expense',
       dataClassification: 'business',
       description: 'Matchable',
-      originalAmount: '10.00',
-      reportingAmount: '10.00',
-      originalCurrencyCode: 'USD',
+      originalAmount: money(10, 'USD'),
+      reportingAmount: money(10, 'USD'),
       status: 'posted',
       transactionDate: DateTime.fromISO('2026-01-01'),
     })
@@ -300,7 +299,9 @@ test.group('Household finance access over HTTP', () => {
       .where('cardLabel', `New ${nonce}`)
       .firstOrFail()
     assert.isNull(savedCard.vaultTokenReference)
-    assert.equal(Number(savedCard.creditLimit), 0)
+    // Credit limits are self-contained PriceMoney objects with their own currency.
+    assert.equal(savedCard.creditLimit.amount, 0)
+    assert.equal(savedCard.creditLimit.currency_code, 'USD')
     assert.isNull(savedCard.nextPaymentDueDate)
     await grant('household_finance', 'update')
     assert.equal(await status(`/financial-transactions/${householdTx.id}/void`, {}), 302)

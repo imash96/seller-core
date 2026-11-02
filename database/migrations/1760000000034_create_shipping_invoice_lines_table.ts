@@ -46,16 +46,28 @@ export default class extends BaseSchema {
         .notNullable()
         .defaultTo('base_freight')
       table.string('description', 255).nullable()
-      table.string('currency_code', 3).notNullable().defaultTo('USD')
-      table.decimal('expected_amount', 14, 2).notNullable().defaultTo(0)
-      table.decimal('billed_amount', 14, 2).notNullable().defaultTo(0)
-      table.decimal('variance_amount', 14, 2).notNullable().defaultTo(0)
+      table.jsonb('expected_amount').nullable()
+      table.jsonb('billed_amount').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('tax_amount').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('variance_amount').nullable()
       table.boolean('allow_duplicate_charge').notNullable().defaultTo(false)
       table.text('reconciliation_notes').nullable()
       table.timestamp('created_at', { useTz: true }).notNullable().defaultTo(this.now())
       table.timestamp('updated_at', { useTz: true }).notNullable().defaultTo(this.now())
     })
 
+    this.schema.raw(
+      'ALTER TABLE shipping_invoice_lines ADD CONSTRAINT chk_shipping_invoice_lines_expected_amount_money CHECK (expected_amount IS NULL OR is_valid_price_money(expected_amount, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE shipping_invoice_lines ADD CONSTRAINT chk_shipping_invoice_lines_billed_amount_money CHECK (is_valid_price_money(billed_amount, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE shipping_invoice_lines ADD CONSTRAINT chk_shipping_invoice_lines_tax_amount_money CHECK (is_valid_price_money(tax_amount, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE shipping_invoice_lines ADD CONSTRAINT chk_shipping_invoice_lines_variance_amount_money CHECK (variance_amount IS NULL OR is_valid_price_money(variance_amount, true))'
+    )
     this.schema.raw(
       'CREATE INDEX idx_shipping_invoice_lines_invoice ON shipping_invoice_lines (shipping_invoice_id)'
     )

@@ -52,7 +52,7 @@ export function OrderDetailsDrawer({
       onClose={onClose}
       direction="right"
       title={`Order ${String(order.orderNumber)}`}
-      subtitle={`External ID: ${String(order.externalOrderId || 'Direct')} · ${String(order.marketplaceCode || 'direct').toUpperCase()}`}
+      subtitle={`External ID: ${String(order.externalOrderId || 'Direct')} · ${String(order.channelCode || 'direct').toUpperCase()}`}
       widthClass="max-w-xl"
     >
       <div className="p-6 space-y-6">

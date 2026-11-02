@@ -13,7 +13,7 @@ import ModuleEntitlement from './module_entitlement.js'
 import Order from './order.js'
 import Role from './role.js'
 import UserRole from './user_role.js'
-import UserSession from './user_session.js'
+import Session from './session.js'
 import { prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
 
@@ -31,9 +31,6 @@ export default class User extends AuthFinder(AppBaseModel) {
 
   @column({ columnName: 'full_name' })
   declare public fullName: string
-
-  @column({ columnName: 'company_name' })
-  declare public companyName: string | null
 
   @column({ columnName: 'phone' })
   declare public phone: string | null
@@ -87,8 +84,8 @@ export default class User extends AuthFinder(AppBaseModel) {
   @hasMany(() => ModuleEntitlement, { foreignKey: 'userId' })
   declare public moduleEntitlements: HasMany<typeof ModuleEntitlement>
 
-  @hasMany(() => UserSession, { foreignKey: 'userId' })
-  declare public userSessions: HasMany<typeof UserSession>
+  @hasMany(() => Session, { foreignKey: 'userId' })
+  declare public sessions: HasMany<typeof Session>
 
   @hasManyThrough([() => Role, () => UserRole], {
     throughLocalKey: 'roleId',

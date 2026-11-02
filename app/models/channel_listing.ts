@@ -1,23 +1,20 @@
 /**
  * ChannelListing — maps to "channel_listings".
- * Per-seller-account listing mapping for one product variant (Amazon ASIN/listing, eBay item id, Etsy listing, storefront URL).
- * Exposes multi-currency `prices: Array<{ currency_code: string, amount: number }>` via `ChannelListingPrice` and `channelAttributes.prices`.
+ *
+ * Per-seller-account listing mapping for one product variant (Amazon
+ * ASIN/listing, eBay item id, Etsy listing, storefront URL). Prices are a
+ * MedusaJS v2 multi-currency array plus the primary `listed_price` PriceMoney
+ * object — there is no standalone `currency_code` column.
  */
-import { belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
-import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
+import { belongsTo, column } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import type { DateTime } from 'luxon'
 import Product from './product.js'
 import ProductVariant from './product_variant.js'
 import SellerAccount from './seller_account.js'
-import ChannelListingPrice from './channel_listing_price.js'
-import { prepareJson } from './json_helpers.js'
+import { moneyColumn, prepareJson, priceArrayColumn } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
-import {
-  type PriceMoney,
-  buildMultiCurrencyPriceArray,
-  normalizePriceMoney,
-  normalizePriceMoneyArray,
-} from '../types/price.js'
+import type { MedusaVariantPrice, PriceMoney } from '../types/price.js'
 
 export default class ChannelListing extends AppBaseModel {
   static readonly table = 'channel_listings'
@@ -28,9 +25,6 @@ export default class ChannelListing extends AppBaseModel {
 
   @column({ columnName: 'seller_account_id' })
   declare public sellerAccountId: string
-
-  @column({ columnName: 'product_id' })
-  declare public productId: string
 
   @column({ columnName: 'product_variant_id' })
   declare public productVariantId: string
@@ -44,9 +38,6 @@ export default class ChannelListing extends AppBaseModel {
   @column({ columnName: 'external_sku' })
   declare public externalSku: string | null
 
-  @column({ columnName: 'asin' })
-  declare public asin: string | null
-
   @column({ columnName: 'channel_title' })
   declare public channelTitle: string | null
 
@@ -56,11 +47,13 @@ export default class ChannelListing extends AppBaseModel {
   @column({ columnName: 'channel_category_id' })
   declare public channelCategoryId: string | null
 
-  @column({ columnName: 'currency_code' })
-  declare public currencyCode: string
+  /** MedusaJS v2 multi-currency price array for this listing. */
+  @priceArrayColumn({ columnName: 'prices' })
+  declare public prices: MedusaVariantPrice[]
 
-  @column({ columnName: 'listed_price' })
-  declare public listedPrice: string
+  /** Primary listed amount, self-contained with its own currency code. */
+  @moneyColumn({ columnName: 'listed_price' })
+  declare public listedPrice: PriceMoney
 
   @column({ columnName: 'allocated_quantity' })
   declare public allocatedQuantity: number
@@ -92,38 +85,30 @@ export default class ChannelListing extends AppBaseModel {
   @belongsTo(() => SellerAccount, { foreignKey: 'sellerAccountId' })
   declare public sellerAccount: BelongsTo<typeof SellerAccount>
 
-  @belongsTo(() => Product, { foreignKey: 'productId' })
-  declare public product: BelongsTo<typeof Product>
-
   @belongsTo(() => ProductVariant, { foreignKey: 'productVariantId' })
   declare public productVariant: BelongsTo<typeof ProductVariant>
 
-  @hasMany(() => ChannelListingPrice, { foreignKey: 'channelListingId' })
-  declare public priceRecords: HasMany<typeof ChannelListingPrice>
+  /**
+   * The product is derived through the variant — `channel_listings` never stores a
+   * second `product_id`. Preload `productVariant.product` to read it.
+   */
+  get productId(): string | null {
+    return this.productVariant?.productId ?? null
+  }
 
-  override serialize(): Record<string, any> {
-    const raw = super.serialize()
-    const baseCur = (this.currencyCode || 'USD').toUpperCase()
-    const listedNum = Number(this.listedPrice ?? 0)
-    const attrs = (this.channelAttributes ?? {}) as Record<string, any>
+  /** Convenience accessor for the preloaded product (listing → variant → product). */
+  get product(): Product | undefined {
+    return this.productVariant?.product ?? undefined
+  }
 
-    let prices: PriceMoney[] = []
-    if (Array.isArray(this.priceRecords) && this.priceRecords.length > 0) {
-      prices = this.priceRecords.map((pr) => ({
-        currency_code: (pr.currencyCode || baseCur).toUpperCase(),
-        amount: Number(Number(pr.amount ?? 0).toFixed(2)),
-      }))
-    } else if (Array.isArray(attrs.prices) && attrs.prices.length > 0) {
-      prices = normalizePriceMoneyArray(attrs.prices, listedNum, baseCur)
-    } else {
-      prices = buildMultiCurrencyPriceArray(listedNum || 239.99)
-    }
+  /** Marketplace catalog identity of the sellable unit, owned by the variant. */
+  get asin(): string | null {
+    return this.productVariant?.asin ?? null
+  }
 
-    return {
-      ...raw,
-      price: prices,
-      prices,
-      listedPriceMoney: normalizePriceMoney(listedNum, baseCur),
-    }
+  override serialize(cherryPick?: any): Record<string, any> {
+    const raw = super.serialize(cherryPick)
+    const prices = Array.isArray(raw.prices) ? raw.prices : []
+    return { ...raw, prices, price: prices }
   }
 }

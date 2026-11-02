@@ -1,10 +1,17 @@
-import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import FinancialTransaction from '#models/financial_transaction'
 import ManualReconciliation from '#models/manual_reconciliation'
-import AuditLog from '#models/audit_log'
+import { AuditContext } from './audit_context.js'
+import PaymentReconciled from '#events/payment_reconciled'
 import type User from '#models/user'
 import { FinanceAccessService } from '#services/finance_access_service'
+import {
+  type PriceMoney,
+  amountOf,
+  currencyOf,
+  money,
+  normalizeCurrencyCode,
+} from '../types/price.js'
 
 export class ReconciliationError extends Error {
   constructor(
@@ -35,9 +42,7 @@ export class ManualReconciliationService {
     requestId?: string
   }) {
     const reference = String(input.reference ?? '').trim()
-    const currency = String(input.currency ?? '')
-      .trim()
-      .toUpperCase()
+    const currency = normalizeCurrencyCode(input.currency, 'XXX')
     const notes = String(input.notes ?? '').trim()
     if (
       reference.length < 2 ||
@@ -48,10 +53,21 @@ export class ManualReconciliationService {
       throw new ReconciliationError(
         'Provide a valid statement reference, currency and notes (up to 2000 characters).'
       )
-    const amount = normalizeAmount(input.amount)
+    // The observed statement amount is its own self-contained PriceMoney object.
+    const observedAmount: PriceMoney = money(normalizeAmount(input.amount), currency)
     const household = await FinanceAccessService.permissions(input.user)
+    // Captured inside the transaction and published only once it commits. The
+    // holder keeps the assignment visible across the callback boundary.
+    const committed: {
+      value: { transactionId: string; userId: string; amount: PriceMoney } | null
+    } = { value: null }
     try {
-      return await db.transaction(async (trx) => {
+      return await AuditContext.transaction(async (trx) => {
+        await AuditContext.apply(trx, {
+          actorUserId: input.user.id,
+          requestId: input.requestId ?? null,
+          reason: 'finance.manual_reconciliation_created',
+        })
         const tx = await FinancialTransaction.query({ client: trx })
           .where('userId', input.user.id)
           .where('id', input.transactionId)
@@ -63,8 +79,8 @@ export class ManualReconciliationService {
         if (!['posted', 'settled'].includes(tx.status))
           throw new ReconciliationError('Only posted or settled transactions can be matched.', 409)
         if (
-          normalizeAmount(tx.originalAmount) !== amount ||
-          tx.originalCurrencyCode.toUpperCase() !== currency
+          normalizeAmount(amountOf(tx.originalAmount)) !== normalizeAmount(observedAmount.amount) ||
+          currencyOf(tx.originalAmount).toUpperCase() !== observedAmount.currency_code
         )
           throw new ReconciliationError(
             'Statement amount and currency must exactly match the original ledger entry.',
@@ -75,8 +91,7 @@ export class ManualReconciliationService {
             userId: input.user.id,
             financialTransactionId: tx.id,
             sourceReference: reference,
-            observedAmount: amount,
-            currencyCode: currency,
+            observedAmount,
             notes: notes || null,
             previousStatus: tx.status,
             reconciledByUserId: input.user.id,
@@ -87,26 +102,11 @@ export class ManualReconciliationService {
         tx.status = 'reconciled'
         tx.reconciledAt = DateTime.now()
         await tx.save()
-        await AuditLog.create(
-          {
-            actorUserId: input.user.id,
-            userId: input.user.id,
-            action: 'finance.manual_reconciliation_created',
-            entityType: 'financial_transactions',
-            entityId: tx.id,
-            requestId: input.requestId ?? null,
-            beforeState: { status: match.previousStatus },
-            afterState: {
-              status: tx.status,
-              reconciliationId: match.id,
-              sourceReference: reference,
-              amount,
-              currency,
-            },
-            metadata: { verification: 'manual' },
-          },
-          { client: trx }
-        )
+        committed.value = {
+          transactionId: tx.id,
+          userId: tx.userId,
+          amount: tx.originalAmount,
+        }
         return match
       })
     } catch (error) {
@@ -116,6 +116,24 @@ export class ManualReconciliationService {
           409
         )
       throw error
+    } finally {
+      // Publishing happens after the transaction settles, so a listener can never
+      // observe a half-written reconciliation. Only a committed match is announced.
+      const published = committed.value
+      if (published) {
+        try {
+          await PaymentReconciled.dispatch({
+            financialTransactionId: published.transactionId,
+            userId: published.userId,
+            status: 'reconciled',
+            amount: published.amount,
+            requestId: input.requestId,
+          })
+        } catch {
+          // The event bus is best-effort: the ledger change already committed and
+          // must not be undone by a listener problem.
+        }
+      }
     }
   }
 
@@ -129,7 +147,12 @@ export class ManualReconciliationService {
     if (reason.length < 3 || reason.length > 2000)
       throw new ReconciliationError('Provide a reversal reason (3–2000 characters).')
     const household = await FinanceAccessService.permissions(input.user)
-    return db.transaction(async (trx) => {
+    return AuditContext.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
+        actorUserId: input.user.id,
+        requestId: input.requestId ?? null,
+        reason: 'finance.manual_reconciliation_reversed',
+      })
       const tx = await FinancialTransaction.query({ client: trx })
         .where('userId', input.user.id)
         .where('id', input.transactionId)
@@ -153,20 +176,6 @@ export class ManualReconciliationService {
       tx.status = match.previousStatus
       tx.reconciledAt = null
       await tx.save()
-      await AuditLog.create(
-        {
-          actorUserId: input.user.id,
-          userId: input.user.id,
-          action: 'finance.manual_reconciliation_reversed',
-          entityType: 'financial_transactions',
-          entityId: tx.id,
-          requestId: input.requestId ?? null,
-          beforeState: { status: 'reconciled', reconciliationId: match.id },
-          afterState: { status: tx.status, reason },
-          metadata: { verification: 'manual' },
-        },
-        { client: trx }
-      )
       return match
     })
   }

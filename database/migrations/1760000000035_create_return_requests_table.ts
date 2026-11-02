@@ -89,10 +89,15 @@ export default class extends BaseSchema {
       table.string('return_carrier', 100).nullable()
       table.string('return_tracking_number', 150).nullable()
       table.text('return_label_url').nullable()
-      table.string('currency_code', 3).notNullable().defaultTo('USD')
-      table.decimal('return_shipping_cost', 14, 2).notNullable().defaultTo(0)
-      table.decimal('restocking_fee_amount', 14, 2).notNullable().defaultTo(0)
-      table.decimal('refund_amount', 14, 2).notNullable().defaultTo(0)
+      table
+        .jsonb('return_shipping_cost')
+        .notNullable()
+        .defaultTo('{"currency_code":"USD","amount":0}')
+      table
+        .jsonb('restocking_fee_total')
+        .notNullable()
+        .defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('refund_total').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
       table
         .string('replacement_order_id', 64)
         .nullable()
@@ -121,7 +126,13 @@ export default class extends BaseSchema {
       'ALTER TABLE return_requests ADD CONSTRAINT chk_return_requests_qty_valid CHECK (quantity_requested > 0 AND quantity_approved >= 0 AND quantity_received >= 0 AND quantity_approved <= quantity_requested AND quantity_received <= quantity_requested)'
     )
     this.schema.raw(
-      'ALTER TABLE return_requests ADD CONSTRAINT chk_return_requests_amounts_nonneg CHECK (return_shipping_cost >= 0 AND restocking_fee_amount >= 0 AND refund_amount >= 0)'
+      'ALTER TABLE return_requests ADD CONSTRAINT chk_return_requests_return_shipping_cost_money CHECK (is_valid_price_money(return_shipping_cost, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE return_requests ADD CONSTRAINT chk_return_requests_restocking_fee_total_money CHECK (is_valid_price_money(restocking_fee_total, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE return_requests ADD CONSTRAINT chk_return_requests_refund_total_money CHECK (is_valid_price_money(refund_total, false))'
     )
     this.schema.raw(
       'CREATE UNIQUE INDEX uq_return_requests_user_rma ON return_requests (user_id, rma_number)'

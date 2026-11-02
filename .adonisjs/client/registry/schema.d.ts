@@ -865,6 +865,19 @@ export interface Registry {
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/seller_accounts_controller').default['deleteSellerAccount']>>>
     }
   }
+  'seller_accounts.sync': {
+    methods: ["POST"]
+    pattern: '/seller-accounts/:id/sync'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/seller_accounts_controller').default['queueSellerSync']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/seller_accounts_controller').default['queueSellerSync']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/seller_accounts_controller').default['queueSellerSync']>>>
+    }
+  }
   'shipments.store': {
     methods: ["POST"]
     pattern: '/shipments'
@@ -928,58 +941,6 @@ export interface Registry {
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['deleteShipment']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['deleteShipment']>>>
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['deleteShipment']>>>
-    }
-  }
-  'carrier_invoices.store': {
-    methods: ["POST"]
-    pattern: '/carrier-invoices'
-    types: {
-      body: {}
-      paramsTuple: []
-      params: {}
-      query: {}
-      response: ExtractResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['storeCarrierInvoice']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['storeCarrierInvoice']>>>
-      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['storeCarrierInvoice']>>>
-    }
-  }
-  'carrier_invoices.update': {
-    methods: ["POST"]
-    pattern: '/carrier-invoices/:id'
-    types: {
-      body: {}
-      paramsTuple: [ParamValue]
-      params: { id: ParamValue }
-      query: {}
-      response: ExtractResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['updateCarrierInvoice']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['updateCarrierInvoice']>>>
-      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['updateCarrierInvoice']>>>
-    }
-  }
-  'carrier_invoices.update_status': {
-    methods: ["POST"]
-    pattern: '/carrier-invoices/:id/status'
-    types: {
-      body: {}
-      paramsTuple: [ParamValue]
-      params: { id: ParamValue }
-      query: {}
-      response: ExtractResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['updateCarrierInvoice']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['updateCarrierInvoice']>>>
-      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['updateCarrierInvoice']>>>
-    }
-  }
-  'carrier_invoices.delete': {
-    methods: ["POST"]
-    pattern: '/carrier-invoices/:id/delete'
-    types: {
-      body: {}
-      paramsTuple: [ParamValue]
-      params: { id: ParamValue }
-      query: {}
-      response: ExtractResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['deleteCarrierInvoice']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['deleteCarrierInvoice']>>>
-      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/shipments_controller').default['deleteCarrierInvoice']>>>
     }
   }
   'shipping_invoices.store': {
@@ -1175,45 +1136,6 @@ export interface Registry {
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['deleteFinancialAccount']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['deleteFinancialAccount']>>>
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['deleteFinancialAccount']>>>
-    }
-  }
-  'finance_accounts.store': {
-    methods: ["POST"]
-    pattern: '/finance-accounts'
-    types: {
-      body: {}
-      paramsTuple: []
-      params: {}
-      query: {}
-      response: ExtractResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['storeFinanceAccount']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['storeFinanceAccount']>>>
-      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['storeFinanceAccount']>>>
-    }
-  }
-  'finance_accounts.update': {
-    methods: ["POST"]
-    pattern: '/finance-accounts/:id'
-    types: {
-      body: {}
-      paramsTuple: [ParamValue]
-      params: { id: ParamValue }
-      query: {}
-      response: ExtractResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['updateFinanceAccount']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['updateFinanceAccount']>>>
-      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['updateFinanceAccount']>>>
-    }
-  }
-  'finance_accounts.delete': {
-    methods: ["POST"]
-    pattern: '/finance-accounts/:id/delete'
-    types: {
-      body: {}
-      paramsTuple: [ParamValue]
-      params: { id: ParamValue }
-      query: {}
-      response: ExtractResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['deleteFinanceAccount']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['deleteFinanceAccount']>>>
-      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['deleteFinanceAccount']>>>
     }
   }
   'credit_cards.store': {

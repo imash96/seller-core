@@ -30,8 +30,7 @@ export default class extends BaseSchema {
         .defaultTo('bank_checking')
       table.string('institution_name', 150).nullable()
       table.string('account_number_last_4', 4).nullable()
-      table.string('currency_code', 3).notNullable().defaultTo('USD')
-      table.decimal('current_balance', 14, 2).notNullable().defaultTo(0)
+      table.jsonb('current_balance').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
       table
         .enum('data_classification', ['business', 'household_personal'], {
           enumName: 'data_classification',
@@ -47,6 +46,9 @@ export default class extends BaseSchema {
 
     this.schema.raw(
       "ALTER TABLE financial_accounts ADD CONSTRAINT chk_financial_accounts_last4 CHECK (account_number_last_4 IS NULL OR account_number_last_4 ~ '^[0-9]{4}$')"
+    )
+    this.schema.raw(
+      'ALTER TABLE financial_accounts ADD CONSTRAINT chk_financial_accounts_current_balance_money CHECK (is_valid_price_money(current_balance, true))'
     )
     this.schema.raw('CREATE INDEX idx_financial_accounts_user ON financial_accounts (user_id)')
     this.schema.raw(

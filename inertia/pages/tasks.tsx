@@ -1,3 +1,4 @@
+import { Stack } from '@astryxdesign/core/Stack'
 import {
   PageHeader,
   PageSection,
@@ -58,14 +59,14 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
   }, [tasksReminders])
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Tasks, Reminders & Saved Views"
         description="Operational SLA reminders, credit card payment alerts, and saved filter views across modules."
         icon={ListChecks}
         badge={`${tasksReminders.length} tasks · ${stats.activeCount} active`}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <AppButton
               variant="secondary"
               size="sm"
@@ -77,7 +78,7 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
             <AppButton variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>
               Create Task
             </AppButton>
-          </div>
+          </Stack>
         }
       />
 
@@ -298,7 +299,7 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
               },
             ],
             actions: (
-              <div className="flex items-center gap-2 flex-wrap">
+              <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -331,7 +332,7 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             ),
           })}
           columns={[
@@ -352,7 +353,7 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
             }),
             col.date('dueAt', 'Due'),
             col.action('Actions', (row) => (
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <Stack direction="horizontal" align="center" wrap="wrap" gap={1.5}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -385,7 +386,7 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             )),
           ]}
         />
@@ -447,6 +448,6 @@ export default function Tasks({ tasksReminders, savedViews }: Props) {
           emptyDescription="Create a saved view to store filter presets for any module."
         />
       </PageSection>
-    </div>
+    </Stack>
   )
 }

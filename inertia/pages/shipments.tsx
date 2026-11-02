@@ -1,3 +1,6 @@
+import { Text } from '@astryxdesign/core/Text'
+import { Grid } from '@astryxdesign/core/Grid'
+import { Stack } from '@astryxdesign/core/Stack'
 import {
   PageHeader,
   PageSection,
@@ -144,14 +147,14 @@ export default function Shipments({
   }, [shipments, statusGroupFilter, searchQuery])
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Shipments & Carrier Invoices (/shipments)"
         description="Interactive parcel fulfillment status bar, card-based shipment tracking, and carrier invoice variance reconciliation."
         icon={Truck}
         badge={`${shipments.length} shipments · ${shippingInvoices.length} invoices`}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <AppButton
               label="+ Record Carrier Invoice"
               variant="secondary"
@@ -166,7 +169,7 @@ export default function Shipments({
               icon={Plus}
               onClick={() => setCreateShipmentOpen(true)}
             />
-          </div>
+          </Stack>
         }
       />
 
@@ -231,7 +234,7 @@ export default function Shipments({
         title="Fulfillment Shipments (Card-Based Dispatch Queue)"
         description="Track parcel carrier status, volumetric vs actual weight, and shipping cost estimates."
         actions={
-          <div className="flex items-center gap-2">
+          <Stack direction="horizontal" align="center" gap={2}>
             {statusGroupFilter !== 'all' && (
               <AppButton
                 label="Show All Shipments"
@@ -247,12 +250,15 @@ export default function Shipments({
               icon={Plus}
               onClick={() => setCreateShipmentOpen(true)}
             />
-          </div>
+          </Stack>
         }
       >
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-card-border bg-muted/25 p-3.5">
-            <div className="md:col-span-2">
+        <Stack gap={4}>
+          <Grid
+            columns={{ minWidth: 220, max: 1 }}
+            className="md:grid-cols-3 rounded-2xl border border-card-border bg-muted/25 p-3.5"
+          >
+            <Stack className="md:col-span-2">
               <AppInput
                 label="Search Shipments"
                 icon={Search}
@@ -261,7 +267,7 @@ export default function Shipments({
                 onClear={() => setSearchQuery('')}
                 placeholder="Shipment #, tracking number, carrier, order #..."
               />
-            </div>
+            </Stack>
             <AppSelect
               label="Fulfillment Stage"
               value={statusGroupFilter}
@@ -274,10 +280,14 @@ export default function Shipments({
                 { value: 'exception', label: `Exceptions / Delayed (${stats.exceptions})` },
               ]}
             />
-          </div>
+          </Grid>
 
           {filteredShipments.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border p-10 text-center space-y-3">
+            <Stack
+              gap={3}
+              padding={10}
+              className="rounded-2xl border border-dashed border-border text-center"
+            >
               <p className="text-sm font-bold text-foreground">
                 No shipments match your active filter.
               </p>
@@ -287,9 +297,9 @@ export default function Shipments({
                 size="sm"
                 onClick={() => setCreateShipmentOpen(true)}
               />
-            </div>
+            </Stack>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <Grid columns={{ minWidth: 220, max: 1 }} className="md:grid-cols-2 xl:grid-cols-3">
               {filteredShipments.map((shipment) => {
                 const currency = String(shipment.currencyCode ?? 'USD')
                 const estCost = Number(shipment.estimatedShippingCost ?? 0)
@@ -300,80 +310,124 @@ export default function Shipments({
                 const items = (shipment.shipmentItems as Row[]) ?? []
 
                 return (
-                  <div
+                  <Stack
+                    justify="between"
                     key={String(shipment.id)}
-                    className="rounded-2xl border border-card-border bg-card text-card-foreground hover:border-primary/40 shadow-xs hover:shadow-md transition-all flex flex-col justify-between overflow-hidden"
+                    className="rounded-2xl border border-card-border bg-card text-card-foreground hover:border-primary/40 shadow-xs hover:shadow-md transition-all overflow-hidden"
                   >
-                    <div className="p-5 space-y-3.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-extrabold text-foreground font-mono">
+                    <Stack gap={3} padding={5}>
+                      <Stack direction="horizontal" align="start" justify="between" gap={2}>
+                        <Stack>
+                          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
+                            <Text size="sm" color="primary" className="font-extrabold font-mono">
                               {String(shipment.shipmentNumber)}
-                            </span>
+                            </Text>
                             <StatusBadge
                               label={String(
                                 shipment.carrierName || shipment.carrierCode || 'Carrier'
                               ).toUpperCase()}
                               variant="info"
                             />
-                          </div>
+                          </Stack>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             Order: <strong className="text-foreground">#{String(orderNum)}</strong>
                             {shipment.serviceLevel ? ` · ${String(shipment.serviceLevel)}` : ''}
                           </p>
-                        </div>
+                        </Stack>
                         <StatusBadge
                           label={String(shipment.status ?? 'pending').replace(/_/g, ' ')}
                           variant={STATUS_TONES[String(shipment.status)] ?? 'neutral'}
                         />
-                      </div>
+                      </Stack>
 
-                      <div className="rounded-xl border border-border-subtle bg-muted/25 p-2.5 flex items-center justify-between gap-2 text-xs">
-                        <span className="text-muted-foreground font-medium">Tracking #:</span>
+                      <Stack
+                        direction="horizontal"
+                        align="center"
+                        justify="between"
+                        gap={2}
+                        padding={2}
+                        className="rounded-xl border border-border-subtle bg-muted/25 text-xs"
+                      >
+                        <Text color="secondary" weight="medium">
+                          Tracking #:
+                        </Text>
                         <MonoBadge text={String(shipment.trackingNumber || 'AWAITING_LABEL')} />
-                      </div>
+                      </Stack>
 
-                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-divider text-xs">
-                        <div>
-                          <span className="block text-[10px] font-bold uppercase text-muted-foreground">
+                      <Grid
+                        columns={{ minWidth: 220, max: 3 }}
+                        className="pt-2 border-t border-divider text-xs"
+                      >
+                        <Stack>
+                          <Text
+                            size="3xs"
+                            color="secondary"
+                            weight="bold"
+                            className="block uppercase"
+                          >
                             Est. Freight
-                          </span>
-                          <span className="font-bold text-foreground tabular-nums">
+                          </Text>
+                          <Text color="primary" weight="bold" hasTabularNumbers>
                             {money(currency, estCost)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="block text-[10px] font-bold uppercase text-muted-foreground">
+                          </Text>
+                        </Stack>
+                        <Stack>
+                          <Text
+                            size="3xs"
+                            color="secondary"
+                            weight="bold"
+                            className="block uppercase"
+                          >
                             Actual Billed
-                          </span>
-                          <span
-                            className={`font-extrabold tabular-nums ${
+                          </Text>
+                          <Text
+                            as="span"
+                            weight="bold"
+                            hasTabularNumbers
+                            className={
                               actCost > estCost && estCost > 0 ? 'text-error' : 'text-price-current'
-                            }`}
+                            }
                           >
                             {money(currency, actCost)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="block text-[10px] font-bold uppercase text-muted-foreground">
+                          </Text>
+                        </Stack>
+                        <Stack>
+                          <Text
+                            size="3xs"
+                            color="secondary"
+                            weight="bold"
+                            className="block uppercase"
+                          >
                             Dispatched
-                          </span>
-                          <span className="font-medium text-foreground-secondary">
+                          </Text>
+                          <Text weight="medium" className="text-foreground-secondary">
                             {when(shipment.shippedAt || shipment.createdAt)}
-                          </span>
-                        </div>
-                      </div>
+                          </Text>
+                        </Stack>
+                      </Grid>
 
                       {items.length > 0 && (
-                        <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-1">
+                        <Stack
+                          direction="horizontal"
+                          align="center"
+                          gap={1.5}
+                          className="text-2xs text-muted-foreground pt-1"
+                        >
                           <Package className="w-3.5 h-3.5 text-primary shrink-0" />
-                          <span className="truncate">{items.length} parcel line(s) fulfilled</span>
-                        </div>
+                          <Text maxLines={1}>{items.length} parcel line(s) fulfilled</Text>
+                        </Stack>
                       )}
-                    </div>
+                    </Stack>
 
-                    <div className="px-5 py-3 bg-muted/30 border-t border-divider flex items-center justify-between gap-2">
+                    <Stack
+                      direction="horizontal"
+                      align="center"
+                      justify="between"
+                      gap={2}
+                      paddingInline={5}
+                      paddingBlock={3}
+                      className="bg-muted/30 border-t border-divider"
+                    >
                       <AppButton
                         label="Update Status"
                         variant="primary"
@@ -381,21 +435,21 @@ export default function Shipments({
                         icon={Edit3}
                         onClick={() => setUpdateShipmentRow(shipment)}
                       />
-                      <div className="flex items-center gap-1.5">
+                      <Stack direction="horizontal" align="center" gap={1.5}>
                         <AppButton
                           label="+ Invoice"
                           variant="secondary"
                           size="xs"
                           onClick={() => setCreateInvoiceOpen(true)}
                         />
-                      </div>
-                    </div>
-                  </div>
+                      </Stack>
+                    </Stack>
+                  </Stack>
                 )
               })}
-            </div>
+            </Grid>
           )}
-        </div>
+        </Stack>
       </PageSection>
 
       {/* =====================================================================
@@ -415,7 +469,11 @@ export default function Shipments({
         }
       >
         {shippingInvoices.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border p-8 text-center space-y-2">
+          <Stack
+            gap={2}
+            padding={8}
+            className="rounded-2xl border border-dashed border-border text-center"
+          >
             <p className="text-sm font-bold text-foreground">No carrier invoices recorded yet.</p>
             <AppButton
               label="+ Record Carrier Invoice"
@@ -423,12 +481,12 @@ export default function Shipments({
               size="sm"
               onClick={() => setCreateInvoiceOpen(true)}
             />
-          </div>
+          </Stack>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-card-border bg-card shadow-xs">
+          <Stack className="overflow-x-auto rounded-2xl border border-card-border bg-card shadow-xs">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-divider bg-muted/40 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b border-divider bg-muted/40 text-2xs font-bold uppercase tracking-wider text-muted-foreground">
                   <th className="py-3.5 px-4">Invoice #</th>
                   <th className="py-3.5 px-4">Carrier</th>
                   <th className="py-3.5 px-4">Invoice Date</th>
@@ -492,7 +550,7 @@ export default function Shipments({
                         />
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <Stack direction="horizontal" align="center" justify="end" gap={1.5}>
                           <AppButton
                             label="Reconcile"
                             variant="secondary"
@@ -501,19 +559,19 @@ export default function Shipments({
                             onClick={() => setUpdateInvoiceRow(inv)}
                           />
                           <RowAction
-                            action={`/carrier-invoices/${inv.id}/delete`}
+                            action={`/shipping-invoices/${inv.id}/delete`}
                             label="Delete"
                             variant="ghost"
                             confirmText={`Delete invoice ${inv.invoiceNumber}?`}
                           />
-                        </div>
+                        </Stack>
                       </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
-          </div>
+          </Stack>
         )}
       </PageSection>
 
@@ -604,7 +662,7 @@ export default function Shipments({
         title="Record Carrier Invoice (local only)"
         subtitle="An omitted expected amount remains unverified. No carrier or payment provider is contacted."
         submitLabel="Create Invoice"
-        action="/carrier-invoices"
+        action="/shipping-invoices"
         fields={[
           { name: 'carrierCode', label: 'Carrier code', required: true },
           { name: 'carrierName', label: 'Carrier name', required: true },
@@ -642,8 +700,8 @@ export default function Shipments({
         submitLabel="Update Invoice"
         action={
           updateInvoiceRow
-            ? `/carrier-invoices/${updateInvoiceRow.id}`
-            : '/carrier-invoices/placeholder'
+            ? `/shipping-invoices/${updateInvoiceRow.id}`
+            : '/shipping-invoices/placeholder'
         }
         initialValues={{
           paymentStatus: String(updateInvoiceRow?.paymentStatus ?? 'unpaid'),
@@ -681,6 +739,6 @@ export default function Shipments({
           },
         ]}
       />
-    </div>
+    </Stack>
   )
 }

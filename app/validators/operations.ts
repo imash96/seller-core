@@ -1,5 +1,5 @@
 import vine from '@vinejs/vine'
-import { objectId } from './helpers.js'
+import { medusaPricesArraySchema, objectId, priceMoneySchema } from './helpers.js'
 
 export const createSellerAccountValidator = vine.create({
   salesChannelId: objectId(),
@@ -17,7 +17,6 @@ export const createCustomerValidator = vine.create({
   email: vine.string().email().trim().optional().nullable(),
   proxyEmail: vine.string().email().trim().optional().nullable(),
   phone: vine.string().trim().optional().nullable(),
-  preferredCurrency: vine.string().fixedLength(3).toUpperCase().optional(),
   riskLevel: vine.enum(['low', 'medium', 'high', 'under_review', 'cleared'] as const).optional(),
   line1: vine.string().trim().optional(),
   city: vine.string().trim().optional(),
@@ -33,27 +32,42 @@ export const createProductValidator = vine.create({
   sku: vine.string().trim().minLength(2).maxLength(120),
   skuPrefix: vine.string().trim().maxLength(20).optional(),
   asin: vine.string().trim().maxLength(20).optional().nullable(),
-  currencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
-  retailPrice: vine.number().min(0),
-  costPrice: vine.number().min(0).optional(),
-  manufacturingCost: vine.number().min(0).optional(),
-  packagingCost: vine.number().min(0).optional(),
+  /** USD base price; the multi-currency array is derived from it. */
+  priceUsd: vine.number().min(0),
+  costPrice: priceMoneySchema().optional(),
+  manufacturingCost: priceMoneySchema().optional(),
+  packagingCost: priceMoneySchema().optional(),
   stockOnHand: vine.number().min(0).optional(),
   hasVariants: vine.string().trim().optional(),
   variationDimensions: vine.string().trim().optional(),
   description: vine.string().trim().optional().nullable(),
-  pricesJson: vine.string().trim().optional(),
+  pricesJson: medusaPricesArraySchema().optional(),
 })
+
+// Canonical fulfilment channels and tax collection models (mirrors the DB CHECKs).
+const FULFILLMENT_CHANNELS = ['MFN', 'AFN', 'FBA', 'FBM', '3PL', 'direct'] as const
+const TAX_COLLECTION_MODELS = ['marketplace_facilitator', 'seller', 'none'] as const
 
 export const createOrderValidator = vine.create({
   orderNumber: vine.string().trim().minLength(2).maxLength(100),
   externalOrderId: vine.string().trim().maxLength(150).optional().nullable(),
+  externalDisplayId: vine.string().trim().maxLength(150).optional().nullable(),
   sellerAccountId: objectId().optional().nullable(),
   marketplaceCode: vine.string().trim().maxLength(50).optional(),
+  marketplaceSiteId: vine.string().trim().maxLength(64).optional().nullable(),
+  fulfillmentChannel: vine.enum(FULFILLMENT_CHANNELS).optional(),
+  taxCollectionModel: vine.enum(TAX_COLLECTION_MODELS).optional(),
+  earliestShipAt: vine.string().trim().optional().nullable(),
+  latestShipAt: vine.string().trim().optional().nullable(),
+  earliestDeliveryAt: vine.string().trim().optional().nullable(),
+  latestDeliveryAt: vine.string().trim().optional().nullable(),
   currencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
   reportingCurrencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
   exchangeRate: vine.number().min(0.0001).optional(),
-  shippingCostAmount: vine.number().min(0).optional(),
+  shippingCostTotal: priceMoneySchema().optional(),
+  shippingCostCurrencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
+  paymentProcessingFeesTotal: priceMoneySchema().optional(),
+  marketplaceFeesTotal: priceMoneySchema().optional(),
   customerFullName: vine.string().trim().minLength(2).maxLength(255),
   customerEmail: vine.string().email().trim().optional().nullable(),
   customerPhone: vine.string().trim().optional().nullable(),
@@ -64,11 +78,14 @@ export const createOrderValidator = vine.create({
   sku: vine.string().trim().minLength(1).maxLength(120),
   itemTitle: vine.string().trim().minLength(1).maxLength(255),
   quantityOrdered: vine.number().withoutDecimals().min(1),
-  unitPrice: vine.number().min(0),
-  unitCostAmount: vine.number().min(0).optional(),
-  taxAmount: vine.number().min(0).optional(),
-  discountAmount: vine.number().min(0).optional(),
-  shippingChargedAmount: vine.number().min(0).optional(),
+  unitPrice: priceMoneySchema(),
+  unitCost: priceMoneySchema().optional(),
+  taxTotal: priceMoneySchema().optional(),
+  discountTotal: priceMoneySchema().optional(),
+  promotionTotal: priceMoneySchema().optional(),
+  shippingTotal: priceMoneySchema().optional(),
+  shippingDiscountTotal: priceMoneySchema().optional(),
+  shippingTaxTotal: priceMoneySchema().optional(),
 })
 
 export const bulkOrderImportValidator = vine.create({
@@ -91,7 +108,9 @@ export const createShipmentValidator = vine.create({
   widthCm: vine.number().min(1).optional(),
   heightCm: vine.number().min(1).optional(),
   deadWeightGrams: vine.number().min(1).optional(),
-  estimatedShippingCost: vine.number().min(0).optional(),
+  estimatedShippingCost: priceMoneySchema().optional(),
+  estimatedShippingCostCurrencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
+  insuranceCost: priceMoneySchema().optional(),
   status: vine
     .enum([
       'pending',
@@ -128,8 +147,9 @@ export const createShippingInvoiceValidator = vine.create({
     'return_shipping',
     'other',
   ] as const),
-  expectedAmount: vine.number().min(0).optional(),
-  billedAmount: vine.number().min(0),
+  expectedAmount: priceMoneySchema().optional(),
+  billedAmount: priceMoneySchema(),
+  taxAmount: priceMoneySchema().optional(),
 })
 
 export const createReturnRequestValidator = vine.create({
@@ -150,7 +170,9 @@ export const createReturnRequestValidator = vine.create({
     .enum(['refund', 'partial_refund', 'replacement', 'store_credit', 'rejected'] as const)
     .optional(),
   quantityRequested: vine.number().withoutDecimals().min(1),
-  restockingFeeAmount: vine.number().min(0).optional(),
+  restockingFeeTotal: priceMoneySchema().optional(),
+  returnShippingCost: priceMoneySchema().optional(),
+  returnCostCurrencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
   customerComments: vine.string().trim().optional(),
 })
 
@@ -158,10 +180,10 @@ export const createRefundValidator = vine.create({
   orderId: objectId(),
   returnRequestId: objectId().optional().nullable(),
   refundNumber: vine.string().trim().minLength(2).maxLength(100),
-  itemsRefundAmount: vine.number().min(0),
-  shippingRefundAmount: vine.number().min(0).optional(),
-  taxRefundAmount: vine.number().min(0).optional(),
-  restockingFeeDeducted: vine.number().min(0).optional(),
+  itemsRefundTotal: priceMoneySchema(),
+  shippingRefundTotal: priceMoneySchema().optional(),
+  taxRefundTotal: priceMoneySchema().optional(),
+  restockingFeeTotal: priceMoneySchema().optional(),
   reason: vine.string().trim().optional(),
 })
 
@@ -174,9 +196,9 @@ export const createCreditCardValidator = vine.create({
   expMonth: vine.number().withoutDecimals().min(1).max(12),
   expYear: vine.number().withoutDecimals().min(2000).max(2100),
   currencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
-  creditLimit: vine.number().min(0).optional(),
-  currentBalance: vine.number().min(0).optional(),
-  minimumPaymentDue: vine.number().min(0).optional(),
+  creditLimit: priceMoneySchema().optional(),
+  currentBalance: priceMoneySchema().optional(),
+  minimumPaymentDue: priceMoneySchema().optional(),
   nextPaymentDueDate: vine.string().trim().optional(),
   sellerAccountId: objectId().optional().nullable(),
   usagePurpose: vine
@@ -205,10 +227,10 @@ export const createFinancialTransactionValidator = vine.create({
   description: vine.string().trim().minLength(2).maxLength(255),
   vendorOrPayer: vine.string().trim().optional(),
   originalCurrencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
-  originalAmount: vine.number().min(0.01),
+  originalAmount: priceMoneySchema({ min: 0.01 }),
   exchangeRate: vine.number().min(0.0001).optional(),
   reportingCurrencyCode: vine.string().fixedLength(3).toUpperCase().optional(),
-  taxAmount: vine.number().min(0).optional(),
+  taxTotal: priceMoneySchema().optional(),
   transactionDate: vine.string().trim(),
   financialAccountId: objectId().optional().nullable(),
   financeCategoryId: objectId().optional().nullable(),
@@ -248,7 +270,6 @@ export const updateCustomerValidator = vine.create({
   fullName: vine.string().trim().minLength(2).maxLength(255).optional(),
   email: vine.string().email().trim().optional().nullable(),
   phone: vine.string().trim().optional().nullable(),
-  preferredCurrency: vine.string().fixedLength(3).toUpperCase().optional(),
   riskLevel: vine.enum(['low', 'medium', 'high', 'under_review', 'cleared'] as const).optional(),
   notes: vine.string().trim().optional().nullable(),
 })
@@ -271,15 +292,15 @@ export const updateSellerAccountValidator = vine.create({
 
 export const updateFinancialAccountValidator = vine.create({
   accountName: vine.string().trim().minLength(2).maxLength(150).optional(),
-  currentBalance: vine.number().optional(),
+  currentBalance: priceMoneySchema().optional(),
   isActive: vine.boolean().optional(),
 })
 
 export const updateCreditCardValidator = vine.create({
   cardLabel: vine.string().trim().minLength(2).maxLength(150).optional(),
-  currentBalance: vine.number().min(0).optional(),
-  creditLimit: vine.number().min(0).optional(),
-  minimumPaymentDue: vine.number().min(0).optional(),
+  currentBalance: priceMoneySchema().optional(),
+  creditLimit: priceMoneySchema().optional(),
+  minimumPaymentDue: priceMoneySchema().optional(),
   nextPaymentDueDate: vine.string().trim().optional().nullable(),
   status: vine.enum(['active', 'frozen', 'expired', 'cancelled'] as const).optional(),
 })
@@ -330,11 +351,16 @@ export const updateTaskValidator = vine.create({
 export const createVariantValidator = vine.create({
   sku: vine.string().trim().minLength(2).maxLength(120),
   title: vine.string().trim().minLength(1).maxLength(255),
-  retailPrice: vine.number().min(0),
-  costPrice: vine.number().min(0).optional(),
+  asin: vine.string().trim().maxLength(20).optional().nullable(),
+  /** USD base price; the variant price array is derived from it. */
+  priceUsd: vine.number().min(0),
+  costPrice: priceMoneySchema().optional(),
+  manufacturingCost: priceMoneySchema().optional(),
+  packagingCost: priceMoneySchema().optional(),
   stockOnHand: vine.number().min(0).optional(),
   attributeName: vine.string().trim().maxLength(100).optional(),
   attributeValue: vine.string().trim().maxLength(255).optional(),
+  pricesJson: medusaPricesArraySchema().optional(),
 })
 
 export const updateVariantStockValidator = vine.create({

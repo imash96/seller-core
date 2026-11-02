@@ -4,7 +4,7 @@ import User from '#models/user'
 import Organization from '#models/organization'
 import OrganizationMembership from '#models/organization_membership'
 import Role from '#models/role'
-import AuditLog from '#models/audit_log'
+import { AuditContext } from './audit_context.js'
 
 export class OrganizationError extends Error {
   constructor(
@@ -105,7 +105,12 @@ export class OrganizationService {
     const name = String(nameInput ?? '').trim()
     if (name.length < 2 || name.length > 150)
       throw new OrganizationError('Organization name must be 2–150 characters.')
-    return db.transaction(async (trx) => {
+    return AuditContext.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
+        actorUserId: actor.id,
+        requestId: requestId ?? null,
+        reason: 'organization.created',
+      })
       // Serialize creates per actor so the quota cannot be bypassed with concurrent requests.
       await User.query({ client: trx }).where('id', actor.id).forUpdate().firstOrFail()
       const count = await Organization.query({ client: trx })
@@ -127,19 +132,6 @@ export class OrganizationService {
         },
         { client: trx }
       )
-      await AuditLog.create(
-        {
-          actorUserId: actor.id,
-          userId: actor.id,
-          action: 'organization.created',
-          entityType: 'organizations',
-          entityId: organization.id,
-          requestId: requestId ?? null,
-          afterState: { name },
-          metadata: {},
-        },
-        { client: trx }
-      )
       return organization
     })
   }
@@ -156,8 +148,13 @@ export class OrganizationService {
     const roleId = String(input.roleId ?? '').trim()
     if (!email || email.length > 254 || !['true', 'false'].includes(String(input.isAdmin)))
       throw new OrganizationError('Provide a valid email and administrator setting.')
-    return db.transaction(async (trx) => {
+    return AuditContext.transaction(async (trx) => {
       const org = await this.lockAdmin(actor, organizationId, trx)
+      await AuditContext.apply(trx, {
+        actorUserId: actor.id,
+        requestId: requestId ?? null,
+        reason: 'organization.member_upserted',
+      })
       const target = await User.query({ client: trx }).where('email', email).first()
       if (!target || target.status !== 'active')
         throw new OrganizationError('Active user not found.', 404)
@@ -174,7 +171,6 @@ export class OrganizationService {
         .where('organizationId', org.id)
         .where('userId', target.id)
         .first()
-      const before = existing ? { isAdmin: existing.isAdmin, roleId: existing.roleId } : null
       const member = existing ?? new OrganizationMembership()
       member.useTransaction(trx)
       member.organizationId = org.id
@@ -183,20 +179,6 @@ export class OrganizationService {
       member.roleId = roleId || null
       member.addedByUserId = existing?.addedByUserId ?? actor.id
       await member.save()
-      await AuditLog.create(
-        {
-          actorUserId: actor.id,
-          userId: target.id,
-          action: existing ? 'organization.member_updated' : 'organization.member_added',
-          entityType: 'organizations',
-          entityId: org.id,
-          requestId: requestId ?? null,
-          beforeState: before,
-          afterState: { memberUserId: target.id, isAdmin: member.isAdmin, roleId: member.roleId },
-          metadata: {},
-        },
-        { client: trx }
-      )
       return member
     })
   }
@@ -207,8 +189,13 @@ export class OrganizationService {
     membershipId: string,
     requestId?: string
   ) {
-    return db.transaction(async (trx) => {
+    return AuditContext.transaction(async (trx) => {
       const org = await this.lockAdmin(actor, organizationId, trx)
+      await AuditContext.apply(trx, {
+        actorUserId: actor.id,
+        requestId: requestId ?? null,
+        reason: 'organization.member_removed',
+      })
       const member = await OrganizationMembership.query({ client: trx })
         .where('organizationId', org.id)
         .where('id', membershipId)
@@ -216,21 +203,7 @@ export class OrganizationService {
       if (!member) throw new OrganizationError('Member not found.', 404)
       if (member.userId === org.ownerUserId)
         throw new OrganizationError('The owner cannot be removed.', 409)
-      const memberUserId = member.userId
       await member.delete()
-      await AuditLog.create(
-        {
-          actorUserId: actor.id,
-          userId: memberUserId,
-          action: 'organization.member_removed',
-          entityType: 'organizations',
-          entityId: org.id,
-          requestId: requestId ?? null,
-          beforeState: { memberUserId, isAdmin: member.isAdmin, roleId: member.roleId },
-          metadata: {},
-        },
-        { client: trx }
-      )
     })
   }
 }

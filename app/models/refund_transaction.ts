@@ -11,11 +11,16 @@ import FinancialAccount from './financial_account.js'
 import Order from './order.js'
 import OrderLineItem from './order_line_item.js'
 import ReturnRequest from './return_request.js'
+import { moneyColumn } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import type { PriceMoney } from '../types/price.js'
 
 export default class RefundTransaction extends AppBaseModel {
   static readonly table = 'refund_transactions'
   static readonly idPrefix = 'ref'
+
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'grandRefundTotal'
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -41,23 +46,20 @@ export default class RefundTransaction extends AppBaseModel {
   @column({ columnName: 'status' })
   declare public status: string
 
-  @column({ columnName: 'currency_code' })
-  declare public currencyCode: string
+  @moneyColumn({ columnName: 'items_refund_total' })
+  declare public itemsRefundTotal: PriceMoney
 
-  @column({ columnName: 'items_refund_amount' })
-  declare public itemsRefundAmount: string
+  @moneyColumn({ columnName: 'shipping_refund_total' })
+  declare public shippingRefundTotal: PriceMoney
 
-  @column({ columnName: 'shipping_refund_amount' })
-  declare public shippingRefundAmount: string
+  @moneyColumn({ columnName: 'tax_refund_total' })
+  declare public taxRefundTotal: PriceMoney
 
-  @column({ columnName: 'tax_refund_amount' })
-  declare public taxRefundAmount: string
+  @moneyColumn({ columnName: 'restocking_fee_total' })
+  declare public restockingFeeTotal: PriceMoney
 
-  @column({ columnName: 'restocking_fee_deducted' })
-  declare public restockingFeeDeducted: string
-
-  @column({ columnName: 'total_refund_amount' })
-  declare public totalRefundAmount: string
+  @moneyColumn({ columnName: 'grand_refund_total' })
+  declare public grandRefundTotal: PriceMoney
 
   @column({ columnName: 'reason' })
   declare public reason: string | null

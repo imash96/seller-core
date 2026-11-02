@@ -8,8 +8,6 @@ import { belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import type { DateTime } from 'luxon'
 import Order from './order.js'
-import SellerAccount from './seller_account.js'
-import SyncJob from './sync_job.js'
 import { prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
 
@@ -22,12 +20,6 @@ export default class OrderImportPayload extends AppBaseModel {
 
   @column({ columnName: 'order_id' })
   declare public orderId: string
-
-  @column({ columnName: 'sync_job_id' })
-  declare public syncJobId: string | null
-
-  @column({ columnName: 'seller_account_id' })
-  declare public sellerAccountId: string | null
 
   @column({ columnName: 'payload_hash' })
   declare public payloadHash: string
@@ -47,9 +39,12 @@ export default class OrderImportPayload extends AppBaseModel {
   @belongsTo(() => Order, { foreignKey: 'orderId' })
   declare public order: BelongsTo<typeof Order>
 
-  @belongsTo(() => SyncJob, { foreignKey: 'syncJobId' })
-  declare public syncJob: BelongsTo<typeof SyncJob>
+  /** Sync job and seller account are read from the parent order row. */
+  get syncJobId(): string | null {
+    return this.order?.syncJobId ?? null
+  }
 
-  @belongsTo(() => SellerAccount, { foreignKey: 'sellerAccountId' })
-  declare public sellerAccount: BelongsTo<typeof SellerAccount>
+  get sellerAccountId(): string | null {
+    return this.order?.sellerAccountId ?? null
+  }
 }

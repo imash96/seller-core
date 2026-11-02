@@ -19,8 +19,7 @@ export default class extends BaseSchema {
         .inTable('financial_transactions')
         .onDelete('RESTRICT')
       table.string('source_reference', 150).notNullable()
-      table.decimal('observed_amount', 14, 2).notNullable()
-      table.string('currency_code', 3).notNullable()
+      table.jsonb('observed_amount').notNullable()
       table.text('notes').nullable()
       table.string('previous_status', 30).notNullable()
       table
@@ -49,7 +48,7 @@ export default class extends BaseSchema {
       'CREATE INDEX idx_manual_reconciliations_user_tx ON manual_reconciliations (user_id, financial_transaction_id)'
     )
     this.schema.raw(
-      'ALTER TABLE manual_reconciliations ADD CONSTRAINT chk_manual_reconciliation_amount CHECK (observed_amount >= 0)'
+      'ALTER TABLE manual_reconciliations ADD CONSTRAINT chk_manual_reconciliation_observed_amount_money CHECK (is_valid_price_money(observed_amount, false))'
     )
   }
 

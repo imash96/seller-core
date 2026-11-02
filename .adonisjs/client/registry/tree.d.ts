@@ -99,6 +99,7 @@ export interface ApiDefinition {
     store: typeof routes['seller_accounts.store']
     update: typeof routes['seller_accounts.update']
     delete: typeof routes['seller_accounts.delete']
+    sync: typeof routes['seller_accounts.sync']
   }
   shipments: {
     store: typeof routes['shipments.store']
@@ -106,12 +107,6 @@ export interface ApiDefinition {
     bulkExport: typeof routes['shipments.bulk_export']
     updateStatus: typeof routes['shipments.update_status']
     delete: typeof routes['shipments.delete']
-  }
-  carrierInvoices: {
-    store: typeof routes['carrier_invoices.store']
-    update: typeof routes['carrier_invoices.update']
-    updateStatus: typeof routes['carrier_invoices.update_status']
-    delete: typeof routes['carrier_invoices.delete']
   }
   shippingInvoices: {
     store: typeof routes['shipping_invoices.store']
@@ -137,11 +132,6 @@ export interface ApiDefinition {
     store: typeof routes['financial_accounts.store']
     update: typeof routes['financial_accounts.update']
     delete: typeof routes['financial_accounts.delete']
-  }
-  financeAccounts: {
-    store: typeof routes['finance_accounts.store']
-    update: typeof routes['finance_accounts.update']
-    delete: typeof routes['finance_accounts.delete']
   }
   creditCards: {
     store: typeof routes['credit_cards.store']

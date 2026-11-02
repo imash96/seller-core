@@ -34,3 +34,20 @@ docs <topic> getting-started, principles, tokens, theme … (`astryx docs` lists
 docs cli commands, API reference, integration authoring
 upgrade --from <old version> --apply run after a dependency bump
 <!-- ASTRYX:END -->
+
+## Local development & verification
+
+WebSSH-free local loop (embedded Postgres shipped as a devDependency):
+
+```bash
+pnpm db:start                 # embedded PostgreSQL on 127.0.0.1:5432
+pnpm db:migrate && pnpm db:seed
+NODE_ENV=test node ace serve   # port 3333, test DB — required by tests/functional/*
+pnpm test                      # in another shell
+pnpm typecheck                 # tsc (server) + tsc (inertia)
+pnpm db:schema:check           # fails if schema.dbml / supabase_schema.sql drift
+```
+
+`tests/functional/*` talk to a live server on `http://localhost:3333`, and that server
+must run with `NODE_ENV=test` so it shares `TEST_DATABASE_URL` with the test runner.
+Run the app for manual browsing with plain `node ace serve` (development DB) instead.

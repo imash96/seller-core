@@ -1,3 +1,6 @@
+import { Grid } from '@astryxdesign/core/Grid'
+import { Text } from '@astryxdesign/core/Text'
+import { Stack } from '@astryxdesign/core/Stack'
 import { useState, useMemo } from 'react'
 import { router } from '@inertiajs/react'
 import {
@@ -70,27 +73,63 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
   const [page, setPage] = useState(1)
   const pageSize = 10
 
+  // Raw marketplace payload — the importer auto-detects Amazon / eBay / Etsy /
+  // MedusaJS / canonical Seller Core JSON per record.
   const sampleJson = JSON.stringify(
     [
       {
-        orderNumber: 'AMZ-2026-901',
+        payload: {
+          Orders: [
+            {
+              AmazonOrderId: '902-8324761-1234567',
+              MarketplaceId: 'ATVPDKIKX0DER',
+              PurchaseDate: '2026-02-11T14:22:31Z',
+              OrderStatus: 'Unshipped',
+              FulfillmentChannel: 'AFN',
+              OrderTotal: { Amount: '857.83', CurrencyCode: 'USD' },
+              TaxCollection: { Model: 'MarketplaceFacilitator' },
+              LatestShipDate: '2026-02-14T23:59:59Z',
+              ShippingAddress: {
+                Name: 'Priya Nair',
+                AddressLine1: '221B Marine Drive',
+                City: 'Mumbai',
+                StateOrRegion: 'MH',
+                PostalCode: '400020',
+                CountryCode: 'IN',
+              },
+              BuyerInfo: { BuyerEmail: 'buyer@marketplace.amazon.com' },
+            },
+          ],
+        },
+        orderItemsPayload: {
+          payload: {
+            OrderItems: [
+              {
+                ASIN: 'B09ASTRYX1',
+                SellerSKU: 'MCTDC01-BLK-NP-RG-M',
+                OrderItemId: 'OI-1',
+                Title: 'Leather Duster Coat',
+                QuantityOrdered: 1,
+                ItemPrice: { Amount: '750.00', CurrencyCode: 'USD' },
+                ItemTax: { Amount: '60.00', CurrencyCode: 'USD' },
+                ShippingPrice: { Amount: '40.00', CurrencyCode: 'USD' },
+                ShippingTax: { Amount: '7.83', CurrencyCode: 'USD' },
+              },
+            ],
+          },
+        },
+      },
+      {
+        orderNumber: 'ORD-CANON-901',
         externalOrderId: 'EXT-901',
-        customerFullName: 'Jane Doe',
+        customer: { fullName: 'Jane Doe', email: 'jane@example.com' },
         currencyCode: 'USD',
         lines: [
-          {
-            sku: 'MCTDC01-BLK-NP-RG-M',
-            title: 'Leather Duster Coat',
-            quantityOrdered: 1,
-            currencyCode: 'USD',
-            unitPrice: 239.99,
-          },
           {
             sku: 'MJKBK03-BLK-NP-SL-L',
             title: 'Moto Biker Jacket',
             quantityOrdered: 1,
-            currencyCode: 'USD',
-            unitPrice: 259.99,
+            unitPrice: { currency_code: 'USD', amount: 259.99 },
           },
         ],
       },
@@ -127,7 +166,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
       if (statusFilter !== 'all' && String(o.status) !== statusFilter) return false
-      if (channelFilter !== 'all' && String(o.marketplaceCode) !== channelFilter) return false
+      if (channelFilter !== 'all' && String(o.channelCode) !== channelFilter) return false
 
       const cust = (o.customer as Row) ?? {}
       if (customerSegmentFilter === 'repeat') {
@@ -148,7 +187,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
         const hay = [
           o.orderNumber,
           o.externalOrderId,
-          o.marketplaceCode,
+          o.channelCode,
           cust.fullName,
           cust.email,
           ...((o.lineItems as Row[]) ?? []).map((li) => `${li.sku} ${li.title}`),
@@ -189,14 +228,14 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
   }
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Orders & Multi-Currency P&L"
         description="3-section order cards featuring stacked product thumbnails, multi-currency OrderPrice & OrderLineItemPrice P&L waterfall economics, and customer repeat/fraud intelligence."
         icon={Package}
         badge={`${orders.length} orders`}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <AppButton
               label="Export CSV"
               variant="outline"
@@ -218,7 +257,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
               icon={Plus}
               onClick={() => setCreateOpen(true)}
             />
-          </div>
+          </Stack>
         }
       />
 
@@ -269,12 +308,26 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
 
       {/* Bulk Selection Floating/Inline Bar */}
       {selectedIds.length > 0 && (
-        <div className="px-4 py-3 rounded-2xl border border-primary/35 bg-primary-subtle flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+        <Stack
+          direction="horizontal"
+          align="center"
+          justify="between"
+          wrap="wrap"
+          gap={3}
+          paddingInline={4}
+          paddingBlock={3}
+          className="rounded-2xl border border-primary/35 bg-primary-subtle"
+        >
+          <Stack
+            direction="horizontal"
+            align="center"
+            gap={2}
+            className="text-sm font-bold text-foreground"
+          >
             <CheckSquare className="w-4 h-4 text-primary" />
-            <span>{selectedIds.length} order(s) selected</span>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
+            <Text>{selectedIds.length} order(s) selected</Text>
+          </Stack>
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <select
               value={bulkStatus}
               onChange={(e) => setBulkStatus(e.target.value)}
@@ -298,8 +351,8 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
               size="xs"
               onClick={() => setSelectedIds([])}
             />
-          </div>
-        </div>
+          </Stack>
+        </Stack>
       )}
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
@@ -309,8 +362,11 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
         title="Order Operations Queue (3-Section Cards)"
         description="Left: Product thumbnail stack (tilted layered images when multi-item). Center: Multi-currency OrderPrice & OrderLineItemPrice P&L breakdown. Right: Customer address & Repeat/Fraud intelligence."
       >
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 rounded-2xl border border-card-border bg-muted/25 p-3.5">
+        <Stack gap={4}>
+          <Grid
+            columns={{ minWidth: 220, max: 1 }}
+            className="md:grid-cols-2 lg:grid-cols-4 rounded-2xl border border-card-border bg-muted/25 p-3.5"
+          >
             <AppInput
               label="Search Order / SKU / Customer"
               icon={Search}
@@ -368,14 +424,18 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
                 { value: 'fraud_risk', label: 'Fraud / High-Risk Buyers' },
               ]}
             />
-          </div>
+          </Grid>
 
           {paginatedOrders.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border p-10 text-center space-y-3">
+            <Stack
+              gap={3}
+              padding={10}
+              className="rounded-2xl border border-dashed border-border text-center"
+            >
               <p className="text-sm font-bold text-foreground">
                 No orders match your active filters.
               </p>
-              <div className="flex items-center justify-center gap-2">
+              <Stack direction="horizontal" align="center" justify="center" gap={2}>
                 <AppButton
                   label="Reset Filters"
                   variant="secondary"
@@ -393,10 +453,10 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
                   size="sm"
                   onClick={() => setCreateOpen(true)}
                 />
-              </div>
-            </div>
+              </Stack>
+            </Stack>
           ) : (
-            <div className="space-y-4">
+            <Stack gap={4}>
               {paginatedOrders.map((order) => (
                 <OrderCard
                   key={String(order.id)}
@@ -419,9 +479,9 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
                 totalRecords={filteredOrders.length}
                 onPageChange={setPage}
               />
-            </div>
+            </Stack>
           )}
-        </div>
+        </Stack>
       </PageSection>
 
       {/* Create Order Modal */}
@@ -451,7 +511,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
             })),
           },
           {
-            name: 'marketplaceCode',
+            name: 'channelCode',
             label: 'Marketplace',
             kind: 'select',
             default: 'direct',
@@ -461,7 +521,58 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
               { value: 'amazon', label: 'Amazon' },
               { value: 'ebay', label: 'eBay' },
               { value: 'etsy', label: 'Etsy' },
+              { value: 'medusa', label: 'MedusaJS' },
             ],
+          },
+          {
+            name: 'externalDisplayId',
+            label: 'External display ID (Amazon SellerOrderId / eBay legacyOrderId)',
+            section: '1. Order & Channel',
+          },
+          {
+            name: 'marketplaceSiteId',
+            label: 'Marketplace site ID (MarketplaceId / shop_id / region_id)',
+            section: '1. Order & Channel',
+          },
+          {
+            name: 'fulfillmentChannel',
+            label: 'Fulfilment channel',
+            kind: 'select',
+            default: 'MFN',
+            section: '1. Order & Channel',
+            options: [
+              { value: 'MFN', label: 'MFN — merchant fulfilled' },
+              { value: 'AFN', label: 'AFN — Amazon fulfilled' },
+              { value: 'FBA', label: 'FBA' },
+              { value: 'FBM', label: 'FBM' },
+              { value: '3PL', label: '3PL' },
+              { value: 'direct', label: 'Direct (own webstore)' },
+            ],
+          },
+          {
+            name: 'taxCollectionModel',
+            label: 'Tax collection model',
+            kind: 'select',
+            default: 'seller',
+            section: '1. Order & Channel',
+            options: [
+              { value: 'seller', label: 'Seller remits tax' },
+              {
+                value: 'marketplace_facilitator',
+                label: 'Marketplace facilitator (Amazon/eBay/Etsy remit)',
+              },
+              { value: 'none', label: 'No tax collected' },
+            ],
+          },
+          {
+            name: 'latestShipAt',
+            label: 'Ship-by deadline (ISO 8601)',
+            section: '1. Order & Channel',
+          },
+          {
+            name: 'latestDeliveryAt',
+            label: 'Deliver-by deadline (ISO 8601)',
+            section: '1. Order & Channel',
           },
           {
             name: 'currencyCode',
@@ -543,35 +654,35 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
             section: '3. Line Item & P&L Economics',
           },
           {
-            name: 'unitCostAmount',
+            name: 'unitCost',
             label: 'Unit COGS',
             kind: 'number',
             default: '0',
             section: '3. Line Item & P&L Economics',
           },
           {
-            name: 'taxAmount',
+            name: 'taxTotal',
             label: 'Tax',
             kind: 'number',
             default: '0',
             section: '3. Line Item & P&L Economics',
           },
           {
-            name: 'discountAmount',
+            name: 'discountTotal',
             label: 'Discount',
             kind: 'number',
             default: '0',
             section: '3. Line Item & P&L Economics',
           },
           {
-            name: 'shippingChargedAmount',
+            name: 'shippingTotal',
             label: 'Shipping charged to buyer',
             kind: 'number',
             default: '0',
             section: '3. Line Item & P&L Economics',
           },
           {
-            name: 'shippingCostAmount',
+            name: 'shippingCostTotal',
             label: 'Actual shipping cost',
             kind: 'number',
             default: '0',
@@ -585,15 +696,14 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
         isOpen={bulkOpen}
         onOpenChange={setBulkOpen}
         title="Idempotent Bulk Order Import (JSON)"
-        subtitle="Deduplicates on (seller_account_id, external_order_id) and creates OrderPrice, OrderLineItemPrice, and SyncJob records."
+        subtitle="Paste raw Amazon SP-API / eBay Fulfillment / Etsy v3 / MedusaJS v2 payloads or canonical Seller Core JSON. The platform is auto-detected per record; imports dedupe on (seller_account_id, external_order_id) and record per-record failures in sync_job_errors."
         submitLabel="Run Import Batch"
         action="/orders/bulk-import"
         presetActions={[
           {
-            label: 'Load Sample Multi-Item JSON',
+            label: 'Load Sample Marketplace Payloads',
             values: {
               idempotencyKey: 'batch-orders-2026-01',
-              marketplaceCode: 'amazon',
               ordersJson: sampleJson,
             },
           },
@@ -604,19 +714,6 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
             label: 'Idempotency key',
             default: 'batch-orders-2026-01',
             required: true,
-          },
-          {
-            name: 'marketplaceCode',
-            label: 'Marketplace code',
-            kind: 'select',
-            default: 'amazon',
-            required: true,
-            options: [
-              { value: 'amazon', label: 'Amazon' },
-              { value: 'ebay', label: 'eBay' },
-              { value: 'etsy', label: 'Etsy' },
-              { value: 'direct', label: 'Direct' },
-            ],
           },
           {
             name: 'sellerAccountId',
@@ -671,6 +768,6 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
           setEditRow(o)
         }}
       />
-    </div>
+    </Stack>
   )
 }

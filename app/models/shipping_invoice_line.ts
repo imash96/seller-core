@@ -9,11 +9,16 @@ import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import type { DateTime } from 'luxon'
 import Shipment from './shipment.js'
 import ShippingInvoice from './shipping_invoice.js'
+import { moneyColumn, nullableMoneyColumn } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import type { PriceMoney } from '../types/price.js'
 
 export default class ShippingInvoiceLine extends AppBaseModel {
   static readonly table = 'shipping_invoice_lines'
   static readonly idPrefix = 'sinvl'
+
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'billedAmount'
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -24,26 +29,23 @@ export default class ShippingInvoiceLine extends AppBaseModel {
   @column({ columnName: 'shipment_id' })
   declare public shipmentId: string | null
 
-  @column({ columnName: 'tracking_number' })
-  declare public trackingNumber: string | null
-
   @column({ columnName: 'charge_type' })
   declare public chargeType: string
 
   @column({ columnName: 'description' })
   declare public description: string | null
 
-  @column({ columnName: 'currency_code' })
-  declare public currencyCode: string
+  @nullableMoneyColumn({ columnName: 'expected_amount' })
+  declare public expectedAmount: PriceMoney | null
 
-  @column({ columnName: 'expected_amount' })
-  declare public expectedAmount: string | null
+  @moneyColumn({ columnName: 'billed_amount' })
+  declare public billedAmount: PriceMoney
 
-  @column({ columnName: 'billed_amount' })
-  declare public billedAmount: string
+  @moneyColumn({ columnName: 'tax_amount' })
+  declare public taxAmount: PriceMoney
 
-  @column({ columnName: 'variance_amount' })
-  declare public varianceAmount: string | null
+  @nullableMoneyColumn({ columnName: 'variance_amount' })
+  declare public varianceAmount: PriceMoney | null
 
   @column({ columnName: 'allow_duplicate_charge' })
   declare public allowDuplicateCharge: boolean
@@ -59,6 +61,11 @@ export default class ShippingInvoiceLine extends AppBaseModel {
 
   @belongsTo(() => ShippingInvoice, { foreignKey: 'shippingInvoiceId' })
   declare public shippingInvoice: BelongsTo<typeof ShippingInvoice>
+
+  /** Tracking is derived from the linked shipment (`shipments.tracking_number`). */
+  get trackingNumber(): string | null {
+    return this.shipment?.trackingNumber ?? null
+  }
 
   @belongsTo(() => Shipment, { foreignKey: 'shipmentId' })
   declare public shipment: BelongsTo<typeof Shipment>

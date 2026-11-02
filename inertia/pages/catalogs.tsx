@@ -1,7 +1,9 @@
+import { Grid } from '@astryxdesign/core/Grid'
 import { Stack, VStack, HStack } from '@astryxdesign/core/Stack'
 import { Table, proportional } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
 import { router } from '@inertiajs/react'
+import { FeedbackBanner } from '~/modules/common/feedback-banner'
 import { getCsrfToken } from '~/lib/cookies'
 import {
   PageHeader,
@@ -82,13 +84,8 @@ type GeneratedProductPreview = {
   structuredBaseCode: string
   structuredCode?: string
   title: string
-  title75?: string
-  title80?: string
   subTitle: string
-  subTitle125?: string
   description: string
-  shortDescription: string
-  extendedDescription: string
   categoryId: string | null
   categoryName: string
   categoryHandle: string
@@ -182,17 +179,11 @@ export default function Catalogs({
     fileName: '',
     status: 'draft',
     title: '',
-    title75: '',
-    title80: '',
     subTitle: '',
-    subTitle125: '',
     productType: 'Duster Coat',
     categoryHandle: 'mens/apparel/outerwear/coats/duster-coats',
     resolvedCategoryId: '',
     genderCode: 'M',
-    categoryCode: 'CT',
-    productCode: 'DC',
-    fitCode: 'RG',
     lengthCode: 'MX',
     leatherCode: 'NP',
     priceTierCode: '01',
@@ -225,8 +216,6 @@ export default function Catalogs({
     ageGroup: 'adult',
     careInstructions: 'Professional Leather Clean Only',
     description: '',
-    shortDescription: '',
-    extendedDescription: '',
     featuresLines:
       'PREMIUM LAMBSKIN LEATHER: Crafted from supple 100% real lambskin leather\nICONIC DUSTER DESIGN & FIT: Full-length western duster silhouette\nCLASSIC BUTTON CLOSURE: Durable matte hardware with storm flap\nVERSATILE COLLAR & POCKETS: Multi-pocket interior & exterior storage',
     keywordsLines:
@@ -297,17 +286,11 @@ export default function Catalogs({
       fileName: `MJKBK${seq}-BLK-NP-SL`,
       status: 'draft',
       title: '',
-      title75: '',
-      title80: '',
       subTitle: '',
-      subTitle125: '',
       productType: 'Biker Jacket',
       categoryHandle: 'men/outerwear/jackets/biker-motorcycle',
       resolvedCategoryId: '',
       genderCode: 'M',
-      categoryCode: 'JK',
-      productCode: 'BK',
-      fitCode: 'SL',
       lengthCode: 'XX',
       leatherCode: 'NP',
       priceTierCode: '02',
@@ -340,10 +323,6 @@ export default function Catalogs({
       ageGroup: 'adult',
       careInstructions: 'Professional Leather Clean Only',
       description: 'Premium handcrafted genuine lambskin leather motorcycle jacket.',
-      shortDescription:
-        'Handcrafted 100% genuine lambskin leather biker jacket with YKK zippers and quilted lining.',
-      extendedDescription:
-        '✨ Premium Genuine Lambskin Leather — tailored for durability, comfort, and timeless moto style.',
       featuresLines:
         '100% Genuine Lambskin Leather\nHeavy-Duty YKK Zippers\nInterior & Exterior Security Pockets\nBreathable Quilted Liner',
       keywordsLines: 'biker leather jacket; mens motorcycle jacket; lambskin moto jacket',
@@ -378,17 +357,11 @@ export default function Catalogs({
       fileName: String(item.fileName ?? ''),
       status: String(item.status ?? 'draft'),
       title: String(item.title ?? ''),
-      title75: String(item.title75 ?? item.title ?? ''),
-      title80: String(item.title80 ?? item.title ?? ''),
       subTitle: String(item.subTitle ?? ''),
-      subTitle125: String(item.subTitle125 ?? item.subTitle ?? ''),
       productType: String(item.productType ?? item.type ?? 'Duster Coat'),
       categoryHandle: String(item.categoryHandle ?? 'men/outerwear/coats/duster'),
       resolvedCategoryId: String(item.resolvedCategoryId ?? ''),
       genderCode: String(item.genderCode ?? 'M'),
-      categoryCode: String(item.categoryCode ?? 'CT'),
-      productCode: String(item.productCode ?? 'DC'),
-      fitCode: String(item.fitCode ?? 'RG'),
       lengthCode: String(item.lengthCode ?? 'MX'),
       leatherCode: String(item.leatherCode ?? item.materialCode ?? 'NP'),
       priceTierCode: String(item.priceTierCode ?? item.priceTier ?? '01'),
@@ -422,8 +395,6 @@ export default function Catalogs({
       ageGroup: String(attrs.age_group ?? 'adult'),
       careInstructions: String(attrs.care_instructions ?? 'Professional Leather Clean Only'),
       description: String(item.description ?? ''),
-      shortDescription: String(item.shortDescription ?? ''),
-      extendedDescription: String(item.extendedDescription ?? ''),
       featuresLines: Array.isArray(attrs.bullets)
         ? attrs.bullets.join('\n')
         : Array.isArray(item.features)
@@ -793,14 +764,14 @@ export default function Catalogs({
   const readyCount = catalogItems.length - convertedCount
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Master Catalog Studio (/catalog)"
         description="Brand-agnostic master catalog stored in PostgreSQL with modular SKU/Color/Size/Price config, multi-facet filtering, complete 4-section CRUD modals, and interactive Product & Variant Preview before conversion."
         icon={Layers}
         badge={`${catalogItems.length} catalog SKUs · ${convertedCount} converted · ${categories.length} categories`}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <AppButton
               label={busyId === 'sync-cat' ? 'Syncing...' : 'Sync Medusa Categories'}
               variant="secondary"
@@ -836,7 +807,7 @@ export default function Catalogs({
               size="sm"
               onClick={() => router.visit('/products')}
             />
-          </div>
+          </Stack>
         }
       />
 
@@ -1038,31 +1009,11 @@ export default function Catalogs({
 
       {/* Feedback Banner */}
       {banner && (
-        <div
-          className={`flex items-start justify-between gap-3 rounded-2xl border p-4 text-sm ${
-            banner.tone === 'success'
-              ? 'border-success/40 bg-success-subtle text-foreground'
-              : banner.tone === 'error'
-                ? 'border-error/40 bg-error-subtle text-foreground'
-                : 'border-info/40 bg-info-subtle text-foreground'
-          }`}
-        >
-          <div className="flex items-start gap-2.5">
-            {banner.tone === 'error' ? (
-              <AlertCircle className="h-5 w-5 text-error shrink-0 mt-0.5" />
-            ) : (
-              <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" />
-            )}
-            <p className="font-medium">{banner.message}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setBanner(null)}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            Dismiss
-          </button>
-        </div>
+        <FeedbackBanner
+          tone={banner.tone}
+          message={banner.message}
+          onDismiss={() => setBanner(null)}
+        />
       )}
 
       {/* Collapsible Accordion for Modular Catalog Config Reference */}
@@ -1075,95 +1026,130 @@ export default function Catalogs({
             badge={`${Object.keys(modularConfig.colorCodes).length} Colors · 3 Tiers`}
             badgeVariant="info"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-              <div className="rounded-xl border border-card-border bg-card p-3.5 space-y-2">
-                <div className="font-bold text-foreground flex items-center justify-between">
-                  <span>sku.ts & taxonomy.ts</span>
+            <Grid
+              columns={{ minWidth: 220, max: 1 }}
+              className="md:grid-cols-2 lg:grid-cols-4 text-xs"
+            >
+              <Stack gap={2} padding={3} className="rounded-xl border border-card-border bg-card">
+                <Stack
+                  direction="horizontal"
+                  align="center"
+                  justify="between"
+                  className="font-bold text-foreground"
+                >
+                  <Text>sku.ts & taxonomy.ts</Text>
                   <MonoBadge text="SKU Format" />
-                </div>
-                <p className="font-mono text-[11px] text-primary break-all">
+                </Stack>
+                <p className="font-mono text-2xs text-primary break-all">
                   {modularConfig.skuFormat}
                 </p>
-                <div className="text-muted-foreground space-y-1">
-                  <div>
+                <Stack gap={1} className="text-muted-foreground">
+                  <Stack>
                     <strong>Genders:</strong>{' '}
                     {Object.entries(modularConfig.genders)
                       .map(([code, label]) => `${label} (${code})`)
                       .join(', ')}
-                  </div>
-                  <div>
+                  </Stack>
+                  <Stack>
                     <strong>Categories:</strong>{' '}
                     {Object.entries(modularConfig.categories)
                       .map(([code, label]) => `${label} (${code})`)
                       .join(', ')}
-                  </div>
-                  <div>
+                  </Stack>
+                  <Stack>
                     <strong>Fits:</strong>{' '}
                     {Object.entries(modularConfig.fits)
                       .map(([code, label]) => `${label} (${code})`)
                       .join(', ')}
-                  </div>
-                </div>
-              </div>
+                  </Stack>
+                </Stack>
+              </Stack>
 
-              <div className="rounded-xl border border-card-border bg-card p-3.5 space-y-2">
-                <div className="font-bold text-foreground flex items-center justify-between">
-                  <span>colors.ts</span>
+              <Stack gap={2} padding={3} className="rounded-xl border border-card-border bg-card">
+                <Stack
+                  direction="horizontal"
+                  align="center"
+                  justify="between"
+                  className="font-bold text-foreground"
+                >
+                  <Text>colors.ts</Text>
                   <Badge
                     label={`${Object.keys(modularConfig.colorCodes).length} Colors`}
                     variant="info"
                   />
-                </div>
-                <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                </Stack>
+                <Stack gap={1} className="max-h-36 overflow-y-auto pr-1">
                   {Object.entries(modularConfig.colorCodes).map(([code, c]) => (
-                    <div key={code} className="flex items-center justify-between text-[11px]">
-                      <span className="font-mono font-semibold text-foreground">{code}</span>
-                      <span className="text-muted-foreground">
+                    <Stack
+                      direction="horizontal"
+                      align="center"
+                      justify="between"
+                      key={code}
+                      className="text-2xs"
+                    >
+                      <Text color="primary" weight="semibold" className="font-mono">
+                        {code}
+                      </Text>
+                      <Text color="secondary">
                         {c.name} ({c.colorMap})
-                      </span>
-                    </div>
+                      </Text>
+                    </Stack>
                   ))}
-                </div>
-              </div>
+                </Stack>
+              </Stack>
 
-              <div className="rounded-xl border border-card-border bg-card p-3.5 space-y-2">
-                <div className="font-bold text-foreground flex items-center justify-between">
-                  <span>prices.ts</span>
+              <Stack gap={2} padding={3} className="rounded-xl border border-card-border bg-card">
+                <Stack
+                  direction="horizontal"
+                  align="center"
+                  justify="between"
+                  className="font-bold text-foreground"
+                >
+                  <Text>prices.ts</Text>
                   <Badge label="Tier Pricing" variant="success" />
-                </div>
-                <div className="space-y-2">
+                </Stack>
+                <Stack gap={2}>
                   {Object.entries(modularConfig.priceTiers).map(([tier, data]) => (
-                    <div key={tier} className="rounded-lg border border-divider bg-muted/20 p-2">
-                      <div className="font-semibold text-foreground">
+                    <Stack
+                      padding={2}
+                      key={tier}
+                      className="rounded-lg border border-divider bg-muted/20"
+                    >
+                      <Stack className="font-semibold text-foreground">
                         Tier {tier} — {data.label}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                      </Stack>
+                      <Stack className="text-2xs text-muted-foreground mt-0.5">
                         S: ${data.prices.S ?? 229.99} · M: ${data.prices.M ?? 239.99} · XL: $
                         {data.prices.XL ?? 239.99} · 3XL: ${data.prices['3XL'] ?? 259.99}
-                      </div>
-                    </div>
+                      </Stack>
+                    </Stack>
                   ))}
-                </div>
-              </div>
+                </Stack>
+              </Stack>
 
-              <div className="rounded-xl border border-card-border bg-card p-3.5 space-y-2">
-                <div className="font-bold text-foreground flex items-center justify-between">
-                  <span>leatherCodes & sizes.ts</span>
+              <Stack gap={2} padding={3} className="rounded-xl border border-card-border bg-card">
+                <Stack
+                  direction="horizontal"
+                  align="center"
+                  justify="between"
+                  className="font-bold text-foreground"
+                >
+                  <Text>leatherCodes & sizes.ts</Text>
                   <Badge label="Materials & Sizes" variant="warning" />
-                </div>
-                <div className="text-muted-foreground space-y-1">
-                  <div>
+                </Stack>
+                <Stack gap={1} className="text-muted-foreground">
+                  <Stack>
                     <strong>Materials:</strong>{' '}
                     {Object.entries(modularConfig.leatherCodes)
                       .map(([code, label]) => `${label} (${code})`)
                       .join(', ')}
-                  </div>
-                  <div>
+                  </Stack>
+                  <Stack>
                     <strong>Size Systems:</strong> {modularConfig.sizeGroups.join(', ')}
-                  </div>
-                </div>
-              </div>
-            </div>
+                  </Stack>
+                </Stack>
+              </Stack>
+            </Grid>
           </AccordionItem>
         </Accordion>
       )}
@@ -1173,8 +1159,11 @@ export default function Catalogs({
         title="Master Catalog Items (Table-Based CRUD & Product Converter)"
         description="Filter catalog SKUs by gender, category, product type, or conversion status. Click 'Convert to Product' on any SKU to preview and edit generated variants before creating the Product."
       >
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 rounded-2xl border border-card-border bg-muted/25 p-3.5">
+        <Stack gap={4}>
+          <Grid
+            columns={{ minWidth: 220, max: 1 }}
+            className="md:grid-cols-2 lg:grid-cols-5 rounded-2xl border border-card-border bg-muted/25 p-3.5"
+          >
             <AppInput
               label="Search SKU / Title / Handle"
               icon={Search}
@@ -1234,14 +1223,18 @@ export default function Catalogs({
                 { value: 'converted', label: 'Converted to Product' },
               ]}
             />
-          </div>
+          </Grid>
 
           {filteredItems.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border p-10 text-center space-y-3">
+            <Stack
+              gap={3}
+              padding={10}
+              className="rounded-2xl border border-dashed border-border text-center"
+            >
               <p className="text-sm font-bold text-foreground">
                 No Catalog SKUs match your current filters.
               </p>
-              <div className="flex items-center justify-center gap-2">
+              <Stack direction="horizontal" align="center" justify="center" gap={2}>
                 <AppButton
                   label="+ New Catalog SKU"
                   variant="primary"
@@ -1256,13 +1249,13 @@ export default function Catalogs({
                   icon={Upload}
                   onClick={() => setImportJsonModalOpen(true)}
                 />
-              </div>
-            </div>
+              </Stack>
+            </Stack>
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-card-border bg-card shadow-xs">
+            <Stack className="overflow-x-auto rounded-2xl border border-card-border bg-card shadow-xs">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="border-b border-divider bg-muted/40 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b border-divider bg-muted/40 text-2xs font-bold uppercase tracking-wider text-muted-foreground">
                     <th className="py-3.5 px-4">SKU & Structured Code</th>
                     <th className="py-3.5 px-4">Catalog Title & Subtitle</th>
                     <th className="py-3.5 px-4">Gender / Category / Type</th>
@@ -1296,56 +1289,58 @@ export default function Catalogs({
                     return (
                       <tr key={String(item.id)} className="hover:bg-muted/20 transition-colors">
                         <td className="py-3.5 px-4 align-top">
-                          <div className="font-mono font-extrabold text-sm text-foreground">
+                          <Stack className="font-mono font-extrabold text-sm text-foreground">
                             {skuKey}
-                          </div>
-                          <div className="font-mono text-[11px] text-primary mt-0.5">
+                          </Stack>
+                          <Stack className="font-mono text-2xs text-primary mt-0.5">
                             {baseCode}
-                          </div>
+                          </Stack>
                         </td>
                         <td className="py-3.5 px-4 align-top max-w-xs">
-                          <div className="font-bold text-foreground line-clamp-1">
+                          <Stack className="font-bold text-foreground line-clamp-1">
                             {String(item.title)}
-                          </div>
-                          <div className="text-muted-foreground line-clamp-1 mt-0.5">
-                            {String(item.subTitle || item.shortDescription || '—')}
-                          </div>
-                          <div className="text-[11px] font-mono text-muted-foreground mt-1">
+                          </Stack>
+                          <Stack className="text-muted-foreground line-clamp-1 mt-0.5">
+                            {String(item.subTitle || '—')}
+                          </Stack>
+                          <Stack className="text-2xs font-mono text-muted-foreground mt-1">
                             /{String(item.categoryHandle ?? '')}
-                          </div>
+                          </Stack>
                         </td>
                         <td className="py-3.5 px-4 align-top">
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                          <Stack direction="horizontal" align="center" wrap="wrap" gap={1.5}>
                             <Badge
                               label={`Gender: ${item.genderCode ?? item.gender ?? 'M'}`}
                               variant="info"
                             />
                             <Badge label={`Cat: ${item.categoryCode ?? 'CT'}`} variant="neutral" />
                             <Badge label={prodType} variant="purple" />
-                          </div>
-                          <div className="text-[11px] text-muted-foreground mt-1">
+                          </Stack>
+                          <Stack className="text-2xs text-muted-foreground mt-1">
                             Fit: {String(item.fitCode ?? 'RG')} · Mat:{' '}
                             {String(item.leatherCode ?? item.materialCode ?? 'NP')}
-                          </div>
+                          </Stack>
                         </td>
                         <td className="py-3.5 px-4 align-top">
-                          <div className="text-foreground font-medium">
+                          <Stack className="text-foreground font-medium">
                             Colors ({colors.length}):{' '}
-                            <span className="font-mono text-primary">{colors.join(', ')}</span>
-                          </div>
-                          <div className="text-muted-foreground mt-0.5 line-clamp-1">
+                            <Text color="accent" className="font-mono">
+                              {colors.join(', ')}
+                            </Text>
+                          </Stack>
+                          <Stack className="text-muted-foreground mt-0.5 line-clamp-1">
                             Sizes ({sizes.length}):{' '}
-                            <span className="font-mono">{sizes.join(', ')}</span>
-                          </div>
+                            <Text className="font-mono">{sizes.join(', ')}</Text>
+                          </Stack>
                         </td>
                         <td className="py-3.5 px-4 align-top">
-                          <div className="font-bold text-price-current">
+                          <Stack className="font-bold text-price-current">
                             Tier {String(item.priceTierCode ?? item.priceTier ?? '01')}
-                          </div>
-                          <div className="text-muted-foreground mt-0.5">
+                          </Stack>
+                          <Stack className="text-muted-foreground mt-0.5">
                             {String(item.estimatedVariantCount ?? colors.length * sizes.length)}{' '}
                             variants
-                          </div>
+                          </Stack>
                         </td>
                         <td className="py-3.5 px-4 align-top">
                           <Badge
@@ -1353,13 +1348,19 @@ export default function Catalogs({
                             variant={isConverted ? 'success' : 'warning'}
                           />
                           {item.convertedProductTitle && (
-                            <div className="text-[11px] text-success font-medium mt-1 line-clamp-1">
+                            <Stack className="text-2xs text-success font-medium mt-1 line-clamp-1">
                               → {String(item.convertedProductTitle)}
-                            </div>
+                            </Stack>
                           )}
                         </td>
                         <td className="py-3.5 px-4 align-top text-right">
-                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          <Stack
+                            direction="horizontal"
+                            align="center"
+                            justify="end"
+                            wrap="wrap"
+                            gap={1.5}
+                          >
                             <AppButton
                               label={
                                 busyId === `preview-${item.id}`
@@ -1395,34 +1396,48 @@ export default function Catalogs({
                               icon={Trash2}
                               onClick={() => handleDeleteCatalogItem(item)}
                             />
-                          </div>
+                          </Stack>
                         </td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
-            </div>
+            </Stack>
           )}
-        </div>
+        </Stack>
       </PageSection>
 
       {/* =====================================================================
           MODAL 1: CONVERT TO PRODUCT — GENERATED PREVIEW & INLINE EDIT MODAL
          ===================================================================== */}
       {previewModalOpen && previewData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="relative w-full max-w-5xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl max-h-[92vh] flex flex-col">
-            <div className="flex items-start justify-between gap-4 border-b border-divider px-6 py-4 bg-muted/30">
-              <div>
-                <div className="flex items-center gap-2">
+        <Stack
+          direction="horizontal"
+          align="center"
+          justify="center"
+          padding={4}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs overflow-y-auto"
+        >
+          <Stack className="relative w-full max-w-5xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl">
+            <Stack
+              direction="horizontal"
+              align="start"
+              justify="between"
+              gap={4}
+              paddingInline={6}
+              paddingBlock={4}
+              className="border-b border-divider bg-muted/30"
+            >
+              <Stack>
+                <Stack direction="horizontal" align="center" gap={2}>
                   <Badge label={`Catalog ${previewData.skuKey}`} variant="info" />
                   <MonoBadge text={previewData.structuredBaseCode} />
                   <Badge
                     label={`${previewData.variants.length} Generated Variants`}
                     variant="success"
                   />
-                </div>
+                </Stack>
                 <h2 className="text-lg font-bold text-foreground mt-1">
                   Generated Product & Variants Preview (Editable Before Creation)
                 </h2>
@@ -1431,7 +1446,7 @@ export default function Catalogs({
                   category linkage, and individual Cartesian (Color × Size) variant SKUs before
                   saving to `/products`.
                 </p>
-              </div>
+              </Stack>
               <button
                 type="button"
                 onClick={() => setPreviewModalOpen(false)}
@@ -1439,36 +1454,26 @@ export default function Catalogs({
               >
                 <X className="h-5 w-5" />
               </button>
-            </div>
+            </Stack>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              <div className="rounded-xl border border-card-border bg-muted/20 p-4 space-y-4">
+            <Stack direction="horizontal" gap={6} padding={6} className="flex-1 overflow-y-auto">
+              <Stack
+                gap={4}
+                padding={4}
+                className="rounded-xl border border-card-border bg-muted/20"
+              >
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   1. Parent Product Metadata (Brand-Agnostic)
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
+                <Grid columns={{ minWidth: 220, max: 1 }} className="md:grid-cols-3">
+                  <Stack className="md:col-span-2">
                     <AppInput
-                      label="Product Title (60c)"
+                      label="Product Title (channel caps applied at publish)"
                       value={previewData.title}
                       onChange={(e) => setPreviewData({ ...previewData, title: e.target.value })}
                     />
-                  </div>
-                  <div>
-                    <AppInput
-                      label="Title 75 (Etsy / Amazon)"
-                      value={previewData.title75 ?? previewData.title}
-                      onChange={(e) => setPreviewData({ ...previewData, title75: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <AppInput
-                      label="Title 80 (eBay)"
-                      value={previewData.title80 ?? previewData.title}
-                      onChange={(e) => setPreviewData({ ...previewData, title80: e.target.value })}
-                    />
-                  </div>
-                  <div>
+                  </Stack>
+                  <Stack>
                     <AppInput
                       label="Structured Base Code (SKU Prefix)"
                       value={previewData.structuredBaseCode}
@@ -1480,8 +1485,8 @@ export default function Catalogs({
                         })
                       }
                     />
-                  </div>
-                  <div>
+                  </Stack>
+                  <Stack>
                     <AppSelect
                       label="Medusa Category"
                       value={previewData.categoryId ?? ''}
@@ -1499,39 +1504,30 @@ export default function Catalogs({
                         })),
                       ]}
                     />
-                  </div>
-                  <div>
+                  </Stack>
+                  <Stack>
                     <AppInput
                       label="Subtitle (60c)"
                       value={previewData.subTitle}
                       onChange={(e) => setPreviewData({ ...previewData, subTitle: e.target.value })}
                     />
-                  </div>
-                  <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  </Stack>
+                  <Stack className="md:col-span-3">
                     <AppTextarea
-                      label="SEO Description"
-                      rows={2}
+                      label="SEO Description (the single canonical copy)"
+                      rows={3}
                       value={previewData.description}
                       onChange={(e) =>
                         setPreviewData({ ...previewData, description: e.target.value })
                       }
                     />
-                    <AppTextarea
-                      label="Short Description (Amazon <=500c)"
-                      maxChars={500}
-                      rows={2}
-                      value={previewData.shortDescription}
-                      onChange={(e) =>
-                        setPreviewData({ ...previewData, shortDescription: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
+                  </Stack>
+                </Grid>
+              </Stack>
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
+              <Stack gap={3}>
+                <Stack direction="horizontal" align="center" justify="between">
+                  <Stack>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       2. Generated Product Variants ({previewData.variants.length} SKUs from Color ×
                       Size)
@@ -1540,7 +1536,7 @@ export default function Catalogs({
                       Edit any SKU, Variant Title, Color, Size, Retail Tier Price, Cost Price, or
                       Initial Stock before saving.
                     </p>
-                  </div>
+                  </Stack>
                   <AppButton
                     label="+ Add Custom Variant Row"
                     variant="secondary"
@@ -1548,11 +1544,11 @@ export default function Catalogs({
                     icon={Plus}
                     onClick={addBlankPreviewVariant}
                   />
-                </div>
+                </Stack>
 
-                <div className="overflow-x-auto rounded-xl border border-card-border bg-card max-h-80">
+                <Stack className="overflow-x-auto rounded-xl border border-card-border bg-card max-h-80">
                   <table className="w-full text-left border-collapse text-xs">
-                    <thead className="sticky top-0 bg-muted border-b border-divider text-[11px] font-bold uppercase text-muted-foreground">
+                    <thead className="sticky top-0 bg-muted border-b border-divider text-2xs font-bold uppercase text-muted-foreground">
                       <tr>
                         <th className="py-2.5 px-3">Generated Variant SKU</th>
                         <th className="py-2.5 px-3">Variant Title</th>
@@ -1572,7 +1568,7 @@ export default function Catalogs({
                               type="text"
                               value={v.sku}
                               onChange={(e) => updatePreviewVariant(idx, 'sku', e.target.value)}
-                              className="w-56 rounded border border-input-border bg-input-background px-2 py-1 font-mono text-[11px] text-foreground"
+                              className="w-56 rounded border border-input-border bg-input-background px-2 py-1 font-mono text-2xs text-foreground"
                             />
                           </td>
                           <td className="py-2 px-3">
@@ -1655,17 +1651,24 @@ export default function Catalogs({
                       ))}
                     </tbody>
                   </table>
-                </div>
-              </div>
-            </div>
+                </Stack>
+              </Stack>
+            </Stack>
 
-            <div className="flex items-center justify-between border-t border-divider px-6 py-4 bg-muted/25">
-              <div className="text-xs text-muted-foreground">
+            <Stack
+              direction="horizontal"
+              align="center"
+              justify="between"
+              paddingInline={6}
+              paddingBlock={4}
+              className="border-t border-divider bg-muted/25"
+            >
+              <Stack className="text-xs text-muted-foreground">
                 Creates <strong>1 Parent Product</strong> +{' '}
                 <strong>{previewData.variants.length} ProductVariants</strong> with normalized color
                 & size attributes.
-              </div>
-              <div className="flex items-center gap-2">
+              </Stack>
+              <Stack direction="horizontal" align="center" gap={2}>
                 <AppButton
                   label="Cancel"
                   variant="ghost"
@@ -1683,23 +1686,36 @@ export default function Catalogs({
                   loading={convertingProduct}
                   onClick={handleConfirmConvertToProduct}
                 />
-              </div>
-            </div>
-          </div>
-        </div>
+              </Stack>
+            </Stack>
+          </Stack>
+        </Stack>
       )}
 
       {/* =====================================================================
           MODAL 2: COMPLETE 4-SECTION CREATE / EDIT CATALOG SKU MODAL (ALL DB FIELDS)
          ===================================================================== */}
       {editCatalogModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+        <Stack
+          direction="horizontal"
+          align="center"
+          justify="center"
+          padding={4}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs overflow-y-auto"
+        >
           <form
             onSubmit={handleSaveCatalogItem}
-            className="relative w-full max-w-5xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl max-h-[92vh] flex flex-col"
+            className="relative w-full max-w-5xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl max-h-screen flex flex-col"
           >
-            <div className="flex items-center justify-between border-b border-divider px-6 py-4 bg-muted/30">
-              <div>
+            <Stack
+              direction="horizontal"
+              align="center"
+              justify="between"
+              paddingInline={6}
+              paddingBlock={4}
+              className="border-b border-divider bg-muted/30"
+            >
+              <Stack>
                 <h2 className="text-lg font-bold text-foreground">
                   {editingCatalogItem
                     ? `Edit Master Catalog SKU: ${editingCatalogItem.skuCode ?? editingCatalogItem.catalogKey}`
@@ -1709,7 +1725,7 @@ export default function Catalogs({
                   Complete 4-section specification covering Multi-Length Titles, Modular Taxonomy
                   Codes, Cartesian Variant Matrix, and Garment Construction Attributes.
                 </p>
-              </div>
+              </Stack>
               <button
                 type="button"
                 onClick={() => setEditCatalogModalOpen(false)}
@@ -1717,15 +1733,24 @@ export default function Catalogs({
               >
                 <X className="h-5 w-5" />
               </button>
-            </div>
+            </Stack>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
+            <Stack
+              direction="horizontal"
+              gap={6}
+              padding={6}
+              className="flex-1 overflow-y-auto text-xs"
+            >
               {/* SECTION 1: IDENTITY & MULTI-LENGTH TITLES */}
-              <div className="rounded-2xl border border-card-border bg-muted/20 p-4 space-y-3">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-primary">
+              <Stack
+                gap={3}
+                padding={4}
+                className="rounded-2xl border border-card-border bg-muted/20"
+              >
+                <Stack className="text-xs font-extrabold uppercase tracking-wider text-primary">
                   1. Catalog Identity & Multi-Length Marketplace Titles
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                </Stack>
+                <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2 lg:grid-cols-4">
                   <AppInput
                     label="Catalog SKU Key *"
                     required
@@ -1755,7 +1780,7 @@ export default function Catalogs({
                       { value: 'converted', label: 'Converted to Product' },
                     ]}
                   />
-                  <div className="sm:col-span-2">
+                  <Stack className="sm:col-span-2">
                     <AppInput
                       label="Primary Title (Max 60 chars) *"
                       required
@@ -1764,44 +1789,28 @@ export default function Catalogs({
                       onChange={(e) => setFormState({ ...formState, title: e.target.value })}
                       placeholder="Men's Black Lambskin Leather Duster Coat"
                     />
-                  </div>
-                  <AppInput
-                    label="Title 75 (Max 75 chars — Etsy / Amazon)"
-                    maxLength={75}
-                    value={formState.title75}
-                    onChange={(e) => setFormState({ ...formState, title75: e.target.value })}
-                  />
-                  <AppInput
-                    label="Title 80 (Max 80 chars — eBay)"
-                    maxLength={80}
-                    value={formState.title80}
-                    onChange={(e) => setFormState({ ...formState, title80: e.target.value })}
-                  />
-                  <div className="sm:col-span-2">
+                  </Stack>
+                  <Stack className="sm:col-span-2">
                     <AppInput
                       label="Subtitle (Max 60 chars)"
                       maxLength={60}
                       value={formState.subTitle}
                       onChange={(e) => setFormState({ ...formState, subTitle: e.target.value })}
                     />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <AppInput
-                      label="Extended Subtitle 125 (Max 125 chars)"
-                      maxLength={125}
-                      value={formState.subTitle125}
-                      onChange={(e) => setFormState({ ...formState, subTitle125: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
+                  </Stack>
+                </Grid>
+              </Stack>
 
               {/* SECTION 2: MEDUSA TAXONOMY & MODULAR SKU CODES */}
-              <div className="rounded-2xl border border-card-border bg-muted/20 p-4 space-y-3">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-primary">
+              <Stack
+                gap={3}
+                padding={4}
+                className="rounded-2xl border border-card-border bg-muted/20"
+              >
+                <Stack className="text-xs font-extrabold uppercase tracking-wider text-primary">
                   2. Medusa Category Taxonomy & Modular SKU Code Segments
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                </Stack>
+                <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2 lg:grid-cols-4">
                   <AppInput
                     label="Product Type *"
                     required
@@ -1809,7 +1818,7 @@ export default function Catalogs({
                     onChange={(e) => setFormState({ ...formState, productType: e.target.value })}
                     placeholder="Duster Coat"
                   />
-                  <div className="sm:col-span-2">
+                  <Stack className="sm:col-span-2">
                     <AppInput
                       label="Medusa Category Handle *"
                       required
@@ -1819,7 +1828,7 @@ export default function Catalogs({
                       }
                       placeholder="men/outerwear/coats/duster"
                     />
-                  </div>
+                  </Stack>
                   <AppSelect
                     label="Resolved Medusa Category"
                     value={formState.resolvedCategoryId}
@@ -1846,35 +1855,6 @@ export default function Catalogs({
                     ]}
                   />
                   <AppSelect
-                    label="Category Code"
-                    value={formState.categoryCode}
-                    onChange={(e) => setFormState({ ...formState, categoryCode: e.target.value })}
-                    options={[
-                      { value: 'CT', label: 'CT — Coat' },
-                      { value: 'JK', label: 'JK — Jacket' },
-                      { value: 'BZ', label: 'BZ — Blazer' },
-                      { value: 'VS', label: 'VS — Vest' },
-                      { value: 'SH', label: 'SH — Shirt' },
-                      { value: 'TS', label: 'TS — T-Shirt' },
-                      { value: 'PT', label: 'PT — Pants' },
-                      { value: 'TR', label: 'TR — Trouser' },
-                      { value: 'SR', label: 'SR — Shorts' },
-                      { value: 'SK', label: 'SK — Skirt' },
-                      { value: 'FW', label: 'FW — Footwear' },
-                      { value: 'BG', label: 'BG — Bags' },
-                      { value: 'HD', label: 'HD — Home Decor' },
-                      { value: 'AC', label: 'AC — Accessories' },
-                    ]}
-                  />
-                  <AppInput
-                    label="Product Sub-Type Code (2-Letter)"
-                    value={formState.productCode}
-                    onChange={(e) =>
-                      setFormState({ ...formState, productCode: e.target.value.toUpperCase() })
-                    }
-                    placeholder="DC, BK, CF, BM, OC..."
-                  />
-                  <AppSelect
                     label="Material / Leather Code"
                     value={formState.leatherCode}
                     onChange={(e) => setFormState({ ...formState, leatherCode: e.target.value })}
@@ -1887,18 +1867,6 @@ export default function Catalogs({
                       { value: 'CW', label: 'CW — Cowhide' },
                       { value: 'GT', label: 'GT — Goat Leather' },
                       { value: 'BF', label: 'BF — Buffalo Leather' },
-                    ]}
-                  />
-                  <AppSelect
-                    label="Fit Code"
-                    value={formState.fitCode}
-                    onChange={(e) => setFormState({ ...formState, fitCode: e.target.value })}
-                    options={[
-                      { value: 'RG', label: 'RG — Regular Fit' },
-                      { value: 'SL', label: 'SL — Slim Fit' },
-                      { value: 'RL', label: 'RL — Relaxed Fit' },
-                      { value: 'TF', label: 'TF — Tailored Fit' },
-                      { value: 'XX', label: 'XX — Not Applicable' },
                     ]}
                   />
                   <AppSelect
@@ -1928,23 +1896,27 @@ export default function Catalogs({
                     onChange={(e) => setFormState({ ...formState, pattern: e.target.value })}
                     placeholder="Solid"
                   />
-                </div>
-              </div>
+                </Grid>
+              </Stack>
 
               {/* SECTION 3: CARTESIAN VARIANT MATRIX & MEDIA */}
-              <div className="rounded-2xl border border-card-border bg-muted/20 p-4 space-y-3">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-primary">
+              <Stack
+                gap={3}
+                padding={4}
+                className="rounded-2xl border border-card-border bg-muted/20"
+              >
+                <Stack className="text-xs font-extrabold uppercase tracking-wider text-primary">
                   3. Cartesian Variant Matrix (Colors × Sizes), Stock & Media
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="sm:col-span-2">
+                </Stack>
+                <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2 lg:grid-cols-4">
+                  <Stack className="sm:col-span-2">
                     <AppInput
                       label="Color Codes (comma-separated 3-letter codes)"
                       value={formState.colorCodes}
                       onChange={(e) => setFormState({ ...formState, colorCodes: e.target.value })}
                       placeholder="BLK, BLU, BRN, TAN, MAR, OGR"
                     />
-                  </div>
+                  </Stack>
                   <AppSelect
                     label="Size System Group"
                     value={formState.sizeGroup}
@@ -1962,31 +1934,35 @@ export default function Catalogs({
                     onChange={(e) => setFormState({ ...formState, sizeCodes: e.target.value })}
                     placeholder="S, M, L, XL, 2XL"
                   />
-                  <div className="sm:col-span-2">
+                  <Stack className="sm:col-span-2">
                     <AppInput
                       label="Product Image URLs (comma-separated)"
                       value={formState.imagesCsv}
                       onChange={(e) => setFormState({ ...formState, imagesCsv: e.target.value })}
                       placeholder="https://example.com/img1.jpg, https://example.com/img2.jpg"
                     />
-                  </div>
-                  <div className="sm:col-span-2">
+                  </Stack>
+                  <Stack className="sm:col-span-2">
                     <AppInput
                       label="SEO Tags (comma-separated)"
                       value={formState.tagsCsv}
                       onChange={(e) => setFormState({ ...formState, tagsCsv: e.target.value })}
                       placeholder="leather, duster coat, outerwear, mens"
                     />
-                  </div>
-                </div>
-              </div>
+                  </Stack>
+                </Grid>
+              </Stack>
 
               {/* SECTION 4: GARMENT CONSTRUCTION ATTRIBUTES & DESCRIPTIONS */}
-              <div className="rounded-2xl border border-card-border bg-muted/20 p-4 space-y-3">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-primary">
+              <Stack
+                gap={3}
+                padding={4}
+                className="rounded-2xl border border-card-border bg-muted/20"
+              >
+                <Stack className="text-xs font-extrabold uppercase tracking-wider text-primary">
                   4. Garment Construction Attributes & Multi-Marketplace Copy
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                </Stack>
+                <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2 lg:grid-cols-4">
                   <AppInput
                     label="Outer Material"
                     value={formState.material}
@@ -2049,7 +2025,7 @@ export default function Catalogs({
                     value={formState.sleeveType}
                     onChange={(e) => setFormState({ ...formState, sleeveType: e.target.value })}
                   />
-                  <div className="sm:col-span-2">
+                  <Stack className="sm:col-span-2">
                     <AppInput
                       label="Pocket Description"
                       value={formState.pocketDescription}
@@ -2057,7 +2033,7 @@ export default function Catalogs({
                         setFormState({ ...formState, pocketDescription: e.target.value })
                       }
                     />
-                  </div>
+                  </Stack>
                   <AppInput
                     label="Pocket Types (comma-separated)"
                     value={formState.pocketsCsv}
@@ -2070,32 +2046,14 @@ export default function Catalogs({
                       setFormState({ ...formState, careInstructions: e.target.value })
                     }
                   />
-                </div>
+                </Grid>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                <Grid columns={{ minWidth: 220, max: 1 }} className="md:grid-cols-3 pt-2">
                   <AppTextarea
                     label="SEO Product Description"
                     rows={3}
                     value={formState.description}
                     onChange={(e) => setFormState({ ...formState, description: e.target.value })}
-                  />
-                  <AppTextarea
-                    label="Short Description (Amazon <=500 chars)"
-                    maxChars={500}
-                    rows={3}
-                    value={formState.shortDescription}
-                    onChange={(e) =>
-                      setFormState({ ...formState, shortDescription: e.target.value })
-                    }
-                  />
-                  <AppTextarea
-                    label="Extended Description (eBay & Etsy <=3000 chars)"
-                    maxChars={3000}
-                    rows={3}
-                    value={formState.extendedDescription}
-                    onChange={(e) =>
-                      setFormState({ ...formState, extendedDescription: e.target.value })
-                    }
                   />
                   <AppTextarea
                     label="Bullet Points (1 per line)"
@@ -2117,11 +2075,19 @@ export default function Catalogs({
                       setFormState({ ...formState, specialFeaturesLines: e.target.value })
                     }
                   />
-                </div>
-              </div>
-            </div>
+                </Grid>
+              </Stack>
+            </Stack>
 
-            <div className="flex items-center justify-end gap-2 border-t border-divider px-6 py-4 bg-muted/25">
+            <Stack
+              direction="horizontal"
+              align="center"
+              justify="end"
+              gap={2}
+              paddingInline={6}
+              paddingBlock={4}
+              className="border-t border-divider bg-muted/25"
+            >
               <AppButton
                 label="Cancel"
                 variant="ghost"
@@ -2135,19 +2101,32 @@ export default function Catalogs({
                 loading={busyId === 'save-catalog'}
                 type="submit"
               />
-            </div>
+            </Stack>
           </form>
-        </div>
+        </Stack>
       )}
 
       {/* =====================================================================
           MODAL 3: IMPORT BULK CATALOG JSON MODAL
          ===================================================================== */}
       {importJsonModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="relative w-full max-w-3xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl flex flex-col max-h-[88vh]">
-            <div className="flex items-center justify-between border-b border-divider px-6 py-4 bg-muted/30">
-              <div>
+        <Stack
+          direction="horizontal"
+          align="center"
+          justify="center"
+          padding={4}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
+        >
+          <Stack className="relative w-full max-w-3xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl">
+            <Stack
+              direction="horizontal"
+              align="center"
+              justify="between"
+              paddingInline={6}
+              paddingBlock={4}
+              className="border-b border-divider bg-muted/30"
+            >
+              <Stack>
                 <h2 className="text-lg font-bold text-foreground">
                   Import Brand-Agnostic Master Catalog JSON
                 </h2>
@@ -2155,7 +2134,7 @@ export default function Catalogs({
                   Upload or paste a Catalog JSON file (keyed by SKU1, SKU2, etc.) to store in the
                   database.
                 </p>
-              </div>
+              </Stack>
               <button
                 type="button"
                 onClick={() => setImportJsonModalOpen(false)}
@@ -2163,12 +2142,12 @@ export default function Catalogs({
               >
                 <X className="h-5 w-5" />
               </button>
-            </div>
-            <div className="p-6 space-y-4 overflow-y-auto">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
+            </Stack>
+            <Stack gap={4} padding={6} className="overflow-y-auto">
+              <Stack direction="horizontal" align="center" justify="between" wrap="wrap" gap={2}>
                 <label className="inline-flex items-center gap-2 rounded-xl border border-input-border bg-muted/50 px-3 py-1.5 text-xs font-semibold text-foreground cursor-pointer hover:bg-muted">
                   <Upload className="h-3.5 w-3.5" />
-                  <span>Upload .json File</span>
+                  <Text>Upload .json File</Text>
                   <input
                     type="file"
                     accept=".json,application/json"
@@ -2182,7 +2161,7 @@ export default function Catalogs({
                   size="xs"
                   onClick={() => setCatalogJsonText(JSON.stringify(sampleCatalogJson, null, 2))}
                 />
-              </div>
+              </Stack>
               <Stack direction="horizontal" gap={3} wrap="wrap">
                 <AppSelect
                   label="Price tier"
@@ -2220,8 +2199,16 @@ export default function Catalogs({
                 spellCheck={false}
                 className="w-full rounded-xl border border-input-border bg-muted/30 p-3 font-mono text-xs text-foreground"
               />
-            </div>
-            <div className="flex items-center justify-end gap-2 border-t border-divider px-6 py-4 bg-muted/25">
+            </Stack>
+            <Stack
+              direction="horizontal"
+              align="center"
+              justify="end"
+              gap={2}
+              paddingInline={6}
+              paddingBlock={4}
+              className="border-t border-divider bg-muted/25"
+            >
               <AppButton
                 label="Cancel"
                 variant="ghost"
@@ -2235,9 +2222,9 @@ export default function Catalogs({
                 loading={busyId === 'import-json'}
                 onClick={handleImportCatalogJson}
               />
-            </div>
-          </div>
-        </div>
+            </Stack>
+          </Stack>
+        </Stack>
       )}
 
       {/* =====================================================================
@@ -2291,61 +2278,49 @@ export default function Catalogs({
         }
       >
         {detailDrawerItem && (
-          <div className="space-y-4 text-xs">
-            <div className="rounded-xl border border-card-border bg-muted/20 p-4 space-y-2">
-              <div className="font-bold text-foreground">Taxonomy & Modular Codes</div>
-              <div className="grid grid-cols-2 gap-2 text-muted-foreground">
-                <div>
+          <Stack gap={4} className="text-xs">
+            <Stack gap={2} padding={4} className="rounded-xl border border-card-border bg-muted/20">
+              <Stack className="font-bold text-foreground">Taxonomy & Modular Codes</Stack>
+              <Grid columns={{ minWidth: 220, max: 2 }} className="text-muted-foreground">
+                <Stack>
                   <strong>Category Handle:</strong> {String(detailDrawerItem.categoryHandle)}
-                </div>
-                <div>
+                </Stack>
+                <Stack>
                   <strong>Product Type:</strong>{' '}
                   {String(detailDrawerItem.productType ?? detailDrawerItem.type)}
-                </div>
-                <div>
+                </Stack>
+                <Stack>
                   <strong>Gender:</strong>{' '}
                   {String(detailDrawerItem.gender ?? detailDrawerItem.genderCode)}
-                </div>
-                <div>
+                </Stack>
+                <Stack>
                   <strong>Category Code:</strong> {String(detailDrawerItem.categoryCode)}
-                </div>
-                <div>
+                </Stack>
+                <Stack>
                   <strong>Fit Code:</strong> {String(detailDrawerItem.fitCode)}
-                </div>
-                <div>
+                </Stack>
+                <Stack>
                   <strong>Material / Tier:</strong>{' '}
                   {String(detailDrawerItem.leatherCode ?? detailDrawerItem.materialCode)} / Tier{' '}
                   {String(detailDrawerItem.priceTierCode ?? detailDrawerItem.priceTier)}
-                </div>
-              </div>
-            </div>
+                </Stack>
+              </Grid>
+            </Stack>
 
-            <div className="rounded-xl border border-card-border bg-muted/20 p-4 space-y-2">
-              <div className="font-bold text-foreground">Descriptions</div>
+            <Stack gap={2} padding={4} className="rounded-xl border border-card-border bg-muted/20">
+              <Stack className="font-bold text-foreground">Descriptions</Stack>
               <p className="text-muted-foreground">{String(detailDrawerItem.description)}</p>
-              {detailDrawerItem.shortDescription && (
-                <p className="text-muted-foreground border-t border-divider pt-2">
-                  <strong>Amazon Short Description:</strong>{' '}
-                  {String(detailDrawerItem.shortDescription)}
-                </p>
-              )}
-              {detailDrawerItem.extendedDescription && (
-                <p className="text-muted-foreground border-t border-divider pt-2">
-                  <strong>eBay / Etsy Extended Description:</strong>{' '}
-                  {String(detailDrawerItem.extendedDescription)}
-                </p>
-              )}
-            </div>
+            </Stack>
 
-            <div className="rounded-xl border border-card-border bg-muted/20 p-4 space-y-2">
-              <div className="font-bold text-foreground">Raw Attributes JSON</div>
-              <pre className="overflow-x-auto font-mono text-[11px] text-foreground">
+            <Stack gap={2} padding={4} className="rounded-xl border border-card-border bg-muted/20">
+              <Stack className="font-bold text-foreground">Raw Attributes JSON</Stack>
+              <pre className="overflow-x-auto font-mono text-2xs text-foreground">
                 {JSON.stringify(detailDrawerItem.attributes ?? {}, null, 2)}
               </pre>
-            </div>
-          </div>
+            </Stack>
+          </Stack>
         )}
       </SlideOverDrawer>
-    </div>
+    </Stack>
   )
 }

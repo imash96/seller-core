@@ -1,3 +1,4 @@
+import { Stack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { HStack } from '@astryxdesign/core/HStack'
 import {
@@ -24,6 +25,7 @@ import {
   Edit3,
   Trash2,
   Ban,
+  FileBarChart,
 } from 'lucide-react'
 
 type Props = {
@@ -103,6 +105,7 @@ export default function Finance({
   const [editCatRow, setEditCatRow] = useState<Row | null>(null)
   const [matchRow, setMatchRow] = useState<Row | null>(null)
   const [reverseRow, setReverseRow] = useState<Row | null>(null)
+  const [reportOpen, setReportOpen] = useState(false)
 
   const stats = useMemo(() => {
     const totalBalances = financialAccounts
@@ -159,14 +162,14 @@ export default function Finance({
   }
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Finance & Multi-Currency Ledger"
         description="Manage accounts, card metadata and local ledger entries. No payment or card-vault integration is connected."
         icon={CreditCard}
         badge={`${financialAccounts.length} accounts · ${creditCards.length} cards · ${financialTransactions.length} tx`}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <AppButton
               variant="outline"
               size="sm"
@@ -194,6 +197,14 @@ export default function Finance({
               Financial Account
             </AppButton>
             <AppButton
+              variant="outline"
+              size="sm"
+              icon={FileBarChart}
+              onClick={() => setReportOpen(true)}
+            >
+              Report
+            </AppButton>
+            <AppButton
               variant="primary"
               size="sm"
               icon={Plus}
@@ -201,7 +212,7 @@ export default function Finance({
             >
               Record Transaction
             </AppButton>
-          </div>
+          </Stack>
         }
       />
 
@@ -255,6 +266,20 @@ export default function Finance({
       />
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
+
+      <FormModal
+        isOpen={reportOpen}
+        onOpenChange={setReportOpen}
+        title="Queue Finance Report"
+        subtitle="Aggregates the ledger by currency for the selected period and drops the summary into your notifications."
+        submitLabel="Queue Report"
+        action="/finance/reports"
+        fields={[
+          { name: 'periodStart', label: 'Period Start', kind: 'date', required: true },
+          { name: 'periodEnd', label: 'Period End', kind: 'date', required: true },
+        ]}
+        onSuccess={() => setReportOpen(false)}
+      />
 
       {/* Create Financial Account Modal */}
       <FormModal
@@ -700,7 +725,7 @@ export default function Finance({
               { label: 'Institution', value: String(row.institutionName ?? '—') },
             ],
             actions: (
-              <div className="flex items-center gap-2">
+              <Stack direction="horizontal" align="center" gap={2}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -725,7 +750,7 @@ export default function Finance({
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             ),
           })}
           columns={[
@@ -741,7 +766,7 @@ export default function Finance({
               household_personal: 'purple',
             }),
             col.action('Actions', (row) => (
-              <div className="flex items-center gap-1.5">
+              <Stack direction="horizontal" align="center" gap={1.5}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -766,7 +791,7 @@ export default function Finance({
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             )),
           ]}
         />
@@ -813,7 +838,7 @@ export default function Finance({
               },
             ],
             actions: (
-              <div className="flex items-center gap-2">
+              <Stack direction="horizontal" align="center" gap={2}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -834,7 +859,7 @@ export default function Finance({
                 >
                   Cancel Card
                 </AppButton>
-              </div>
+              </Stack>
             ),
           })}
           columns={[
@@ -850,7 +875,7 @@ export default function Finance({
               cancelled: 'error',
             }),
             col.action('Actions', (row) => (
-              <div className="flex items-center gap-1.5">
+              <Stack direction="horizontal" align="center" gap={1.5}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -871,7 +896,7 @@ export default function Finance({
                 >
                   Cancel
                 </AppButton>
-              </div>
+              </Stack>
             )),
           ]}
         />
@@ -1020,7 +1045,7 @@ export default function Finance({
               { label: 'Class', value: String(row.dataClassification ?? '—').replace(/_/g, ' ') },
             ],
             actions: (
-              <div className="flex items-center gap-2">
+              <Stack direction="horizontal" align="center" gap={2}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -1045,7 +1070,7 @@ export default function Finance({
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             ),
           })}
           columns={[
@@ -1063,7 +1088,7 @@ export default function Finance({
             }),
             col.text('isTaxDeductible', 'Tax deductible', 110),
             col.action('Actions', (row) => (
-              <div className="flex items-center gap-1.5">
+              <Stack direction="horizontal" align="center" gap={1.5}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -1088,11 +1113,11 @@ export default function Finance({
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             )),
           ]}
         />
       </PageSection>
-    </div>
+    </Stack>
   )
 }

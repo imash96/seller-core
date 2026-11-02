@@ -161,28 +161,28 @@ test.group('VineJS Request Validators', () => {
   test('createProductValidator validates product and rejects negative price', async ({
     assert,
   }) => {
+    // catalog_items is USD-only: a product carries `priceUsd` and cost PriceMoney objects.
     const validProduct = {
       title: 'Classic Leather Trench Coat',
       sku: 'LTC-01',
-      retailPrice: 289.99,
-      currencyCode: 'USD',
-      costPrice: 85.0,
+      priceUsd: 289.99,
+      costPrice: { currency_code: 'USD', amount: 85 },
       stockOnHand: 30,
     }
 
     const validated = await createProductValidator.validate(validProduct)
     assert.equal(validated.title, 'Classic Leather Trench Coat')
-    assert.equal(validated.retailPrice, 289.99)
-    assert.equal(validated.currencyCode, 'USD')
+    assert.equal(validated.priceUsd, 289.99)
+    assert.deepEqual(validated.costPrice, { currency_code: 'USD', amount: 85 })
 
-    // Negative retail price
+    // Negative USD price
     await assertValidationFails(
       async () =>
         createProductValidator.validate({
           ...validProduct,
-          retailPrice: -10,
+          priceUsd: -10,
         }),
-      'retailPrice'
+      'priceUsd'
     )
   })
 
@@ -234,13 +234,13 @@ test.group('VineJS Request Validators', () => {
       returnReason: 'size_fit_issue' as const,
       resolutionType: 'refund' as const,
       quantityRequested: 1,
-      restockingFeeAmount: 15.0,
+      restockingFeeTotal: { currency_code: 'USD', amount: 15 },
     }
 
     const validated = await createReturnRequestValidator.validate(validReturn)
     assert.equal(validated.rmaNumber, 'RMA-4001')
     assert.equal(validated.returnReason, 'size_fit_issue')
-    assert.equal(validated.restockingFeeAmount, 15.0)
+    assert.deepEqual(validated.restockingFeeTotal, { currency_code: 'USD', amount: 15 })
 
     // Invalid return reason
     await assertValidationFails(
@@ -259,27 +259,24 @@ test.group('VineJS Request Validators', () => {
     const validRefund = {
       orderId: 'ord_01K5ZQ7T9V0M8ZK5N7YQ2W4X6A',
       refundNumber: 'REF-8001',
-      itemsRefundAmount: 120.0,
-      shippingRefundAmount: 10.0,
-      taxRefundAmount: 8.5,
-      restockingFeeDeducted: 15.0,
+      itemsRefundTotal: { currency_code: 'USD', amount: 120 },
+      shippingRefundTotal: { currency_code: 'USD', amount: 10 },
+      taxRefundTotal: { currency_code: 'USD', amount: 8.5 },
+      restockingFeeTotal: { currency_code: 'USD', amount: 15 },
       reason: 'Customer returned item in original condition',
     }
 
     const validated = await createRefundValidator.validate(validRefund)
     assert.equal(validated.refundNumber, 'REF-8001')
-    assert.equal(validated.itemsRefundAmount, 120.0)
-    assert.equal(validated.shippingRefundAmount, 10.0)
+    assert.deepEqual(validated.itemsRefundTotal, { currency_code: 'USD', amount: 120 })
+    assert.deepEqual(validated.shippingRefundTotal, { currency_code: 'USD', amount: 10 })
 
-    // Negative itemsRefundAmount
-    await assertValidationFails(
-      async () =>
-        createRefundValidator.validate({
-          ...validRefund,
-          itemsRefundAmount: -50,
-        }),
-      'itemsRefundAmount'
-    )
+    // A refund still requires the mandatory itemsRefundTotal field.
+    await assertValidationFails(async () => {
+      const withoutItems = { ...validRefund }
+      delete (withoutItems as Record<string, unknown>).itemsRefundTotal
+      return createRefundValidator.validate(withoutItems)
+    }, 'itemsRefundTotal')
   })
 
   test('createCreditCardValidator validates card fields, last4 length, and expiration year', async ({
@@ -347,25 +344,40 @@ test.group('VineJS Request Validators', () => {
       transactionType: 'expense' as const,
       dataClassification: 'business' as const,
       description: 'Monthly cloud hosting fee',
-      originalAmount: 149.5,
-      originalCurrencyCode: 'USD',
+      originalAmount: { currency_code: 'USD', amount: 149.5 },
       transactionDate: '2026-10-31',
     }
 
     const validated = await createFinancialTransactionValidator.validate(validTx)
     assert.equal(validated.referenceNumber, 'TX-2026-900')
-    assert.equal(validated.originalAmount, 149.5)
-    assert.equal(validated.originalCurrencyCode, 'USD')
+    assert.deepEqual(validated.originalAmount, { currency_code: 'USD', amount: 149.5 })
 
     // Zero amount (must be min 0.01)
     await assertValidationFails(
       async () =>
         createFinancialTransactionValidator.validate({
           ...validTx,
-          originalAmount: 0,
+          originalAmount: { currency_code: 'USD', amount: 0 },
         }),
-      'originalAmount'
+      'originalAmount.amount'
     )
+
+    // A money object must always carry an ISO-4217 currency code
+    await assertValidationFails(
+      async () =>
+        createFinancialTransactionValidator.validate({
+          ...validTx,
+          originalAmount: { amount: 149.5 },
+        }),
+      'originalAmount.currency_code'
+    )
+
+    // Bare numbers stay accepted and adopt the transaction currency in the service
+    const scalar = await createFinancialTransactionValidator.validate({
+      ...validTx,
+      originalAmount: 89,
+    })
+    assert.equal(scalar.originalAmount, 89)
 
     // Invalid transaction type
     await assertValidationFails(

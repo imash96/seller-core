@@ -1,3 +1,5 @@
+import { Text } from '@astryxdesign/core/Text'
+import { Stack } from '@astryxdesign/core/Stack'
 import { useState } from 'react'
 import { router } from '@inertiajs/react'
 import { Building2, Plus, UserPlus, Trash2 } from 'lucide-react'
@@ -28,7 +30,7 @@ export default function Organizations({ organizations }: { organizations: Org[] 
   const [activeOrg, setActiveOrg] = useState<Org | null>(null)
   const [editMember, setEditMember] = useState<Member | null>(null)
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Organizations"
         icon={Building2}
@@ -39,11 +41,15 @@ export default function Organizations({ organizations }: { organizations: Org[] 
           </AppButton>
         }
       />
-      <div role="status" className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm">
+      <Stack
+        padding={4}
+        role="status"
+        className="rounded-xl border border-warning/40 bg-warning/10 text-sm"
+      >
         <strong>Setup only:</strong> Shared access to orders, finance, catalog and other operational
         data is not yet enabled. Organization roles do not yet grant access to those records. Super
         administrators cannot yet browse other users’ operational data here.
-      </div>
+      </Stack>
       {organizations.map((org) => (
         <PageSection
           key={org.id}
@@ -55,7 +61,7 @@ export default function Organizations({ organizations }: { organizations: Org[] 
           }
         >
           {org.canManage && (
-            <div className="mb-4">
+            <Stack className="mb-4">
               <AppButton
                 variant="secondary"
                 size="sm"
@@ -67,10 +73,10 @@ export default function Organizations({ organizations }: { organizations: Org[] 
               >
                 Add or update member
               </AppButton>
-            </div>
+            </Stack>
           )}
-          <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="w-full min-w-[520px] text-sm">
+          <Stack className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full min-w-130 text-sm">
               <thead className="text-left bg-muted/40">
                 <tr>
                   <th className="p-3">Member</th>
@@ -83,10 +89,10 @@ export default function Organizations({ organizations }: { organizations: Org[] 
                 {org.members.map((member) => (
                   <tr key={member.id} className="border-t border-border">
                     <td className="p-3">
-                      <span className="font-medium">{member.fullName}</span>
-                      <div className="text-xs text-muted-foreground">
+                      <Text weight="medium">{member.fullName}</Text>
+                      <Stack className="text-xs text-muted-foreground">
                         {member.email} · {member.status}
-                      </div>
+                      </Stack>
                     </td>
                     <td className="p-3">
                       {member.userId === org.ownerUserId
@@ -98,7 +104,7 @@ export default function Organizations({ organizations }: { organizations: Org[] 
                     <td className="p-3">{member.roleName ?? 'None'}</td>
                     <td className="p-3">
                       {org.canManage && member.userId !== org.ownerUserId && (
-                        <div className="flex gap-2">
+                        <Stack direction="horizontal" gap={2}>
                           <AppButton
                             variant="secondary"
                             size="xs"
@@ -120,14 +126,14 @@ export default function Organizations({ organizations }: { organizations: Org[] 
                           >
                             Remove
                           </AppButton>
-                        </div>
+                        </Stack>
                       )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </Stack>
         </PageSection>
       ))}
       <FormModal
@@ -177,6 +183,6 @@ export default function Organizations({ organizations }: { organizations: Org[] 
           },
         ]}
       />
-    </div>
+    </Stack>
   )
 }

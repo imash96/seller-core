@@ -1,3 +1,5 @@
+import { Grid } from '@astryxdesign/core/Grid'
+import { Stack } from '@astryxdesign/core/Stack'
 import { Head, router } from '@inertiajs/react'
 import { useState, useMemo } from 'react'
 import {
@@ -122,14 +124,14 @@ export default function InventoryPage({ products }: Props) {
   return (
     <>
       <Head title="Inventory & Stock Control" />
-      <div className="space-y-6">
+      <Stack gap={6}>
         <PageHeader
           title="Inventory & Warehouse Stock Control (/inventory)"
           description="Monitor real-time SKU stock levels, reorder alerts, reserved units, and multi-currency ProductVariantPrice valuation across all products and variants."
           icon={Warehouse}
           badge={`${variantRows.length} active SKUs · ${totalUnits.toLocaleString()} units`}
           actions={
-            <div className="flex items-center gap-2 flex-wrap">
+            <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
               <AppButton
                 label="← Products (/products)"
                 variant="secondary"
@@ -143,7 +145,7 @@ export default function InventoryPage({ products }: Props) {
                 icon={Plus}
                 onClick={() => setAddVariantOpen(true)}
               />
-            </div>
+            </Stack>
           }
         />
 
@@ -203,10 +205,13 @@ export default function InventoryPage({ products }: Props) {
             />
           }
         >
-          <div className="space-y-4">
+          <Stack gap={4}>
             {/* Filter Bar */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-card-border bg-muted/25 p-3.5">
-              <div className="md:col-span-2">
+            <Grid
+              columns={{ minWidth: 220, max: 1 }}
+              className="md:grid-cols-3 rounded-2xl border border-card-border bg-muted/25 p-3.5"
+            >
+              <Stack className="md:col-span-2">
                 <AppInput
                   label="Search SKU / Product / Variant"
                   icon={Search}
@@ -218,7 +223,7 @@ export default function InventoryPage({ products }: Props) {
                   onClear={() => setSearchQuery('')}
                   placeholder="Filter by SKU code, product title, color or size..."
                 />
-              </div>
+              </Stack>
               <AppSelect
                 label="Stock Health Filter"
                 value={healthFilter}
@@ -233,14 +238,18 @@ export default function InventoryPage({ products }: Props) {
                   { value: 'out_of_stock', label: 'Out of Stock (0 Available)' },
                 ]}
               />
-            </div>
+            </Grid>
 
             {paginatedRows.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border p-10 text-center space-y-3">
+              <Stack
+                gap={3}
+                padding={10}
+                className="rounded-2xl border border-dashed border-border text-center"
+              >
                 <p className="text-sm font-bold text-foreground">
                   No inventory SKUs match your active filters.
                 </p>
-                <div className="flex items-center justify-center gap-2">
+                <Stack direction="horizontal" align="center" justify="center" gap={2}>
                   <AppButton
                     label="Reset Filters"
                     variant="secondary"
@@ -256,14 +265,14 @@ export default function InventoryPage({ products }: Props) {
                     size="sm"
                     onClick={() => setAddVariantOpen(true)}
                   />
-                </div>
-              </div>
+                </Stack>
+              </Stack>
             ) : (
-              <div className="space-y-4">
-                <div className="overflow-x-auto rounded-2xl border border-card-border bg-card shadow-xs">
+              <Stack gap={4}>
+                <Stack className="overflow-x-auto rounded-2xl border border-card-border bg-card shadow-xs">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b border-divider bg-muted/40 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <tr className="border-b border-divider bg-muted/40 text-2xs font-bold uppercase tracking-wider text-muted-foreground">
                         <th className="py-3.5 px-4">Variant SKU</th>
                         <th className="py-3.5 px-4">Parent Product & Variant</th>
                         <th className="py-3.5 px-4">Stock Health</th>
@@ -295,21 +304,21 @@ export default function InventoryPage({ products }: Props) {
                               <MonoBadge text={String(row.sku)} />
                             </td>
                             <td className="py-3.5 px-4 align-middle max-w-xs">
-                              <div className="font-bold text-foreground truncate">
+                              <Stack className="font-bold text-foreground truncate">
                                 {String(row.productTitle)}
-                              </div>
-                              <div className="text-muted-foreground truncate mt-0.5">
+                              </Stack>
+                              <Stack className="text-muted-foreground truncate mt-0.5">
                                 {String(row.title)}
-                              </div>
+                              </Stack>
                             </td>
                             <td className="py-3.5 px-4 align-middle">
-                              <div className="space-y-1.5 w-32">
+                              <Stack gap={1.5} className="w-32">
                                 <StatusBadge
                                   label={String(row.stockHealth).replace(/_/g, ' ')}
                                   variant={healthTone}
                                 />
                                 <ProgressMeter value={pct} tone={healthTone} />
-                              </div>
+                              </Stack>
                             </td>
                             <td className="py-3.5 px-4 align-middle text-right font-bold text-foreground tabular-nums">
                               {String(row.stockOnHand ?? 0)}
@@ -331,7 +340,7 @@ export default function InventoryPage({ products }: Props) {
                               {convertToLocale(invMoney)}
                             </td>
                             <td className="py-3.5 px-4 align-middle text-right">
-                              <div className="flex items-center justify-end gap-1.5">
+                              <Stack direction="horizontal" align="center" justify="end" gap={1.5}>
                                 <AppButton
                                   label="Adjust Stock & Prices"
                                   variant="primary"
@@ -346,14 +355,14 @@ export default function InventoryPage({ products }: Props) {
                                   icon={Box}
                                   onClick={() => router.visit('/products')}
                                 />
-                              </div>
+                              </Stack>
                             </td>
                           </tr>
                         )
                       })}
                     </tbody>
                   </table>
-                </div>
+                </Stack>
 
                 <PaginationBar
                   currentPage={currentPage}
@@ -361,9 +370,9 @@ export default function InventoryPage({ products }: Props) {
                   totalRecords={filteredRows.length}
                   onPageChange={setPage}
                 />
-              </div>
+              </Stack>
             )}
-          </div>
+          </Stack>
         </PageSection>
 
         {/* Modals */}
@@ -441,7 +450,7 @@ export default function InventoryPage({ products }: Props) {
             },
           ]}
         />
-      </div>
+      </Stack>
     </>
   )
 }

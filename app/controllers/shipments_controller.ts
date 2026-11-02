@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
-import AuditLog from '#models/audit_log'
+import { AuditContext } from '#services/audit_context'
 import ShippingInvoiceLine from '#models/shipping_invoice_line'
 import { csvCell } from '../utils/csv.js'
 import type { HttpContext } from '@adonisjs/core/http'
@@ -12,6 +12,7 @@ import { FulfillmentAndReturnsService } from '../services/fulfillment_and_return
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createShipmentValidator, createShippingInvoiceValidator } from '#validators/operations'
 import { ShipmentStatus } from '../enums/index.js'
+import { amountOf, currencyOf, money } from '../types/price.js'
 
 export default class ShipmentsController {
   async index({ auth, inertia }: HttpContext) {
@@ -66,6 +67,8 @@ export default class ShipmentsController {
         heightCm: payload.heightCm,
         deadWeightGrams: payload.deadWeightGrams,
         estimatedShippingCost: payload.estimatedShippingCost,
+        estimatedShippingCostCurrencyCode: payload.estimatedShippingCostCurrencyCode,
+        insuranceCost: payload.insuranceCost,
         status: payload.status || ShipmentStatus.IN_TRANSIT,
         items: [
           {
@@ -74,11 +77,14 @@ export default class ShipmentsController {
           },
         ],
       })
+      // The order number comes from the relation, not from a cast: the shipment
+      // response never carried it.
+      await shipment.load('order')
       await ShipmentDispatched.dispatch({
         shipmentId: shipment.id,
         shipmentNumber: shipment.shipmentNumber,
         orderId: payload.orderId,
-        orderNumber: (shipment as any).orderNumber ?? String(shipment.shipmentNumber),
+        orderNumber: shipment.order.orderNumber,
         userId: user.id,
         carrierCode: payload.carrierCode,
         trackingNumber: payload.trackingNumber ?? null,
@@ -174,8 +180,8 @@ export default class ShipmentsController {
           shipment.carrierName,
           shipment.trackingNumber,
           shipment.status,
-          shipment.currencyCode,
-          shipment.estimatedShippingCost,
+          currencyOf(shipment.estimatedShippingCost),
+          amountOf(shipment.estimatedShippingCost),
           shipment.shippedAt?.toISO(),
           shipment.deliveredAt?.toISO(),
         ]
@@ -202,6 +208,7 @@ export default class ShipmentsController {
         carrierName: payload.carrierName,
         invoiceNumber: payload.invoiceNumber,
         currencyCode: payload.currencyCode || 'USD',
+        taxAmount: payload.taxAmount,
         invoiceDate: payload.invoiceDate,
         dueDate: payload.dueDate,
         lines: [
@@ -210,12 +217,13 @@ export default class ShipmentsController {
             chargeType: payload.chargeType,
             expectedAmount: payload.expectedAmount,
             billedAmount: payload.billedAmount,
+            taxAmount: payload.taxAmount,
           },
         ],
       })
       session.flash(
         'success',
-        `Carrier invoice ${invoice.invoiceNumber} recorded locally (${invoice.reconciliationStatus}, variance: ${invoice.varianceAmount}).`
+        `Carrier invoice ${invoice.invoiceNumber} recorded locally (${invoice.reconciliationStatus}, variance: ${amountOf(invoice.varianceTotal)} ${currencyOf(invoice.varianceTotal)}).`
       )
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to create shipping invoice')
@@ -246,6 +254,13 @@ export default class ShipmentsController {
         error: 'Provide valid status, paid amount, and an explanatory note.',
       })
     const result = await db.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
+        actorUserId: user.id,
+        requestId: request.id(),
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') ?? null,
+        reason: 'shipping_invoice.manual_review',
+      })
       const invoice = await ShippingInvoice.query({ client: trx })
         .where('userId', user.id)
         .where('id', params.id)
@@ -253,7 +268,7 @@ export default class ShipmentsController {
         .first()
       if (!invoice) return { status: 404, error: 'Invoice not found.' }
       const amount = Number(amountText)
-      const total = Number(invoice.totalAmount)
+      const total = amountOf(invoice.grandTotal)
       if (
         (status === 'paid' && (amount !== total || !reference)) ||
         (status === 'partially_paid' && (amount <= 0 || amount >= total || !reference)) ||
@@ -275,7 +290,7 @@ export default class ShipmentsController {
             (line) =>
               line.expectedAmount === null ||
               line.varianceAmount === null ||
-              Number(line.varianceAmount) !== 0
+              amountOf(line.varianceAmount) !== 0
           ))
       )
         return {
@@ -283,39 +298,13 @@ export default class ShipmentsController {
           error:
             'An unverified or discrepant invoice cannot be marked matched. Use resolved with a note after manual review.',
         }
-      const before = {
-        paymentStatus: invoice.paymentStatus,
-        reconciliationStatus: invoice.reconciliationStatus,
-        paidAmount: invoice.paidAmount,
-        paymentReference: invoice.paymentReference,
-      }
       invoice.paymentStatus = status
       invoice.reconciliationStatus = reconciliation
-      invoice.paidAmount = amount.toFixed(2)
+      invoice.paidTotal = money(amount, currencyOf(invoice.grandTotal))
       invoice.paidAt = status === 'paid' ? (invoice.paidAt ?? DateTime.now()) : null
       invoice.paymentReference = reference || null
       invoice.notes = note
       await invoice.save()
-      await AuditLog.create(
-        {
-          actorUserId: user.id,
-          userId: user.id,
-          action: 'shipping_invoice.manual_review',
-          entityType: 'shipping_invoices',
-          entityId: invoice.id,
-          requestId: request.id(),
-          beforeState: before,
-          afterState: {
-            paymentStatus: status,
-            reconciliationStatus: reconciliation,
-            paidAmount: invoice.paidAmount,
-            paymentReference: invoice.paymentReference,
-            notes: note,
-          },
-          metadata: { verification: 'manual' },
-        },
-        { client: trx }
-      )
       return { status: 200, number: invoice.invoiceNumber }
     })
     if (result.status !== 200) {

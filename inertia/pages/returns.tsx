@@ -1,3 +1,4 @@
+import { Stack } from '@astryxdesign/core/Stack'
 import {
   PageHeader,
   PageSection,
@@ -107,14 +108,14 @@ export default function Returns({
   }, [returnRequests, refundTransactions])
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Returns (RMA) & Refund Ledger"
         description="Full RMA lifecycle with line-item quantity guards, carrier return tracking, and over-refund protection."
         icon={RotateCcw}
         badge={`${returnRequests.length} RMAs · ${refundTransactions.length} refunds`}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <AppButton
               variant="secondary"
               size="sm"
@@ -131,7 +132,7 @@ export default function Returns({
             >
               Create RMA
             </AppButton>
-          </div>
+          </Stack>
         }
       />
 
@@ -533,6 +534,6 @@ export default function Returns({
           ]}
         />
       </PageSection>
-    </div>
+    </Stack>
   )
 }

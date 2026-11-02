@@ -10,11 +10,22 @@ import type { DateTime } from 'luxon'
 import Order from './order.js'
 import ShipmentItem from './shipment_item.js'
 import ShippingInvoiceLine from './shipping_invoice_line.js'
+import { generatedColumn, moneyColumn } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import type { PriceMoney } from '../types/price.js'
 
 export default class Shipment extends AppBaseModel {
   static readonly table = 'shipments'
   static readonly idPrefix = 'shp'
+
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'estimatedShippingCost'
+
+  /** Both weights are GENERATED ALWAYS AS (...) STORED from dimensions and dead weight. */
+  static override readonly generatedColumns = [
+    'volumetricWeightGrams',
+    'billedWeightGrams',
+  ] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -64,20 +75,22 @@ export default class Shipment extends AppBaseModel {
   @column({ columnName: 'dead_weight_grams' })
   declare public deadWeightGrams: string | null
 
-  @column({ columnName: 'volumetric_weight_grams' })
-  declare public volumetricWeightGrams: string | null
+  /** Generated: (length × width × height) / 5 — read-only, never written. */
+  @generatedColumn({ columnName: 'volumetric_weight_grams' })
+  declare public readonly volumetricWeightGrams: string | null
 
-  @column({ columnName: 'billed_weight_grams' })
-  declare public billedWeightGrams: string | null
+  /** Generated: greatest(dead_weight_grams, volumetric) — read-only, never written. */
+  @generatedColumn({ columnName: 'billed_weight_grams' })
+  declare public readonly billedWeightGrams: string | null
 
-  @column({ columnName: 'currency_code' })
-  declare public currencyCode: string
+  @moneyColumn({ columnName: 'estimated_shipping_cost' })
+  declare public estimatedShippingCost: PriceMoney
 
-  @column({ columnName: 'estimated_shipping_cost' })
-  declare public estimatedShippingCost: string
+  @moneyColumn({ columnName: 'actual_invoiced_cost' })
+  declare public actualInvoicedCost: PriceMoney
 
-  @column({ columnName: 'actual_invoiced_cost' })
-  declare public actualInvoicedCost: string
+  @moneyColumn({ columnName: 'insurance_cost' })
+  declare public insuranceCost: PriceMoney
 
   @column.dateTime({ columnName: 'shipped_at' })
   declare public shippedAt: DateTime | null

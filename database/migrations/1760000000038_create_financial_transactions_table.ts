@@ -87,12 +87,10 @@ export default class extends BaseSchema {
         .defaultTo('posted')
       table.string('description', 255).notNullable()
       table.string('vendor_or_payer', 200).nullable()
-      table.string('original_currency_code', 3).notNullable().defaultTo('USD')
-      table.decimal('original_amount', 14, 2).notNullable()
+      table.jsonb('original_amount').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
       table.decimal('exchange_rate', 18, 8).notNullable().defaultTo(1)
-      table.string('reporting_currency_code', 3).notNullable().defaultTo('USD')
-      table.decimal('reporting_amount', 14, 2).notNullable()
-      table.decimal('tax_amount', 14, 2).notNullable().defaultTo(0)
+      table.jsonb('reporting_amount').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('tax_total').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
       table.date('transaction_date').notNullable()
       table.date('conversion_date').nullable()
       table.date('due_date').nullable()
@@ -106,7 +104,13 @@ export default class extends BaseSchema {
     })
 
     this.schema.raw(
-      'ALTER TABLE financial_transactions ADD CONSTRAINT chk_financial_transactions_amounts_nonneg CHECK (original_amount >= 0 AND reporting_amount >= 0 AND tax_amount >= 0)'
+      'ALTER TABLE financial_transactions ADD CONSTRAINT chk_financial_transactions_original_amount_money CHECK (is_valid_price_money(original_amount, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE financial_transactions ADD CONSTRAINT chk_financial_transactions_reporting_amount_money CHECK (is_valid_price_money(reporting_amount, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE financial_transactions ADD CONSTRAINT chk_financial_transactions_tax_total_money CHECK (is_valid_price_money(tax_total, false))'
     )
     this.schema.raw(
       'ALTER TABLE financial_transactions ADD CONSTRAINT chk_financial_transactions_rate_positive CHECK (exchange_rate > 0)'

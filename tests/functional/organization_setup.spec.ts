@@ -10,7 +10,6 @@ async function makeUser(email: string, isSuperAdmin = false) {
   return User.create({
     email,
     fullName: 'Operator',
-    companyName: 'Same company',
     password: 'Password123!',
     status: 'active',
     isSuperAdmin,
@@ -37,6 +36,8 @@ test.group('Organization membership setup', () => {
       .where('isPersonal', true)
       .firstOrFail()
     assert.notEqual(personal.id, otherPersonal.id)
+    // Entity ids are ULID-compatible (optional lowercase prefix + 26 chars).
+    assert.match(personal.id, /^org_[0-9A-HJKMNP-TV-Z]{26}$/)
     const role = await Role.create({
       name: `Operator ${n}`,
       slug: `operator-${n}`,
@@ -115,9 +116,29 @@ test.group('Organization membership setup', () => {
         }),
       /administrator/
     )
-    assert.lengthOf(
-      await AuditLog.query().where('entityType', 'organizations').where('entityId', org.id),
-      5
+    // One row mutation → one audit row. The organization itself only changes once.
+    const orgAudits = await AuditLog.query()
+      .where('entityType', 'organizations')
+      .where('entityId', org.id)
+    assert.lengthOf(orgAudits, 1)
+    assert.equal(orgAudits[0].action, 'INSERT')
+    assert.equal(orgAudits[0].actorUserId, owner.id)
+    assert.equal((orgAudits[0].metadata as any)?.reason, 'organization.created')
+
+    // Membership changes are audited on `organization_memberships` (owner row + 3
+    // upserts + 1 removal), each attributed to the acting user through the trigger.
+    const membershipAudits = await AuditLog.query()
+      .where('entityType', 'organization_memberships')
+      .whereRaw(`metadata ->> 'reason' LIKE 'organization.member%'`)
+    assert.lengthOf(membershipAudits, 4)
+    assert.deepEqual(Array.from(new Set(membershipAudits.map((entry) => entry.action))).sort(), [
+      'DELETE',
+      'INSERT',
+      'UPDATE',
+    ])
+    assert.include(
+      membershipAudits.map((entry) => entry.actorUserId),
+      platformAdmin.id
     )
     const otherOrgs = await OrganizationService.list(other)
     assert.notInclude(

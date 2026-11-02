@@ -32,7 +32,13 @@ export class WorkspaceLookupService {
         ? SellerAccount.query().where('userId', userId).orderBy('accountName')
         : [],
       can('orders')
-        ? Order.query().where('userId', userId).orderBy('orderedAt', 'desc').limit(100)
+        ? Order.query()
+            .where('userId', userId)
+            .preload('sellerAccount', (accountQuery) =>
+              accountQuery.where('userId', userId).preload('salesChannel')
+            )
+            .orderBy('orderedAt', 'desc')
+            .limit(100)
         : [],
       can('orders')
         ? OrderLineItem.query().where('userId', userId).orderBy('createdAt', 'desc').limit(250)

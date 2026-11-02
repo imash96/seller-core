@@ -7,7 +7,12 @@ import {
   buildStructuredBaseCode,
   formatVariantSku,
 } from './sku.js'
-import { COLOR_CODES, resolveColorInfo, type ColorCodeEntry } from './colors.js'
+import {
+  COLOR_CODES,
+  resolveColorInfo,
+  resolveColorInfoFromValue,
+  type ColorCodeEntry,
+} from './colors.js'
 import { SIZE_DATA, resolveSizeInfo, type SizeGroupKey, type SizeDataEntry } from './sizes.js'
 import { LIST_PRICES, resolveTierPrice, resolveTierMultiCurrencyPrices } from './prices.js'
 import {
@@ -37,6 +42,7 @@ export {
   formatVariantSku,
   COLOR_CODES,
   resolveColorInfo,
+  resolveColorInfoFromValue,
   type ColorCodeEntry,
   SIZE_DATA,
   resolveSizeInfo,

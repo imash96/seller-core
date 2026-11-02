@@ -31,8 +31,9 @@ export default class extends BaseSchema {
       table.string('sub_title_125', 255).nullable()
       table.string('slug', 255).notNullable()
       table.string('sku_prefix', 100).nullable()
-      table.jsonb('list_price').notNullable().defaultTo('[]')
-      table.jsonb('sale_price').notNullable().defaultTo('[]')
+      // MedusaJS v2 style multi-currency price array:
+      // [{ currency_code, amount, compare_at_amount?, min_quantity?, max_quantity?, rules? }]
+      table.jsonb('prices').notNullable().defaultTo('[]')
       table.string('collection_name', 100).nullable()
       table.text('description').nullable()
       table.text('extended_description').nullable()
@@ -57,6 +58,9 @@ export default class extends BaseSchema {
       table.timestamp('updated_at', { useTz: true }).notNullable().defaultTo(this.now())
     })
 
+    this.schema.raw(
+      'ALTER TABLE products ADD CONSTRAINT chk_products_prices_medusa CHECK (is_valid_medusa_prices_array(prices))'
+    )
     this.schema.raw('CREATE UNIQUE INDEX uq_products_user_slug ON products (user_id, slug)')
     this.schema.raw('CREATE INDEX idx_products_user_status ON products (user_id, status)')
     this.schema.raw('CREATE INDEX idx_products_brand ON products (brand_id)')

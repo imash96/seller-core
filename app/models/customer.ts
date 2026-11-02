@@ -10,12 +10,19 @@ import type { DateTime } from 'luxon'
 import CustomerAddress from './customer_address.js'
 import CustomerRiskSignal from './customer_risk_signal.js'
 import Order from './order.js'
-import { prepareJson } from './json_helpers.js'
+import { generatedColumn, moneyColumn, prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import type { PriceMoney } from '../types/price.js'
 
 export default class Customer extends AppBaseModel {
   static readonly table = 'customers'
   static readonly idPrefix = 'cust'
+
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'totalSpent'
+
+  /** `is_repeat_customer` is GENERATED ALWAYS AS (orders_count > 1) STORED. */
+  static override readonly generatedColumns = ['isRepeatCustomer'] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -25,12 +32,6 @@ export default class Customer extends AppBaseModel {
 
   @column({ columnName: 'full_name' })
   declare public fullName: string
-
-  @column({ columnName: 'first_name' })
-  declare public firstName: string | null
-
-  @column({ columnName: 'last_name' })
-  declare public lastName: string | null
 
   @column({ columnName: 'company_name' })
   declare public companyName: string | null
@@ -50,17 +51,15 @@ export default class Customer extends AppBaseModel {
   @column({ columnName: 'normalized_phone' })
   declare public normalizedPhone: string | null
 
-  @column({ columnName: 'preferred_currency' })
-  declare public preferredCurrency: string
-
   @column({ columnName: 'orders_count' })
   declare public ordersCount: number
 
-  @column({ columnName: 'total_spent' })
-  declare public totalSpent: string
+  @moneyColumn({ columnName: 'total_spent' })
+  declare public totalSpent: PriceMoney
 
-  @column({ columnName: 'is_repeat_customer' })
-  declare public isRepeatCustomer: boolean
+  /** Generated: orders_count > 1 — read-only, never written. */
+  @generatedColumn({ columnName: 'is_repeat_customer' })
+  declare public readonly isRepeatCustomer: boolean
 
   @column({ columnName: 'risk_level' })
   declare public riskLevel: string

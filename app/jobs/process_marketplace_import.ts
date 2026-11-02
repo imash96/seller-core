@@ -1,22 +1,42 @@
 import { Job } from '@boringnode/queue'
 import logger from '@adonisjs/core/services/logger'
-import db from '@adonisjs/lucid/services/db'
+import { DateTime } from 'luxon'
+import SyncJob from '#models/sync_job'
+import Order from '#models/order'
+import { AuditContext } from '../services/audit_context.js'
+import { SyncJobStatus } from '../enums/index.js'
+import OrderPlaced from '#events/order_placed'
+import { OrderService, type CreateOrderInput } from '../services/order_service.js'
+import type { MarketplacePlatform } from '../services/order_sync_normalizer_service.js'
+import { currencyOf } from '../types/price.js'
+
+/**
+ * One canonical order accepted by the bulk importer: exactly the shape
+ * `OrderService.createOrder` takes, minus the identity/tenancy fields the job
+ * supplies itself.
+ */
+export type ImportOrderPayload = Omit<
+  CreateOrderInput,
+  'userId' | 'sellerAccountId' | 'syncJobId' | 'actorUserId'
+>
+
+/** Raw marketplace payloads normalized before import (SP-API / eBay / Etsy / MedusaJS). */
+type RawMarketplacePayload = {
+  platform: MarketplacePlatform
+  order: unknown
+  /** Amazon SP-API order items response, when taxes/prices live in a second call. */
+  orderItems?: unknown
+}
 
 type Payload = {
-  userId?: string
+  userId: string
   sellerAccountId?: string | null
-  idempotencyKey?: string
-  orders?: Array<{
-    orderNumber: string
-    externalOrderId?: string | null
-    customerFullName: string
-    currencyCode?: string
-    lines: Array<{ sku: string; title: string; quantityOrdered: number; unitPrice: number }>
-  }>
+  idempotencyKey: string
+  /** Canonical Seller Core orders. */
+  orders?: ImportOrderPayload[]
+  /** Raw marketplace payloads; the platform is auto-detected. */
+  platformPayloads?: RawMarketplacePayload[]
   requestId?: string
-  // Fallback: single-order fulfillment context dispatched from event listener
-  orderId?: string
-  context?: string
 }
 
 /**
@@ -35,50 +55,64 @@ export default class ProcessMarketplaceImport extends Job<Payload> {
 
   async execute() {
     const payload = this.payload as Payload
-    const { userId, sellerAccountId, idempotencyKey, orders, requestId } = payload
+    const { userId, sellerAccountId, idempotencyKey, requestId } = payload
+    let orders = payload.orders
 
-    if (payload.orderId && !orders) {
-      logger.info(
-        { orderId: payload.orderId, context: payload.context },
-        '[job] fulfillment prep (single order)'
+    // Raw marketplace payloads go through OrderService.importBulkOrders, which
+    // auto-detects the platform and records normalization failures per record.
+    const payloads = (payload.platformPayloads ?? []).map((raw) => ({
+      platform: raw.platform,
+      payload: raw.order,
+      orderItemsPayload: raw.orderItems,
+      sellerAccountId: (sellerAccountId as string | null) ?? null,
+    }))
+
+    if (!orders?.length && !payloads.length) {
+      throw new Error(
+        'VALIDATION_ERROR: a bulk import needs at least one canonical order or platform payload.'
       )
-      return
     }
 
-    if (!orders?.length) {
-      logger.warn({ idempotencyKey }, '[job] no orders in payload — skipping')
-      return
-    }
-
-    const { OrderService } = await import('#services/order_service')
-
-    logger.info({ idempotencyKey, count: orders.length }, '[job] processing bulk import')
+    logger.info(
+      { idempotencyKey, count: (orders?.length ?? 0) + payloads.length },
+      '[job] processing bulk import'
+    )
 
     const result = await OrderService.importBulkOrders({
-      userId: userId!,
-      actorUserId: userId!,
-      sellerAccountId: (sellerAccountId as string | null) ?? null,
-      idempotencyKey: idempotencyKey!,
-      orders: orders as any,
-    } as any)
+      userId,
+      actorUserId: userId,
+      sellerAccountId: sellerAccountId ?? null,
+      idempotencyKey,
+      orders,
+      payloads,
+      correlationId: requestId ?? undefined,
+    })
 
     // Emit per-order events (after commit so listeners see persisted rows)
-    for (const o of (result as any).createdOrderIds ?? (result as any).createdOrders ?? []) {
+    for (const orderId of result.createdOrderIds) {
       try {
-        const orderPlacedMod = await import('#events/order_placed')
-        const OrderPlaced = orderPlacedMod.default
+        const placed = await Order.query()
+          .where('id', orderId)
+          .preload('sellerAccount', (sellerAccountQuery) =>
+            sellerAccountQuery.preload('salesChannel')
+          )
+          .firstOrFail()
         await OrderPlaced.dispatch({
-          orderId: (o as any).id,
-          orderNumber: (o as any).orderNumber,
-          userId: userId!,
-          customerId: (o as any).customerId,
-          currencyCode: (o as any).currencyCode ?? 'USD',
-          totalAmount: String((o as any).totalAmount ?? 0),
-          marketplaceCode: (o as any).marketplaceCode ?? 'direct',
+          orderId: placed.id,
+          orderNumber: placed.orderNumber,
+          userId: userId,
+          customerId: placed.customerId,
+          currencyCode: currencyOf(placed.grandTotal),
+          grandTotal: placed.grandTotal,
+          marketplaceCode: placed.channelCode,
           sellerAccountId: (sellerAccountId as string | null) ?? null,
           requestId,
         })
-      } catch {}
+      } catch (err) {
+        // One undeliverable event must not fail an import that already committed.
+        // The order row is the source of truth, so log loudly and continue.
+        logger.error({ err, orderId }, '[job] order placed event could not be dispatched')
+      }
     }
 
     logger.info(
@@ -91,21 +125,28 @@ export default class ProcessMarketplaceImport extends Job<Payload> {
     )
   }
 
+  /**
+   * Persists the failure on the real `sync_jobs` row so retries and the imports
+   * UI see the same history the successful path writes.
+   */
   async failed(error: Error) {
     const payload = this.payload as Payload
-    logger.error(
-      { err: error, idempotencyKey: (payload as any).idempotencyKey },
-      '[job] bulk import failed'
-    )
-    // Persist failure for ops visibility
+    logger.error({ err: error, idempotencyKey: payload.idempotencyKey }, '[job] bulk import failed')
     try {
-      await db.table('sync_job_errors').insert({
-        id: `sje_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        sync_job_id: `job_${Date.now()}`,
-        error_code: 'QUEUE_FAILED',
-        error_message: error.message.slice(0, 2000),
-        created_at: new Date().toISOString(),
+      const job = await SyncJob.query()
+        .where('userId', payload.userId)
+        .where('idempotencyKey', payload.idempotencyKey)
+        .first()
+      if (!job) return
+      await AuditContext.transaction(async (trx) => {
+        job.useTransaction(trx)
+        job.status = SyncJobStatus.FAILED
+        job.errorSummary = { queue_error: error.message.slice(0, 2000) }
+        job.completedAt = DateTime.now()
+        await job.save()
       })
-    } catch {}
+    } catch (persistError) {
+      logger.warn({ err: persistError }, '[job] failed to persist import failure')
+    }
   }
 }

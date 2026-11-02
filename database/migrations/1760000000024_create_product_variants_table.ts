@@ -25,12 +25,16 @@ export default class extends BaseSchema {
       table.string('mpn', 100).nullable()
       table.string('asin', 20).nullable()
       table.jsonb('attributes').notNullable().defaultTo('{}')
-      table.string('currency_code', 3).notNullable().defaultTo('USD')
-      table.decimal('retail_price', 14, 2).notNullable().defaultTo(0)
-      table.decimal('compare_at_price', 14, 2).nullable()
-      table.decimal('cost_price', 14, 2).notNullable().defaultTo(0)
-      table.decimal('manufacturing_cost', 14, 2).notNullable().defaultTo(0)
-      table.decimal('packaging_cost', 14, 2).notNullable().defaultTo(0)
+      // MedusaJS v2 multi-currency price array — the variant's own currency_code,
+      // retail price and compare-at price all live inside this array.
+      table.jsonb('prices').notNullable().defaultTo('[]')
+      // Self-contained cost objects (each cost may be booked in its own currency).
+      table.jsonb('cost_price').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table
+        .jsonb('manufacturing_cost')
+        .notNullable()
+        .defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('packaging_cost').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
       table.integer('stock_on_hand').notNullable().defaultTo(0)
       table.integer('stock_reserved').notNullable().defaultTo(0)
       table.integer('reorder_point').notNullable().defaultTo(5)
@@ -57,7 +61,16 @@ export default class extends BaseSchema {
       'ALTER TABLE product_variants ADD CONSTRAINT chk_product_variants_qty_nonneg CHECK (stock_on_hand >= 0 AND stock_reserved >= 0 AND reorder_point >= 0)'
     )
     this.schema.raw(
-      'ALTER TABLE product_variants ADD CONSTRAINT chk_product_variants_prices_nonneg CHECK (retail_price >= 0 AND cost_price >= 0 AND manufacturing_cost >= 0 AND packaging_cost >= 0 AND (compare_at_price IS NULL OR compare_at_price >= 0))'
+      'ALTER TABLE product_variants ADD CONSTRAINT chk_product_variants_prices_medusa CHECK (is_valid_medusa_prices_array(prices))'
+    )
+    this.schema.raw(
+      'ALTER TABLE product_variants ADD CONSTRAINT chk_product_variants_cost_price_money CHECK (is_valid_price_money(cost_price, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE product_variants ADD CONSTRAINT chk_product_variants_manufacturing_cost_money CHECK (is_valid_price_money(manufacturing_cost, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE product_variants ADD CONSTRAINT chk_product_variants_packaging_cost_money CHECK (is_valid_price_money(packaging_cost, false))'
     )
     this.schema.raw(
       'CREATE UNIQUE INDEX uq_product_variants_user_sku ON product_variants (user_id, sku)'

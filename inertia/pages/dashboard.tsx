@@ -1,3 +1,4 @@
+import { Stack } from '@astryxdesign/core/Stack'
 import { Link } from '@adonisjs/inertia/react'
 import { Button } from '@astryxdesign/core/Button'
 import {
@@ -33,6 +34,7 @@ import {
 } from 'lucide-react'
 import { Grid, VStack } from '@astryxdesign/core'
 import { Text } from '@astryxdesign/core/Text'
+import { resolvePriceMoney } from '~/lib/utils'
 
 type Props = {
   kpis: DashboardKpis
@@ -102,7 +104,7 @@ export default function Dashboard(props: Props) {
   const filteredOrders = useMemo(() => {
     if (channelFilter === 'all') return orders
     return orders.filter((o) =>
-      String(o.marketplaceCode ?? o.sellerAccountId ?? '')
+      String(o.channelCode ?? o.sellerAccountId ?? '')
         .toLowerCase()
         .includes(channelFilter.toLowerCase())
     )
@@ -113,18 +115,19 @@ export default function Dashboard(props: Props) {
     if (channelFilter === 'all') return kpis
     const usdOrders = filteredOrders.filter((o) => o.reportingCurrencyCode === 'USD')
     const rateOf = (o: Row) => Number(o.exchangeRate || 1)
-    const gross = usdOrders.reduce((s, o) => s + Number(o.reportingTotalAmount ?? 0), 0)
-    const refunded = usdOrders.reduce((s, o) => s + Number(o.refundedAmount || 0) * rateOf(o), 0)
+    // Every amount is a self-contained PriceMoney object; reporting totals are
+    // already converted to the reporting currency server-side.
+    const amount = (value: unknown) => Number(resolvePriceMoney(value, 'USD').amount || 0)
+    const gross = usdOrders.reduce((s, o) => s + amount(o.reportingTotal), 0)
+    const refunded = usdOrders.reduce((s, o) => s + amount(o.refundedTotal) * rateOf(o), 0)
     const fees = usdOrders.reduce(
       (s, o) =>
-        s +
-        (Number(o.marketplaceFeesAmount || 0) + Number(o.paymentProcessingFeesAmount || 0)) *
-          rateOf(o),
+        s + (amount(o.marketplaceFeesTotal) + amount(o.paymentProcessingFeesTotal)) * rateOf(o),
       0
     )
-    const cogs = usdOrders.reduce((s, o) => s + Number(o.cogsAmount || 0) * rateOf(o), 0)
-    const ship = usdOrders.reduce((s, o) => s + Number(o.shippingCostAmount || 0) * rateOf(o), 0)
-    const profit = usdOrders.reduce((s, o) => s + Number(o.netProfitAmount || 0) * rateOf(o), 0)
+    const cogs = usdOrders.reduce((s, o) => s + amount(o.cogsTotal) * rateOf(o), 0)
+    const ship = usdOrders.reduce((s, o) => s + amount(o.shippingCostTotal) * rateOf(o), 0)
+    const profit = usdOrders.reduce((s, o) => s + amount(o.netProfit) * rateOf(o), 0)
     return {
       ...kpis,
       totalOrders: filteredOrders.length,
@@ -147,7 +150,7 @@ export default function Dashboard(props: Props) {
   const marketplaceSegments = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const o of filteredOrders) {
-      const key = String(o.marketplaceCode ?? 'direct')
+      const key = String(o.channelCode ?? 'direct')
       counts[key] = (counts[key] ?? 0) + 1
     }
     const colors: Record<string, string> = {
@@ -214,7 +217,7 @@ export default function Dashboard(props: Props) {
       Number(activeKpis.totalShippingCost) || 1
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Executive Operations & P&L Command Center"
         description="Recent order economics, carrier invoices, risk review queues and local ledger activity."
@@ -236,8 +239,16 @@ export default function Dashboard(props: Props) {
       </Text>
 
       {/* Top Executive Filter Bar */}
-      <div className="bg-card text-card-foreground border border-border rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+      <Stack
+        direction="horizontal"
+        align="center"
+        justify="between"
+        wrap="wrap"
+        gap={3}
+        padding={3}
+        className="bg-card text-card-foreground border border-border rounded-xl shadow-xs"
+      >
+        <Stack direction="horizontal" align="center" gap={1.5} className="overflow-x-auto pb-0.5">
           {CHANNEL_FILTERS.map((ch) => {
             const active = channelFilter === ch.value
             return (
@@ -255,8 +266,8 @@ export default function Dashboard(props: Props) {
               </button>
             )
           })}
-        </div>
-      </div>
+        </Stack>
+      </Stack>
 
       {/* 4 Hero KPI Scorecards */}
       <Grid columns={{ minWidth: 280, max: 3 }} gap={4}>
@@ -291,37 +302,40 @@ export default function Dashboard(props: Props) {
           icon={<TrendingUp className="w-5 h-5" />}
           tone="success"
         >
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>Cost Stack (COGS / Fees / Ship)</span>
-              <span className="tabular-nums">
-                Ship: {money('USD', activeKpis.totalShippingCost)}
-              </span>
-            </div>
-            <div className="flex h-2 rounded-full overflow-hidden bg-muted">
-              <div
+          <Stack gap={1.5}>
+            <Stack
+              direction="horizontal"
+              align="center"
+              justify="between"
+              className="text-2xs text-muted-foreground"
+            >
+              <Text>Cost Stack (COGS / Fees / Ship)</Text>
+              <Text hasTabularNumbers>Ship: {money('USD', activeKpis.totalShippingCost)}</Text>
+            </Stack>
+            <Stack direction="horizontal" className="h-2 rounded-full overflow-hidden bg-muted">
+              <Stack
                 style={{
                   width: `${(Number(activeKpis.totalCogs) / totalCostBurden) * 100}%`,
                 }}
+                aria-label="COGS"
                 className="bg-amber-500"
-                title="COGS"
               />
-              <div
+              <Stack
                 style={{
                   width: `${(Number(activeKpis.totalMarketplaceFees) / totalCostBurden) * 100}%`,
                 }}
+                aria-label="Marketplace & Payment Fees"
                 className="bg-orange-500"
-                title="Marketplace & Payment Fees"
               />
-              <div
+              <Stack
                 style={{
                   width: `${(Number(activeKpis.totalShippingCost) / totalCostBurden) * 100}%`,
                 }}
+                aria-label="Shipping Cost"
                 className="bg-cyan-500"
-                title="Shipping Cost"
               />
-            </div>
-          </div>
+            </Stack>
+          </Stack>
         </KpiScorecard>
 
         <KpiScorecard
@@ -352,14 +366,19 @@ export default function Dashboard(props: Props) {
           icon={<AlertTriangle className="w-5 h-5" />}
           tone="warning"
         >
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Household ledger spend:</span>
-            <span className="font-semibold text-foreground tabular-nums">
+          <Stack
+            direction="horizontal"
+            align="center"
+            justify="between"
+            className="text-xs text-muted-foreground"
+          >
+            <Text>Household ledger spend:</Text>
+            <Text color="primary" weight="semibold" hasTabularNumbers>
               {access.householdFinance && access.finance
                 ? money('USD', activeKpis.householdExpenses)
                 : 'Restricted'}
-            </span>
-          </div>
+            </Text>
+          </Stack>
         </KpiScorecard>
       </Grid>
 
@@ -376,7 +395,7 @@ export default function Dashboard(props: Props) {
       />
 
       {/* 4 Interactive Visual Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Grid columns={{ minWidth: 220, max: 1 }} className="lg:grid-cols-2">
         <PageSection
           title="Order Economics & P&L Waterfall"
           description="Gross Sales → − Refunds → = Net Sales → − COGS → − Channel Fees → − Shipping → = Order Net Profit."
@@ -400,10 +419,10 @@ export default function Dashboard(props: Props) {
           description="Distribution by sales channel and fulfillment lifecycle stage."
           actions={<PieChart className="w-4 h-4 text-primary" />}
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
             <DonutChart title="Channel Mix" segments={marketplaceSegments} />
             <DonutChart title="Status Funnel" segments={statusSegments} />
-          </div>
+          </Grid>
         </PageSection>
 
         <PageSection
@@ -413,7 +432,7 @@ export default function Dashboard(props: Props) {
         >
           <CreditUtilizationBars cards={creditCards} transactions={financialTransactions} />
         </PageSection>
-      </div>
+      </Grid>
 
       {/* Interactive Tabbed Operational Queues */}
       <PageSection
@@ -421,7 +440,12 @@ export default function Dashboard(props: Props) {
         description="Switch across active operational domains without leaving the command center."
       >
         <VStack gap={4}>
-          <div className="flex items-center gap-2 overflow-x-auto border-b border-border pb-2.5">
+          <Stack
+            direction="horizontal"
+            align="center"
+            gap={2}
+            className="overflow-x-auto border-b border-border pb-2.5"
+          >
             {QUEUE_TABS.map((tab) => {
               const active = activeTab === tab.id
               return (
@@ -439,44 +463,44 @@ export default function Dashboard(props: Props) {
                 </button>
               )
             })}
-          </div>
+          </Stack>
 
           {activeTab === 'orders' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">
+            <Stack gap={3}>
+              <Stack direction="horizontal" align="center" justify="between">
+                <Text size="xsm" color="secondary">
                   Showing latest {Math.min(8, filteredOrders.length)} of {filteredOrders.length}{' '}
                   orders
-                </span>
+                </Text>
                 <Link href="/orders">
                   <Button label="Open Orders Module →" variant="secondary" size="sm" />
                 </Link>
-              </div>
+              </Stack>
               <DataTable
                 rows={filteredOrders.slice(0, 8)}
                 empty="No orders recorded yet."
                 columns={[
                   col.text('orderNumber', 'Order #', 140),
                   col.badge('status', 'Status', STATUS_TONES),
-                  col.text('marketplaceCode', 'Channel', 110),
+                  col.text('channelCode', 'Channel', 110),
                   col.money('totalAmount', 'Order Total', 'currencyCode'),
                   col.money('netProfitAmount', 'Net Profit', 'reportingCurrencyCode'),
                   col.date('orderedAt', 'Ordered At'),
                 ]}
               />
-            </div>
+            </Stack>
           )}
 
           {activeTab === 'shipments' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">
+            <Stack gap={3}>
+              <Stack direction="horizontal" align="center" justify="between">
+                <Text size="xsm" color="secondary">
                   Active parcel dispatches & carrier tracking
-                </span>
+                </Text>
                 <Link href="/shipments">
                   <Button label="Open Shipments & Invoices →" variant="secondary" size="sm" />
                 </Link>
-              </div>
+              </Stack>
               <DataTable
                 rows={shipments.slice(0, 8)}
                 empty="No shipments dispatched yet."
@@ -489,20 +513,20 @@ export default function Dashboard(props: Props) {
                   col.date('shippedAt', 'Shipped'),
                 ]}
               />
-            </div>
+            </Stack>
           )}
 
           {activeTab === 'returns' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Grid columns={{ minWidth: 220, max: 1 }} className="lg:grid-cols-2">
               <VStack gap={3}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground">
+                <Stack direction="horizontal" align="center" justify="between">
+                  <Text size="xsm" color="primary" weight="semibold">
                     Open Return Requests (RMAs)
-                  </span>
+                  </Text>
                   <Link href="/returns">
                     <Button label="Manage RMAs →" variant="ghost" size="sm" />
                   </Link>
-                </div>
+                </Stack>
                 <DataTable
                   rows={returnRequests.slice(0, 6)}
                   empty="No return requests."
@@ -516,12 +540,14 @@ export default function Dashboard(props: Props) {
               </VStack>
 
               <VStack gap={3}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground">Marketplace Claims</span>
+                <Stack direction="horizontal" align="center" justify="between">
+                  <Text size="xsm" color="primary" weight="semibold">
+                    Marketplace Claims
+                  </Text>
                   <Link href="/claims">
                     <Button label="Manage Claims →" variant="ghost" size="sm" />
                   </Link>
-                </div>
+                </Stack>
                 <DataTable
                   rows={marketplaceClaims.slice(0, 6)}
                   empty="No marketplace claims."
@@ -533,20 +559,20 @@ export default function Dashboard(props: Props) {
                   ]}
                 />
               </VStack>
-            </div>
+            </Grid>
           )}
 
           {activeTab === 'finance' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Grid columns={{ minWidth: 220, max: 1 }} className="lg:grid-cols-2">
               <VStack gap={3}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground">
+                <Stack direction="horizontal" align="center" justify="between">
+                  <Text size="xsm" color="primary" weight="semibold">
                     Registered Credit Cards
-                  </span>
+                  </Text>
                   <Link href="/finance">
                     <Button label="Open Finance →" variant="ghost" size="sm" />
                   </Link>
-                </div>
+                </Stack>
                 <DataTable
                   rows={creditCards.slice(0, 6)}
                   empty="No credit cards."
@@ -560,14 +586,14 @@ export default function Dashboard(props: Props) {
               </VStack>
 
               <VStack gap={3}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground">
+                <Stack direction="horizontal" align="center" justify="between">
+                  <Text size="xsm" color="primary" weight="semibold">
                     Operational Tasks & Reminders
-                  </span>
+                  </Text>
                   <Link href="/tasks">
                     <Button label="Open Tasks →" variant="ghost" size="sm" />
                   </Link>
-                </div>
+                </Stack>
                 <DataTable
                   rows={tasksReminders.slice(0, 6)}
                   empty="No tasks queued."
@@ -584,20 +610,20 @@ export default function Dashboard(props: Props) {
                   ]}
                 />
               </VStack>
-            </div>
+            </Grid>
           )}
 
           {activeTab === 'governance' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Grid columns={{ minWidth: 220, max: 1 }} className="lg:grid-cols-2">
               <VStack gap={3}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground">
+                <Stack direction="horizontal" align="center" justify="between">
+                  <Text size="xsm" color="primary" weight="semibold">
                     Connected Seller Accounts
-                  </span>
+                  </Text>
                   <Link href="/seller-accounts">
                     <Button label="Manage Accounts →" variant="ghost" size="sm" />
                   </Link>
-                </div>
+                </Stack>
                 <DataTable
                   rows={sellerAccounts.slice(0, 6)}
                   empty="No seller accounts."
@@ -611,14 +637,14 @@ export default function Dashboard(props: Props) {
               </VStack>
 
               <VStack gap={3}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground">
+                <Stack direction="horizontal" align="center" justify="between">
+                  <Text size="xsm" color="primary" weight="semibold">
                     Recent Tamper-Evident Audit Events
-                  </span>
+                  </Text>
                   <Link href="/audit">
                     <Button label="Full Audit Trail →" variant="ghost" size="sm" />
                   </Link>
-                </div>
+                </Stack>
                 <DataTable
                   rows={auditLogs.slice(0, 6).map((r) => ({
                     ...r,
@@ -637,10 +663,10 @@ export default function Dashboard(props: Props) {
                   ]}
                 />
               </VStack>
-            </div>
+            </Grid>
           )}
         </VStack>
       </PageSection>
-    </div>
+    </Stack>
   )
 }
