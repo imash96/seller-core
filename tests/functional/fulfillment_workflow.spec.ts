@@ -112,8 +112,9 @@ test.group('Local fulfillment HTTP workflow', () => {
     assert.equal(invoice.paymentReference, 'receipt-123')
     assert.lengthOf(
       await AuditLog.query()
+        .where('entityType', 'shipping_invoices')
         .where('entityId', invoice.id)
-        .where('action', 'shipping_invoice.manual_review'),
+        .whereRaw(`metadata ->> 'reason' = 'shipping_invoice.manual_review'`),
       1
     )
     assert.equal((await send(`/carrier-invoices/${invoice.id}/delete`, {})).status, 409)

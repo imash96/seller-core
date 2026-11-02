@@ -66,11 +66,18 @@ test.group('Admin entitlements over HTTP', () => {
       .where('userId', target.id)
       .where('moduleKey', 'finance')
     assert.lengthOf(records, 1)
+    // Exactly one audit row per row mutation, written by the database trigger.
     const audits = await AuditLog.query()
-      .where('userId', target.id)
+      .where('entityType', 'module_entitlements')
       .where('entityId', records[0].id)
-      .where('action', 'rbac.entitlement_changed')
+      .whereRaw(`metadata ->> 'reason' = 'rbac.entitlement_changed'`)
+      .orderBy('createdAt', 'asc')
     assert.lengthOf(audits, 2)
-    assert.equal(audits.filter((entry) => (entry.beforeState as any)?.isEnabled === null).length, 1)
+    assert.deepEqual(audits.map((entry) => entry.action).sort(), ['INSERT', 'UPDATE'])
+    // The actor is published through `SET LOCAL app.actor_user_id`, never re-derived.
+    assert.deepEqual(Array.from(new Set(audits.map((entry) => entry.actorUserId))), [admin.id])
+    // Trigger snapshots are raw row images, so columns keep their snake_case names.
+    const update = audits.find((entry) => entry.action === 'UPDATE')!
+    assert.notEqual((update.beforeState as any)?.is_enabled, (update.afterState as any)?.is_enabled)
   })
 })

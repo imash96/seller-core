@@ -62,12 +62,45 @@
   - Evaluated independently of RBAC roles so disabling a module immediately blocks access even if a role has permission.
 - **Session & Password Security (`007`–`008`)**:
   - Passwords hashed via AdonisJS `@adonisjs/core/services/hash` (`scrypt`).
-  - `user_sessions` and `password_reset_tokens` store only SHA-256 token hashes (`session_token_hash`, `token_hash`), never raw tokens.
+  - `sessions` is the single session store: the guard's own `sessions` table carries revocation (`is_revoked`, `revoked_at`, `last_active_at`) and is shared with `SessionRegistryService`, so logout, suspension, lockout and password change revoke exactly the rows the browser's cookie points at. `password_reset_tokens` stores only a SHA-256 `token_hash`, never a raw token.
   - Account suspension (`RbacService.suspendUser`) immediately revokes all active sessions.
 
 ### 3.3 Immutable Tamper-Evident Audit Logging (`audit_logs`, `009`)
 
-- Records `actor_user_id`, `user_id`, `action`, `entity_type`, `entity_id`, `request_id`, `ip_address`, `user_agent`, `before_state` (`jsonb`), `after_state` (`jsonb`), and `checksum` (`varchar(64)` SHA-256 digest computed via `computeAuditChecksum()`).
+`audit_logs` records `id` (`aud_` + 26 Crockford Base32 characters), `actor_user_id`, `user_id`, `action`, `entity_type`, `entity_id`, `request_id`, `correlation_id`, `ip_address`, `user_agent`, `before_state` (`jsonb`), `after_state` (`jsonb`), `metadata` (`jsonb`) and `checksum` (`varchar(64)` SHA-256 digest computed via `computeAuditChecksum()`).
+
+#### One writer: the `trg_audit_capture` trigger
+
+Row-level auditing has exactly one writer, `fn_audit_log_capture()` in PostgreSQL, attached as `trg_audit_capture` (`AFTER INSERT OR UPDATE OR DELETE … FOR EACH ROW`) to **every** table in `public` except `audit_logs` and `adonis_schema*`. Migration `0068` drops and re-creates the trigger across the whole schema, so tables added by later migrations can never be silently un-audited.
+
+| Concern                 | Mechanism                                                                                                                                                                     |
+| :---------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Actor attribution       | `app.actor_user_id` GUC → `audit_logs.actor_user_id` (falls back to nothing; never guessed)                                                                                    |
+| Request lineage         | `app.request_id`, `app.correlation_id` GUCs → `request_id`, `correlation_id`                                                                                                   |
+| Client identity         | `app.ip_address`, `app.user_agent` GUCs                                                                                                                                        |
+| Semantic intent         | `app.audit_reason` GUC → `metadata.reason` (e.g. `order.cancelled`, `finance.manual_reconciliation_created`) — a label on the single row, never a second row                    |
+| Single row per mutation | `AFTER … FOR EACH ROW` fires once per changed row; `UPDATE`s that leave every non-timestamp column unchanged write nothing                                                    |
+| Diff                    | `metadata.changed_fields` lists the columns that actually changed                                                                                                              |
+| Append-only             | `trg_audit_logs_append_only` raises on `UPDATE`/`DELETE`; `checksum` makes tampering evident at rest                                                                            |
+| Redaction               | `password`, `encrypted_credentials`, `session_token_hash`, `vault_token_reference`, `raw_payload`, `access_token`, `refresh_token`, `client_secret`, `api_key`, `card_number`, `cvv`, `authorization` are stripped from `before_state`/`after_state` before hashing |
+
+The context is published transactionally by `AuditContext` (`app/services/audit_context.ts`) using `set_config(…, is_local => true)` — the parameterised form of `SET LOCAL`, which cannot leak across pooled connections:
+
+```ts
+await AuditContext.run({ actorUserId: user.id, requestId: request.id(), reason: 'order.cancelled' }, async (trx) => {
+  order.useTransaction(trx)
+  order.status = OrderStatus.CANCELLED
+  await order.save()
+})
+```
+
+#### Manual audit rows are restricted by type
+
+`AuditService.record()` (`app/services/audit_service.ts`) accepts **only** actions that are not row mutations, and throws for anything else:
+
+`auth.login`, `auth.login_failed`, `auth.logout`, `export.downloaded`
+
+Because there is no API to write a row-level audit entry by hand, double-auditing is impossible by construction: services, controllers and listeners no longer create `AuditLog` rows for `order.created`, `refund.processed`, `shipping_invoice.*`, `organization.*`, `rbac.*` or `finance.manual_reconciliation_*`.
 
 ### 3.4 Marketplace Seller Accounts & Sync Jobs (`010`–`013`)
 
@@ -133,8 +166,9 @@
 | **DBML & Schema**        | `database/schema.dbml`, `database/schema.ts`, `database/schema_rules.ts`                                                                              | Self-contained DBML specification, custom generator rules, and 40 auto-generated Lucid `*Schema` classes                                               |
 | **Migrations (40)**      | `database/migrations/1760000000001_*.ts` .. `1760000000040_*.ts`                                                                                      | Dependency-ordered UUIDv7 migrations with native PostgreSQL enums, composite indexes, and `CHECK` constraints                                          |
 | **Models (40)**          | `app/models/*.ts`                                                                                                                                     | 40 Lucid models with UUIDv7 `@beforeCreate()` hooks, AES-256-GCM encryption, identity normalization, and typed relationships                           |
-| **Enums & Utils**        | `app/enums/index.ts`, `app/utils/uuid.ts`                                                                                                             | 44 shared TypeScript enum constants/types, RFC 9562 `uuidv7()`, email/phone normalization, address fingerprinting, and SHA-256 audit checksums         |
-| **Domain Services**      | `app/services/rbac_service.ts`, `app/services/catalog_service.ts`, `app/services/order_service.ts`, `app/services/fulfillment_and_returns_service.ts` | Transactional business services for RBAC/entitlements/audit, catalog & variants, manual/bulk orders, shipments, carrier invoices, returns, and refunds |
+| **Enums & Utils**        | `app/enums/index.ts`, `app/utils/uuid.ts`, `app/utils/generate_entity_id.ts`                                                                           | 44 shared TypeScript enum constants/types, ULID entity ids, email/phone normalization, address fingerprinting, and SHA-256 audit checksums         |
+| **Domain Services**      | `app/services/rbac_service.ts`, `app/services/catalog_service.ts`, `app/services/order_service.ts`, `app/services/fulfillment_and_returns_service.ts` | Transactional business services for RBAC/entitlements, catalog & variants, manual/bulk orders, shipments, carrier invoices, returns, and refunds      |
+| **Audit & Schema**       | `app/services/audit_context.ts`, `app/services/audit_service.ts`, `scripts/sync_schema_dbml.mjs`                                                       | Transaction-scoped audit GUCs, the closed non-row audit writer, and schema artifact regeneration validated with `@dbml/core`                         |
 | **Controllers & Routes** | `app/controllers/session_controller.ts`, `app/controllers/operations_controller.ts`, `start/routes.ts`                                                | Auth session controller and full-CRUD operations controller across all 9 modules                                                                       |
 | **Validators & Seeders** | `app/validators/user.ts`, `app/validators/operations.ts`, `database/seeders/main_seeder.ts`                                                           | VineJS v4 validators and idempotent multi-currency, multi-user seeder                                                                                  |
 | **Frontend (Astryx UI)** | `inertia/components/astryx.tsx`, `inertia/pages/dashboard.tsx`, `inertia/pages/auth/login.tsx`, `inertia/pages/home.tsx`, `inertia/layouts/app.tsx`   | React 19 + Inertia v5 + TailwindCSS v4 UI built on the Facebook/Meta Astryx design system with 9 tabs and 19 modal/inline CRUD workflows               |

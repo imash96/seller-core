@@ -9,6 +9,7 @@
  */
 import { readFile, writeFile } from 'node:fs/promises'
 import pg from 'pg'
+import { Parser, exporter } from '@dbml/core'
 
 const CONNECTION =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@127.0.0.1:5432/postgres'
@@ -174,6 +175,17 @@ function renderChecks(tableName) {
   return result
 }
 
+// Business tables that must be documented. Framework/infrastructure tables
+// (adonis_schema*, sessions, queue_*) are intentionally excluded from the DBML.
+const IGNORED_TABLES = new Set([
+  'adonis_schema',
+  'adonis_schema_versions',
+  'queue_jobs',
+  'queue_schedules',
+])
+
+const droppedTables = []
+
 for (let i = 0; i < lines.length; i++) {
   const line = lines[i]
   const tableMatch = line.match(/^Table (\w+(?:\.\w+)?) \{/)
@@ -192,6 +204,14 @@ for (let i = 0; i < lines.length; i++) {
       block.push(candidate)
     }
     const tailIndex = j
+    if (!byTable.has(currentTable) && !IGNORED_TABLES.has(currentTable)) {
+      // The table no longer exists in PostgreSQL: drop the stale documentation
+      // instead of keeping a block that describes a table the migrations removed.
+      out.pop()
+      droppedTables.push(currentTable)
+      i = tailIndex
+      continue
+    }
     const columnBlock = []
     let indexBlock = []
     let checkBlock = []
@@ -238,15 +258,6 @@ for (let i = 0; i < lines.length; i++) {
 
 await client.end()
 
-// Business tables that must be documented. Framework/infrastructure tables
-// (adonis_schema*, sessions, queue_*) are intentionally excluded from the DBML.
-const IGNORED_TABLES = new Set([
-  'adonis_schema',
-  'adonis_schema_versions',
-  'queue_jobs',
-  'queue_schedules',
-])
-
 const missing = [...byTable.keys()].filter(
   (table) => !emittedTables.has(table) && !IGNORED_TABLES.has(table)
 )
@@ -266,7 +277,32 @@ if (missing.length) {
   console.log(`Appended ${missing.length} previously undocumented table(s): ${missing.join(', ')}`)
 }
 
+if (droppedTables.length) {
+  console.log(`Removed ${droppedTables.length} stale table block(s): ${droppedTables.join(', ')}`)
+}
+
 const rendered = out.join('\n')
+
+/**
+ * The DBML must be machine-readable, not just human-readable: parse it and export it
+ * back to PostgreSQL DDL. Any parse/diagnostic error fails the sync (and therefore
+ * `db:schema:check`), so a malformed note or ref can never be committed.
+ */
+function validateDbml(source) {
+  const database = Parser.parse(source, 'dbml')
+  const tables = database?.schemas?.flatMap((schema) => schema.tables ?? []) ?? []
+  const diagnostics = tables.flatMap((table) =>
+    (table.diagnostics ?? []).map((diagnostic) => `${table.name}: ${diagnostic.message}`)
+  )
+  if (diagnostics.length) {
+    throw new Error(`DBML diagnostics:\n${diagnostics.join('\n')}`)
+  }
+  const ddl = exporter.export(source, 'postgres')
+  if (typeof ddl !== 'string' || !ddl.includes('CREATE TABLE')) {
+    throw new Error('DBML export produced no PostgreSQL DDL.')
+  }
+  return { tables: tables.length, ddlLength: ddl.length }
+}
 
 if (check) {
   if (rendered !== file) {
@@ -277,7 +313,11 @@ if (check) {
   } else {
     console.log('database/schema.dbml is in sync with the database.')
   }
+  const validated = validateDbml(file)
+  console.log(`database/schema.dbml parses cleanly (${validated.tables} tables, ${validated.ddlLength} DDL chars).`)
 } else {
   await writeFile(FILE, rendered)
+  const validated = validateDbml(rendered)
   console.log(`Synced ${emittedTables.size} tables into database/schema.dbml`)
+  console.log(`database/schema.dbml parses cleanly (${validated.tables} tables, ${validated.ddlLength} DDL chars).`)
 }

@@ -53,6 +53,7 @@
     "@astryxdesign/cli": "0.7.1",
     "@astryxdesign/theme-neutral": "0.7.1",
     "@babel/core": "7.29.7",
+    "@dbml/core": "^11.0.0",
     "@japa/assert": "^4.2.0",
     "@japa/plugin-adonisjs": "^5.2.0",
     "@japa/runner": "^5.4.0",

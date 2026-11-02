@@ -84,9 +84,9 @@ export default class extends BaseSchema {
   }
 
   async down() {
-    this.schema.alterTable('users', (table) => {
-      table.string('company_name', 255).nullable()
-    })
+    // Raw DDL: `alterTable()` is deferred to the end of the migration, so the
+    // backfill below would run before the column exists.
+    this.schema.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS company_name varchar(255) NULL')
     this.schema.raw(
       `UPDATE users AS u SET company_name = o.name
          FROM organizations AS o

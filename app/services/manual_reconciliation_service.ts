@@ -2,7 +2,7 @@ import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import FinancialTransaction from '#models/financial_transaction'
 import ManualReconciliation from '#models/manual_reconciliation'
-import AuditLog from '#models/audit_log'
+import { AuditContext } from './audit_context.js'
 import type User from '#models/user'
 import { FinanceAccessService } from '#services/finance_access_service'
 import {
@@ -58,6 +58,11 @@ export class ManualReconciliationService {
     const household = await FinanceAccessService.permissions(input.user)
     try {
       return await db.transaction(async (trx) => {
+        await AuditContext.apply(trx, {
+          actorUserId: input.user.id,
+          requestId: input.requestId ?? null,
+          reason: 'finance.manual_reconciliation_created',
+        })
         const tx = await FinancialTransaction.query({ client: trx })
           .where('userId', input.user.id)
           .where('id', input.transactionId)
@@ -92,25 +97,6 @@ export class ManualReconciliationService {
         tx.status = 'reconciled'
         tx.reconciledAt = DateTime.now()
         await tx.save()
-        await AuditLog.create(
-          {
-            actorUserId: input.user.id,
-            userId: input.user.id,
-            action: 'finance.manual_reconciliation_created',
-            entityType: 'financial_transactions',
-            entityId: tx.id,
-            requestId: input.requestId ?? null,
-            beforeState: { status: match.previousStatus },
-            afterState: {
-              status: tx.status,
-              reconciliationId: match.id,
-              sourceReference: reference,
-              observedAmount,
-            },
-            metadata: { verification: 'manual' },
-          },
-          { client: trx }
-        )
         return match
       })
     } catch (error) {
@@ -134,6 +120,11 @@ export class ManualReconciliationService {
       throw new ReconciliationError('Provide a reversal reason (3–2000 characters).')
     const household = await FinanceAccessService.permissions(input.user)
     return db.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
+        actorUserId: input.user.id,
+        requestId: input.requestId ?? null,
+        reason: 'finance.manual_reconciliation_reversed',
+      })
       const tx = await FinancialTransaction.query({ client: trx })
         .where('userId', input.user.id)
         .where('id', input.transactionId)
@@ -157,20 +148,6 @@ export class ManualReconciliationService {
       tx.status = match.previousStatus
       tx.reconciledAt = null
       await tx.save()
-      await AuditLog.create(
-        {
-          actorUserId: input.user.id,
-          userId: input.user.id,
-          action: 'finance.manual_reconciliation_reversed',
-          entityType: 'financial_transactions',
-          entityId: tx.id,
-          requestId: input.requestId ?? null,
-          beforeState: { status: 'reconciled', reconciliationId: match.id },
-          afterState: { status: tx.status, reason },
-          metadata: { verification: 'manual' },
-        },
-        { client: trx }
-      )
       return match
     })
   }

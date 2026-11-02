@@ -8,5 +8,4 @@ export const listeners = {
   NotifySlack: () => import('#listeners/notify_slack'),
   QueueFulfillment: () => import('#listeners/queue_fulfillment'),
   UpdateSellerMetrics: () => import('#listeners/update_seller_metrics'),
-  WriteAuditTrail: () => import('#listeners/write_audit_trail'),
 }

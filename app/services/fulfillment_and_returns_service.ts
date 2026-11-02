@@ -11,7 +11,7 @@ import RefundTransaction from '#models/refund_transaction'
 import FinancialTransaction from '#models/financial_transaction'
 import FinancialAccount from '#models/financial_account'
 import OutboxEvent from '#models/outbox_event'
-import AuditLog from '#models/audit_log'
+import { AuditContext } from './audit_context.js'
 import {
   OrderStatus,
   OrderPaymentStatus,
@@ -366,6 +366,10 @@ export class FulfillmentAndReturnsService {
     assertAmount(input.taxAmount, 'Invalid tax amount')
 
     return await db.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
+        actorUserId: input.userId,
+        reason: 'shipping_invoice.created',
+      })
       const currencyCode = normalizeCurrencyCode(input.currencyCode, 'USD')
       let subtotalTotal = money(0, currencyCode)
       let taxTotal = toMoney(input.taxAmount ?? 0, currencyCode)
@@ -462,30 +466,6 @@ export class FulfillmentAndReturnsService {
           ? InvoiceReconciliationStatus.VARIANCE_DETECTED
           : InvoiceReconciliationStatus.MATCHED
       await invoice.save()
-      await AuditLog.create(
-        {
-          actorUserId: input.userId,
-          userId: input.userId,
-          action: 'shipping_invoice.created',
-          entityType: 'shipping_invoices',
-          entityId: invoice.id,
-          afterState: {
-            invoiceNumber: invoice.invoiceNumber,
-            grandTotal: invoice.grandTotal,
-            reconciliationStatus: invoice.reconciliationStatus,
-            varianceTotal: invoice.varianceTotal,
-            lines: input.lines.map((line) => ({
-              shipmentId: line.shipmentId ?? null,
-              chargeType: line.chargeType,
-              expectedAmount: normalizeNullablePriceMoney(line.expectedAmount, currencyCode),
-              billedAmount: toMoney(line.billedAmount, currencyCode),
-            })),
-          },
-          metadata: { verification: 'manual' },
-        },
-        { client: trx }
-      )
-
       return invoice
     })
   }
@@ -603,6 +583,10 @@ export class FulfillmentAndReturnsService {
     reason?: string
   }): Promise<RefundTransaction> {
     return await db.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
+        actorUserId: input.actorUserId ?? input.userId,
+        reason: 'refund.processed',
+      })
       const order = await Order.query({ client: trx })
         .where('userId', input.userId)
         .andWhere('id', input.orderId)
@@ -757,21 +741,6 @@ export class FulfillmentAndReturnsService {
       ledgerTx.settledAt = DateTime.now()
       ledgerTx.metadata = { refundId: refund.id }
       await ledgerTx.save()
-
-      const audit = new AuditLog()
-      audit.useTransaction(trx)
-      audit.actorUserId = input.actorUserId ?? input.userId
-      audit.userId = input.userId
-      audit.action = 'refund.processed'
-      audit.entityType = 'refund_transactions'
-      audit.entityId = refund.id
-      audit.afterState = {
-        refundNumber: refund.refundNumber,
-        grandRefundTotal: refund.grandRefundTotal,
-        orderNumber: order.orderNumber,
-      }
-      audit.metadata = {}
-      await audit.save()
 
       return refund
     })

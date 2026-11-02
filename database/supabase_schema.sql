@@ -138,35 +138,141 @@ CREATE OR REPLACE FUNCTION public.fn_audit_log_capture()
  LANGUAGE plpgsql
 AS $function$
       DECLARE
-        v_new jsonb; v_old jsonb; v_changed text[] := '{}'; v_k text;
-        v_action text; v_entity_id text; v_user_id text; v_actor text; v_checksum text;
+        v_new jsonb;
+        v_old jsonb;
+        v_changed text[] := '{}';
+        v_k text;
+        v_action text;
+        v_entity_id text;
+        v_actor text;
+        v_user_id text;
+        v_request_id text;
+        v_correlation_id text;
+        v_ip text;
+        v_user_agent text;
+        v_reason text;
+        v_checksum text;
+        v_redacted constant text[] := ARRAY[
+          'password',
+          'encrypted_credentials',
+          'session_token_hash',
+          'vault_token_reference',
+          'raw_payload',
+          'access_token',
+          'refresh_token',
+          'client_secret',
+          'api_key',
+          'card_number',
+          'cvv',
+          'authorization'
+        ];
       BEGIN
         IF TG_OP = 'INSERT' THEN
-          v_new := to_jsonb(NEW); v_old := NULL; v_action := 'INSERT';
+          v_new := to_jsonb(NEW) - v_redacted;
+          v_old := NULL;
+          v_action := 'INSERT';
         ELSIF TG_OP = 'UPDATE' THEN
-          v_new := to_jsonb(NEW); v_old := to_jsonb(OLD); v_action := 'UPDATE';
+          v_new := to_jsonb(NEW) - v_redacted;
+          v_old := to_jsonb(OLD) - v_redacted;
+          v_action := 'UPDATE';
           FOR v_k IN SELECT jsonb_object_keys(v_new) LOOP
-            IF v_k = ANY(ARRAY['updated_at','created_at']) THEN CONTINUE; END IF;
-            IF v_new->v_k IS DISTINCT FROM v_old->v_k THEN v_changed := v_changed || v_k; END IF;
+            -- Timestamps that change without a business decision (row touch,
+            -- session heartbeat) must not generate an audit event.
+            IF v_k = ANY (ARRAY['updated_at', 'created_at', 'last_active_at']) THEN
+              CONTINUE;
+            END IF;
+            IF v_new -> v_k IS DISTINCT FROM v_old -> v_k THEN
+              v_changed := v_changed || v_k;
+            END IF;
           END LOOP;
-          IF COALESCE(array_length(v_changed, 1), 0) = 0 THEN RETURN NULL; END IF;
+          -- A write that changed nothing but touched the row is not an audit event.
+          IF COALESCE(array_length(v_changed, 1), 0) = 0 THEN
+            RETURN NULL;
+          END IF;
         ELSE
-          v_new := NULL; v_old := to_jsonb(OLD); v_action := 'DELETE';
+          v_new := NULL;
+          v_old := to_jsonb(OLD) - v_redacted;
+          v_action := 'DELETE';
           v_changed := ARRAY(SELECT jsonb_object_keys(v_old));
         END IF;
-        v_entity_id := COALESCE(v_new->>'id', v_old->>'id');
-        v_user_id := COALESCE(v_new->>'user_id', v_old->>'user_id');
+
+        v_entity_id := COALESCE(v_new ->> 'id', v_old ->> 'id');
         v_actor := NULLIF(current_setting('app.actor_user_id', true), '');
-        -- Never duplicate credentials, password hashes or raw import payloads into audit history.
-        v_new := v_new - ARRAY['password', 'encrypted_credentials', 'session_token_hash', 'vault_token_reference', 'raw_payload'];
-        v_old := v_old - ARRAY['password', 'encrypted_credentials', 'session_token_hash', 'vault_token_reference', 'raw_payload'];
-        v_checksum := encode(sha256(convert_to(
-          COALESCE(v_new::text, '') || '|' || COALESCE(v_old::text, '') || '|' || COALESCE(v_changed::text, ''), 'UTF8')), 'hex');
-        INSERT INTO audit_logs (id, actor_user_id, user_id, action, entity_type, entity_id, before_state, after_state, metadata, checksum, created_at)
-        VALUES ('aud_' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 26)),
-          v_actor, v_user_id, v_action, TG_TABLE_NAME, v_entity_id, v_old, v_new,
-          jsonb_build_object('changed_fields', to_jsonb(v_changed)), v_checksum, now());
+        v_user_id := COALESCE(v_new ->> 'user_id', v_old ->> 'user_id', v_actor);
+        v_request_id := NULLIF(current_setting('app.request_id', true), '');
+        v_correlation_id := NULLIF(current_setting('app.correlation_id', true), '');
+        v_ip := NULLIF(current_setting('app.ip_address', true), '');
+        v_user_agent := NULLIF(current_setting('app.user_agent', true), '');
+        v_reason := NULLIF(current_setting('app.audit_reason', true), '');
+
+        v_checksum := encode(
+          sha256(
+            convert_to(
+              COALESCE(v_new::text, '') || '|' || COALESCE(v_old::text, '') || '|' ||
+              COALESCE(v_changed::text, '') || '|' || COALESCE(v_entity_id, ''),
+              'UTF8'
+            )
+          ),
+          'hex'
+        );
+
+        INSERT INTO audit_logs (
+          id, actor_user_id, user_id, action, entity_type, entity_id,
+          request_id, correlation_id, ip_address, user_agent,
+          before_state, after_state, metadata, checksum, created_at
+        )
+        VALUES (
+          'aud_' || substr(fn_crockford_base32(uuid_send(gen_random_uuid())), 1, 26),
+          v_actor,
+          v_user_id,
+          v_action,
+          TG_TABLE_NAME,
+          v_entity_id,
+          v_request_id,
+          v_correlation_id,
+          v_ip,
+          v_user_agent,
+          v_old,
+          v_new,
+          jsonb_strip_nulls(
+            jsonb_build_object(
+              'changed_fields', to_jsonb(v_changed),
+              'reason', v_reason
+            )
+          ),
+          v_checksum,
+          now()
+        );
         RETURN NULL;
+      END $function$;
+
+CREATE OR REPLACE FUNCTION public.fn_crockford_base32(p_bytes bytea)
+ RETURNS text
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
+      DECLARE
+        v_alphabet constant text := '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+        v_bits bigint := 0;
+        v_value bigint := 0;
+        v_out text := '';
+        v_i integer;
+        v_byte integer;
+      BEGIN
+        FOR v_i IN 0 .. length(p_bytes) - 1 LOOP
+          v_byte := get_byte(p_bytes, v_i);
+          v_value := (v_value << 8) | v_byte;
+          v_bits := v_bits + 8;
+          WHILE v_bits >= 5 LOOP
+            v_bits := v_bits - 5;
+            v_out := v_out || substr(v_alphabet, ((v_value >> v_bits::integer) & 31)::integer + 1, 1);
+          END LOOP;
+        END LOOP;
+        IF v_bits > 0 THEN
+          v_out := v_out || substr(v_alphabet, ((v_value << (5 - v_bits)::integer) & 31)::integer + 1, 1);
+        END IF;
+        -- 128 random bits encode to 26 Crockford characters (130 bits, last one padded).
+        RETURN substr(v_out, 1, 26);
       END $function$;
 
 CREATE OR REPLACE FUNCTION public.generate_entity_id(prefix text DEFAULT NULL::text)
@@ -174,44 +280,17 @@ CREATE OR REPLACE FUNCTION public.generate_entity_id(prefix text DEFAULT NULL::t
  LANGUAGE plpgsql
 AS $function$
       DECLARE
-        alphabet CONSTANT text := '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-        timestamp_ms bigint := (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint;
-        time_part text := '';
-        random_part text := '';
-        random_value numeric := 0;
-        raw_random bytea := substring(uuid_send(gen_random_uuid()) from 1 for 10);
-        suffix text := '';
-        i integer;
-        digit integer;
+        v_id text;
       BEGIN
-        IF prefix IS NOT NULL AND prefix !~ '^[a-z]{2,8}$' THEN
-          RAISE EXCEPTION 'invalid entity id prefix: %', prefix;
+        v_id := fn_crockford_base32(uuid_send(gen_random_uuid()));
+        IF prefix IS NULL OR prefix = '' THEN
+          RETURN v_id;
         END IF;
-
-        -- 48-bit millisecond timestamp encoded into ten base32 characters.
-        FOR i IN REVERSE 9..0 LOOP
-          digit := (timestamp_ms % 32)::integer;
-          time_part := substr(alphabet, digit + 1, 1) || time_part;
-          timestamp_ms := timestamp_ms / 32;
-        END LOOP;
-
-        -- 80 bits of randomness encoded into sixteen base32 characters.
-        FOR i IN 0..9 LOOP
-          random_value := random_value * 256 + get_byte(raw_random, i);
-        END LOOP;
-        FOR i IN REVERSE 15..0 LOOP
-          digit := (random_value % 32)::integer;
-          random_part := substr(alphabet, digit + 1, 1) || random_part;
-          random_value := floor(random_value / 32);
-        END LOOP;
-
-        suffix := time_part || random_part;
-        IF prefix IS NULL THEN
-          RETURN suffix;
+        IF prefix !~ '^[a-z]{2,8}$' THEN
+          RAISE EXCEPTION 'generate_entity_id: prefix "%" must match ^[a-z]{2,8}$', prefix;
         END IF;
-        RETURN prefix || '_' || suffix;
-      END;
-      $function$;
+        RETURN prefix || '_' || v_id;
+      END $function$;
 
 -- ---------- TABLES ----------
 CREATE TABLE "audit_logs" (
@@ -1182,8 +1261,9 @@ ALTER TABLE "order_line_items" ADD CONSTRAINT "chk_order_line_items_fulfillment_
 ALTER TABLE "order_line_items" ADD CONSTRAINT "chk_order_line_items_grand_total_price_money" CHECK (is_valid_price_money(grand_total, false));
 ALTER TABLE "order_line_items" ADD CONSTRAINT "chk_order_line_items_marketplace_fee_price_money" CHECK (is_valid_price_money(marketplace_fee, false));
 ALTER TABLE "order_line_items" ADD CONSTRAINT "chk_order_line_items_promotion_total_price_money" CHECK (is_valid_price_money(promotion_total, false));
-ALTER TABLE "order_line_items" ADD CONSTRAINT "chk_order_line_items_qty_bounds" CHECK (((quantity_fulfilled >= 0) AND (quantity_returned >= 0) AND (quantity_cancelled >= 0) AND (quantity_fulfilled <= quantity_ordered) AND (quantity_returned <= quantity_ordered) AND (quantity_cancelled <= quantity_ordered)));
+ALTER TABLE "order_line_items" ADD CONSTRAINT "chk_order_line_items_qty_bounds" CHECK (((quantity_fulfilled >= 0) AND (quantity_returned >= 0) AND (quantity_cancelled >= 0) AND (quantity_fulfilled <= quantity_ordered) AND (quantity_returned <= quantity_ordered) AND (quantity_cancelled <= quantity_ordered) AND ((quantity_fulfilled + quantity_cancelled) <= quantity_ordered)));
 ALTER TABLE "order_line_items" ADD CONSTRAINT "chk_order_line_items_qty_ordered_positive" CHECK ((quantity_ordered > 0));
+ALTER TABLE "order_line_items" ADD CONSTRAINT "chk_order_line_items_refund_within_total" CHECK ((((refunded_total ->> 'currency_code'::text) = (grand_total ->> 'currency_code'::text)) AND (((refunded_total ->> 'amount'::text))::numeric <= ((grand_total ->> 'amount'::text))::numeric)));
 ALTER TABLE "order_line_items" ADD CONSTRAINT "chk_order_line_items_refunded_total_price_money" CHECK (is_valid_price_money(refunded_total, false));
 ALTER TABLE "order_line_items" ADD CONSTRAINT "chk_order_line_items_shipping_discount_total_price_money" CHECK (is_valid_price_money(shipping_discount_total, false));
 ALTER TABLE "order_line_items" ADD CONSTRAINT "chk_order_line_items_shipping_tax_total_price_money" CHECK (is_valid_price_money(shipping_tax_total, false));
@@ -1207,7 +1287,7 @@ ALTER TABLE "orders" ADD CONSTRAINT "chk_orders_net_proceeds_price_money" CHECK 
 ALTER TABLE "orders" ADD CONSTRAINT "chk_orders_net_profit_price_money" CHECK (is_valid_price_money(net_profit, true));
 ALTER TABLE "orders" ADD CONSTRAINT "chk_orders_payment_processing_fees_total_price_money" CHECK (is_valid_price_money(payment_processing_fees_total, false));
 ALTER TABLE "orders" ADD CONSTRAINT "chk_orders_promotion_total_price_money" CHECK (is_valid_price_money(promotion_total, false));
-ALTER TABLE "orders" ADD CONSTRAINT "chk_orders_refund_within_total" CHECK ((((refunded_total ->> 'amount'::text))::numeric <= ((grand_total ->> 'amount'::text))::numeric));
+ALTER TABLE "orders" ADD CONSTRAINT "chk_orders_refund_within_total" CHECK ((((refunded_total ->> 'currency_code'::text) = (grand_total ->> 'currency_code'::text)) AND (((refunded_total ->> 'amount'::text))::numeric <= ((grand_total ->> 'amount'::text))::numeric)));
 ALTER TABLE "orders" ADD CONSTRAINT "chk_orders_refunded_total_price_money" CHECK (is_valid_price_money(refunded_total, false));
 ALTER TABLE "orders" ADD CONSTRAINT "chk_orders_reporting_total_price_money" CHECK (is_valid_price_money(reporting_total, false));
 ALTER TABLE "orders" ADD CONSTRAINT "chk_orders_ship_window" CHECK (((latest_ship_at IS NULL) OR (earliest_ship_at IS NULL) OR (latest_ship_at >= earliest_ship_at)));
@@ -1272,6 +1352,7 @@ CREATE UNIQUE INDEX uq_brands_user_slug ON public.brands USING btree (user_id, s
 CREATE INDEX idx_catalog_items_resolved_category ON public.catalog_items USING btree (resolved_category_id);
 CREATE UNIQUE INDEX uq_catalog_items_user_key ON public.catalog_items USING btree (user_id, catalog_key);
 CREATE INDEX idx_channel_listings_user ON public.channel_listings USING btree (user_id);
+CREATE INDEX idx_channel_listings_user_seller_status ON public.channel_listings USING btree (user_id, seller_account_id, listing_status, sync_status);
 CREATE INDEX idx_channel_listings_variant ON public.channel_listings USING btree (product_variant_id);
 CREATE UNIQUE INDEX uq_channel_listings_account_ext_variant ON public.channel_listings USING btree (seller_account_id, external_listing_id, product_variant_id);
 CREATE INDEX idx_card_seller_accounts_seller ON public.credit_card_seller_accounts USING btree (seller_account_id);
@@ -1297,6 +1378,7 @@ CREATE INDEX idx_financial_transactions_classification ON public.financial_trans
 CREATE INDEX idx_financial_transactions_due ON public.financial_transactions USING btree (user_id, status, due_date);
 CREATE INDEX idx_financial_transactions_order ON public.financial_transactions USING btree (order_id);
 CREATE INDEX idx_financial_transactions_seller ON public.financial_transactions USING btree (seller_account_id);
+CREATE INDEX idx_financial_transactions_user_account_date ON public.financial_transactions USING btree (user_id, financial_account_id, transaction_date DESC);
 CREATE INDEX idx_financial_transactions_user_type_date ON public.financial_transactions USING btree (user_id, transaction_type, transaction_date);
 CREATE UNIQUE INDEX uq_financial_transactions_user_ref ON public.financial_transactions USING btree (user_id, reference_number);
 CREATE INDEX idx_manual_reconciliations_user_tx ON public.manual_reconciliations USING btree (user_id, financial_transaction_id);
@@ -1312,6 +1394,7 @@ CREATE INDEX idx_order_import_payloads_hash ON public.order_import_payloads USIN
 CREATE INDEX idx_order_import_payloads_order ON public.order_import_payloads USING btree (order_id);
 CREATE INDEX idx_order_line_items_external_listing ON public.order_line_items USING btree (user_id, external_listing_id) WHERE (external_listing_id IS NOT NULL);
 CREATE INDEX idx_order_line_items_order ON public.order_line_items USING btree (order_id);
+CREATE INDEX idx_order_line_items_user_order ON public.order_line_items USING btree (user_id, order_id);
 CREATE INDEX idx_order_line_items_variant ON public.order_line_items USING btree (product_variant_id);
 CREATE UNIQUE INDEX uq_order_line_items_ext_id ON public.order_line_items USING btree (order_id, external_order_line_id) WHERE (external_order_line_id IS NOT NULL);
 CREATE INDEX idx_orders_customer ON public.orders USING btree (customer_id);
@@ -1321,7 +1404,9 @@ CREATE INDEX idx_orders_seller_account ON public.orders USING btree (seller_acco
 CREATE INDEX idx_orders_sync_job ON public.orders USING btree (sync_job_id);
 CREATE INDEX idx_orders_user_fulfillment_channel ON public.orders USING btree (user_id, fulfillment_channel);
 CREATE INDEX idx_orders_user_ordered_at ON public.orders USING btree (user_id, ordered_at);
+CREATE INDEX idx_orders_user_seller_ordered ON public.orders USING btree (user_id, seller_account_id, ordered_at DESC);
 CREATE INDEX idx_orders_user_status ON public.orders USING btree (user_id, status);
+CREATE INDEX idx_orders_user_status_payment_fulfillment ON public.orders USING btree (user_id, status, payment_status, fulfillment_status);
 CREATE UNIQUE INDEX uq_orders_seller_external_id ON public.orders USING btree (seller_account_id, external_order_id) WHERE (external_order_id IS NOT NULL);
 CREATE UNIQUE INDEX uq_orders_user_order_number ON public.orders USING btree (user_id, order_number);
 CREATE INDEX organization_memberships_user_id_organization_id_index ON public.organization_memberships USING btree (user_id, organization_id);
@@ -1333,11 +1418,14 @@ CREATE UNIQUE INDEX uq_permissions_resource_action ON public.permissions USING b
 CREATE UNIQUE INDEX uq_product_categories_user_slug ON public.product_categories USING btree (user_id, slug);
 CREATE INDEX idx_variant_attributes_lookup ON public.product_variant_attributes USING btree (user_id, attribute_name, attribute_value);
 CREATE UNIQUE INDEX uq_variant_attributes_variant_name ON public.product_variant_attributes USING btree (product_variant_id, attribute_name);
+CREATE INDEX idx_product_variants_prices_gin ON public.product_variants USING gin (prices jsonb_path_ops);
 CREATE INDEX idx_product_variants_product ON public.product_variants USING btree (product_id);
 CREATE INDEX idx_product_variants_user_asin ON public.product_variants USING btree (user_id, asin);
+CREATE INDEX idx_product_variants_user_product_status ON public.product_variants USING btree (user_id, product_id, status);
 CREATE UNIQUE INDEX uq_product_variants_user_sku ON public.product_variants USING btree (user_id, sku);
 CREATE INDEX idx_products_brand ON public.products USING btree (brand_id);
 CREATE INDEX idx_products_category ON public.products USING btree (category_id);
+CREATE INDEX idx_products_prices_gin ON public.products USING gin (prices jsonb_path_ops);
 CREATE INDEX idx_products_user_status ON public.products USING btree (user_id, status);
 CREATE UNIQUE INDEX uq_products_user_slug ON public.products USING btree (user_id, slug);
 CREATE UNIQUE INDEX queue_jobs_dedup_active_uidx ON public.queue_jobs USING btree (queue, dedup_id) WHERE ((dedup_id IS NOT NULL) AND (status = ANY (ARRAY['pending'::text, 'delayed'::text])));
@@ -1500,6 +1588,7 @@ ALTER TABLE "users" ADD CONSTRAINT "users_created_by_user_id_foreign" FOREIGN KE
 -- ---------- TRIGGERS ----------
 CREATE TRIGGER trg_audit_logs_append_only BEFORE DELETE OR UPDATE ON public.audit_logs FOR EACH ROW EXECUTE FUNCTION fn_audit_log_append_only();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.brands FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
+CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.catalog_items FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.channel_listings FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.credit_card_seller_accounts FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.credit_cards FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
@@ -1509,12 +1598,15 @@ CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.cust
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.finance_categories FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.financial_accounts FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.financial_transactions FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
+CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.manual_reconciliations FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.marketplace_claims FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.module_entitlements FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.notifications FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.order_import_payloads FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.order_line_items FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.orders FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
+CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.organization_memberships FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
+CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.organizations FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.outbox_events FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.password_reset_tokens FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.permissions FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
@@ -1522,6 +1614,8 @@ CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.prod
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.product_variant_attributes FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.product_variants FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.products FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
+CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.queue_jobs FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
+CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.queue_schedules FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.refund_transactions FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.return_requests FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.role_permissions FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
@@ -1529,6 +1623,7 @@ CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.role
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.sales_channels FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.saved_views FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.seller_accounts FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
+CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.sessions FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.shipment_items FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.shipments FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();
 CREATE TRIGGER trg_audit_capture AFTER INSERT OR DELETE OR UPDATE ON public.shipping_invoice_lines FOR EACH ROW EXECUTE FUNCTION fn_audit_log_capture();

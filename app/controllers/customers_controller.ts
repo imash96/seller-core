@@ -6,11 +6,11 @@ import CustomerAddress from '#models/customer_address'
 import CustomerRiskSignal from '#models/customer_risk_signal'
 import Order from '#models/order'
 import ReturnRequest from '#models/return_request'
-import { RbacService } from '../services/rbac_service.js'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createCustomerValidator, updateCustomerValidator } from '#validators/operations'
 import { RiskReviewStatus } from '../enums/index.js'
 import { amountOf, money, normalizePriceMoney } from '../types/price.js'
+import { AuditContext } from '#services/audit_context'
 
 export default class CustomersController {
   async index({ auth, inertia }: HttpContext) {
@@ -86,20 +86,20 @@ export default class CustomersController {
         return response.redirect().back()
       }
       const beforeRisk = customer.riskLevel
-      customer.merge(payload)
-      await customer.save()
-      if (payload.riskLevel && payload.riskLevel !== beforeRisk) {
-        await RbacService.recordAudit({
+      await db.transaction(async (trx) => {
+        await AuditContext.apply(trx, {
           actorUserId: user.id,
-          userId: user.id,
-          action: 'customer.risk_level_changed',
-          entityType: 'customers',
-          entityId: customer.id,
           requestId: request.id(),
-          beforeState: { riskLevel: beforeRisk },
-          afterState: { riskLevel: payload.riskLevel },
-        }).catch(() => {})
-      }
+          ipAddress: request.ip(),
+          reason:
+            payload.riskLevel && payload.riskLevel !== beforeRisk
+              ? 'customer.risk_level_changed'
+              : 'customer.updated',
+        })
+        customer.useTransaction(trx)
+        customer.merge(payload)
+        await customer.save()
+      })
       session.flash('success', `Customer "${customer.fullName}" updated.`)
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to update customer')
@@ -175,6 +175,12 @@ export default class CustomersController {
         .andWhere('customerId', source.id)
         .update({ customerId: target.id })
 
+      await AuditContext.apply(trx, {
+        actorUserId: user.id,
+        requestId: request.id(),
+        ipAddress: request.ip(),
+        reason: 'customer.merged',
+      })
       target.useTransaction(trx)
       target.ordersCount = Number(target.ordersCount || 0) + Number(source.ordersCount || 0)
       // Lifetime spend is a self-contained PriceMoney; merge into the target's currency.
@@ -190,17 +196,6 @@ export default class CustomersController {
       source.mergedIntoCustomerId = target.id
       source.ordersCount = 0
       await source.save()
-    })
-
-    await RbacService.recordAudit({
-      actorUserId: user.id,
-      userId: user.id,
-      action: 'customer.merged',
-      entityType: 'customers',
-      entityId: target.id,
-      requestId: request.id(),
-      beforeState: { sourceCustomerId: source.id, sourceName: source.fullName },
-      afterState: { targetCustomerId: target.id, targetName: target.fullName },
     })
 
     session.flash(

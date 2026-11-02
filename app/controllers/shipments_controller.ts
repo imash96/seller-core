@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
-import AuditLog from '#models/audit_log'
+import { AuditContext } from '#services/audit_context'
 import ShippingInvoiceLine from '#models/shipping_invoice_line'
 import { csvCell } from '../utils/csv.js'
 import type { HttpContext } from '@adonisjs/core/http'
@@ -251,6 +251,13 @@ export default class ShipmentsController {
         error: 'Provide valid status, paid amount, and an explanatory note.',
       })
     const result = await db.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
+        actorUserId: user.id,
+        requestId: request.id(),
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') ?? null,
+        reason: 'shipping_invoice.manual_review',
+      })
       const invoice = await ShippingInvoice.query({ client: trx })
         .where('userId', user.id)
         .where('id', params.id)
@@ -288,12 +295,6 @@ export default class ShipmentsController {
           error:
             'An unverified or discrepant invoice cannot be marked matched. Use resolved with a note after manual review.',
         }
-      const before = {
-        paymentStatus: invoice.paymentStatus,
-        reconciliationStatus: invoice.reconciliationStatus,
-        paidTotal: invoice.paidTotal,
-        paymentReference: invoice.paymentReference,
-      }
       invoice.paymentStatus = status
       invoice.reconciliationStatus = reconciliation
       invoice.paidTotal = money(amount, currencyOf(invoice.grandTotal))
@@ -301,26 +302,6 @@ export default class ShipmentsController {
       invoice.paymentReference = reference || null
       invoice.notes = note
       await invoice.save()
-      await AuditLog.create(
-        {
-          actorUserId: user.id,
-          userId: user.id,
-          action: 'shipping_invoice.manual_review',
-          entityType: 'shipping_invoices',
-          entityId: invoice.id,
-          requestId: request.id(),
-          beforeState: before,
-          afterState: {
-            paymentStatus: status,
-            reconciliationStatus: reconciliation,
-            paidTotal: invoice.paidTotal,
-            paymentReference: invoice.paymentReference,
-            notes: note,
-          },
-          metadata: { verification: 'manual' },
-        },
-        { client: trx }
-      )
       return { status: 200, number: invoice.invoiceNumber }
     })
     if (result.status !== 200) {

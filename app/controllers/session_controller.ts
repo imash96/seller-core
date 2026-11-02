@@ -1,7 +1,8 @@
 import { DateTime } from 'luxon'
 import User from '#models/user'
 import { loginValidator } from '#validators/user'
-import { RbacService } from '../services/rbac_service.js'
+import { AuditService } from '../services/audit_service.js'
+import { AuditContext } from '../services/audit_context.js'
 import { SessionRegistryService } from '../services/session_registry_service.js'
 import { UserStatus } from '../enums/index.js'
 import type { HttpContext } from '@adonisjs/core/http'
@@ -46,11 +47,23 @@ export default class SessionController {
     try {
       const user = await User.verifyCredentials(email, password)
 
-      user.failedLoginAttempts = 0
-      user.lockedUntil = null
-      user.lastLoginAt = DateTime.now()
-      user.lastLoginIp = request.ip()
-      await user.save()
+      await AuditContext.run(
+        {
+          actorUserId: user.id,
+          requestId: request.id(),
+          ipAddress: request.ip(),
+          userAgent: request.header('user-agent') ?? null,
+          reason: 'auth.login',
+        },
+        async (trx) => {
+          user.useTransaction(trx)
+          user.failedLoginAttempts = 0
+          user.lockedUntil = null
+          user.lastLoginAt = DateTime.now()
+          user.lastLoginIp = request.ip()
+          await user.save()
+        }
+      )
 
       await auth.use('web').login(user)
       // The guard regenerates the session id on login, so the registry is tagged
@@ -58,13 +71,11 @@ export default class SessionController {
       // browser's cookie points at.
       await SessionRegistryService.tag(ctx, user.id)
 
-      await RbacService.recordAudit({
+      await AuditService.recordLogin({
         actorUserId: user.id,
         userId: user.id,
-        action: 'auth.login',
-        entityType: 'users',
-        entityId: user.id,
         requestId: request.id(),
+        correlationId: request.header('x-correlation-id') ?? null,
         ipAddress: request.ip(),
         userAgent: request.header('user-agent') ?? null,
         afterState: { email: user.email, status: user.status },
@@ -83,7 +94,27 @@ export default class SessionController {
           existingUser.status = UserStatus.LOCKED
           existingUser.lockedUntil = DateTime.now().plus({ minutes: 30 })
         }
-        await existingUser.save()
+        await AuditContext.run(
+          {
+            actorUserId: existingUser.id,
+            requestId: request.id(),
+            ipAddress: request.ip(),
+            userAgent: request.header('user-agent') ?? null,
+            reason: 'auth.login_failed',
+          },
+          async (trx) => {
+            existingUser.useTransaction(trx)
+            await existingUser.save()
+          }
+        )
+        await AuditService.recordLoginFailed({
+          email,
+          userId: existingUser.id,
+          requestId: request.id(),
+          ipAddress: request.ip(),
+          userAgent: request.header('user-agent') ?? null,
+          reason: 'invalid_credentials',
+        })
         const remaining = Math.max(0, 5 - existingUser.failedLoginAttempts)
         session.flash(
           'error',
@@ -107,14 +138,13 @@ export default class SessionController {
       await SessionRegistryService.revoke(session.sessionId)
       await SessionRegistryService.untag(ctx, user.id)
 
-      await RbacService.recordAudit({
+      await AuditService.recordLogout({
         actorUserId: user.id,
         userId: user.id,
-        action: 'auth.logout',
-        entityType: 'users',
-        entityId: user.id,
         requestId: request.id(),
+        correlationId: request.header('x-correlation-id') ?? null,
         ipAddress: request.ip(),
+        userAgent: request.header('user-agent') ?? null,
       })
     }
 

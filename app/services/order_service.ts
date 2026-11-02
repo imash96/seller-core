@@ -10,7 +10,7 @@ import ProductVariant from '#models/product_variant'
 import SyncJob from '#models/sync_job'
 import SyncJobError from '#models/sync_job_error'
 import OutboxEvent from '#models/outbox_event'
-import AuditLog from '#models/audit_log'
+import { AuditContext } from './audit_context.js'
 import {
   OrderSourceType,
   OrderStatus,
@@ -176,6 +176,9 @@ export interface OrderLineInput {
 export interface CreateOrderInput {
   userId: string
   actorUserId?: string
+  /** Propagated to the audit trigger (`app.request_id` / `app.correlation_id`). */
+  requestId?: string | null
+  correlationId?: string | null
   sellerAccountId?: string | null
   orderNumber: string
   /** Amazon AmazonOrderId / eBay orderId / Etsy receipt_id / Medusa order.id. */
@@ -321,6 +324,14 @@ export class OrderService {
     )
 
     return await db.transaction(async (trx) => {
+      // Every row written below (customer, order, lines, payload, outbox) is audited
+      // by the trg_audit_capture trigger with this actor/request context.
+      await AuditContext.apply(trx, {
+        actorUserId: input.actorUserId ?? input.userId,
+        requestId: input.requestId ?? null,
+        correlationId: input.correlationId ?? null,
+        reason: 'order.created',
+      })
       // 1. Resolve or create customer scoped to user_id
       let customer: Customer | null = null
       const normEmail = normalizeEmail(input.customer.email)
@@ -827,25 +838,6 @@ export class OrderService {
       }
       outbox.status = OutboxEventStatus.PENDING
       await outbox.save()
-
-      const audit = new AuditLog()
-      audit.useTransaction(trx)
-      audit.actorUserId = input.actorUserId ?? input.userId
-      audit.userId = input.userId
-      audit.action = 'order.created'
-      audit.entityType = 'orders'
-      audit.entityId = order.id
-      audit.afterState = {
-        orderNumber: order.orderNumber,
-        externalOrderId: order.externalOrderId,
-        externalDisplayId: order.externalDisplayId,
-        grandTotal: order.grandTotal,
-        reportingTotal: order.reportingTotal,
-        fulfillmentChannel: order.fulfillmentChannel,
-        taxCollectionModel: order.taxCollectionModel,
-      }
-      audit.metadata = { sourceType: order.sourceType }
-      await audit.save()
 
       return order
     })

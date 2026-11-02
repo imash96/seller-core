@@ -876,8 +876,6 @@ export default class MainSeeder extends BaseSeeder {
     await MarketplaceClaim.create({
       userId: adminUser.id,
       orderId: order2.id,
-      sellerAccountId: dtcWeb.id,
-      customerId: order2.customerId,
       claimNumber: 'CLM-2026-041',
       externalClaimId: 'DP-8819201',
       claimType: ClaimType.ITEM_NOT_RECEIVED,

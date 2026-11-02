@@ -1,6 +1,9 @@
 import { DateTime } from 'luxon'
 import { csvCell } from '../utils/csv.js'
+import db from '@adonisjs/lucid/services/db'
 import type { HttpContext } from '@adonisjs/core/http'
+import { AuditContext } from '#services/audit_context'
+import { AuditService } from '#services/audit_service'
 import Order from '#models/order'
 import Customer from '#models/customer'
 import OrderPlaced from '#events/order_placed'
@@ -195,21 +198,20 @@ export default class OrdersController {
         return response.redirect().back()
       }
       const prevStatus = order.status
-      order.status = status
-      if (status === OrderStatus.CANCELLED) {
-        order.cancelledAt = DateTime.now()
-      }
-      await order.save()
-
-      await RbacService.recordAudit({
-        actorUserId: user.id,
-        userId: user.id,
-        action: 'order.status_updated',
-        entityType: 'order',
-        entityId: order.id,
-        beforeState: { status: prevStatus },
-        afterState: { status },
-        ipAddress: request.ip(),
+      await db.transaction(async (trx) => {
+        await AuditContext.apply(trx, {
+          actorUserId: user.id,
+          requestId: request.id(),
+          ipAddress: request.ip(),
+          userAgent: request.header('user-agent') ?? null,
+          reason: 'order.status_updated',
+        })
+        order.useTransaction(trx)
+        order.status = status
+        if (status === OrderStatus.CANCELLED) {
+          order.cancelledAt = DateTime.now()
+        }
+        await order.save()
       })
 
       await OrderStatusChanged.dispatch({
@@ -237,20 +239,18 @@ export default class OrdersController {
         .andWhere('id', params.id)
         .firstOrFail()
 
-      const snapshot = order.serialize()
-      order.status = OrderStatus.CANCELLED
-      order.cancelledAt = DateTime.now()
-      await order.save()
-
-      await RbacService.recordAudit({
-        actorUserId: user.id,
-        userId: user.id,
-        action: 'order.cancelled',
-        entityType: 'order',
-        entityId: order.id,
-        beforeState: snapshot,
-        afterState: { status: OrderStatus.CANCELLED },
-        ipAddress: request.ip(),
+      await db.transaction(async (trx) => {
+        await AuditContext.apply(trx, {
+          actorUserId: user.id,
+          requestId: request.id(),
+          ipAddress: request.ip(),
+          userAgent: request.header('user-agent') ?? null,
+          reason: 'order.cancelled',
+        })
+        order.useTransaction(trx)
+        order.status = OrderStatus.CANCELLED
+        order.cancelledAt = DateTime.now()
+        await order.save()
       })
 
       session.flash('success', `Order ${order.orderNumber} cancelled.`)
@@ -354,24 +354,23 @@ export default class OrdersController {
       session.flash('error', 'Delivered orders cannot be changed through bulk status updates.')
       return response.redirect().back()
     }
-    for (const order of orders) {
-      const prevStatus = order.status
-      order.status = status
-      if (status === OrderStatus.CANCELLED) {
-        order.cancelledAt = DateTime.now()
-      }
-      await order.save()
-      await RbacService.recordAudit({
+    await db.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
         actorUserId: user.id,
-        userId: user.id,
-        action: 'order.bulk_status_updated',
-        entityType: 'order',
-        entityId: order.id,
-        beforeState: { status: prevStatus },
-        afterState: { status },
+        requestId: request.id(),
         ipAddress: request.ip(),
+        userAgent: request.header('user-agent') ?? null,
+        reason: 'order.bulk_status_updated',
       })
-    }
+      for (const order of orders) {
+        order.useTransaction(trx)
+        order.status = status
+        if (status === OrderStatus.CANCELLED) {
+          order.cancelledAt = DateTime.now()
+        }
+        await order.save()
+      }
+    })
 
     session.flash('success', `Updated ${orders.length} order(s) to "${status}".`)
     return response.redirect().back()
@@ -403,7 +402,7 @@ export default class OrdersController {
       'order_number',
       'external_order_id',
       'external_display_id',
-      'marketplace_code',
+      'channel_code',
       'marketplace_site_id',
       'fulfillment_channel',
       'tax_collection_model',
@@ -468,6 +467,15 @@ export default class OrdersController {
           .join(',')
       ),
     ]
+
+    // Exports are not row mutations, so they are one of the few manual audit rows.
+    await AuditService.recordExport({
+      actorUserId: user.id,
+      entityType: 'orders',
+      requestId: request.id(),
+      ipAddress: request.ip(),
+      metadata: { orderCount: orders.length, ids },
+    })
 
     response.header('Content-Type', 'text/csv; charset=utf-8')
     response.header('Content-Disposition', `attachment; filename="orders-export-${Date.now()}.csv"`)

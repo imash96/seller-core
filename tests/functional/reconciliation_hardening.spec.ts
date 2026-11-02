@@ -105,15 +105,24 @@ test.group('Reconciliation hardening', () => {
       .firstOrFail()
     assert.isNotNull(history.reversedAt)
     assert.equal(history.reversalReason, 'Incorrect statement')
-    assert.lengthOf(
-      await AuditLog.query()
-        .where('entityId', tx.id)
-        .whereIn('action', [
-          'finance.manual_reconciliation_created',
-          'finance.manual_reconciliation_reversed',
-        ]),
-      2
-    )
+    // The audit trigger records the transaction UPDATEs; the semantic intent lives in
+    // `metadata.reason`, so no second (manual) audit row is written per operation.
+    const txAudits = await AuditLog.query()
+      .where('entityType', 'financial_transactions')
+      .where('entityId', tx.id)
+      .whereRaw(`metadata ->> 'reason' IN (?, ?)`, [
+        'finance.manual_reconciliation_created',
+        'finance.manual_reconciliation_reversed',
+      ])
+      .orderBy('createdAt', 'asc')
+    assert.lengthOf(txAudits, 2)
+    assert.equal((txAudits[0].metadata as any)?.reason, 'finance.manual_reconciliation_created')
+    assert.equal((txAudits[0].beforeState as any)?.status, 'posted')
+    assert.equal((txAudits[0].afterState as any)?.status, 'reconciled')
+    assert.equal((txAudits[1].metadata as any)?.reason, 'finance.manual_reconciliation_reversed')
+    assert.equal((txAudits[1].beforeState as any)?.status, 'reconciled')
+    assert.equal((txAudits[1].afterState as any)?.status, 'posted')
+    assert.deepEqual(Array.from(new Set(txAudits.map((entry) => entry.actorUserId))), [user.id])
     await ManualReconciliationService.reconcile({ ...base, transactionId: other.id })
   })
 
@@ -121,7 +130,7 @@ test.group('Reconciliation hardening', () => {
     const user = await makeUser(`rollback-${Date.now()}@example.com`)
     const tx = await makeTx(user, 'ROLLBACK')
     await db.rawQuery(
-      `CREATE FUNCTION test_reconcile_audit_failure() RETURNS trigger AS $$ BEGIN IF NEW.action = 'finance.manual_reconciliation_created' THEN RAISE EXCEPTION 'injected audit failure'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`
+      `CREATE FUNCTION test_reconcile_audit_failure() RETURNS trigger AS $$ BEGIN IF NEW.entity_type = 'financial_transactions' AND NEW.metadata ->> 'reason' = 'finance.manual_reconciliation_created' THEN RAISE EXCEPTION 'injected audit failure'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`
     )
     await db.rawQuery(
       'CREATE TRIGGER test_reconcile_audit_failure BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION test_reconcile_audit_failure()'
