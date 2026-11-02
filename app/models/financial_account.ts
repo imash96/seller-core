@@ -18,6 +18,9 @@ export default class FinancialAccount extends AppBaseModel {
   static readonly table = 'financial_accounts'
   static readonly idPrefix = 'facct'
 
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'currentBalance'
+
   @column({ columnName: 'user_id' })
   declare public userId: string
 

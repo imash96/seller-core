@@ -19,6 +19,9 @@ export default class RefundTransaction extends AppBaseModel {
   static readonly table = 'refund_transactions'
   static readonly idPrefix = 'ref'
 
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'grandRefundTotal'
+
   @column({ columnName: 'user_id' })
   declare public userId: string
 

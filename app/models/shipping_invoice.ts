@@ -18,6 +18,9 @@ export default class ShippingInvoice extends AppBaseModel {
   static readonly table = 'shipping_invoices'
   static readonly idPrefix = 'sinv'
 
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'totalAmount'
+
   @column({ columnName: 'user_id' })
   declare public userId: string
 

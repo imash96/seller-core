@@ -1,3 +1,39 @@
+# Seller Core — Architecture, Audit & Refactor Notes
+
+> **Status: current.** The sections below ("Phase 1" … "Phase 7" of the original
+> handover) are kept as the historical baseline. Where they disagree with this
+> summary, **this summary wins** — the refactor changed the schema, the audit model
+> and the module layout.
+
+## 0. Current state (after the 9-phase refactor)
+
+| Area                 | State                                                                                                                                                                                                                                                                                                                                                                      |
+| :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Money**            | Every amount is a self-contained `{ currency_code, amount }` JSONB validated by `is_valid_price_money`. No standalone `currency_code` / `reporting_currency_code` columns remain on business tables, and the EAV price tables (`*_price`, `price_service.ts`, migration `…0047`) are deleted. `reporting_total` may differ from `grand_total` only by an explicit FX rate. |
+| **Catalog**          | `catalog_items` is USD-only (`base_price_usd`, `price_tier`). `products`, `product_variants` and `channel_listings` carry MedusaJS v2 price arrays (`[{ currency_code, amount }]`, serialized as both `prices` and the `price` alias).                                                                                                                                     |
+| **Schema artifacts** | `database/schema.dbml` (45 tables), the generated `database/schema.ts` schema classes and `database/supabase_schema.sql` are regenerated from one script and verified byte-for-byte in `pnpm db:schema:check` (DBML also parsed/exported with `@dbml/core`).                                                                                                               |
+| **Migrations**       | 68 migrations (`…0001` … `…0068`); the last one adds the Crockford/ULID `generate_entity_id()` helper, the single audit trigger, tenant composite + JSONB GIN indexes and the cross-field money/quantity CHECKs.                                                                                                                                                           |
+| **Audit**            | One writer: the `trg_audit_capture` trigger on every public table. Actor/request identity travels through transaction-local GUCs (`AuditContext.run`, `AuditContext.runRequest`, `#middleware/audit_context_middleware`). Manual audit writes were removed; `AuditService.record()` is limited to the non-row actions (`auth.*`, `export.downloaded`).                     |
+| **Events / jobs**    | 6 domain events, 3 listeners (`create_notification`, `queue_fulfillment`, `enqueue_risk_review`), 7 jobs (`prepare_fulfillment`, `generate_finance_report`, `process_marketplace_import`, `sync_seller_account`, `send_notification`, `drain_outbox`, `cleanup_expired_sessions`). No stubs: every job does bounded, deterministic work and every listener is idempotent.  |
+| **Outbox**           | `order.created` and `shipment.delivered.notify_customer` are written inside the aggregate transaction; `OutboxService.drain()` claims with `FOR UPDATE SKIP LOCKED`, publishes idempotently, backs off exponentially and dead-letters.                                                                                                                                     |
+| **Controllers**      | 14 controllers, no catch-all `operations_controller` / `pages_controller`.                                                                                                                                                                                                                                                                                                 |
+| **UI**               | React 19 + Inertia + Tailwind. Money columns render through `col.money(...)` and `MultiCurrencyPriceStack` / `MultiCurrencyPriceInput`, i.e. always with a currency code; per-row currency is derived from the money object (`AppBaseModel.currencyAttribute` → serialized `currencyCode`).                                                                                |
+| **Tests**            | 27 spec files, 166 passing (`node ace test`), including audit-trigger, schema-invariant, serialization, outbox and inventory-transition suites.                                                                                                                                                                                                                            |
+
+## 1. Verified commands
+
+| Check            | Command                                                                         | Result                                           |
+| :--------------- | :------------------------------------------------------------------------------ | :----------------------------------------------- |
+| Types (app)      | `tsc --noEmit`                                                                  | 0 errors                                         |
+| Types (UI)       | `tsc --noEmit --project inertia/tsconfig.json`                                  | 0 errors                                         |
+| Lint             | `eslint .`                                                                      | 0 errors, 0 warnings                             |
+| Tests            | `node ace test`                                                                 | 166 passed                                       |
+| Schema parity    | `pnpm db:schema:check`                                                          | DBML + Supabase SQL in sync, DBML parses cleanly |
+| Fresh database   | `drop schema public cascade` → `node ace migration:run` → `node ace db:seed` ×2 | migrates, seeds once, second run a no-op         |
+| Production build | `node ace build`                                                                | builds                                           |
+
+---
+
 # SellerCore Astryx — Multi-User E-Commerce Operations & Business Management SaaS
 
 ## Client Delivery Package: Phases 1–7 Architecture, Audit, DBML, Implementation & Verification Manual
@@ -73,25 +109,28 @@
 
 Row-level auditing has exactly one writer, `fn_audit_log_capture()` in PostgreSQL, attached as `trg_audit_capture` (`AFTER INSERT OR UPDATE OR DELETE … FOR EACH ROW`) to **every** table in `public` except `audit_logs` and `adonis_schema*`. Migration `0068` drops and re-creates the trigger across the whole schema, so tables added by later migrations can never be silently un-audited.
 
-| Concern                 | Mechanism                                                                                                                                                                     |
-| :---------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Actor attribution       | `app.actor_user_id` GUC → `audit_logs.actor_user_id` (falls back to nothing; never guessed)                                                                                    |
-| Request lineage         | `app.request_id`, `app.correlation_id` GUCs → `request_id`, `correlation_id`                                                                                                   |
-| Client identity         | `app.ip_address`, `app.user_agent` GUCs                                                                                                                                        |
-| Semantic intent         | `app.audit_reason` GUC → `metadata.reason` (e.g. `order.cancelled`, `finance.manual_reconciliation_created`) — a label on the single row, never a second row                    |
-| Single row per mutation | `AFTER … FOR EACH ROW` fires once per changed row; `UPDATE`s that leave every non-timestamp column unchanged write nothing                                                    |
-| Diff                    | `metadata.changed_fields` lists the columns that actually changed                                                                                                              |
-| Append-only             | `trg_audit_logs_append_only` raises on `UPDATE`/`DELETE`; `checksum` makes tampering evident at rest                                                                            |
+| Concern                 | Mechanism                                                                                                                                                                                                                                                           |
+| :---------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Actor attribution       | `app.actor_user_id` GUC → `audit_logs.actor_user_id` (falls back to nothing; never guessed)                                                                                                                                                                         |
+| Request lineage         | `app.request_id`, `app.correlation_id` GUCs → `request_id`, `correlation_id`                                                                                                                                                                                        |
+| Client identity         | `app.ip_address`, `app.user_agent` GUCs                                                                                                                                                                                                                             |
+| Semantic intent         | `app.audit_reason` GUC → `metadata.reason` (e.g. `order.cancelled`, `finance.manual_reconciliation_created`) — a label on the single row, never a second row                                                                                                        |
+| Single row per mutation | `AFTER … FOR EACH ROW` fires once per changed row; `UPDATE`s that leave every non-timestamp column unchanged write nothing                                                                                                                                          |
+| Diff                    | `metadata.changed_fields` lists the columns that actually changed                                                                                                                                                                                                   |
+| Append-only             | `trg_audit_logs_append_only` raises on `UPDATE`/`DELETE`; `checksum` makes tampering evident at rest                                                                                                                                                                |
 | Redaction               | `password`, `encrypted_credentials`, `session_token_hash`, `vault_token_reference`, `raw_payload`, `access_token`, `refresh_token`, `client_secret`, `api_key`, `card_number`, `cvv`, `authorization` are stripped from `before_state`/`after_state` before hashing |
 
 The context is published transactionally by `AuditContext` (`app/services/audit_context.ts`) using `set_config(…, is_local => true)` — the parameterised form of `SET LOCAL`, which cannot leak across pooled connections:
 
 ```ts
-await AuditContext.run({ actorUserId: user.id, requestId: request.id(), reason: 'order.cancelled' }, async (trx) => {
-  order.useTransaction(trx)
-  order.status = OrderStatus.CANCELLED
-  await order.save()
-})
+await AuditContext.run(
+  { actorUserId: user.id, requestId: request.id(), reason: 'order.cancelled' },
+  async (trx) => {
+    order.useTransaction(trx)
+    order.status = OrderStatus.CANCELLED
+    await order.save()
+  }
+)
 ```
 
 #### Manual audit rows are restricted by type
@@ -152,8 +191,8 @@ Because there is no API to write a row-level audit entry by hand, double-auditin
 
 - Path: [`database/schema.dbml`](../database/schema.dbml)
 - Validated via `@dbml/core`:
-  - **40 Tables**
-  - **44 Enums**
+  - **45 Tables**
+  - **44+ Enums**
   - **98 Foreign-Key Refs**
   - **66,204 chars of PostgreSQL DDL exported with 0 errors**
 
@@ -161,18 +200,18 @@ Because there is no API to write a row-level audit entry by hand, double-auditin
 
 ## Phase 5 — Implementation File Inventory
 
-| Layer                    | Files                                                                                                                                                 | Description                                                                                                                                            |
-| :----------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **DBML & Schema**        | `database/schema.dbml`, `database/schema.ts`, `database/schema_rules.ts`                                                                              | Self-contained DBML specification, custom generator rules, and 40 auto-generated Lucid `*Schema` classes                                               |
-| **Migrations (40)**      | `database/migrations/1760000000001_*.ts` .. `1760000000040_*.ts`                                                                                      | Dependency-ordered UUIDv7 migrations with native PostgreSQL enums, composite indexes, and `CHECK` constraints                                          |
-| **Models (40)**          | `app/models/*.ts`                                                                                                                                     | 40 Lucid models with UUIDv7 `@beforeCreate()` hooks, AES-256-GCM encryption, identity normalization, and typed relationships                           |
-| **Enums & Utils**        | `app/enums/index.ts`, `app/utils/uuid.ts`, `app/utils/generate_entity_id.ts`                                                                           | 44 shared TypeScript enum constants/types, ULID entity ids, email/phone normalization, address fingerprinting, and SHA-256 audit checksums         |
-| **Domain Services**      | `app/services/rbac_service.ts`, `app/services/catalog_service.ts`, `app/services/order_service.ts`, `app/services/fulfillment_and_returns_service.ts` | Transactional business services for RBAC/entitlements, catalog & variants, manual/bulk orders, shipments, carrier invoices, returns, and refunds      |
-| **Audit & Schema**       | `app/services/audit_context.ts`, `app/services/audit_service.ts`, `scripts/sync_schema_dbml.mjs`                                                       | Transaction-scoped audit GUCs, the closed non-row audit writer, and schema artifact regeneration validated with `@dbml/core`                         |
-| **Controllers & Routes** | `app/controllers/session_controller.ts`, `app/controllers/operations_controller.ts`, `start/routes.ts`                                                | Auth session controller and full-CRUD operations controller across all 9 modules                                                                       |
-| **Validators & Seeders** | `app/validators/user.ts`, `app/validators/operations.ts`, `database/seeders/main_seeder.ts`                                                           | VineJS v4 validators and idempotent multi-currency, multi-user seeder                                                                                  |
-| **Frontend (Astryx UI)** | `inertia/components/astryx.tsx`, `inertia/pages/dashboard.tsx`, `inertia/pages/auth/login.tsx`, `inertia/pages/home.tsx`, `inertia/layouts/app.tsx`   | React 19 + Inertia v5 + TailwindCSS v4 UI built on the Facebook/Meta Astryx design system with 9 tabs and 19 modal/inline CRUD workflows               |
-| **Automated Tests**      | `tests/unit/architecture_and_operations.spec.ts`                                                                                                      | 12 Japa database-backed verification tests                                                                                                             |
+| Layer                    | Files                                                                                                                                                 | Description                                                                                                                                                                         |
+| :----------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **DBML & Schema**        | `database/schema.dbml`, `database/schema.ts`, `database/schema_rules.ts`                                                                              | Self-contained DBML specification, custom generator rules, and 40 auto-generated Lucid `*Schema` classes                                                                            |
+| **Migrations (40)**      | `database/migrations/1760000000001_*.ts` .. `1760000000040_*.ts`                                                                                      | Dependency-ordered UUIDv7 migrations with native PostgreSQL enums, composite indexes, and `CHECK` constraints                                                                       |
+| **Models (40)**          | `app/models/*.ts`                                                                                                                                     | 40 Lucid models with UUIDv7 `@beforeCreate()` hooks, AES-256-GCM encryption, identity normalization, and typed relationships                                                        |
+| **Enums & Utils**        | `app/enums/index.ts`, `app/utils/uuid.ts`, `app/utils/generate_entity_id.ts`                                                                          | 44 shared TypeScript enum constants/types, ULID entity ids, email/phone normalization, address fingerprinting, and SHA-256 audit checksums                                          |
+| **Domain Services**      | `app/services/rbac_service.ts`, `app/services/catalog_service.ts`, `app/services/order_service.ts`, `app/services/fulfillment_and_returns_service.ts` | Transactional business services for RBAC/entitlements, catalog & variants, manual/bulk orders, shipments, carrier invoices, returns, and refunds                                    |
+| **Audit & Schema**       | `app/services/audit_context.ts`, `app/services/audit_service.ts`, `scripts/sync_schema_dbml.mjs`                                                      | Transaction-scoped audit GUCs, the closed non-row audit writer, and schema artifact regeneration validated with `@dbml/core`                                                        |
+| **Controllers & Routes** | `app/controllers/*.ts`, `start/routes.ts`                                                                                                             | 14 focused controllers (orders, shipments, returns, catalog, finance, customers, admin, …); the historical catch-all `operations_controller` / `pages_controller` have been removed |
+| **Validators & Seeders** | `app/validators/user.ts`, `app/validators/operations.ts`, `database/seeders/main_seeder.ts`                                                           | VineJS v4 validators and idempotent multi-currency, multi-user seeder                                                                                                               |
+| **Frontend (Astryx UI)** | `inertia/components/astryx.tsx`, `inertia/pages/dashboard.tsx`, `inertia/pages/auth/login.tsx`, `inertia/pages/home.tsx`, `inertia/layouts/app.tsx`   | React 19 + Inertia v5 + TailwindCSS v4 UI built on the Facebook/Meta Astryx design system with 9 tabs and 19 modal/inline CRUD workflows                                            |
+| **Automated Tests**      | `tests/unit/architecture_and_operations.spec.ts`                                                                                                      | 12 Japa database-backed verification tests                                                                                                                                          |
 
 ---
 

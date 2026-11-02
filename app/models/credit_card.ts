@@ -17,6 +17,9 @@ export default class CreditCard extends AppBaseModel {
   static readonly table = 'credit_cards'
   static readonly idPrefix = 'ccard'
 
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'creditLimit'
+
   @column({ columnName: 'user_id' })
   declare public userId: string
 

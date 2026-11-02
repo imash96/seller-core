@@ -8,6 +8,9 @@ export default class ManualReconciliation extends AppBaseModel {
   static readonly table = 'manual_reconciliations'
   static readonly idPrefix = 'mrec'
 
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'observedAmount'
+
   @column({ columnName: 'user_id' }) declare userId: string
   @column({ columnName: 'financial_transaction_id' }) declare financialTransactionId: string
   @column({ columnName: 'source_reference' }) declare sourceReference: string

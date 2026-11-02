@@ -18,6 +18,9 @@ export default class MarketplaceClaim extends AppBaseModel {
   static readonly table = 'marketplace_claims'
   static readonly idPrefix = 'mcl'
 
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'disputedAmount'
+
   @column({ columnName: 'user_id' })
   declare public userId: string
 

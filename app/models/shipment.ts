@@ -18,6 +18,9 @@ export default class Shipment extends AppBaseModel {
   static readonly table = 'shipments'
   static readonly idPrefix = 'shp'
 
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'estimatedShippingCost'
+
   /** Both weights are GENERATED ALWAYS AS (...) STORED from dimensions and dead weight. */
   static override readonly generatedColumns = [
     'volumetricWeightGrams',

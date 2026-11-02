@@ -1,5 +1,7 @@
 import { BaseModel, beforeCreate, beforeSave, column } from '@adonisjs/lucid/orm'
+import type { CherryPick } from '@adonisjs/lucid/types/model'
 import { generateEntityId } from '../utils/generate_entity_id.js'
+import { type PriceMoney, currencyOf } from '../types/price.js'
 
 /**
  * Application base model.
@@ -25,6 +27,18 @@ export default class AppBaseModel extends BaseModel {
 
   /** Attribute names of database-generated columns — never written. */
   static readonly generatedColumns: readonly string[] = []
+
+  /**
+   * Money attribute that identifies the row's currency.
+   *
+   * Money columns are self-contained `{ currency_code, amount }` values, but a UI
+   * that renders "1,240.50" next to a column header still needs to know which
+   * currency that is. Declaring the attribute here appends a read-only
+   * `currencyCode` field to `serialize()` output, derived from the money object —
+   * so no consumer has to guess or default to USD, and no standalone
+   * `currency_code` column is reintroduced.
+   */
+  static readonly currencyAttribute: string | null = null
 
   /** ULID primary key (varchar(64), may include an entity prefix). */
   @column({ isPrimary: true, columnName: 'id' })
@@ -55,5 +69,14 @@ export default class AppBaseModel extends BaseModel {
         delete model.$attributes[key]
       }
     }
+  }
+
+  override serialize(cherryPick?: CherryPick): Record<string, any> {
+    const raw = super.serialize(cherryPick)
+    const attribute = (this.constructor as typeof AppBaseModel).currencyAttribute
+    if (!attribute) return raw
+    const value = raw[attribute] as PriceMoney | null | undefined
+    const code = value && typeof value === 'object' ? currencyOf(value) : null
+    return code ? { ...raw, currencyCode: code } : raw
   }
 }

@@ -22,6 +22,9 @@ export default class FinancialTransaction extends AppBaseModel {
   static readonly table = 'financial_transactions'
   static readonly idPrefix = 'ftx'
 
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'originalAmount'
+
   @column({ columnName: 'user_id' })
   declare public userId: string
 

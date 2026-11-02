@@ -409,7 +409,6 @@ router
       .as('financial_accounts.delete')
       .use(middleware.operationsPermission({ resource: 'finance', action: 'delete' }))
 
-
     router
       .post('/credit-cards', [FinanceController, 'storeCreditCard'])
       .as('credit_cards.store')

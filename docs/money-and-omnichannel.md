@@ -166,13 +166,13 @@ currency code.
 
 ### 5.1 Models — `app/models/json_helpers.ts`
 
-| Export                                                                            | Purpose                                                                                                 |
-| :-------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------ |
-| `moneyColumn({ columnName })` / `nullableMoneyColumn(...)`                        | Lucid `@column` decorator with `prepare`/`consume` for a single `PriceMoney` JSONB column                |
-| `priceArrayColumn(...)`                                                           | MedusaJS v2 price array (`prices` on `products`, `product_variants`, `channel_listings`)                 |
-| `moneyEntryArrayColumn({ columnName, amountKey })`                                | Breakdown arrays whose money property is `total` (`order_line_items.tax_lines`) or `amount` (`adjustments`) |
-| `generatedColumn({ columnName, consume })`                                        | Read-only STORED generated column — never emitted in `INSERT`/`UPDATE`                                  |
-| `moneyKindOf(definition)`                                                         | Introspection used by tests/audits to assert the column kind                                             |
+| Export                                                     | Purpose                                                                                                     |
+| :--------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------- |
+| `moneyColumn({ columnName })` / `nullableMoneyColumn(...)` | Lucid `@column` decorator with `prepare`/`consume` for a single `PriceMoney` JSONB column                   |
+| `priceArrayColumn(...)`                                    | MedusaJS v2 price array (`prices` on `products`, `product_variants`, `channel_listings`)                    |
+| `moneyEntryArrayColumn({ columnName, amountKey })`         | Breakdown arrays whose money property is `total` (`order_line_items.tax_lines`) or `amount` (`adjustments`) |
+| `generatedColumn({ columnName, consume })`                 | Read-only STORED generated column — never emitted in `INSERT`/`UPDATE`                                      |
+| `moneyKindOf(definition)`                                  | Introspection used by tests/audits to assert the column kind                                                |
 
 `AppBaseModel` (`app/models/base_model.ts`) owns the id contract (`static idPrefix`,
 `@beforeCreate generateId`) and `@beforeSave discardGeneratedColumnWrites()`, which drops
@@ -215,13 +215,13 @@ single canonical `PriceMoney` and no consumer sees two shapes.
 
 ### 5.4 Verification
 
-| Check                                 | Result                                                    |
-| :------------------------------------ | :-------------------------------------------------------- |
-| `tsc --noEmit` (+ `inertia/tsconfig`) | 0 errors                                                  |
-| `eslint .`                            | 0 errors, 0 warnings                                      |
-| `node ace test`                       | 148 passed (148)                                          |
-| `node ace migration:run` → `db:seed` ×2 | seeded once, second run a no-op; counts stable           |
-| `pnpm db:schema:check`                | both artifacts in sync                                    |
+| Check                                   | Result                                         |
+| :-------------------------------------- | :--------------------------------------------- |
+| `tsc --noEmit` (+ `inertia/tsconfig`)   | 0 errors                                       |
+| `eslint .`                              | 0 errors, 0 warnings                           |
+| `node ace test`                         | 148 passed (148)                               |
+| `node ace migration:run` → `db:seed` ×2 | seeded once, second run a no-op; counts stable |
+| `pnpm db:schema:check`                  | both artifacts in sync                         |
 
 ## 6. Phase 6 — services, controllers, jobs and events
 
@@ -247,13 +247,13 @@ Inventory used to be reserved on order creation and never released. Now every tr
 that moves physical units keeps `stock_on_hand` and the reservation in step, so the
 generated `stock_available` column stays truthful:
 
-| Transition                              | `stock_reserved` | `stock_on_hand` |
-| :-------------------------------------- | :--------------- | :-------------- |
-| `createOrder` (reservation)             | `+qty`           | —               |
-| `createShipment` (units dispatched)     | `-qty`           | `-qty`          |
-| `updateShipmentStatuses → returned_to_sender` | —         | `+qty`          |
-| `receiveReturn` (RMA received, `restock_inventory`) | —    | `+qty` (delta)  |
-| `cancelOrder` (unshipped units)         | `-qty`           | —               |
+| Transition                                          | `stock_reserved` | `stock_on_hand` |
+| :-------------------------------------------------- | :--------------- | :-------------- |
+| `createOrder` (reservation)                         | `+qty`           | —               |
+| `createShipment` (units dispatched)                 | `-qty`           | `-qty`          |
+| `updateShipmentStatuses → returned_to_sender`       | —                | `+qty`          |
+| `receiveReturn` (RMA received, `restock_inventory`) | —                | `+qty` (delta)  |
+| `cancelOrder` (unshipped units)                     | `-qty`           | —               |
 
 `OrderService.cancelOrder()` is the single cancellation path used by
 `OrdersController.updateOrderStatus` and `deleteOrder`: it locks the order, releases the
@@ -305,9 +305,49 @@ the service owns retry policy).
 
 ### 6.5 Verification
 
-| Check                     | Result                                                    |
-| :------------------------ | :-------------------------------------------------------- |
-| `tsc --noEmit`            | 0 errors                                                  |
-| `eslint app tests`        | 0 errors, 0 warnings                                      |
-| `node ace test`           | 162 passed (162)                                          |
-| `node ace db:seed` ×2     | seeded once, second run a no-op; counts stable            |
+| Check                 | Result                                         |
+| :-------------------- | :--------------------------------------------- |
+| `tsc --noEmit`        | 0 errors                                       |
+| `eslint app tests`    | 0 errors, 0 warnings                           |
+| `node ace test`       | 162 passed (162)                               |
+| `node ace db:seed` ×2 | seeded once, second run a no-op; counts stable |
+
+## 7. Phase 7 — serialization contract and UI
+
+Money columns are typed `PriceMoney` on the model, in the database and over the wire.
+What the UI needed was the _currency_ next to the amount, which previously came from a
+dropped `currency_code` column.
+
+`AppBaseModel` now declares `static readonly currencyAttribute`, the money attribute that
+identifies a row's currency. `serialize()` appends a derived, read-only `currencyCode`
+field from that money object:
+
+| Model                  | `currencyAttribute`                      |
+| :--------------------- | :--------------------------------------- |
+| `Order`                | `grandTotal` (existing bespoke override) |
+| `OrderLineItem`        | `unitPrice` (existing)                   |
+| `FinancialAccount`     | `currentBalance`                         |
+| `FinancialTransaction` | `originalAmount`                         |
+| `CreditCard`           | `creditLimit`                            |
+| `Customer`             | `totalSpent`                             |
+| `ManualReconciliation` | `observedAmount`                         |
+| `MarketplaceClaim`     | `disputedAmount`                         |
+| `RefundTransaction`    | `grandRefundTotal`                       |
+| `ReturnRequest`        | `refundTotal`                            |
+| `Shipment`             | `estimatedShippingCost`                  |
+| `ShippingInvoice`      | `totalAmount`                            |
+| `ShippingInvoiceLine`  | `billedAmount`                           |
+
+Consequences:
+
+- A CAD account renders `1,240.50 CAD`, an EUR customer balance renders `320.25 EUR` —
+  never the user's default currency, and no `currency_code` column is reintroduced.
+- `ProductVariant.serialize()`/`ChannelListing.serialize()` expose the full MedusaJS v2
+  array as both `prices` and the `price` alias, and `ProductVariant` adds
+  `inventoryValue` (`costPrice × stockOnHand`) as `PriceMoney`.
+- The UI reads currency arrays through `MultiCurrencyPriceStack` (display) and
+  `MultiCurrencyPriceInput` (form) and amounts through `col.money(field, label, currency)`,
+  so no page multiplies or formats a bare number.
+
+Verified by `tests/unit/serialization.spec.ts` (4 cases: non-USD account, EUR customer,
+variant price array + inventory value, shipment cost currency).

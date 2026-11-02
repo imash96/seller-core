@@ -20,6 +20,9 @@ export default class ReturnRequest extends AppBaseModel {
   static readonly table = 'return_requests'
   static readonly idPrefix = 'rma'
 
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'refundTotal'
+
   @column({ columnName: 'user_id' })
   declare public userId: string
 

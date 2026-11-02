@@ -18,6 +18,9 @@ export default class Customer extends AppBaseModel {
   static readonly table = 'customers'
   static readonly idPrefix = 'cust'
 
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'totalSpent'
+
   /** `is_repeat_customer` is GENERATED ALWAYS AS (orders_count > 1) STORED. */
   static override readonly generatedColumns = ['isRepeatCustomer'] as const
 
