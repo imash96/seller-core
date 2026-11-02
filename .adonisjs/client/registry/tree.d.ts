@@ -149,6 +149,11 @@ export interface ApiDefinition {
     reverseReconciliation: typeof routes['financial_transactions.reverse_reconciliation']
     void: typeof routes['financial_transactions.void']
   }
+  finance: {
+    reports: {
+      store: typeof routes['finance.reports.store']
+    }
+  }
   tasks: {
     store: typeof routes['tasks.store']
     update: typeof routes['tasks.update']

@@ -570,6 +570,12 @@ const routes = {
     tokens: [[0,"financial-transactions"]],
     types: placeholder as Registry['financial_transactions.store']['types'],
   },
+  'finance.reports.store': {
+    methods: ["POST"],
+    pattern: '/finance/reports',
+    tokens: [[0,"finance"],[0,"reports"]],
+    types: placeholder as Registry['finance.reports.store']['types'],
+  },
   'financial_transactions.reconcile': {
     methods: ["POST"],
     pattern: '/financial-transactions/:id/reconcile',

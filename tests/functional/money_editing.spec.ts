@@ -17,7 +17,7 @@ import { amountOf, currencyOf } from '../../app/types/price.js'
  */
 function makeJar() {
   const jar = new Map<string, string>()
-  const base = 'http://localhost:3333'
+  const base = process.env.APP_URL || 'http://localhost:3333'
   const send = async (path: string, body?: Record<string, unknown>) => {
     const xsrf = jar.get('XSRF-TOKEN')
     const response = await fetch(base + path, {
@@ -55,7 +55,9 @@ test.group('Per-amount currency editing', () => {
     })
     const { send } = makeJar()
     await send('/store/product-categories')
-    assert.equal((await send('/', { email: user.email, password: 'Password123!' })).status, 302)
+    const loginRes = await send('/', { email: user.email, password: 'Password123!' })
+    console.log('LOGIN STATUS:', loginRes.status, 'LOCATION:', loginRes.headers.get('location'), 'COOKIES:', [...loginRes.headers.getSetCookie()])
+    assert.equal(loginRes.status, 302)
 
     const sku = `MONEY-${nonce}`
     const create = await send('/products', {
@@ -72,6 +74,7 @@ test.group('Per-amount currency editing', () => {
         { currency_code: 'MXN', amount: 2699.99 },
       ]),
     })
+    console.log('CREATE STATUS:', create.status, 'LOCATION:', create.headers.get('location'))
     assert.equal(create.status, 302)
 
     const product = await Product.query()
@@ -105,7 +108,9 @@ test.group('Per-amount currency editing', () => {
     })
     const { send } = makeJar()
     await send('/store/product-categories')
-    assert.equal((await send('/', { email: user.email, password: 'Password123!' })).status, 302)
+    const loginRes = await send('/', { email: user.email, password: 'Password123!' })
+    console.log('LOGIN STATUS:', loginRes.status, 'LOCATION:', loginRes.headers.get('location'), 'COOKIES:', [...loginRes.headers.getSetCookie()])
+    assert.equal(loginRes.status, 302)
 
     const orderNumber = `ORD-MONEY-${nonce}`
     const create = await send('/orders', {
@@ -122,6 +127,7 @@ test.group('Per-amount currency editing', () => {
       // Booked in another currency on purpose: shipping is paid to a Mexican carrier.
       shippingCostTotal: { amount: 240, currencyCode: 'MXN' },
     })
+    console.log('CREATE STATUS:', create.status, 'LOCATION:', create.headers.get('location'))
     assert.equal(create.status, 302)
 
     const order = await Order.query()
@@ -149,7 +155,9 @@ test.group('Per-amount currency editing', () => {
     })
     const { send } = makeJar()
     await send('/store/product-categories')
-    assert.equal((await send('/', { email: user.email, password: 'Password123!' })).status, 302)
+    const loginRes = await send('/', { email: user.email, password: 'Password123!' })
+    console.log('LOGIN STATUS:', loginRes.status, 'LOCATION:', loginRes.headers.get('location'), 'COOKIES:', [...loginRes.headers.getSetCookie()])
+    assert.equal(loginRes.status, 302)
 
     const orderNumber = `ORD-RET-${nonce}`
     await send('/orders', {
@@ -205,7 +213,9 @@ test.group('Per-amount currency editing', () => {
     })
     const { send } = makeJar()
     await send('/store/product-categories')
-    assert.equal((await send('/', { email: user.email, password: 'Password123!' })).status, 302)
+    const loginRes = await send('/', { email: user.email, password: 'Password123!' })
+    console.log('LOGIN STATUS:', loginRes.status, 'LOCATION:', loginRes.headers.get('location'), 'COOKIES:', [...loginRes.headers.getSetCookie()])
+    assert.equal(loginRes.status, 302)
 
     const invoiceResponse = await send('/shipping-invoices', {
       carrierCode: 'dhl',

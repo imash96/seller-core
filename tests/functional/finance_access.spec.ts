@@ -125,23 +125,23 @@ test.group('Household finance access over HTTP', () => {
       inertia = false
     ): Promise<Response> => {
       const token = jar.get('XSRF-TOKEN')
-      const res = await fetch(`http://localhost:3333${path}`, {
+      const res = await fetch(`${process.env.APP_URL || 'http://localhost:3333'}${path}`, {
         method: body ? 'POST' : 'GET',
         redirect: 'manual',
         headers: {
           cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '),
           ...(inertia
             ? {
-                'x-inertia': 'true',
-                'x-requested-with': 'XMLHttpRequest',
-                'x-inertia-version': version,
-              }
+              'x-inertia': 'true',
+              'x-requested-with': 'XMLHttpRequest',
+              'x-inertia-version': version,
+            }
             : {}),
           ...(body
             ? {
-                'content-type': 'application/json',
-                'x-xsrf-token': decodeURIComponent(token ?? ''),
-              }
+              'content-type': 'application/json',
+              'x-xsrf-token': decodeURIComponent(token ?? ''),
+            }
             : {}),
         },
         ...(body ? { body: JSON.stringify(body) } : {}),

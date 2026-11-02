@@ -1229,6 +1229,19 @@ export interface Registry {
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['storeFinancialTransaction']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'finance.reports.store': {
+    methods: ["POST"]
+    pattern: '/finance/reports'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['generateReport']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['generateReport']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/finance_controller').default['generateReport']>>>
+    }
+  }
   'financial_transactions.reconcile': {
     methods: ["POST"]
     pattern: '/financial-transactions/:id/reconcile'

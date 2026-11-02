@@ -98,6 +98,7 @@ export type ScannedRoutes = {
     'finance_categories.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'finance_categories.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'financial_transactions.store': { paramsTuple?: []; params?: {} }
+    'finance.reports.store': { paramsTuple?: []; params?: {} }
     'financial_transactions.reconcile': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'financial_transactions.reverse_reconciliation': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'financial_transactions.void': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -245,6 +246,7 @@ export type ScannedRoutes = {
     'finance_categories.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'finance_categories.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'financial_transactions.store': { paramsTuple?: []; params?: {} }
+    'finance.reports.store': { paramsTuple?: []; params?: {} }
     'financial_transactions.reconcile': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'financial_transactions.reverse_reconciliation': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'financial_transactions.void': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }

@@ -42,6 +42,11 @@ import {
   Plus,
   Search,
 } from 'lucide-react'
+import {
+  GenerateListingsModal,
+  EditListingModal,
+  ListingDetailDrawer,
+} from '~/modules/listing/index'
 
 type SkuGroup = {
   sku: string
@@ -977,460 +982,51 @@ export default function Listings({
       {/* =====================================================================
           MODAL 1: GENERATE MULTI-PLATFORM LISTINGS FROM PRODUCTS + BRAND
          ===================================================================== */}
-      {generateModalOpen && (
-        <Stack
-          direction="horizontal"
-          align="center"
-          justify="center"
-          padding={4}
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
-        >
-          <Stack className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden">
-            <Stack
-              direction="horizontal"
-              align="center"
-              justify="between"
-              paddingInline={6}
-              paddingBlock={4}
-              className="border-b border-divider bg-muted/30"
-            >
-              <Stack>
-                <h2 className="text-lg font-bold text-foreground">
-                  Generate Multi-Platform Listings
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Link Products & Variants with a Brand and run platform transformers (including
-                  multi-currency ChannelListingPrice arrays) for Medusa, Amazon, eBay, and Etsy.
-                </p>
-              </Stack>
-              <button
-                type="button"
-                onClick={() => setGenerateModalOpen(false)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </Stack>
-            <Stack gap={4} padding={6} className="text-xs">
-              <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
-                <AppSelect
-                  label="1. Select Brand *"
-                  value={selectedBrandId}
-                  onChange={(e) => setSelectedBrandId(e.target.value)}
-                  options={[
-                    { value: '', label: '-- Select Brand --' },
-                    ...brands.map((b) => ({ value: String(b.id), label: String(b.name) })),
-                  ]}
-                />
-                <AppSelect
-                  label="Seller Account (Optional Override)"
-                  value={selectedSellerAccountId}
-                  onChange={(e) => setSelectedSellerAccountId(e.target.value)}
-                  options={[
-                    { value: '', label: 'Auto-resolve per Platform' },
-                    ...sellerAccounts.map((sa) => ({
-                      value: String(sa.id),
-                      label: String(sa.accountName),
-                    })),
-                  ]}
-                />
-              </Grid>
-
-              <Stack>
-                <label className="block font-semibold text-foreground mb-1.5">
-                  2. Target E-Commerce Platforms *
-                </label>
-                <Grid columns={{ minWidth: 220, max: 2 }}>
-                  {(['medusa', 'amazon', 'ebay', 'etsy'] as const).map((plat) => {
-                    const checked = selectedPlatforms.includes(plat)
-                    return (
-                      <label
-                        key={plat}
-                        className={`flex items-center gap-2 rounded-xl border p-2.5 cursor-pointer ${
-                          checked
-                            ? 'border-primary bg-primary-subtle text-foreground font-semibold'
-                            : 'border-border bg-muted/20 text-muted-foreground'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() =>
-                            setSelectedPlatforms((prev) =>
-                              prev.includes(plat) ? prev.filter((x) => x !== plat) : [...prev, plat]
-                            )
-                          }
-                        />
-                        <Text>{PLATFORM_BADGES[plat].label}</Text>
-                      </label>
-                    )
-                  })}
-                </Grid>
-              </Stack>
-
-              <Stack>
-                <label className="block font-semibold text-foreground mb-1">
-                  3. Filter Products (Leave unchecked to include all {products.length} products)
-                </label>
-                <Stack
-                  gap={1.5}
-                  padding={2}
-                  className="max-h-36 overflow-y-auto rounded-xl border border-input-border bg-muted/20"
-                >
-                  {products.map((p) => {
-                    const id = String(p.id)
-                    const checked = selectedProductIds.includes(id)
-                    return (
-                      <label key={id} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() =>
-                            setSelectedProductIds((prev) =>
-                              prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-                            )
-                          }
-                        />
-                        <Text color="primary" weight="medium">
-                          {String(p.title)}
-                        </Text>
-                        <Text color="secondary" className="font-mono">
-                          ({String(p.skuPrefix ?? '')})
-                        </Text>
-                      </label>
-                    )
-                  })}
-                </Stack>
-              </Stack>
-
-              <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
-                <AppInput
-                  label="Channel Price Multiplier (1.0 = Base Tier Price)"
-                  type="number"
-                  step="0.05"
-                  value={priceMultiplier}
-                  onChange={(e) => setPriceMultiplier(e.target.value)}
-                />
-                <label className="flex items-center gap-2 cursor-pointer pt-4">
-                  <input
-                    type="checkbox"
-                    checked={assignBrandToProduct}
-                    onChange={(e) => setAssignBrandToProduct(e.target.checked)}
-                  />
-                  <Text color="primary" weight="medium">
-                    Also set selected Brand on Parent Product
-                  </Text>
-                </label>
-              </Grid>
-            </Stack>
-            <Stack
-              direction="horizontal"
-              align="center"
-              justify="end"
-              gap={2}
-              paddingInline={6}
-              paddingBlock={4}
-              className="border-t border-divider bg-muted/25"
-            >
-              <AppButton
-                label="Cancel"
-                variant="ghost"
-                size="sm"
-                onClick={() => setGenerateModalOpen(false)}
-              />
-              <AppButton
-                label={busyKey === 'gen-listings' ? 'Generating...' : 'Generate Platform Listings'}
-                variant="primary"
-                size="sm"
-                loading={busyKey === 'gen-listings'}
-                onClick={handleGenerateListings}
-              />
-            </Stack>
-          </Stack>
-        </Stack>
-      )}
+      <GenerateListingsModal
+        isOpen={generateModalOpen}
+        onClose={() => setGenerateModalOpen(false)}
+        brands={brands}
+        sellerAccounts={sellerAccounts}
+        products={products}
+        selectedBrandId={selectedBrandId}
+        setSelectedBrandId={setSelectedBrandId}
+        selectedSellerAccountId={selectedSellerAccountId}
+        setSelectedSellerAccountId={setSelectedSellerAccountId}
+        selectedPlatforms={selectedPlatforms}
+        setSelectedPlatforms={setSelectedPlatforms}
+        selectedProductIds={selectedProductIds}
+        setSelectedProductIds={setSelectedProductIds}
+        priceMultiplier={priceMultiplier}
+        setPriceMultiplier={setPriceMultiplier}
+        assignBrandToProduct={assignBrandToProduct}
+        setAssignBrandToProduct={setAssignBrandToProduct}
+        busyKey={busyKey}
+        onGenerate={handleGenerateListings}
+        platformBadges={PLATFORM_BADGES}
+      />
 
       {/* =====================================================================
           MODAL 2: COMPLETE EDIT CHANNEL LISTING MODAL (WITH MULTI-CURRENCY PRICES)
          ===================================================================== */}
-      {editingListing && (
-        <Stack
-          direction="horizontal"
-          align="center"
-          justify="center"
-          padding={4}
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs overflow-y-auto"
-        >
-          <form
-            onSubmit={handleSaveListingEdit}
-            className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden max-h-screen flex flex-col"
-          >
-            <Stack
-              direction="horizontal"
-              align="center"
-              justify="between"
-              paddingInline={6}
-              paddingBlock={4}
-              className="border-b border-divider bg-muted/30"
-            >
-              <Stack>
-                <h2 className="text-base font-bold text-foreground">
-                  Edit Platform Listing ({String(editingListing.platform).toUpperCase()})
-                </h2>
-                <p className="text-xs text-muted-foreground font-mono">
-                  SKU: {String(editingListing.externalSku)}
-                </p>
-              </Stack>
-              <button
-                type="button"
-                onClick={() => setEditingListing(null)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </Stack>
-            <Stack
-              direction="horizontal"
-              gap={4}
-              padding={6}
-              className="flex-1 overflow-y-auto text-xs"
-            >
-              <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
-                <AppInput
-                  label="External Listing ID / Offer ID *"
-                  required
-                  value={editForm.externalListingId}
-                  onChange={(e) => setEditForm({ ...editForm, externalListingId: e.target.value })}
-                />
-                <AppInput
-                  label="External Variant ID"
-                  value={editForm.externalVariantId}
-                  onChange={(e) => setEditForm({ ...editForm, externalVariantId: e.target.value })}
-                />
-                <AppInput
-                  label="Channel SKU Override"
-                  value={editForm.externalSku}
-                  onChange={(e) => setEditForm({ ...editForm, externalSku: e.target.value })}
-                />
-                <AppInput
-                  label="Amazon ASIN"
-                  value={editForm.asin}
-                  onChange={(e) => setEditForm({ ...editForm, asin: e.target.value })}
-                />
-                <AppInput
-                  label="Channel Category / Browse Node ID"
-                  value={editForm.channelCategoryId}
-                  onChange={(e) => setEditForm({ ...editForm, channelCategoryId: e.target.value })}
-                />
-                <AppInput
-                  label="Listed price (USD — anchor for the other currencies)"
-                  type="number"
-                  step="0.01"
-                  value={editForm.listedPrice}
-                  onChange={(e) => {
-                    const usd = Number(e.target.value)
-                    setEditForm({
-                      ...editForm,
-                      listedPrice: e.target.value,
-                      currencyCode: 'USD',
-                      // Every other currency follows the USD anchor; overrides survive.
-                      prices: expandUsdPrice(Number.isFinite(usd) ? usd : 0, {
-                        existing: editForm.prices,
-                        preserveOverrides: true,
-                      }),
-                    })
-                  }}
-                />
-                <AppInput
-                  label="Allocated Quantity"
-                  type="number"
-                  value={editForm.allocatedQuantity}
-                  onChange={(e) => setEditForm({ ...editForm, allocatedQuantity: e.target.value })}
-                />
-                <AppSelect
-                  label="Listing Status"
-                  value={editForm.listingStatus}
-                  onChange={(e) => setEditForm({ ...editForm, listingStatus: e.target.value })}
-                  options={[
-                    { value: 'active', label: 'active' },
-                    { value: 'draft', label: 'draft' },
-                    { value: 'inactive', label: 'inactive' },
-                    { value: 'suppressed', label: 'suppressed' },
-                  ]}
-                />
-                <AppSelect
-                  disabled
-                  label="Publication Status (marketplace integration not configured)"
-                  value={editForm.publicationStatus}
-                  onChange={(e) => setEditForm({ ...editForm, publicationStatus: e.target.value })}
-                  options={[
-                    { value: 'published', label: 'published' },
-                    { value: 'unpublished', label: 'unpublished' },
-                    { value: 'draft', label: 'draft' },
-                    { value: 'queued', label: 'queued' },
-                    { value: 'failed', label: 'failed' },
-                  ]}
-                />
-                <Stack className="sm:col-span-2">
-                  <MultiCurrencyPriceInput
-                    label="Multi-Currency Listing Prices (ChannelListingPrice)"
-                    value={editForm.prices}
-                    onChange={(nextPrices) => {
-                      const primary =
-                        nextPrices.find((p) => p.currency_code === editForm.currencyCode) ??
-                        nextPrices[0]
-                      setEditForm({
-                        ...editForm,
-                        prices: nextPrices,
-                        ...(primary
-                          ? {
-                              currencyCode: primary.currency_code,
-                              listedPrice: String(primary.amount),
-                            }
-                          : {}),
-                      })
-                    }}
-                  />
-                </Stack>
-                <Stack className="sm:col-span-2">
-                  <AppInput
-                    label="Channel Title Override"
-                    value={editForm.channelTitle}
-                    onChange={(e) => setEditForm({ ...editForm, channelTitle: e.target.value })}
-                  />
-                </Stack>
-                <Stack className="sm:col-span-2">
-                  <AppTextarea
-                    label="Channel Description Override"
-                    rows={3}
-                    value={editForm.channelDescription}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, channelDescription: e.target.value })
-                    }
-                  />
-                </Stack>
-              </Grid>
-            </Stack>
-            <Stack
-              direction="horizontal"
-              align="center"
-              justify="end"
-              gap={2}
-              paddingInline={6}
-              paddingBlock={4}
-              className="border-t border-divider bg-muted/25"
-            >
-              <AppButton
-                label="Cancel"
-                variant="ghost"
-                size="sm"
-                onClick={() => setEditingListing(null)}
-              />
-              <AppButton label="Save Listing Changes" variant="primary" size="sm" type="submit" />
-            </Stack>
-          </form>
-        </Stack>
-      )}
+      <EditListingModal
+        listing={editingListing}
+        onClose={() => setEditingListing(null)}
+        editForm={editForm}
+        setEditForm={setEditForm}
+        onSubmit={handleSaveListingEdit}
+      />
 
       {/* =====================================================================
           SLIDE-OVER DRAWER: PLATFORM LISTING JSON PAYLOAD INSPECTOR
          ===================================================================== */}
-      <SlideOverDrawer
-        open={!!inspectListing}
+      <ListingDetailDrawer
+        listing={inspectListing}
         onClose={() => setInspectListing(null)}
-        title={`Platform Endpoint JSON Payload (${String(inspectListing?.externalListingId ?? '')})`}
-        subtitle={`${String(inspectListing?.productTitle ?? '')} · Brand: ${String(inspectListing?.brandName ?? '')}`}
-        icon={FileCode2}
-        badge={
-          inspectListing ? (
-            <>
-              <Badge label={String(inspectListing.platform).toUpperCase()} variant="info" />
-              <MonoBadge text={String(inspectListing.externalSku)} />
-            </>
-          ) : null
-        }
-        footer={
-          inspectListing ? (
-            <>
-              <AppButton
-                label="Download Listing JSON"
-                variant="secondary"
-                size="sm"
-                icon={Download}
-                onClick={() =>
-                  downloadJsonFile(
-                    `${inspectListing.platform}_${inspectListing.externalSku}.json`,
-                    inspectListing.transformedPayload ?? inspectListing
-                  )
-                }
-              />
-              <AppButton
-                disabled
-                label="Publish on Platform Now"
-                variant="primary"
-                size="sm"
-                icon={Send}
-                onClick={() => {
-                  const item = inspectListing
-                  setInspectListing(null)
-                  handlePublishSingleListing(item)
-                }}
-              />
-            </>
-          ) : null
-        }
-      >
-        {inspectListing && (
-          <Stack gap={4} className="text-xs">
-            <Grid
-              columns={{ minWidth: 220, max: 2 }}
-              className="rounded-xl border border-card-border bg-muted/20 p-3.5"
-            >
-              <Stack>
-                <strong>Product:</strong> {String(inspectListing.productTitle)}
-              </Stack>
-              <Stack>
-                <strong>Brand:</strong> {String(inspectListing.brandName)}
-              </Stack>
-              <Stack className="col-span-2">
-                <strong className="block mb-1">Multi-Currency Prices (ChannelListingPrice):</strong>
-                <MultiCurrencyPriceStack
-                  prices={
-                    Array.isArray(inspectListing.prices)
-                      ? (inspectListing.prices as PriceMoney[])
-                      : [
-                          resolvePriceMoney(
-                            inspectListing.listedPriceMoney ?? inspectListing.listedPrice,
-                            String(inspectListing.currencyCode ?? 'USD')
-                          ),
-                        ]
-                  }
-                  primaryCurrency={String(inspectListing.currencyCode ?? 'USD')}
-                  maxBadges={6}
-                />
-              </Stack>
-              <Stack>
-                <strong>Sync Status:</strong> {String(inspectListing.syncStatus)}
-              </Stack>
-            </Grid>
-
-            <Stack gap={1.5}>
-              <Stack className="font-bold text-foreground">
-                Generated Platform Transformer JSON Payload
-              </Stack>
-              <pre className="rounded-xl border border-card-border bg-muted/30 p-4 font-mono text-2xs text-foreground overflow-x-auto">
-                {JSON.stringify(
-                  inspectListing.transformedPayload ??
-                    inspectListing.channelAttributes ??
-                    inspectListing,
-                  null,
-                  2
-                )}
-              </pre>
-            </Stack>
-          </Stack>
-        )}
-      </SlideOverDrawer>
+        onPublishListing={(item) => {
+          setInspectListing(null)
+          handlePublishSingleListing(item)
+        }}
+      />
     </Stack>
   )
 }

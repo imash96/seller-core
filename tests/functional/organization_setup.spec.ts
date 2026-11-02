@@ -186,16 +186,16 @@ test.group('Organization setup HTTP', () => {
     const org = await OrganizationService.create(owner, 'HTTP Company')
     const jar = new Map<string, string>()
     const send = async (path: string, body?: Record<string, unknown>) => {
-      const res = await fetch(`http://localhost:3333${path}`, {
+      const res = await fetch(`${process.env.APP_URL || 'http://localhost:3333'}${path}`, {
         method: body ? 'POST' : 'GET',
         redirect: 'manual',
         headers: {
           cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '),
           ...(body
             ? {
-                'content-type': 'application/json',
-                'x-xsrf-token': decodeURIComponent(jar.get('XSRF-TOKEN') ?? ''),
-              }
+              'content-type': 'application/json',
+              'x-xsrf-token': decodeURIComponent(jar.get('XSRF-TOKEN') ?? ''),
+            }
             : {}),
         },
         ...(body ? { body: JSON.stringify(body) } : {}),
@@ -215,15 +215,18 @@ test.group('Organization setup HTTP', () => {
     })
     assert.equal(rejected.status, 403)
     assert.lengthOf(await OrganizationMembership.query().where('organizationId', org.id), 1)
-    const noCsrf = await fetch(`http://localhost:3333/organizations/${org.id}/members`, {
-      method: 'POST',
-      redirect: 'manual',
-      headers: {
-        'cookie': [...jar].map(([k, v]) => `${k}=${v}`).join('; '),
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ email: other.email, isAdmin: true }),
-    })
+    const noCsrf = await fetch(
+      `${process.env.APP_URL || 'http://localhost:3333'}/organizations/${org.id}/members`,
+      {
+        method: 'POST',
+        redirect: 'manual',
+        headers: {
+          'cookie': [...jar].map(([k, v]) => `${k}=${v}`).join('; '),
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ email: other.email, isAdmin: true }),
+      }
+    )
     assert.notEqual(noCsrf.status, 200)
     assert.lengthOf(await OrganizationMembership.query().where('organizationId', org.id), 1)
     await send('/logout', {})

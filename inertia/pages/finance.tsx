@@ -29,6 +29,13 @@ import {
   Ban,
   FileBarChart,
 } from 'lucide-react'
+import {
+  CreateAccountModal,
+  EditAccountModal,
+  CreateCreditCardModal,
+  EditCreditCardModal,
+  CreateTransactionModal,
+} from '~/modules/finance/index'
 
 type Props = {
   financialAccounts: Row[]
@@ -283,341 +290,36 @@ export default function Finance({
         onSuccess={() => setReportOpen(false)}
       />
 
-      {/* Create Financial Account Modal */}
-      <FormModal
+      <CreateAccountModal
         isOpen={createAccountOpen}
         onOpenChange={setCreateAccountOpen}
-        title="Create Financial Account"
-        subtitle="Bank checking, savings, cash, and marketplace clearing accounts."
-        submitLabel="Create Account"
-        action="/financial-accounts"
-        fields={[
-          { name: 'accountName', label: 'Account Name', required: true },
-          {
-            name: 'accountType',
-            label: 'Account Type',
-            kind: 'select',
-            default: 'bank_checking',
-            options: ACCOUNT_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
-          },
-          { name: 'institutionName', label: 'Institution Name' },
-          { name: 'accountNumberLast4', label: 'Last 4 Digits', placeholder: '4401' },
-          {
-            name: 'dataClassification',
-            label: 'Classification',
-            kind: 'select',
-            default: 'business',
-            options: [
-              { value: 'business', label: 'Business' },
-              ...(financeAccess.household.create
-                ? [{ value: 'household_personal', label: 'Household / personal' }]
-                : []),
-            ],
-          },
-          {
-            name: 'currentBalance',
-            label: 'Opening Balance',
-            kind: 'money',
-            currencyFrom: 'currencyCode',
-            default: '0',
-          },
-          { name: 'currencyCode', label: 'Currency', default: 'USD' },
-          {
-            name: 'isActive',
-            label: 'Active Status',
-            kind: 'select',
-            default: 'true',
-            options: [
-              { value: 'true', label: 'Active' },
-              { value: 'false', label: 'Inactive' },
-            ],
-          },
-        ]}
+        householdCreateAccess={financeAccess.household.create}
       />
 
-      {/* Edit Financial Account Modal */}
-      <FormModal
-        isOpen={!!editAccountRow}
-        onOpenChange={(o) => {
-          if (!o) setEditAccountRow(null)
-        }}
-        title={`Edit Account: ${String(editAccountRow?.accountName ?? '')}`}
-        submitLabel="Save Account"
-        action={
-          editAccountRow
-            ? `/financial-accounts/${editAccountRow.id}`
-            : '/financial-accounts/placeholder'
-        }
-        initialValues={
-          editAccountRow
-            ? {
-                accountName: String(editAccountRow.accountName ?? ''),
-                accountType: String(editAccountRow.accountType ?? 'bank_checking'),
-                institutionName: String(editAccountRow.institutionName ?? ''),
-                accountNumberLast4: String(editAccountRow.accountNumberLast4 ?? ''),
-                dataClassification: String(editAccountRow.dataClassification ?? 'business'),
-                currentBalance: moneyAmountString(editAccountRow.currentBalance),
-                currentBalance__currency: moneyCurrencyCode(editAccountRow.currentBalance),
-                currencyCode: String(editAccountRow.currencyCode ?? 'USD'),
-                isActive: String(editAccountRow.isActive ?? 'true'),
-              }
-            : undefined
-        }
-        fields={[
-          { name: 'accountName', label: 'Account Name', required: true },
-          {
-            name: 'accountType',
-            label: 'Account Type',
-            kind: 'select',
-            options: ACCOUNT_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
-          },
-          { name: 'institutionName', label: 'Institution Name' },
-          { name: 'accountNumberLast4', label: 'Last 4 Digits' },
-          {
-            name: 'dataClassification',
-            label: 'Classification',
-            kind: 'select',
-            options: [
-              { value: 'business', label: 'Business' },
-              ...(financeAccess.household.update
-                ? [{ value: 'household_personal', label: 'Household / personal' }]
-                : []),
-            ],
-          },
-          { name: 'currentBalance', label: 'Balance', kind: 'number' },
-          { name: 'currencyCode', label: 'Currency' },
-          {
-            name: 'isActive',
-            label: 'Active',
-            kind: 'select',
-            options: [
-              { value: 'true', label: 'Yes' },
-              { value: 'false', label: 'No' },
-            ],
-          },
-        ]}
+      <EditAccountModal
+        account={editAccountRow}
+        onClose={() => setEditAccountRow(null)}
+        householdUpdateAccess={financeAccess.household.update}
       />
 
-      {/* Create Credit Card Modal */}
-      <FormModal
+      <CreateCreditCardModal
         isOpen={createCardOpen}
         onOpenChange={setCreateCardOpen}
-        title="Add Card Metadata"
-        subtitle="Record card metadata only. No vault or payment integration is configured; never enter a full card number or CVV."
-        submitLabel="Add Card"
-        action="/credit-cards"
-        fields={[
-          { name: 'cardLabel', label: 'Card Label', required: true },
-          {
-            name: 'brandName',
-            label: 'Brand (e.g. Visa, Amex)',
-            required: true,
-            placeholder: 'Visa',
-          },
-          { name: 'cardholderName', label: 'Cardholder Name', required: true },
-          { name: 'last4Digits', label: 'Last 4 Digits', required: true, placeholder: '4242' },
-          { name: 'expMonth', label: 'Exp Month (1–12)', kind: 'number', required: true },
-          { name: 'expYear', label: 'Exp Year (e.g. 2028)', kind: 'number', required: true },
-          { name: 'currencyCode', label: 'Currency Code', default: 'USD' },
-          {
-            name: 'creditLimit',
-            label: 'Credit Limit',
-            kind: 'money',
-            currencyFrom: 'currencyCode',
-          },
-          {
-            name: 'currentBalance',
-            label: 'Current Balance',
-            kind: 'money',
-            currencyFrom: 'currencyCode',
-            default: '0',
-          },
-          {
-            name: 'minimumPaymentDue',
-            label: 'Minimum Payment Due',
-            kind: 'money',
-            currencyFrom: 'currencyCode',
-          },
-          { name: 'nextPaymentDueDate', label: 'Next Due Date', kind: 'date' },
-          {
-            name: 'dataClassification',
-            label: 'Classification',
-            kind: 'select',
-            default: 'business',
-            options: [
-              { value: 'business', label: 'Business' },
-              ...(financeAccess.household.create
-                ? [{ value: 'household_personal', label: 'Household / personal' }]
-                : []),
-            ],
-          },
-          {
-            name: 'sellerAccountId',
-            label: 'Linked Seller Account',
-            kind: 'select',
-            options: sellerAccounts.map((s) => ({
-              value: String(s.id),
-              label: String(s.accountName ?? s.id),
-            })),
-          },
-          {
-            name: 'usagePurpose',
-            label: 'Usage Purpose',
-            kind: 'select',
-            default: 'primary_billing',
-            options: CARD_USAGE.map((u) => ({ value: u, label: u.replace(/_/g, ' ') })),
-          },
-        ]}
+        householdCreateAccess={financeAccess.household.create}
+        sellerAccounts={sellerAccounts}
       />
 
-      {/* Edit Credit Card Modal */}
-      <FormModal
-        isOpen={!!editCardRow}
-        onOpenChange={(o) => {
-          if (!o) setEditCardRow(null)
-        }}
-        title={`Edit Card: ${String(editCardRow?.cardLabel ?? '')}`}
-        submitLabel="Save Card"
-        action={editCardRow ? `/credit-cards/${editCardRow.id}` : '/credit-cards/placeholder'}
-        initialValues={
-          editCardRow
-            ? {
-                cardLabel: String(editCardRow.cardLabel ?? ''),
-                creditLimit: moneyAmountString(editCardRow.creditLimit),
-                creditLimit__currency: moneyCurrencyCode(editCardRow.creditLimit),
-                currentBalance: moneyAmountString(editCardRow.currentBalance),
-                currentBalance__currency: moneyCurrencyCode(editCardRow.currentBalance),
-                minimumPaymentDue: moneyAmountString(editCardRow.minimumPaymentDue),
-                minimumPaymentDue__currency: moneyCurrencyCode(editCardRow.minimumPaymentDue),
-                nextPaymentDueDate: editCardRow.nextPaymentDueDate
-                  ? String(editCardRow.nextPaymentDueDate).slice(0, 10)
-                  : '',
-                status: String(editCardRow.status ?? 'active'),
-              }
-            : undefined
-        }
-        fields={[
-          { name: 'cardLabel', label: 'Card Label', required: true },
-          { name: 'creditLimit', label: 'Credit Limit', kind: 'money' },
-          { name: 'currentBalance', label: 'Current Balance', kind: 'money' },
-          { name: 'minimumPaymentDue', label: 'Minimum Payment Due', kind: 'money' },
-          { name: 'nextPaymentDueDate', label: 'Next Due Date', kind: 'date' },
-          {
-            name: 'status',
-            label: 'Status',
-            kind: 'select',
-            options: CARD_STATUS.map((s) => ({ value: s, label: s })),
-          },
-        ]}
-      />
+      <EditCreditCardModal card={editCardRow} onClose={() => setEditCardRow(null)} />
 
-      {/* Record Financial Transaction Modal */}
-      <FormModal
+      <CreateTransactionModal
         isOpen={createTxOpen}
         onOpenChange={setCreateTxOpen}
-        title="Record Financial Transaction"
-        subtitle="Record a local ledger entry. Linked accounts, cards and categories must match its classification."
-        submitLabel="Record Transaction"
-        action="/financial-transactions"
-        fields={[
-          { name: 'referenceNumber', label: 'Reference Number', required: true },
-          {
-            name: 'transactionType',
-            label: 'Transaction Type',
-            kind: 'select',
-            required: true,
-            options: TX_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
-          },
-          {
-            name: 'dataClassification',
-            label: 'Classification',
-            kind: 'select',
-            default: 'business',
-            options: [
-              { value: 'business', label: 'Business' },
-              ...(financeAccess.household.create
-                ? [{ value: 'household_personal', label: 'Household / personal' }]
-                : []),
-            ],
-          },
-          { name: 'vendorOrPayer', label: 'Vendor / Payer' },
-          { name: 'originalCurrencyCode', label: 'Currency', default: 'USD' },
-          {
-            name: 'originalAmount',
-            label: 'Amount',
-            kind: 'money',
-            currencyFrom: 'originalCurrencyCode',
-            required: true,
-          },
-          { name: 'exchangeRate', label: 'Exchange Rate to USD', kind: 'number', default: '1' },
-          {
-            name: 'taxAmount',
-            label: 'Tax Amount',
-            kind: 'money',
-            currencyFrom: 'originalCurrencyCode',
-          },
-          { name: 'transactionDate', label: 'Transaction Date', kind: 'date', required: true },
-          {
-            name: 'financialAccountId',
-            label: 'Financial Account',
-            kind: 'select',
-            options: (values) =>
-              financialAccounts
-                .filter((a) => a.dataClassification === (values.dataClassification || 'business'))
-                .map((a) => ({
-                  value: String(a.id),
-                  label: `${a.accountName} (${a.dataClassification})`,
-                })),
-          },
-          {
-            name: 'creditCardId',
-            label: 'Credit Card',
-            kind: 'select',
-            options: (values) =>
-              creditCards
-                .filter((c) => c.dataClassification === (values.dataClassification || 'business'))
-                .map((c) => ({
-                  value: String(c.id),
-                  label: `${c.cardLabel} ··${c.last4Digits} (${c.dataClassification})`,
-                })),
-          },
-          {
-            name: 'financeCategoryId',
-            label: 'Finance Category',
-            kind: 'select',
-            options: (values) =>
-              financeCategories
-                .filter((fc) => fc.dataClassification === (values.dataClassification || 'business'))
-                .map((fc) => ({
-                  value: String(fc.id),
-                  label: `${fc.name} (${fc.dataClassification})`,
-                })),
-          },
-          {
-            name: 'sellerAccountId',
-            label: 'Seller Account',
-            kind: 'select',
-            options: sellerAccounts.map((s) => ({
-              value: String(s.id),
-              label: String(s.accountName ?? s.id),
-            })),
-          },
-          {
-            name: 'orderId',
-            label: 'Linked Order (optional)',
-            kind: 'select',
-            options: orders.map((o) => ({
-              value: String(o.id),
-              label: String(o.orderNumber),
-            })),
-          },
-          {
-            name: 'description',
-            label: 'Description',
-            required: true,
-            fullWidth: true,
-          },
-        ]}
+        householdCreateAccess={financeAccess.household.create}
+        financialAccounts={financialAccounts}
+        creditCards={creditCards}
+        financeCategories={financeCategories}
+        sellerAccounts={sellerAccounts}
+        orders={orders}
       />
 
       {/* Create Finance Category Modal */}

@@ -33,7 +33,7 @@ test.group('Local fulfillment HTTP workflow', () => {
       defaultCurrency: 'USD',
       timezone: 'UTC',
     })
-    const base = 'http://localhost:3333'
+    const base = process.env.APP_URL || 'http://localhost:3333'
     const jar = new Map<string, string>()
     const send = async (path: string, body?: Record<string, unknown>) => {
       const xsrf = jar.get('XSRF-TOKEN')
