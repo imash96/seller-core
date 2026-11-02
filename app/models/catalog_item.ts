@@ -10,6 +10,7 @@ import Product from './product.js'
 import ProductCategory from './product_category.js'
 import { prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import { type PriceMoney, money, normalizePriceMoneyArray } from '../types/price.js'
 
 export default class CatalogItem extends AppBaseModel {
   static readonly table = 'catalog_items'
@@ -84,4 +85,19 @@ export default class CatalogItem extends AppBaseModel {
 
   @belongsTo(() => Product, { foreignKey: 'convertedProductId' })
   declare public convertedProduct: BelongsTo<typeof Product>
+
+  /**
+   * `catalog_items` is USD-only by design: the source catalog carries a single USD
+   * base price (`base_price_usd` + `price_tier`) and the multi-currency MedusaJS
+   * price array is derived when the item becomes a product. This getter exposes the
+   * amount as a self-contained PriceMoney so consumers never read a bare number.
+   */
+  get basePrice(): PriceMoney {
+    return money(this.basePriceUsd, 'USD')
+  }
+
+  override serialize(cherryPick?: any): Record<string, any> {
+    const raw = super.serialize(cherryPick)
+    return { ...raw, basePrice: this.basePrice, prices: normalizePriceMoneyArray([this.basePrice]) }
+  }
 }

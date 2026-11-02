@@ -155,3 +155,70 @@ original job, and duplicate `(seller_account_id, external_order_id)` pairs are s
   canonical JSON; the “load sample” preset contains one raw Amazon SP-API payload plus
   one canonical order.
 - CSV export includes the omnichannel identity and money breakdown columns.
+
+---
+
+## 5. Phase 5 — typed models, validators and seed data
+
+The money layer described in §1 is enforced at three levels. Application code never
+hand-assembles JSONB money objects, never writes a derived column, and never omits a
+currency code.
+
+### 5.1 Models — `app/models/json_helpers.ts`
+
+| Export                                                                            | Purpose                                                                                                 |
+| :-------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------ |
+| `moneyColumn({ columnName })` / `nullableMoneyColumn(...)`                        | Lucid `@column` decorator with `prepare`/`consume` for a single `PriceMoney` JSONB column                |
+| `priceArrayColumn(...)`                                                           | MedusaJS v2 price array (`prices` on `products`, `product_variants`, `channel_listings`)                 |
+| `moneyEntryArrayColumn({ columnName, amountKey })`                                | Breakdown arrays whose money property is `total` (`order_line_items.tax_lines`) or `amount` (`adjustments`) |
+| `generatedColumn({ columnName, consume })`                                        | Read-only STORED generated column — never emitted in `INSERT`/`UPDATE`                                  |
+| `moneyKindOf(definition)`                                                         | Introspection used by tests/audits to assert the column kind                                             |
+
+`AppBaseModel` (`app/models/base_model.ts`) owns the id contract (`static idPrefix`,
+`@beforeCreate generateId`) and `@beforeSave discardGeneratedColumnWrites()`, which drops
+any accidental write to a generated column so PostgreSQL never rejects the statement.
+Read-only columns: `product_variants.stock_available`, `customers.is_repeat_customer`,
+`shipments.volumetric_weight_grams`, `shipments.billed_weight_grams`.
+
+`catalog_items` stays USD-only: it serializes `basePrice` as `{currency_code: 'USD', amount: base_price_usd}`
+and `prices` as `[basePrice]` so the UI can render it with the same components without
+persisting a multi-currency array.
+
+### 5.2 Validators — `app/validators/helpers.ts`
+
+```ts
+priceMoneySchema({ min? })     // PriceMoney object | bare number (USD implied by the caller)
+medusaPricesArraySchema()      // MedusaJS v2 array | JSON string | bare number
+normalizeMoneyInput(value, fallback = 'USD')
+objectId()
+```
+
+Form input may arrive in the flat `{ amount, currencyCode }` shape. `canonicalMoneyObject()`
+runs inside `vine.object().parse()` (Vine objects have no `.transform()`), rewriting
+`currencyCode → currency_code` (and `compareAtAmount/minQuantity/maxQuantity` to their
+snake_case equivalents) **before** validation, so the validator's output type stays a
+single canonical `PriceMoney` and no consumer sees two shapes.
+
+### 5.3 Seeder — `database/seeders/main_seeder.ts`
+
+- Every price is written as an explicit object. Product/variant/listing prices are
+  MedusaJS v2 arrays built with `priceArray({ USD, CAD, EUR, GBP, INR, MXN })` — no FX
+  derivation, so the seed doubles as a fixture for the price-array contract.
+  eBay Canada lists in `CAD` only (`listedPrice: {currency_code: 'CAD', amount: 489}`),
+  while the DTC storefront carries the full multi-currency array per listing.
+- Orders are omnichannel and mixed-currency: Amazon US (USD), Medusa storefront (USD),
+  eBay Canada (CAD), Amazon India (INR) — with `unitCost` booked in the sourcing currency.
+- Two `catalog_items` drafts are seeded through `CatalogService.saveCatalogJsonToDb` to
+  exercise the USD-only catalogue (`base_price_usd` + `price_tier`).
+- Re-running `node ace db:seed` is a no-op: the seeder exits early once the demo super
+  admin exists, leaving row counts unchanged.
+
+### 5.4 Verification
+
+| Check                                 | Result                                                    |
+| :------------------------------------ | :-------------------------------------------------------- |
+| `tsc --noEmit` (+ `inertia/tsconfig`) | 0 errors                                                  |
+| `eslint .`                            | 0 errors, 0 warnings                                      |
+| `node ace test`                       | 148 passed (148)                                          |
+| `node ace migration:run` → `db:seed` ×2 | seeded once, second run a no-op; counts stable           |
+| `pnpm db:schema:check`                | both artifacts in sync                                    |

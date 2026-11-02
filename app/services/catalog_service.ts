@@ -38,6 +38,7 @@ import {
   applyCurrencyOverrides,
   buildMultiCurrencyPriceArray,
   money,
+  normalizeNullablePriceMoney,
   normalizePriceMoney,
   normalizePriceMoneyArray,
 } from '../types/price.js'
@@ -825,8 +826,8 @@ export class CatalogService {
       vInput,
       Number(vInput.priceUsd ?? product.prices?.[0]?.amount ?? 239.99)
     )
-    const costCurrency = varPrices.find((price) => price.currency_code === 'USD')?.currency_code
-    const costPrice = normalizePriceMoney(vInput.costPrice ?? 0, costCurrency ?? 'USD')
+    // Cost fields are self-contained PriceMoney objects; a bare number is USD.
+    const costPrice = normalizePriceMoney(vInput.costPrice ?? 0, 'USD')
     const manufacturingCost = normalizePriceMoney(
       vInput.manufacturingCost ?? 0,
       costPrice.currency_code
@@ -874,18 +875,16 @@ export class CatalogService {
     for (const lInput of vInput.listings ?? []) {
       const listingPrices =
         Array.isArray(lInput.prices) && lInput.prices.length > 0
-          ? normalizePriceMoneyArray(
-              lInput.prices,
-              Number(lInput.listedPriceUsd ?? vInput.priceUsd ?? 0)
-            )
+          ? normalizePriceMoneyArray(lInput.prices, Number(lInput.listedPriceUsd ?? 0))
           : varPrices
+      // The primary listed amount falls back to the first entry of the listing's
+      // own price array, so a CAD-only listing never inherits a USD amount.
       const listed =
-        lInput.listedPrice !== undefined && lInput.listedPrice !== null
-          ? normalizePriceMoney(lInput.listedPrice, listingPrices[0]?.currency_code ?? 'USD')
-          : money(
-              listingPrices[0]?.amount ?? vInput.priceUsd ?? 0,
-              listingPrices[0]?.currency_code ?? 'USD'
-            )
+        normalizeNullablePriceMoney(lInput.listedPrice, listingPrices[0]?.currency_code ?? 'USD') ??
+        money(
+          listingPrices[0]?.amount ?? vInput.priceUsd ?? 0,
+          listingPrices[0]?.currency_code ?? 'USD'
+        )
 
       const listing = new ChannelListing()
       if (params.trx) listing.useTransaction(params.trx)

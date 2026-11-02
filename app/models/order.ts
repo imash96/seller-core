@@ -25,7 +25,7 @@ import OrderLineItem from './order_line_item.js'
 import SellerAccount from './seller_account.js'
 import Shipment from './shipment.js'
 import SyncJob from './sync_job.js'
-import { prepareJson } from './json_helpers.js'
+import { moneyColumn, prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
 import {
   FulfillmentChannel,
@@ -38,27 +38,6 @@ import { type PriceMoney, amountOf, currencyOf, sumMoney } from '../types/price.
 export default class Order extends AppBaseModel {
   static readonly table = 'orders'
   static readonly idPrefix = 'ord'
-
-  static override readonly moneyColumns = [
-    'subtotal',
-    'discountTotal',
-    'promotionTotal',
-    'shippingTotal',
-    'shippingDiscountTotal',
-    'taxTotal',
-    'shippingTaxTotal',
-    'marketplaceWithheldTaxTotal',
-    'grandTotal',
-    'marketplaceFeesTotal',
-    'paymentProcessingFeesTotal',
-    'shippingCostTotal',
-    'cogsTotal',
-    'refundedTotal',
-    'netProceeds',
-    'grossProfit',
-    'netProfit',
-    'reportingTotal',
-  ] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -123,58 +102,58 @@ export default class Order extends AppBaseModel {
   @column({ columnName: 'exchange_rate' })
   declare public exchangeRate: string
 
-  @column({ columnName: 'subtotal', prepare: prepareJson })
+  @moneyColumn({ columnName: 'subtotal' })
   declare public subtotal: PriceMoney
 
-  @column({ columnName: 'discount_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'discount_total' })
   declare public discountTotal: PriceMoney
 
-  @column({ columnName: 'promotion_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'promotion_total' })
   declare public promotionTotal: PriceMoney
 
-  @column({ columnName: 'shipping_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'shipping_total' })
   declare public shippingTotal: PriceMoney
 
-  @column({ columnName: 'shipping_discount_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'shipping_discount_total' })
   declare public shippingDiscountTotal: PriceMoney
 
-  @column({ columnName: 'tax_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'tax_total' })
   declare public taxTotal: PriceMoney
 
-  @column({ columnName: 'shipping_tax_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'shipping_tax_total' })
   declare public shippingTaxTotal: PriceMoney
 
-  @column({ columnName: 'marketplace_withheld_tax_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'marketplace_withheld_tax_total' })
   declare public marketplaceWithheldTaxTotal: PriceMoney
 
-  @column({ columnName: 'grand_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'grand_total' })
   declare public grandTotal: PriceMoney
 
-  @column({ columnName: 'marketplace_fees_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'marketplace_fees_total' })
   declare public marketplaceFeesTotal: PriceMoney
 
-  @column({ columnName: 'payment_processing_fees_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'payment_processing_fees_total' })
   declare public paymentProcessingFeesTotal: PriceMoney
 
-  @column({ columnName: 'shipping_cost_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'shipping_cost_total' })
   declare public shippingCostTotal: PriceMoney
 
-  @column({ columnName: 'cogs_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'cogs_total' })
   declare public cogsTotal: PriceMoney
 
-  @column({ columnName: 'refunded_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'refunded_total' })
   declare public refundedTotal: PriceMoney
 
-  @column({ columnName: 'net_proceeds', prepare: prepareJson })
+  @moneyColumn({ columnName: 'net_proceeds' })
   declare public netProceeds: PriceMoney
 
-  @column({ columnName: 'gross_profit', prepare: prepareJson })
+  @moneyColumn({ columnName: 'gross_profit' })
   declare public grossProfit: PriceMoney
 
-  @column({ columnName: 'net_profit', prepare: prepareJson })
+  @moneyColumn({ columnName: 'net_profit' })
   declare public netProfit: PriceMoney
 
-  @column({ columnName: 'reporting_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'reporting_total' })
   declare public reportingTotal: PriceMoney
 
   @column({ columnName: 'shipping_address_snapshot', prepare: prepareJson })

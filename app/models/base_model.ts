@@ -1,10 +1,5 @@
-import { BaseModel, beforeCreate, column } from '@adonisjs/lucid/orm'
+import { BaseModel, beforeCreate, beforeSave, column } from '@adonisjs/lucid/orm'
 import { generateEntityId } from '../utils/generate_entity_id.js'
-import {
-  normalizeNullablePriceMoney,
-  normalizePriceMoney,
-  normalizePriceMoneyArray,
-} from '../types/price.js'
 
 /**
  * Application base model.
@@ -14,23 +9,22 @@ import {
  * `static readonly idPrefix` (e.g. 'usr') so ids are self-describing in URLs,
  * logs and error messages.
  *
- * Monetary columns are self-contained `PriceMoney` JSONB objects
- * (`{ currency_code, amount }`). Subclasses declare them via `moneyColumns`,
- * `nullableMoneyColumns` and `priceArrayColumns` so `serialize()` always emits
- * canonical money objects — no scalar amounts and no standalone currency codes.
+ * Monetary columns are declared per column with the `@moneyColumn()`,
+ * `@nullableMoneyColumn()` and `@priceArrayColumn()` helpers from
+ * `app/models/json_helpers.ts`. Those helpers carry the prepare/consume/serialize
+ * hooks, so every model gets typed `PriceMoney` / `MedusaVariantPrice[]` values on
+ * read, on write and in serialized output without a parallel list of column names.
+ *
+ * Columns that PostgreSQL computes (`GENERATED ALWAYS AS … STORED`) are declared
+ * with `@generatedColumn()` and listed in `generatedColumns`; they are dropped from
+ * INSERT/UPDATE payloads so the database stays their only writer.
  */
 export default class AppBaseModel extends BaseModel {
   /** Entity prefix used when generating the ULID primary key (e.g. 'usr'). */
   static readonly idPrefix: string = ''
 
-  /** Camel-cased PriceMoney columns that are always present (non-nullable). */
-  static readonly moneyColumns: readonly string[] = []
-
-  /** Camel-cased PriceMoney columns that may be `null`. */
-  static readonly nullableMoneyColumns: readonly string[] = []
-
-  /** Camel-cased MedusaJS v2 multi-currency price array columns. */
-  static readonly priceArrayColumns: readonly string[] = []
+  /** Attribute names of database-generated columns — never written. */
+  static readonly generatedColumns: readonly string[] = []
 
   /** ULID primary key (varchar(64), may include an entity prefix). */
   @column({ isPrimary: true, columnName: 'id' })
@@ -44,24 +38,22 @@ export default class AppBaseModel extends BaseModel {
     }
   }
 
-  override serialize(cherryPick?: any): Record<string, any> {
-    const raw = super.serialize(cherryPick) as Record<string, any>
-    const ctor = this.constructor as typeof AppBaseModel
-
-    for (const key of ctor.moneyColumns) {
-      if (key in raw && raw[key] !== null && raw[key] !== undefined) {
-        raw[key] = normalizePriceMoney(raw[key])
+  /**
+   * Keeps database-computed columns out of INSERT/UPDATE statements.
+   *
+   * On a new row the attribute is removed entirely; on a persisted row the
+   * original value is restored so the column is never considered dirty.
+   */
+  @beforeSave()
+  static discardGeneratedColumnWrites(model: AppBaseModel) {
+    const ctor = model.constructor as typeof AppBaseModel
+    for (const key of ctor.generatedColumns) {
+      if (!(key in model.$attributes)) continue
+      if (key in model.$original) {
+        model.$setAttribute(key, model.$original[key])
+      } else {
+        delete model.$attributes[key]
       }
     }
-    for (const key of ctor.nullableMoneyColumns) {
-      if (key in raw) raw[key] = normalizeNullablePriceMoney(raw[key])
-    }
-    for (const key of ctor.priceArrayColumns) {
-      if (!(key in raw)) continue
-      const value = raw[key]
-      raw[key] = Array.isArray(value) && value.length === 0 ? [] : normalizePriceMoneyArray(value)
-    }
-
-    return raw
   }
 }

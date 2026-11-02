@@ -10,15 +10,13 @@ import type Customer from './customer.js'
 import type SellerAccount from './seller_account.js'
 import type { DateTime } from 'luxon'
 import Order from './order.js'
-import { prepareJson } from './json_helpers.js'
+import { moneyColumn, prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
 import type { PriceMoney } from '../types/price.js'
 
 export default class MarketplaceClaim extends AppBaseModel {
   static readonly table = 'marketplace_claims'
   static readonly idPrefix = 'mcl'
-
-  static override readonly moneyColumns = ['disputedTotal', 'sellerLiabilityTotal'] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -38,10 +36,10 @@ export default class MarketplaceClaim extends AppBaseModel {
   @column({ columnName: 'status' })
   declare public status: string
 
-  @column({ columnName: 'disputed_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'disputed_total' })
   declare public disputedTotal: PriceMoney
 
-  @column({ columnName: 'seller_liability_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'seller_liability_total' })
   declare public sellerLiabilityTotal: PriceMoney
 
   @column({ columnName: 'reason' })

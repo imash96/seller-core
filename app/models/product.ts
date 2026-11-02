@@ -15,15 +15,13 @@ import type { DateTime } from 'luxon'
 import Brand from './brand.js'
 import ProductCategory from './product_category.js'
 import ProductVariant from './product_variant.js'
-import { prepareJson } from './json_helpers.js'
+import { prepareJson, priceArrayColumn } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
 import type { MedusaVariantPrice } from '../types/price.js'
 
 export default class Product extends AppBaseModel {
   static readonly table = 'products'
   static readonly idPrefix = 'prod'
-
-  static override readonly priceArrayColumns = ['prices'] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -47,7 +45,7 @@ export default class Product extends AppBaseModel {
   declare public skuPrefix: string | null
 
   /** MedusaJS v2 multi-currency price array. */
-  @column({ columnName: 'prices', prepare: prepareJson })
+  @priceArrayColumn({ columnName: 'prices' })
   declare public prices: MedusaVariantPrice[]
 
   @column({ columnName: 'collection_name' })

@@ -10,15 +10,13 @@ import type { DateTime } from 'luxon'
 import CreditCard from './credit_card.js'
 import FinancialTransaction from './financial_transaction.js'
 import ShippingInvoice from './shipping_invoice.js'
-import { prepareJson } from './json_helpers.js'
+import { moneyColumn } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
 import type { PriceMoney } from '../types/price.js'
 
 export default class FinancialAccount extends AppBaseModel {
   static readonly table = 'financial_accounts'
   static readonly idPrefix = 'facct'
-
-  static override readonly moneyColumns = ['currentBalance'] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -35,7 +33,7 @@ export default class FinancialAccount extends AppBaseModel {
   @column({ columnName: 'account_number_last_4' })
   declare public accountNumberLast4: string | null
 
-  @column({ columnName: 'current_balance', prepare: prepareJson })
+  @moneyColumn({ columnName: 'current_balance' })
   declare public currentBalance: PriceMoney
 
   @column({ columnName: 'data_classification' })

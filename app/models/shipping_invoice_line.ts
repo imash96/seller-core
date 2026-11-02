@@ -9,17 +9,13 @@ import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import type { DateTime } from 'luxon'
 import Shipment from './shipment.js'
 import ShippingInvoice from './shipping_invoice.js'
-import { prepareJson } from './json_helpers.js'
+import { moneyColumn, nullableMoneyColumn } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
 import type { PriceMoney } from '../types/price.js'
 
 export default class ShippingInvoiceLine extends AppBaseModel {
   static readonly table = 'shipping_invoice_lines'
   static readonly idPrefix = 'sinvl'
-
-  static override readonly moneyColumns = ['billedAmount', 'taxAmount'] as const
-
-  static override readonly nullableMoneyColumns = ['expectedAmount', 'varianceAmount'] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -36,16 +32,16 @@ export default class ShippingInvoiceLine extends AppBaseModel {
   @column({ columnName: 'description' })
   declare public description: string | null
 
-  @column({ columnName: 'expected_amount', prepare: prepareJson })
+  @nullableMoneyColumn({ columnName: 'expected_amount' })
   declare public expectedAmount: PriceMoney | null
 
-  @column({ columnName: 'billed_amount', prepare: prepareJson })
+  @moneyColumn({ columnName: 'billed_amount' })
   declare public billedAmount: PriceMoney
 
-  @column({ columnName: 'tax_amount', prepare: prepareJson })
+  @moneyColumn({ columnName: 'tax_amount' })
   declare public taxAmount: PriceMoney
 
-  @column({ columnName: 'variance_amount', prepare: prepareJson })
+  @nullableMoneyColumn({ columnName: 'variance_amount' })
   declare public varianceAmount: PriceMoney | null
 
   @column({ columnName: 'allow_duplicate_charge' })

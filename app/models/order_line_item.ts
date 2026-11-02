@@ -25,7 +25,7 @@ import Order from './order.js'
 import ProductVariant from './product_variant.js'
 import ReturnRequest from './return_request.js'
 import ShipmentItem from './shipment_item.js'
-import { prepareJson } from './json_helpers.js'
+import { moneyColumn, moneyEntryArrayColumn, prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
 import { FulfillmentChannel, type FulfillmentChannelValue } from '../enums/index.js'
 import {
@@ -39,21 +39,6 @@ import {
 export default class OrderLineItem extends AppBaseModel {
   static readonly table = 'order_line_items'
   static readonly idPrefix = 'oline'
-
-  static override readonly moneyColumns = [
-    'unitPrice',
-    'subtotal',
-    'discountTotal',
-    'promotionTotal',
-    'taxTotal',
-    'shippingTotal',
-    'shippingDiscountTotal',
-    'shippingTaxTotal',
-    'grandTotal',
-    'unitCost',
-    'marketplaceFee',
-    'refundedTotal',
-  ] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -104,51 +89,51 @@ export default class OrderLineItem extends AppBaseModel {
   declare public fulfillmentChannel: FulfillmentChannelValue
 
   /** Jurisdiction tax breakdown: [{ code, rate, description, total: PriceMoney }]. */
-  @column({ columnName: 'tax_lines', prepare: prepareJson })
+  @moneyEntryArrayColumn({ columnName: 'tax_lines', amountKey: 'total' })
   declare public taxLines: TaxLineEntry[]
 
   /** Promotion / coupon breakdown: [{ code, promotion_id, description, amount }]. */
-  @column({ columnName: 'adjustments', prepare: prepareJson })
+  @moneyEntryArrayColumn({ columnName: 'adjustments', amountKey: 'amount' })
   declare public adjustments: AdjustmentEntry[]
 
   /** Etsy personalization, Amazon GiftWrapLevel, Medusa metadata, … */
   @column({ columnName: 'custom_attributes', prepare: prepareJson })
   declare public customAttributes: Record<string, any>
 
-  @column({ columnName: 'unit_price', prepare: prepareJson })
+  @moneyColumn({ columnName: 'unit_price' })
   declare public unitPrice: PriceMoney
 
-  @column({ columnName: 'subtotal', prepare: prepareJson })
+  @moneyColumn({ columnName: 'subtotal' })
   declare public subtotal: PriceMoney
 
-  @column({ columnName: 'discount_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'discount_total' })
   declare public discountTotal: PriceMoney
 
-  @column({ columnName: 'promotion_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'promotion_total' })
   declare public promotionTotal: PriceMoney
 
-  @column({ columnName: 'tax_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'tax_total' })
   declare public taxTotal: PriceMoney
 
-  @column({ columnName: 'shipping_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'shipping_total' })
   declare public shippingTotal: PriceMoney
 
-  @column({ columnName: 'shipping_discount_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'shipping_discount_total' })
   declare public shippingDiscountTotal: PriceMoney
 
-  @column({ columnName: 'shipping_tax_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'shipping_tax_total' })
   declare public shippingTaxTotal: PriceMoney
 
-  @column({ columnName: 'grand_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'grand_total' })
   declare public grandTotal: PriceMoney
 
-  @column({ columnName: 'unit_cost', prepare: prepareJson })
+  @moneyColumn({ columnName: 'unit_cost' })
   declare public unitCost: PriceMoney
 
-  @column({ columnName: 'marketplace_fee', prepare: prepareJson })
+  @moneyColumn({ columnName: 'marketplace_fee' })
   declare public marketplaceFee: PriceMoney
 
-  @column({ columnName: 'refunded_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'refunded_total' })
   declare public refundedTotal: PriceMoney
 
   @column({ columnName: 'fulfillment_status' })

@@ -12,7 +12,7 @@ import ChannelListing from './channel_listing.js'
 import OrderLineItem from './order_line_item.js'
 import Product from './product.js'
 import ProductVariantAttribute from './product_variant_attribute.js'
-import { prepareJson } from './json_helpers.js'
+import { generatedColumn, moneyColumn, prepareJson, priceArrayColumn } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
 import {
   type MedusaVariantPrice,
@@ -25,13 +25,8 @@ export default class ProductVariant extends AppBaseModel {
   static readonly table = 'product_variants'
   static readonly idPrefix = 'pvar'
 
-  static override readonly moneyColumns = [
-    'costPrice',
-    'manufacturingCost',
-    'packagingCost',
-  ] as const
-
-  static override readonly priceArrayColumns = ['prices'] as const
+  /** `stock_available` is GENERATED ALWAYS AS (stock_on_hand - stock_reserved). */
+  static override readonly generatedColumns = ['stockAvailable'] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -61,16 +56,16 @@ export default class ProductVariant extends AppBaseModel {
   declare public attributes: any
 
   /** MedusaJS v2 multi-currency price array. */
-  @column({ columnName: 'prices', prepare: prepareJson })
+  @priceArrayColumn({ columnName: 'prices' })
   declare public prices: MedusaVariantPrice[]
 
-  @column({ columnName: 'cost_price', prepare: prepareJson })
+  @moneyColumn({ columnName: 'cost_price' })
   declare public costPrice: PriceMoney
 
-  @column({ columnName: 'manufacturing_cost', prepare: prepareJson })
+  @moneyColumn({ columnName: 'manufacturing_cost' })
   declare public manufacturingCost: PriceMoney
 
-  @column({ columnName: 'packaging_cost', prepare: prepareJson })
+  @moneyColumn({ columnName: 'packaging_cost' })
   declare public packagingCost: PriceMoney
 
   @column({ columnName: 'stock_on_hand' })
@@ -100,9 +95,9 @@ export default class ProductVariant extends AppBaseModel {
   @column.dateTime({ columnName: 'updated_at' })
   declare public updatedAt: DateTime
 
-  /** Generated: stock_on_hand - stock_reserved — read-only stored generated column (never assign). */
-  @column({ columnName: 'stock_available' })
-  declare public stockAvailable: number
+  /** Generated: stock_on_hand - stock_reserved — read-only, never written. */
+  @generatedColumn({ columnName: 'stock_available' })
+  declare public readonly stockAvailable: number
 
   @belongsTo(() => Product, { foreignKey: 'productId' })
   declare public product: BelongsTo<typeof Product>

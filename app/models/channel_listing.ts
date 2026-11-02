@@ -12,17 +12,13 @@ import type { DateTime } from 'luxon'
 import Product from './product.js'
 import ProductVariant from './product_variant.js'
 import SellerAccount from './seller_account.js'
-import { prepareJson } from './json_helpers.js'
+import { moneyColumn, prepareJson, priceArrayColumn } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
 import type { MedusaVariantPrice, PriceMoney } from '../types/price.js'
 
 export default class ChannelListing extends AppBaseModel {
   static readonly table = 'channel_listings'
   static readonly idPrefix = 'clst'
-
-  static override readonly moneyColumns = ['listedPrice'] as const
-
-  static override readonly priceArrayColumns = ['prices'] as const
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -52,11 +48,11 @@ export default class ChannelListing extends AppBaseModel {
   declare public channelCategoryId: string | null
 
   /** MedusaJS v2 multi-currency price array for this listing. */
-  @column({ columnName: 'prices', prepare: prepareJson })
+  @priceArrayColumn({ columnName: 'prices' })
   declare public prices: MedusaVariantPrice[]
 
   /** Primary listed amount, self-contained with its own currency code. */
-  @column({ columnName: 'listed_price', prepare: prepareJson })
+  @moneyColumn({ columnName: 'listed_price' })
   declare public listedPrice: PriceMoney
 
   @column({ columnName: 'allocated_quantity' })

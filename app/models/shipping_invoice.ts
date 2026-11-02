@@ -10,7 +10,7 @@ import type { DateTime } from 'luxon'
 import FinancialAccount from './financial_account.js'
 import FinancialTransaction from './financial_transaction.js'
 import ShippingInvoiceLine from './shipping_invoice_line.js'
-import { prepareJson } from './json_helpers.js'
+import { moneyColumn } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
 import type { PriceMoney } from '../types/price.js'
 
@@ -33,22 +33,22 @@ export default class ShippingInvoice extends AppBaseModel {
   @column({ columnName: 'invoice_number' })
   declare public invoiceNumber: string
 
-  @column({ columnName: 'subtotal_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'subtotal_total' })
   declare public subtotalTotal: PriceMoney
 
-  @column({ columnName: 'discount_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'discount_total' })
   declare public discountTotal: PriceMoney
 
-  @column({ columnName: 'tax_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'tax_total' })
   declare public taxTotal: PriceMoney
 
-  @column({ columnName: 'grand_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'grand_total' })
   declare public grandTotal: PriceMoney
 
-  @column({ columnName: 'paid_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'paid_total' })
   declare public paidTotal: PriceMoney
 
-  @column({ columnName: 'variance_total', prepare: prepareJson })
+  @moneyColumn({ columnName: 'variance_total' })
   declare public varianceTotal: PriceMoney
 
   @column({ columnName: 'payment_status' })
