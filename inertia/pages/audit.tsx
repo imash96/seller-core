@@ -1,3 +1,6 @@
+import { Grid } from '@astryxdesign/core/Grid'
+import { Text } from '@astryxdesign/core/Text'
+import { Stack } from '@astryxdesign/core/Stack'
 import {
   PageHeader,
   PageSection,
@@ -24,18 +27,18 @@ export default function Audit({ auditLogs }: Props) {
   const deletes = auditLogs.filter((r) => String(r.action) === 'DELETE').length
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Tamper-Evident Audit History"
         description="Append-only trail capturing inserts, updates, deletes, and RBAC events with SHA-256 checksums. Database triggers reject any UPDATE or DELETE on audit_logs."
         icon={ScrollText}
         eyebrow={<StatusBadge variant="info" label="Read-only · SHA-256 Checksummed" />}
         meta={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <StatusBadge variant="success" label={`${inserts} inserts`} />
             <StatusBadge variant="info" label={`${updates} updates`} />
             <StatusBadge variant="error" label={`${deletes} deletes`} />
-          </div>
+          </Stack>
         }
       />
 
@@ -77,13 +80,22 @@ export default function Audit({ auditLogs }: Props) {
         ]}
       />
 
-      <div className="p-4 rounded-xl bg-muted/40 border border-border flex items-center gap-2.5 flex-wrap text-xs text-muted-foreground">
+      <Stack
+        direction="horizontal"
+        align="center"
+        wrap="wrap"
+        gap={2}
+        padding={4}
+        className="rounded-xl bg-muted/40 border border-border text-xs text-muted-foreground"
+      >
         <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-        <span className="font-semibold text-foreground">How it works:</span>
+        <Text color="primary" weight="semibold">
+          How it works:
+        </Text>
         <StatusBadge variant="neutral" label="Database trigger writes audit_logs" />
         <StatusBadge variant="neutral" label="Before/After JSONB → SHA-256 checksum → Append" />
         <Lock className="w-3.5 h-3.5 text-muted-foreground" />
-      </div>
+      </Stack>
 
       <PageSection
         title="Audit Trail"
@@ -177,61 +189,65 @@ export default function Audit({ auditLogs }: Props) {
         }
         width="xl"
         footer={
-          <div className="flex justify-end">
+          <Stack direction="horizontal" justify="end">
             <AppButton variant="secondary" size="sm" onClick={() => setInspectRow(null)}>
               Close
             </AppButton>
-          </div>
+          </Stack>
         }
       >
         {inspectRow && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="rounded-xl border border-border bg-muted/20 p-3">
-                <span className="text-muted-foreground block">SHA-256 Checksum</span>
+          <Stack gap={4}>
+            <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2 text-xs">
+              <Stack padding={3} className="rounded-xl border border-border bg-muted/20">
+                <Text color="secondary" className="block">
+                  SHA-256 Checksum
+                </Text>
                 <code className="font-mono text-foreground break-all">
                   {String(inspectRow.checksum ?? '—')}
                 </code>
-              </div>
-              <div className="rounded-xl border border-border bg-muted/20 p-3">
-                <span className="text-muted-foreground block">Timestamp</span>
-                <span className="font-semibold text-foreground">
+              </Stack>
+              <Stack padding={3} className="rounded-xl border border-border bg-muted/20">
+                <Text color="secondary" className="block">
+                  Timestamp
+                </Text>
+                <Text color="primary" weight="semibold">
                   {inspectRow.createdAt
                     ? new Date(String(inspectRow.createdAt)).toLocaleString()
                     : '—'}
-                </span>
-              </div>
-            </div>
+                </Text>
+              </Stack>
+            </Grid>
 
-            <div className="space-y-1.5">
+            <Stack gap={1.5}>
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Before State (JSONB)
               </h4>
               <pre className="p-3.5 rounded-xl border border-border bg-muted/30 font-mono text-xs overflow-x-auto text-foreground">
                 {JSON.stringify(inspectRow.beforeState ?? inspectRow.before_state ?? null, null, 2)}
               </pre>
-            </div>
+            </Stack>
 
-            <div className="space-y-1.5">
+            <Stack gap={1.5}>
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 After State (JSONB)
               </h4>
               <pre className="p-3.5 rounded-xl border border-border bg-muted/30 font-mono text-xs overflow-x-auto text-foreground">
                 {JSON.stringify(inspectRow.afterState ?? inspectRow.after_state ?? null, null, 2)}
               </pre>
-            </div>
+            </Stack>
 
-            <div className="space-y-1.5">
+            <Stack gap={1.5}>
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Audit Metadata
               </h4>
               <pre className="p-3.5 rounded-xl border border-border bg-muted/30 font-mono text-xs overflow-x-auto text-foreground">
                 {JSON.stringify(inspectRow.metadata ?? {}, null, 2)}
               </pre>
-            </div>
-          </div>
+            </Stack>
+          </Stack>
         )}
       </SlideOverDrawer>
-    </div>
+    </Stack>
   )
 }

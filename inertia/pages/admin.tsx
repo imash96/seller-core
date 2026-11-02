@@ -1,3 +1,6 @@
+import { Text } from '@astryxdesign/core/Text'
+import { Grid } from '@astryxdesign/core/Grid'
+import { Stack } from '@astryxdesign/core/Stack'
 import {
   PageHeader,
   PageSection,
@@ -43,21 +46,21 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
   const suspendedCount = allUsers.filter((u) => u.status === 'suspended').length
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Users, RBAC & Module Entitlements"
         description="Provision accounts, assign roles with deny-overrides-allow precedence, and toggle module entitlements. Protected by @adonisjs/bouncer."
         icon={Shield}
         eyebrow={<StatusBadge variant="info" label="Super Admin Governance" />}
         meta={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <StatusBadge variant="success" label={`${activeCount} active`} />
             <StatusBadge variant="neutral" label={`${allUsers.length} users`} />
             <StatusBadge variant="info" label={`${allRoles.length} roles`} />
-          </div>
+          </Stack>
         }
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <AppButton
               variant="secondary"
               size="sm"
@@ -74,7 +77,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
             >
               Provision User
             </AppButton>
-          </div>
+          </Stack>
         }
       />
 
@@ -116,12 +119,21 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
         ]}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card text-card-foreground border border-border rounded-xl p-5 space-y-2 shadow-2xs">
-          <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+      <Grid columns={{ minWidth: 220, max: 1 }} className="md:grid-cols-3">
+        <Stack
+          gap={2}
+          padding={5}
+          className="bg-card text-card-foreground border border-border rounded-xl shadow-2xs"
+        >
+          <Stack
+            direction="horizontal"
+            align="center"
+            gap={2}
+            className="text-sm font-bold text-foreground"
+          >
             <Users className="w-4 h-4 text-primary" />
-            <span>Admin-Only Provisioning</span>
-          </div>
+            <Text>Admin-Only Provisioning</Text>
+          </Stack>
           <p className="text-xs text-muted-foreground leading-relaxed">
             Public registration is disabled. Super Admins provision accounts via{' '}
             <code className="font-mono text-foreground bg-muted px-1 py-0.5 rounded">
@@ -129,13 +141,22 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
             </code>
             .
           </p>
-        </div>
+        </Stack>
 
-        <div className="bg-card text-card-foreground border border-border rounded-xl p-5 space-y-2 shadow-2xs">
-          <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+        <Stack
+          gap={2}
+          padding={5}
+          className="bg-card text-card-foreground border border-border rounded-xl shadow-2xs"
+        >
+          <Stack
+            direction="horizontal"
+            align="center"
+            gap={2}
+            className="text-sm font-bold text-foreground"
+          >
             <KeyRound className="w-4 h-4 text-primary" />
-            <span>Deny-Overrides-Allow RBAC</span>
-          </div>
+            <Text>Deny-Overrides-Allow RBAC</Text>
+          </Stack>
           <p className="text-xs text-muted-foreground leading-relaxed">
             Role permissions carry an explicit{' '}
             <code className="font-mono text-foreground bg-muted px-1 py-0.5 rounded">
@@ -143,19 +164,28 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
             </code>{' '}
             effect — any explicit deny overrides allow grants across all roles.
           </p>
-        </div>
+        </Stack>
 
-        <div className="bg-card text-card-foreground border border-border rounded-xl p-5 space-y-2 shadow-2xs">
-          <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+        <Stack
+          gap={2}
+          padding={5}
+          className="bg-card text-card-foreground border border-border rounded-xl shadow-2xs"
+        >
+          <Stack
+            direction="horizontal"
+            align="center"
+            gap={2}
+            className="text-sm font-bold text-foreground"
+          >
             <Layers className="w-4 h-4 text-primary" />
-            <span>Independent Module Entitlements</span>
-          </div>
+            <Text>Independent Module Entitlements</Text>
+          </Stack>
           <p className="text-xs text-muted-foreground leading-relaxed">
             Gate entire operational modules per user independently of RBAC roles, with full SHA-256
             audit logging.
           </p>
-        </div>
-      </div>
+        </Stack>
+      </Grid>
 
       {/* Provision User Modal */}
       <FormModal
@@ -259,37 +289,44 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
         subtitle={`Slug: ${String(inspectRoleRow?.slug ?? '')} · ${((inspectRoleRow?.permissions as Row[]) ?? []).length} permissions attached`}
         width="lg"
         footer={
-          <div className="flex justify-end">
+          <Stack direction="horizontal" justify="end">
             <AppButton variant="secondary" size="sm" onClick={() => setInspectRoleRow(null)}>
               Close
             </AppButton>
-          </div>
+          </Stack>
         }
       >
         {inspectRoleRow && (
-          <div className="space-y-2.5">
+          <Stack gap={2}>
             {((inspectRoleRow.permissions as Row[]) ?? []).length === 0 ? (
               <p className="text-xs text-muted-foreground">No permissions attached to this role.</p>
             ) : (
               ((inspectRoleRow.permissions as Row[]) ?? []).map((perm: Row) => (
-                <div
+                <Stack
+                  direction="horizontal"
+                  align="center"
+                  justify="between"
+                  gap={3}
+                  padding={3}
                   key={String(perm.id ?? perm.slug)}
-                  className="p-3 rounded-xl border border-border bg-muted/20 flex items-center justify-between gap-3 text-xs"
+                  className="rounded-xl border border-border bg-muted/20 text-xs"
                 >
-                  <div>
-                    <span className="font-mono font-bold text-foreground">{String(perm.slug)}</span>
+                  <Stack>
+                    <Text color="primary" weight="bold" className="font-mono">
+                      {String(perm.slug)}
+                    </Text>
                     {perm.description && (
                       <p className="text-muted-foreground mt-0.5">{String(perm.description)}</p>
                     )}
-                  </div>
+                  </Stack>
                   <StatusBadge
                     variant="success"
                     label={`${String(perm.resource ?? '*')}:${String(perm.action ?? '*')}`}
                   />
-                </div>
+                </Stack>
               ))
             )}
-          </div>
+          </Stack>
         )}
       </SlideOverDrawer>
 
@@ -341,7 +378,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
               },
             ],
             actions: (
-              <div className="flex items-center gap-2 flex-wrap">
+              <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -366,7 +403,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             ),
           })}
           columns={[
@@ -381,7 +418,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
             }),
             col.text('isSuperAdmin', 'Super Admin', 110),
             col.action('Actions', (row) => (
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <Stack direction="horizontal" align="center" wrap="wrap" gap={1.5}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -406,7 +443,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             )),
           ]}
         />
@@ -442,10 +479,10 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
             col.text('name', 'Name', 200),
             col.text('isSystem', 'System', 90),
             col.action('Permissions', (row) => (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
+              <Stack direction="horizontal" align="center" gap={2}>
+                <Text size="xsm" color="secondary">
                   {((row.permissions as Row[]) ?? []).length} granted
-                </span>
+                </Text>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -454,7 +491,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
                 >
                   Inspect
                 </AppButton>
-              </div>
+              </Stack>
             )),
           ]}
         />
@@ -532,6 +569,6 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
           ]}
         />
       </PageSection>
-    </div>
+    </Stack>
   )
 }

@@ -41,7 +41,10 @@ export default class extends BaseSchema {
       table.string('pattern', 100).nullable().defaultTo('Solid')
       table.string('material_code', 20).notNullable().defaultTo('NP')
       table.string('fit_code', 20).notNullable().defaultTo('RG')
+      // Catalog pricing is USD-only: the tier resolves to a USD base price which is
+      // expanded into a MedusaJS v2 multi-currency array on products/variants.
       table.string('price_tier', 10).notNullable().defaultTo('01')
+      table.decimal('base_price_usd', 14, 2).notNullable().defaultTo(239.99)
       table.jsonb('attributes').notNullable().defaultTo('{}')
       table.jsonb('images').notNullable().defaultTo('[]')
       table.jsonb('tags').notNullable().defaultTo('[]')
@@ -57,6 +60,12 @@ export default class extends BaseSchema {
       table.timestamp('updated_at', { useTz: true }).notNullable().defaultTo(this.now())
     })
 
+    this.schema.raw(
+      'ALTER TABLE catalog_items ADD CONSTRAINT chk_catalog_items_base_price_usd_nonneg CHECK (base_price_usd >= 0)'
+    )
+    this.schema.raw(
+      "ALTER TABLE catalog_items ADD CONSTRAINT chk_catalog_items_price_tier_valid CHECK (price_tier ~ '^[0-9]{2}$')"
+    )
     this.schema.raw(
       'CREATE UNIQUE INDEX IF NOT EXISTS uq_catalog_items_user_key ON catalog_items (user_id, catalog_key)'
     )

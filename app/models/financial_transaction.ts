@@ -14,12 +14,16 @@ import Order from './order.js'
 import ProductVariant from './product_variant.js'
 import SellerAccount from './seller_account.js'
 import ShippingInvoice from './shipping_invoice.js'
-import { prepareJson } from './json_helpers.js'
+import { moneyColumn, prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import type { PriceMoney } from '../types/price.js'
 
 export default class FinancialTransaction extends AppBaseModel {
   static readonly table = 'financial_transactions'
   static readonly idPrefix = 'ftx'
+
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'originalAmount'
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -63,23 +67,17 @@ export default class FinancialTransaction extends AppBaseModel {
   @column({ columnName: 'vendor_or_payer' })
   declare public vendorOrPayer: string | null
 
-  @column({ columnName: 'original_currency_code' })
-  declare public originalCurrencyCode: string
-
-  @column({ columnName: 'original_amount' })
-  declare public originalAmount: string
+  @moneyColumn({ columnName: 'original_amount' })
+  declare public originalAmount: PriceMoney
 
   @column({ columnName: 'exchange_rate' })
   declare public exchangeRate: string
 
-  @column({ columnName: 'reporting_currency_code' })
-  declare public reportingCurrencyCode: string
+  @moneyColumn({ columnName: 'reporting_amount' })
+  declare public reportingAmount: PriceMoney
 
-  @column({ columnName: 'reporting_amount' })
-  declare public reportingAmount: string
-
-  @column({ columnName: 'tax_amount' })
-  declare public taxAmount: string
+  @moneyColumn({ columnName: 'tax_total' })
+  declare public taxTotal: PriceMoney
 
   @column.date({ columnName: 'transaction_date' })
   declare public transactionDate: DateTime

@@ -1,3 +1,4 @@
+import { Stack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { HStack } from '@astryxdesign/core/HStack'
 import {
@@ -11,6 +12,8 @@ import {
   col,
   STATUS_TONES,
   money,
+  moneyAmountString,
+  moneyCurrencyCode,
   type Row,
 } from '~/lib/ui'
 import { useState, useMemo } from 'react'
@@ -24,6 +27,7 @@ import {
   Edit3,
   Trash2,
   Ban,
+  FileBarChart,
 } from 'lucide-react'
 
 type Props = {
@@ -103,6 +107,7 @@ export default function Finance({
   const [editCatRow, setEditCatRow] = useState<Row | null>(null)
   const [matchRow, setMatchRow] = useState<Row | null>(null)
   const [reverseRow, setReverseRow] = useState<Row | null>(null)
+  const [reportOpen, setReportOpen] = useState(false)
 
   const stats = useMemo(() => {
     const totalBalances = financialAccounts
@@ -159,14 +164,14 @@ export default function Finance({
   }
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Finance & Multi-Currency Ledger"
         description="Manage accounts, card metadata and local ledger entries. No payment or card-vault integration is connected."
         icon={CreditCard}
         badge={`${financialAccounts.length} accounts · ${creditCards.length} cards · ${financialTransactions.length} tx`}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <AppButton
               variant="outline"
               size="sm"
@@ -194,6 +199,14 @@ export default function Finance({
               Financial Account
             </AppButton>
             <AppButton
+              variant="outline"
+              size="sm"
+              icon={FileBarChart}
+              onClick={() => setReportOpen(true)}
+            >
+              Report
+            </AppButton>
+            <AppButton
               variant="primary"
               size="sm"
               icon={Plus}
@@ -201,7 +214,7 @@ export default function Finance({
             >
               Record Transaction
             </AppButton>
-          </div>
+          </Stack>
         }
       />
 
@@ -256,6 +269,20 @@ export default function Finance({
 
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
+      <FormModal
+        isOpen={reportOpen}
+        onOpenChange={setReportOpen}
+        title="Queue Finance Report"
+        subtitle="Aggregates the ledger by currency for the selected period and drops the summary into your notifications."
+        submitLabel="Queue Report"
+        action="/finance/reports"
+        fields={[
+          { name: 'periodStart', label: 'Period Start', kind: 'date', required: true },
+          { name: 'periodEnd', label: 'Period End', kind: 'date', required: true },
+        ]}
+        onSuccess={() => setReportOpen(false)}
+      />
+
       {/* Create Financial Account Modal */}
       <FormModal
         isOpen={createAccountOpen}
@@ -287,7 +314,13 @@ export default function Finance({
                 : []),
             ],
           },
-          { name: 'currentBalance', label: 'Opening Balance', kind: 'number', default: '0' },
+          {
+            name: 'currentBalance',
+            label: 'Opening Balance',
+            kind: 'money',
+            currencyFrom: 'currencyCode',
+            default: '0',
+          },
           { name: 'currencyCode', label: 'Currency', default: 'USD' },
           {
             name: 'isActive',
@@ -323,7 +356,8 @@ export default function Finance({
                 institutionName: String(editAccountRow.institutionName ?? ''),
                 accountNumberLast4: String(editAccountRow.accountNumberLast4 ?? ''),
                 dataClassification: String(editAccountRow.dataClassification ?? 'business'),
-                currentBalance: String(editAccountRow.currentBalance ?? 0),
+                currentBalance: moneyAmountString(editAccountRow.currentBalance),
+                currentBalance__currency: moneyCurrencyCode(editAccountRow.currentBalance),
                 currencyCode: String(editAccountRow.currencyCode ?? 'USD'),
                 isActive: String(editAccountRow.isActive ?? 'true'),
               }
@@ -385,9 +419,25 @@ export default function Finance({
           { name: 'expMonth', label: 'Exp Month (1–12)', kind: 'number', required: true },
           { name: 'expYear', label: 'Exp Year (e.g. 2028)', kind: 'number', required: true },
           { name: 'currencyCode', label: 'Currency Code', default: 'USD' },
-          { name: 'creditLimit', label: 'Credit Limit', kind: 'number' },
-          { name: 'currentBalance', label: 'Current Balance', kind: 'number', default: '0' },
-          { name: 'minimumPaymentDue', label: 'Minimum Payment Due', kind: 'number' },
+          {
+            name: 'creditLimit',
+            label: 'Credit Limit',
+            kind: 'money',
+            currencyFrom: 'currencyCode',
+          },
+          {
+            name: 'currentBalance',
+            label: 'Current Balance',
+            kind: 'money',
+            currencyFrom: 'currencyCode',
+            default: '0',
+          },
+          {
+            name: 'minimumPaymentDue',
+            label: 'Minimum Payment Due',
+            kind: 'money',
+            currencyFrom: 'currencyCode',
+          },
           { name: 'nextPaymentDueDate', label: 'Next Due Date', kind: 'date' },
           {
             name: 'dataClassification',
@@ -433,9 +483,12 @@ export default function Finance({
           editCardRow
             ? {
                 cardLabel: String(editCardRow.cardLabel ?? ''),
-                creditLimit: String(editCardRow.creditLimit ?? 0),
-                currentBalance: String(editCardRow.currentBalance ?? 0),
-                minimumPaymentDue: String(editCardRow.minimumPaymentDue ?? 0),
+                creditLimit: moneyAmountString(editCardRow.creditLimit),
+                creditLimit__currency: moneyCurrencyCode(editCardRow.creditLimit),
+                currentBalance: moneyAmountString(editCardRow.currentBalance),
+                currentBalance__currency: moneyCurrencyCode(editCardRow.currentBalance),
+                minimumPaymentDue: moneyAmountString(editCardRow.minimumPaymentDue),
+                minimumPaymentDue__currency: moneyCurrencyCode(editCardRow.minimumPaymentDue),
                 nextPaymentDueDate: editCardRow.nextPaymentDueDate
                   ? String(editCardRow.nextPaymentDueDate).slice(0, 10)
                   : '',
@@ -445,9 +498,9 @@ export default function Finance({
         }
         fields={[
           { name: 'cardLabel', label: 'Card Label', required: true },
-          { name: 'creditLimit', label: 'Credit Limit', kind: 'number' },
-          { name: 'currentBalance', label: 'Current Balance', kind: 'number' },
-          { name: 'minimumPaymentDue', label: 'Minimum Payment Due', kind: 'number' },
+          { name: 'creditLimit', label: 'Credit Limit', kind: 'money' },
+          { name: 'currentBalance', label: 'Current Balance', kind: 'money' },
+          { name: 'minimumPaymentDue', label: 'Minimum Payment Due', kind: 'money' },
           { name: 'nextPaymentDueDate', label: 'Next Due Date', kind: 'date' },
           {
             name: 'status',
@@ -489,9 +542,20 @@ export default function Finance({
           },
           { name: 'vendorOrPayer', label: 'Vendor / Payer' },
           { name: 'originalCurrencyCode', label: 'Currency', default: 'USD' },
-          { name: 'originalAmount', label: 'Amount', kind: 'number', required: true },
+          {
+            name: 'originalAmount',
+            label: 'Amount',
+            kind: 'money',
+            currencyFrom: 'originalCurrencyCode',
+            required: true,
+          },
           { name: 'exchangeRate', label: 'Exchange Rate to USD', kind: 'number', default: '1' },
-          { name: 'taxAmount', label: 'Tax Amount', kind: 'number' },
+          {
+            name: 'taxAmount',
+            label: 'Tax Amount',
+            kind: 'money',
+            currencyFrom: 'originalCurrencyCode',
+          },
           { name: 'transactionDate', label: 'Transaction Date', kind: 'date', required: true },
           {
             name: 'financialAccountId',
@@ -700,7 +764,7 @@ export default function Finance({
               { label: 'Institution', value: String(row.institutionName ?? '—') },
             ],
             actions: (
-              <div className="flex items-center gap-2">
+              <Stack direction="horizontal" align="center" gap={2}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -725,7 +789,7 @@ export default function Finance({
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             ),
           })}
           columns={[
@@ -741,7 +805,7 @@ export default function Finance({
               household_personal: 'purple',
             }),
             col.action('Actions', (row) => (
-              <div className="flex items-center gap-1.5">
+              <Stack direction="horizontal" align="center" gap={1.5}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -766,7 +830,7 @@ export default function Finance({
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             )),
           ]}
         />
@@ -813,7 +877,7 @@ export default function Finance({
               },
             ],
             actions: (
-              <div className="flex items-center gap-2">
+              <Stack direction="horizontal" align="center" gap={2}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -834,7 +898,7 @@ export default function Finance({
                 >
                   Cancel Card
                 </AppButton>
-              </div>
+              </Stack>
             ),
           })}
           columns={[
@@ -850,7 +914,7 @@ export default function Finance({
               cancelled: 'error',
             }),
             col.action('Actions', (row) => (
-              <div className="flex items-center gap-1.5">
+              <Stack direction="horizontal" align="center" gap={1.5}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -871,7 +935,7 @@ export default function Finance({
                 >
                   Cancel
                 </AppButton>
-              </div>
+              </Stack>
             )),
           ]}
         />
@@ -959,8 +1023,8 @@ export default function Finance({
         initialValues={
           matchRow
             ? {
-                observedAmount: String(matchRow.originalAmount),
-                currencyCode: String(matchRow.originalCurrencyCode),
+                observedAmount: moneyAmountString(matchRow.originalAmount),
+                observedAmount__currency: moneyCurrencyCode(matchRow.originalAmount),
               }
             : undefined
         }
@@ -971,8 +1035,7 @@ export default function Finance({
             required: true,
             description: 'Must be unique among active matches in this workspace.',
           },
-          { name: 'observedAmount', label: 'Statement amount', kind: 'number', required: true },
-          { name: 'currencyCode', label: 'Statement currency', required: true },
+          { name: 'observedAmount', label: 'Statement amount', kind: 'money', required: true },
           { name: 'notes', label: 'Verification notes', kind: 'textarea' },
         ]}
       />
@@ -1020,7 +1083,7 @@ export default function Finance({
               { label: 'Class', value: String(row.dataClassification ?? '—').replace(/_/g, ' ') },
             ],
             actions: (
-              <div className="flex items-center gap-2">
+              <Stack direction="horizontal" align="center" gap={2}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -1045,7 +1108,7 @@ export default function Finance({
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             ),
           })}
           columns={[
@@ -1063,7 +1126,7 @@ export default function Finance({
             }),
             col.text('isTaxDeductible', 'Tax deductible', 110),
             col.action('Actions', (row) => (
-              <div className="flex items-center gap-1.5">
+              <Stack direction="horizontal" align="center" gap={1.5}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -1088,11 +1151,11 @@ export default function Finance({
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             )),
           ]}
         />
       </PageSection>
-    </div>
+    </Stack>
   )
 }

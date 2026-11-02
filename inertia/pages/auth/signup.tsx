@@ -1,11 +1,21 @@
+import { Stack } from '@astryxdesign/core/Stack'
 import { Link } from '@adonisjs/inertia/react'
 import { Button } from '@astryxdesign/core/Button'
 import { StatusBadge } from '~/components/atoms/status-badge'
 
 export default function SignupDisabled() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6">
-      <div className="w-full max-w-md bg-card text-card-foreground border border-border rounded-2xl p-6 sm:p-8 shadow-lg space-y-4">
+    <Stack
+      direction="horizontal"
+      align="center"
+      justify="center"
+      padding={6}
+      className="min-h-screen bg-background text-foreground"
+    >
+      <Stack
+        gap={4}
+        className="w-full max-w-md bg-card text-card-foreground border border-border rounded-2xl p-6 sm:p-8 shadow-lg"
+      >
         <StatusBadge variant="error" label="Registration disabled" />
         <h1 className="text-2xl font-bold text-foreground tracking-tight">
           Public sign-up is disabled
@@ -15,12 +25,12 @@ export default function SignupDisabled() {
           provisioned by a System Super Administrator. If you need access, contact your
           administrator.
         </p>
-        <div className="pt-2">
+        <Stack className="pt-2">
           <Link href="/">
             <Button label="Go to sign in" variant="primary" />
           </Link>
-        </div>
-      </div>
-    </div>
+        </Stack>
+      </Stack>
+    </Stack>
   )
 }

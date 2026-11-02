@@ -1,3 +1,5 @@
+import { Text } from '@astryxdesign/core/Text'
+import { Stack } from '@astryxdesign/core/Stack'
 import { Form } from '@adonisjs/inertia/react'
 import { Button } from '@astryxdesign/core/Button'
 import AuthLayout from '~/layouts/auth'
@@ -16,28 +18,28 @@ export default function Login() {
       title="Sign in to Seller Core"
       subtitle="Multi-channel e-commerce operations, carrier reconciliation & financial P&L suite."
     >
-      <div className="space-y-5">
-        <div className="p-3.5 rounded-xl bg-muted/50 border border-border space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
+      <Stack gap={5}>
+        <Stack gap={2} padding={3} className="rounded-xl bg-muted/50 border border-border">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <StatusBadge variant="info" label="Admin-provisioned accounts only" />
             <StatusBadge variant="success" label="AES-256-GCM + Bouncer RBAC" />
-          </div>
+          </Stack>
           <p className="text-xs text-muted-foreground leading-relaxed">
             Public self-registration is disabled. Sign in with credentials provisioned by your
             System Super Administrator.
           </p>
-        </div>
+        </Stack>
 
         <Form action="/" method="post">
           {({ errors, processing }) => (
             <VStack gap={4}>
-              <div className="flex flex-col gap-1.5 w-full">
+              <Stack gap={1.5} className="w-full">
                 <label
                   htmlFor="field-email"
                   className="text-xs font-semibold text-foreground flex items-center gap-1"
                 >
-                  <span>Email Address</span>
-                  <span className="text-rose-500">*</span>
+                  <Text>Email Address</Text>
+                  <Text className="text-rose-500">*</Text>
                 </label>
                 <input
                   id="field-email"
@@ -57,7 +59,7 @@ export default function Login() {
                     {errors.email}
                   </p>
                 )}
-              </div>
+              </Stack>
 
               <PasswordField
                 label="Password"
@@ -69,7 +71,7 @@ export default function Login() {
                 error={errors.password}
               />
 
-              <div className="pt-1">
+              <Stack className="pt-1">
                 <Button
                   label={processing ? 'Signing in…' : 'Sign in to Workspace'}
                   type="submit"
@@ -78,19 +80,24 @@ export default function Login() {
                   width="100%"
                   isDisabled={processing}
                 />
-              </div>
+              </Stack>
 
-              <div className="flex items-start gap-2 pt-1 text-xs text-muted-foreground leading-relaxed">
+              <Stack
+                direction="horizontal"
+                align="start"
+                gap={2}
+                className="pt-1 text-xs text-muted-foreground leading-relaxed"
+              >
                 <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" />
-                <span>
+                <Text>
                   Sessions are secured with SHA-256 token hashes and a 2-hour idle expiry. Brute
                   force lockout engages after 5 failed attempts.
-                </span>
-              </div>
+                </Text>
+              </Stack>
             </VStack>
           )}
         </Form>
-      </div>
+      </Stack>
     </AuthLayout>
   )
 }

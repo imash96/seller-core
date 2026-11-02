@@ -315,6 +315,10 @@ router
       .post('/seller-accounts/:id/delete', [SellerAccountsController, 'deleteSellerAccount'])
       .as('seller_accounts.delete')
       .use(middleware.operationsPermission({ resource: 'integrations', action: 'delete' }))
+    router
+      .post('/seller-accounts/:id/sync', [SellerAccountsController, 'queueSellerSync'])
+      .as('seller_accounts.sync')
+      .use(middleware.operationsPermission({ resource: 'integrations', action: 'update' }))
 
     /* ---------- Shipments & carrier invoices ---------- */
     router
@@ -338,22 +342,6 @@ router
       .as('shipments.delete')
       .use(middleware.operationsPermission({ resource: 'shipments', action: 'delete' }))
 
-    router
-      .post('/carrier-invoices', [ShipmentsController, 'storeCarrierInvoice'])
-      .as('carrier_invoices.store')
-      .use(middleware.operationsPermission({ resource: 'shipments', action: 'create' }))
-    router
-      .post('/carrier-invoices/:id', [ShipmentsController, 'updateCarrierInvoice'])
-      .as('carrier_invoices.update')
-      .use(middleware.operationsPermission({ resource: 'shipments', action: 'update' }))
-    router
-      .post('/carrier-invoices/:id/status', [ShipmentsController, 'updateCarrierInvoice'])
-      .as('carrier_invoices.update_status')
-      .use(middleware.operationsPermission({ resource: 'shipments', action: 'update' }))
-    router
-      .post('/carrier-invoices/:id/delete', [ShipmentsController, 'deleteCarrierInvoice'])
-      .as('carrier_invoices.delete')
-      .use(middleware.operationsPermission({ resource: 'shipments', action: 'delete' }))
     router
       .post('/shipping-invoices', [ShipmentsController, 'storeCarrierInvoice'])
       .as('shipping_invoices.store')
@@ -422,19 +410,6 @@ router
       .use(middleware.operationsPermission({ resource: 'finance', action: 'delete' }))
 
     router
-      .post('/finance-accounts', [FinanceController, 'storeFinanceAccount'])
-      .as('finance_accounts.store')
-      .use(middleware.operationsPermission({ resource: 'finance', action: 'create' }))
-    router
-      .post('/finance-accounts/:id', [FinanceController, 'updateFinanceAccount'])
-      .as('finance_accounts.update')
-      .use(middleware.operationsPermission({ resource: 'finance', action: 'update' }))
-    router
-      .post('/finance-accounts/:id/delete', [FinanceController, 'deleteFinanceAccount'])
-      .as('finance_accounts.delete')
-      .use(middleware.operationsPermission({ resource: 'finance', action: 'delete' }))
-
-    router
       .post('/credit-cards', [FinanceController, 'storeCreditCard'])
       .as('credit_cards.store')
       .use(middleware.operationsPermission({ resource: 'credit_cards', action: 'create' }))
@@ -463,6 +438,10 @@ router
     router
       .post('/financial-transactions', [FinanceController, 'storeFinancialTransaction'])
       .as('financial_transactions.store')
+      .use(middleware.operationsPermission({ resource: 'finance', action: 'create' }))
+    router
+      .post('/finance/reports', [FinanceController, 'generateReport'])
+      .as('finance.reports.store')
       .use(middleware.operationsPermission({ resource: 'finance', action: 'create' }))
     router
       .post('/financial-transactions/:id/reconcile', [FinanceController, 'reconcileTransaction'])

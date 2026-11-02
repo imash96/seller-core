@@ -7,17 +7,21 @@
 import { belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import type { DateTime } from 'luxon'
-import Customer from './customer.js'
+import type Customer from './customer.js'
 import Order from './order.js'
 import OrderLineItem from './order_line_item.js'
 import RefundTransaction from './refund_transaction.js'
 import User from './user.js'
-import { prepareJson } from './json_helpers.js'
+import { moneyColumn, prepareJson } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import type { PriceMoney } from '../types/price.js'
 
 export default class ReturnRequest extends AppBaseModel {
   static readonly table = 'return_requests'
   static readonly idPrefix = 'rma'
+
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'refundTotal'
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -27,9 +31,6 @@ export default class ReturnRequest extends AppBaseModel {
 
   @column({ columnName: 'order_line_item_id' })
   declare public orderLineItemId: string
-
-  @column({ columnName: 'customer_id' })
-  declare public customerId: string
 
   @column({ columnName: 'rma_number' })
   declare public rmaNumber: string
@@ -70,17 +71,14 @@ export default class ReturnRequest extends AppBaseModel {
   @column({ columnName: 'return_label_url' })
   declare public returnLabelUrl: string | null
 
-  @column({ columnName: 'currency_code' })
-  declare public currencyCode: string
+  @moneyColumn({ columnName: 'return_shipping_cost' })
+  declare public returnShippingCost: PriceMoney
 
-  @column({ columnName: 'return_shipping_cost' })
-  declare public returnShippingCost: string
+  @moneyColumn({ columnName: 'restocking_fee_total' })
+  declare public restockingFeeTotal: PriceMoney
 
-  @column({ columnName: 'restocking_fee_amount' })
-  declare public restockingFeeAmount: string
-
-  @column({ columnName: 'refund_amount' })
-  declare public refundAmount: string
+  @moneyColumn({ columnName: 'refund_total' })
+  declare public refundTotal: PriceMoney
 
   @column({ columnName: 'replacement_order_id' })
   declare public replacementOrderId: string | null
@@ -124,8 +122,14 @@ export default class ReturnRequest extends AppBaseModel {
   @belongsTo(() => OrderLineItem, { foreignKey: 'orderLineItemId' })
   declare public orderLineItem: BelongsTo<typeof OrderLineItem>
 
-  @belongsTo(() => Customer, { foreignKey: 'customerId' })
-  declare public customer: BelongsTo<typeof Customer>
+  /** Preloaded order — the only path to the customer (`orders.customer_id`). */
+  get customerId(): string | null {
+    return this.order?.customerId ?? null
+  }
+
+  get customer(): Customer | undefined {
+    return this.order?.customer ?? undefined
+  }
 
   @belongsTo(() => Order, { foreignKey: 'replacementOrderId' })
   declare public replacementOrder: BelongsTo<typeof Order>

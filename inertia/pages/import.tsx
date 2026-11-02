@@ -1,3 +1,5 @@
+import { Text } from '@astryxdesign/core/Text'
+import { Stack } from '@astryxdesign/core/Stack'
 import {
   PageHeader,
   PageSection,
@@ -42,21 +44,50 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
   const sampleJson = JSON.stringify(
     [
       {
-        orderNumber: 'AMZ-2026-001',
-        externalOrderId: 'AMZ-EXT-001',
-        customerFullName: 'Alex Johnson',
-        customerEmail: 'alex@example.com',
-        currencyCode: 'USD',
-        exchangeRate: 1,
-        lines: [
-          {
-            sku: 'SKU-001',
-            title: 'Premium Headphones',
-            quantityOrdered: 2,
-            unitPrice: 49.99,
-            unitCostAmount: 20,
+        // Raw Amazon SP-API shape — the importer auto-detects the platform and
+        // normalizes totals, tax lines and SLA windows.
+        payload: {
+          Orders: [
+            {
+              AmazonOrderId: '902-8324761-1234567',
+              MarketplaceId: 'ATVPDKIKX0DER',
+              PurchaseDate: '2026-02-11T14:22:31Z',
+              OrderStatus: 'Unshipped',
+              FulfillmentChannel: 'AFN',
+              OrderTotal: { Amount: '124.98', CurrencyCode: 'USD' },
+              TaxCollection: { Model: 'MarketplaceFacilitator' },
+              LatestShipDate: '2026-02-14T23:59:59Z',
+              ShippingAddress: {
+                Name: 'Alex Johnson',
+                AddressLine1: '1 Market St',
+                City: 'Seattle',
+                StateOrRegion: 'WA',
+                PostalCode: '98101',
+                CountryCode: 'US',
+              },
+              BuyerInfo: { BuyerEmail: 'alex@example.com' },
+            },
+          ],
+        },
+        orderItemsPayload: {
+          payload: {
+            OrderItems: [
+              {
+                ASIN: 'B09ASTRYX1',
+                SellerSKU: 'SKU-001',
+                OrderItemId: 'OI-1',
+                Title: 'Premium Headphones',
+                QuantityOrdered: 2,
+                ItemPrice: { Amount: '99.98', CurrencyCode: 'USD' },
+                ItemTax: { Amount: '8.00', CurrencyCode: 'USD' },
+                ShippingPrice: { Amount: '17.00', CurrencyCode: 'USD' },
+                ShippingTax: { Amount: '0.00', CurrencyCode: 'USD' },
+                PromotionDiscount: { Amount: '0.00', CurrencyCode: 'USD' },
+                ShippingDiscount: { Amount: '0.00', CurrencyCode: 'USD' },
+              },
+            ],
           },
-        ],
+        },
       },
     ],
     null,
@@ -64,14 +95,14 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
   )
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Bulk Marketplace Import & Sync Jobs"
         description="Idempotent JSON order batch import and per-record diagnostics. Marketplace sync is not configured."
         icon={Upload}
         badge={`${syncJobs.length} sync jobs`}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <AppButton
               variant="secondary"
               size="sm"
@@ -89,7 +120,7 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
             >
               Run Bulk JSON Import
             </AppButton>
-          </div>
+          </Stack>
         }
       />
 
@@ -138,7 +169,7 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
         isOpen={importOpen}
         onOpenChange={setImportOpen}
         title="Run Bulk JSON Import"
-        subtitle="Idempotent: re-submitting the same key skips duplicates. One invalid record never aborts the batch."
+        subtitle="Accepts raw Amazon SP-API / eBay Fulfillment / Etsy v3 / MedusaJS v2 payloads or canonical Seller Core JSON — the platform is detected per record. Idempotent: the same key skips duplicates, and one invalid record never aborts the batch."
         submitLabel="Run Import"
         action="/orders/bulk-import"
         presetActions={[
@@ -168,12 +199,12 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
           },
           {
             name: 'ordersJson',
-            label: 'Orders JSON array',
+            label: 'Marketplace payloads or canonical orders (JSON array)',
             kind: 'textarea',
             required: true,
             fullWidth: true,
             placeholder:
-              '[{"orderNumber":"AMZ-1","externalOrderId":"X1","customerFullName":"Jane","lines":[{"sku":"A","title":"Item","quantityOrdered":1,"unitPrice":10}]}]',
+              '[{"payload":{"Orders":[{"AmazonOrderId":"902-1","FulfillmentChannel":"AFN","OrderTotal":{"Amount":"10.00","CurrencyCode":"USD"}}]},"orderItemsPayload":{"payload":{"OrderItems":[{"ASIN":"B0X","SellerSKU":"A","QuantityOrdered":1,"ItemPrice":{"Amount":"10.00","CurrencyCode":"USD"}}]}}}]',
           },
         ]}
       />
@@ -209,41 +240,46 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
         subtitle={`Status: ${String(inspectJob?.status ?? '')} · ${String(inspectJob?.succeededRecords ?? 0)} succeeded · ${String(inspectJob?.failedRecords ?? 0)} failed · ${String(inspectJob?.skippedDuplicates ?? 0)} skipped`}
         width="lg"
         footer={
-          <div className="flex justify-end">
+          <Stack direction="horizontal" justify="end">
             <AppButton variant="secondary" size="sm" onClick={() => setInspectJob(null)}>
               Close
             </AppButton>
-          </div>
+          </Stack>
         }
       >
         {inspectJob && (
-          <div className="space-y-3">
+          <Stack gap={3}>
             {Array.isArray((inspectJob as any).errors) && (inspectJob as any).errors.length > 0 ? (
               (inspectJob as any).errors.map((e: Row, i: number) => (
-                <div
+                <Stack
+                  gap={1}
+                  padding={3}
                   key={i}
-                  className="p-3.5 rounded-xl border border-rose-500/25 bg-rose-500/10 space-y-1"
+                  className="rounded-xl border border-rose-500/25 bg-rose-500/10"
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <Stack direction="horizontal" align="center" justify="between" gap={2}>
                     <StatusBadge
                       variant="error"
                       label={String(e.errorCode ?? e.error_code ?? 'ERROR')}
                     />
-                    <span className="text-xs font-mono text-muted-foreground">
+                    <Text size="xsm" color="secondary" className="font-mono">
                       Record #{String(e.recordIndex ?? e.record_index ?? i + 1)}
-                    </span>
-                  </div>
+                    </Text>
+                  </Stack>
                   <p className="text-xs font-semibold text-foreground">
                     {String(e.message ?? e.errorMessage ?? 'Validation error')}
                   </p>
-                </div>
+                </Stack>
               ))
             ) : (
-              <div className="p-6 text-center text-sm text-muted-foreground rounded-xl border border-dashed border-border bg-muted/20">
+              <Stack
+                padding={6}
+                className="text-center text-sm text-muted-foreground rounded-xl border border-dashed border-border bg-muted/20"
+              >
                 No per-record errors logged for this sync job — all records processed cleanly.
-              </div>
+              </Stack>
             )}
-          </div>
+          </Stack>
         )}
       </SlideOverDrawer>
 
@@ -327,6 +363,6 @@ export default function Import({ syncJobs, sellerAccounts, savedViews }: Props) 
           ]}
         />
       </PageSection>
-    </div>
+    </Stack>
   )
 }

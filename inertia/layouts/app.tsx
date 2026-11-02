@@ -1,3 +1,5 @@
+import { Text } from '@astryxdesign/core/Text'
+import { Stack } from '@astryxdesign/core/Stack'
 import { type ReactNode } from 'react'
 import { Link } from '@adonisjs/inertia/react'
 import type { Data } from '@generated/data'
@@ -33,7 +35,7 @@ export function SidebarLink({
           : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
       }`}
     >
-      <div className="flex items-center gap-3 min-w-0">
+      <Stack direction="horizontal" align="center" gap={3} className="min-w-0">
         {Icon && (
           <Icon
             className={`w-4 h-4 shrink-0 ${
@@ -43,19 +45,22 @@ export function SidebarLink({
             }`}
           />
         )}
-        <span className="truncate">{label}</span>
-      </div>
+        <Text maxLines={1}>{label}</Text>
+      </Stack>
 
       {badge && (
-        <span
-          className={`px-2 py-0.5 text-[11px] font-semibold rounded-full ${
+        <Text
+          as="span"
+          size="2xs"
+          weight="semibold"
+          className={`px-2 py-0.5 rounded-full ${
             isActive
               ? 'bg-sidebar-primary-foreground/20 text-sidebar-primary-foreground'
               : 'bg-sidebar-accent text-sidebar-accent-foreground'
           }`}
         >
           {badge}
-        </span>
+        </Text>
       )}
     </Link>
   )
@@ -71,46 +76,65 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <Stack className="min-h-screen bg-background text-foreground">
       <MobileMenu open={drawerOpen} close={closeDrawer} logout={handleLogout} />
       <FlashMessages />
 
       {/* Desktop Sidebar */}
       <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-sidebar text-sidebar-foreground border-r border-sidebar-border px-5 pb-4">
-          <div className="h-16 border-b border-sidebar-border flex items-center">
+        <Stack
+          paddingInline={5}
+          className="grow gap-y-5 overflow-y-auto bg-sidebar text-sidebar-foreground border-r border-sidebar-border pb-4"
+        >
+          <Stack
+            direction="horizontal"
+            align="center"
+            className="h-16 border-b border-sidebar-border"
+          >
             <Link href="/dashboard" className="flex items-center gap-3 group unstyled-link">
-              <div className="w-9 h-9 bg-sidebar-primary rounded-xl flex items-center justify-center shadow-sm transition-transform group-hover:scale-105">
+              <Stack
+                direction="horizontal"
+                align="center"
+                justify="center"
+                className="w-9 h-9 bg-sidebar-primary rounded-xl shadow-sm transition-transform group-hover:scale-105"
+              >
                 <Box className="w-5 h-5 text-sidebar-primary-foreground" />
-              </div>
-              <div>
-                <span className="text-base font-bold text-sidebar-foreground tracking-tight block leading-none">
+              </Stack>
+              <Stack>
+                <Text
+                  size="base"
+                  weight="bold"
+                  className="text-sidebar-foreground tracking-tight block leading-none"
+                >
                   Seller Core
-                </span>
-                <span className="text-[11px] text-sidebar-foreground/65 block mt-1">
+                </Text>
+                <Text size="2xs" className="text-sidebar-foreground/65 block mt-1">
                   Multi-Channel Operations
-                </span>
-              </div>
+                </Text>
+              </Stack>
             </Link>
-          </div>
+          </Stack>
 
           <nav className="flex flex-1 flex-col justify-between">
-            <div className="space-y-6">
+            <Stack gap={6}>
               {NAVIGATION.map((section) => (
-                <div key={section.title}>
-                  <div className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/55">
+                <Stack key={section.title}>
+                  <Stack
+                    paddingInline={3}
+                    className="mb-2 text-2xs font-semibold uppercase tracking-wider text-sidebar-foreground/55"
+                  >
                     {section.title}
-                  </div>
-                  <div className="space-y-1">
+                  </Stack>
+                  <Stack gap={1}>
                     {section.items.map((item) => (
                       <SidebarLink key={item.href} {...item} />
                     ))}
-                  </div>
-                </div>
+                  </Stack>
+                </Stack>
               ))}
-            </div>
+            </Stack>
 
-            <div className="pt-4 mt-6 border-t border-sidebar-border">
+            <Stack className="pt-4 mt-6 border-t border-sidebar-border">
               <button
                 type="button"
                 onClick={handleLogout}
@@ -118,16 +142,16 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               >
                 <LogOut className="w-4 h-4" /> Sign out
               </button>
-            </div>
+            </Stack>
           </nav>
-        </div>
+        </Stack>
       </aside>
 
       {/* Main Content Area */}
-      <div className="lg:pl-72 flex flex-col min-h-screen">
+      <Stack className="lg:pl-72 min-h-screen">
         <TopBar onMenu={toggleDrawer} user={user} />
         <main className="flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">{children}</main>
-      </div>
-    </div>
+      </Stack>
+    </Stack>
   )
 }

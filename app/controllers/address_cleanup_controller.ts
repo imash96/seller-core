@@ -1,8 +1,10 @@
+import db from '@adonisjs/lucid/services/db'
 import type { HttpContext } from '@adonisjs/core/http'
 import Customer from '#models/customer'
+import { AuditContext } from '#services/audit_context'
 import CustomerAddress from '#models/customer_address'
 import { CleanAdd } from '../services/address_cleanup_service.js'
-import { RbacService } from '../services/rbac_service.js'
+import { money } from '../types/price.js'
 
 export default class AddressCleanupController {
   async index({ auth, inertia }: HttpContext) {
@@ -132,56 +134,63 @@ export default class AddressCleanupController {
       return response.redirect().back()
     }
 
-    let customer = customerId
-      ? await Customer.query().where('userId', user.id).andWhere('id', customerId).first()
-      : null
-
-    if (!customer) {
-      customer = await Customer.create({
-        userId: user.id,
-        fullName: name,
-        phone: phone && phone !== '000-000-0000' ? phone : null,
-        preferredCurrency: user.defaultCurrency || 'USD',
-        riskLevel: 'low',
-        ordersCount: 0,
-        totalSpent: '0.00',
-        isRepeatCustomer: false,
-        riskScore: 0,
-        metadata: { source: 'address_cleanup_tool' },
+    const savedCustomer = await db.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
+        actorUserId: user.id,
+        requestId: request.id(),
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') ?? null,
+        reason: 'address_cleanup.saved_to_customer',
       })
-    }
 
-    await CustomerAddress.create({
-      userId: user.id,
-      customerId: customer.id,
-      addressType: 'shipping',
-      recipientName: name,
-      companyName: request.input('companyName') || null,
-      line1,
-      line2: line2 && line2 !== '-' ? line2 : null,
-      line3: line3 && line3 !== '-' ? line3 : null,
-      city,
-      stateProvince: stateProvince || null,
-      postalCode,
-      countryCode: countryCode || 'US',
-      phone: phone && phone !== '000-000-0000' ? phone : null,
-      isDefault: true,
-      isVerified: true,
+      let record = customerId
+        ? await Customer.query({ client: trx })
+            .where('userId', user.id)
+            .andWhere('id', customerId)
+            .first()
+        : null
+
+      if (!record) {
+        record = new Customer()
+        record.useTransaction(trx)
+        record.userId = user.id
+        record.fullName = name
+        record.phone = phone && phone !== '000-000-0000' ? phone : null
+        record.riskLevel = 'low'
+        record.ordersCount = 0
+        record.totalSpent = money(0, user.defaultCurrency || 'USD')
+        record.riskScore = 0
+        record.metadata = { source: 'address_cleanup_tool' }
+        await record.save()
+      }
+
+      await CustomerAddress.create(
+        {
+          userId: user.id,
+          customerId: record.id,
+          addressType: 'shipping',
+          recipientName: name,
+          companyName: request.input('companyName') || null,
+          line1,
+          line2: line2 && line2 !== '-' ? line2 : null,
+          line3: line3 && line3 !== '-' ? line3 : null,
+          city,
+          stateProvince: stateProvince || null,
+          postalCode,
+          countryCode: countryCode || 'US',
+          phone: phone && phone !== '000-000-0000' ? phone : null,
+          isDefault: true,
+          isVerified: true,
+        },
+        { client: trx }
+      )
+
+      return record
     })
-
-    await RbacService.recordAudit({
-      actorUserId: user.id,
-      userId: user.id,
-      action: 'address_cleanup.saved_to_customer',
-      entityType: 'customer_addresses',
-      entityId: customer.id,
-      requestId: request.id(),
-      afterState: { name, line1, city, stateProvince, postalCode, countryCode },
-    }).catch(() => {})
 
     session.flash(
       'success',
-      `Saved cleaned address for "${customer.fullName}" to Customer Addresses.`
+      `Saved cleaned address for "${savedCustomer.fullName}" to Customer Addresses.`
     )
     return response.redirect().back()
   }

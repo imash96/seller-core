@@ -10,11 +10,16 @@ import type { DateTime } from 'luxon'
 import FinancialAccount from './financial_account.js'
 import FinancialTransaction from './financial_transaction.js'
 import ShippingInvoiceLine from './shipping_invoice_line.js'
+import { moneyColumn } from './json_helpers.js'
 import AppBaseModel from './base_model.js'
+import type { PriceMoney } from '../types/price.js'
 
 export default class ShippingInvoice extends AppBaseModel {
   static readonly table = 'shipping_invoices'
   static readonly idPrefix = 'sinv'
+
+  /** Money attribute that carries this row's currency (serialized as `currencyCode`). */
+  static readonly currencyAttribute = 'totalAmount'
 
   @column({ columnName: 'user_id' })
   declare public userId: string
@@ -31,23 +36,23 @@ export default class ShippingInvoice extends AppBaseModel {
   @column({ columnName: 'invoice_number' })
   declare public invoiceNumber: string
 
-  @column({ columnName: 'currency_code' })
-  declare public currencyCode: string
+  @moneyColumn({ columnName: 'subtotal_total' })
+  declare public subtotalTotal: PriceMoney
 
-  @column({ columnName: 'subtotal_amount' })
-  declare public subtotalAmount: string
+  @moneyColumn({ columnName: 'discount_total' })
+  declare public discountTotal: PriceMoney
 
-  @column({ columnName: 'tax_amount' })
-  declare public taxAmount: string
+  @moneyColumn({ columnName: 'tax_total' })
+  declare public taxTotal: PriceMoney
 
-  @column({ columnName: 'total_amount' })
-  declare public totalAmount: string
+  @moneyColumn({ columnName: 'grand_total' })
+  declare public grandTotal: PriceMoney
 
-  @column({ columnName: 'paid_amount' })
-  declare public paidAmount: string
+  @moneyColumn({ columnName: 'paid_total' })
+  declare public paidTotal: PriceMoney
 
-  @column({ columnName: 'variance_amount' })
-  declare public varianceAmount: string
+  @moneyColumn({ columnName: 'variance_total' })
+  declare public varianceTotal: PriceMoney
 
   @column({ columnName: 'payment_status' })
   declare public paymentStatus: string

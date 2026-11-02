@@ -1,5 +1,4 @@
 import { DateTime } from 'luxon'
-import db from '@adonisjs/lucid/services/db'
 import type { HttpContext } from '@adonisjs/core/http'
 import FinancialAccount from '#models/financial_account'
 import CreditCard from '#models/credit_card'
@@ -11,9 +10,11 @@ import {
   ManualReconciliationService,
   ReconciliationError,
 } from '#services/manual_reconciliation_service'
+import GenerateFinanceReport from '#jobs/generate_finance_report'
 import SellerAccount from '#models/seller_account'
 import Order from '#models/order'
 import { RbacService } from '#services/rbac_service'
+import { AuditContext } from '#services/audit_context'
 import { FinanceAccessService, type FinanceAction } from '#services/finance_access_service'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import {
@@ -23,6 +24,13 @@ import {
   updateFinancialAccountValidator,
 } from '#validators/operations'
 import { CreditCardStatus, FinancialTransactionStatus } from '../enums/index.js'
+import {
+  amountOf,
+  currencyOf,
+  money,
+  normalizeCurrencyCode,
+  normalizePriceMoney,
+} from '../types/price.js'
 
 export default class FinanceController {
   private async checkClassification(
@@ -128,9 +136,11 @@ export default class FinanceController {
     }
 
     const type = String(request.input('accountType', 'bank_checking'))
-    const currency = String(request.input('currencyCode', 'USD')).toUpperCase()
+    const currency = normalizeCurrencyCode(request.input('currencyCode'), 'USD')
     const last4 = request.input('accountNumberLast4')
-    const balance = Number(request.input('currentBalance', 0))
+    // Balances are self-contained PriceMoney so an account can never lose its currency.
+    const currentBalance = normalizePriceMoney(request.input('currentBalance') ?? 0, currency)
+    const balance = amountOf(currentBalance)
     if (
       ![
         'bank_checking',
@@ -149,27 +159,30 @@ export default class FinanceController {
       return response.badRequest({ error: 'Invalid account details.' })
     }
 
-    const account = await FinancialAccount.create({
-      userId: user.id,
-      accountName,
-      accountType: type,
-      dataClassification: classification,
-      institutionName: request.input('institutionName') || null,
-      accountNumberLast4: request.input('accountNumberLast4') || null,
-      currencyCode: currency,
-      currentBalance: balance.toFixed(2),
-      isActive:
-        request.input('isActive') !== undefined
-          ? request.input('isActive') === 'true' || request.input('isActive') === true
-          : true,
-    })
+    const account = await AuditContext.runRequest(
+      ctx,
+      'financial_account.created',
+      async (trx): Promise<FinancialAccount> =>
+        await FinancialAccount.create(
+          {
+            userId: user.id,
+            accountName,
+            accountType: type,
+            dataClassification: classification,
+            institutionName: request.input('institutionName') || null,
+            accountNumberLast4: request.input('accountNumberLast4') || null,
+            currentBalance,
+            isActive:
+              request.input('isActive') !== undefined
+                ? request.input('isActive') === 'true' || request.input('isActive') === true
+                : true,
+          },
+          { client: trx }
+        )
+    )
 
     session.flash('success', `Financial account "${account.accountName}" created.`)
     return response.redirect().back()
-  }
-
-  async storeFinanceAccount(ctx: HttpContext) {
-    return this.storeFinancialAccount(ctx)
   }
 
   async updateFinancialAccount(ctx: HttpContext) {
@@ -201,7 +214,8 @@ export default class FinanceController {
       (newCurrency && !/^[A-Za-z]{3}$/.test(String(newCurrency))) ||
       (newLast4 && !/^\d{4}$/.test(String(newLast4))) ||
       (payload.currentBalance !== undefined &&
-        (!Number.isFinite(payload.currentBalance) || Math.abs(payload.currentBalance) >= 1e12))
+        (!Number.isFinite(amountOf(payload.currentBalance)) ||
+          Math.abs(amountOf(payload.currentBalance)) >= 1e12))
     ) {
       return response.badRequest({ error: 'Invalid account details.' })
     }
@@ -216,19 +230,18 @@ export default class FinanceController {
     if (request.input('dataClassification')) {
       account.dataClassification = classification
     }
-    if (request.input('currencyCode')) {
-      account.currencyCode = String(request.input('currencyCode')).toUpperCase()
-    }
     if (payload.currentBalance !== undefined)
-      account.currentBalance = Number(payload.currentBalance).toFixed(2)
+      account.currentBalance = normalizePriceMoney(
+        payload.currentBalance,
+        currencyOf(account.currentBalance)
+      )
     if (payload.isActive !== undefined) account.isActive = payload.isActive
-    await account.save()
+    await AuditContext.runRequest(ctx, 'financial_account.updated', async (trx) => {
+      account.useTransaction(trx)
+      await account.save()
+    })
     session.flash('success', `Financial account "${account.accountName}" updated.`)
     return response.redirect().back()
-  }
-
-  async updateFinanceAccount(ctx: HttpContext) {
-    return this.updateFinancialAccount(ctx)
   }
 
   async deleteFinancialAccount(ctx: HttpContext) {
@@ -239,13 +252,12 @@ export default class FinanceController {
       .andWhere('userId', user.id)
       .firstOrFail()
     if (!(await this.checkClassification(ctx, 'delete', account.dataClassification))) return
-    await account.delete()
+    await AuditContext.runRequest(ctx, 'financial_account.deleted', async (trx) => {
+      account.useTransaction(trx)
+      await account.delete()
+    })
     session.flash('success', 'Financial account deleted.')
     return response.redirect().back()
-  }
-
-  async deleteFinanceAccount(ctx: HttpContext) {
-    return this.deleteFinancialAccount(ctx)
   }
 
   async storeCreditCard(ctx: HttpContext) {
@@ -273,49 +285,55 @@ export default class FinanceController {
       return response.badRequest({ error: 'Invalid seller account.' })
     }
 
-    const card = await db.transaction(async (trx) => {
-      const createdCard = await CreditCard.create(
-        {
-          userId: user.id,
-          cardLabel: payload.cardLabel,
-          brandName: payload.brandName,
-          issuerBank: payload.issuerBank ?? null,
-          cardholderName: payload.cardholderName.toUpperCase(),
-          last4Digits: payload.last4Digits,
-          expMonth: payload.expMonth,
-          expYear: payload.expYear,
-          vaultTokenReference: null,
-          currencyCode: payload.currencyCode || 'USD',
-          creditLimit: (payload.creditLimit ?? 0).toFixed(2),
-          currentBalance: (payload.currentBalance ?? 0).toFixed(2),
-          statementBalance: (payload.currentBalance ?? 0).toFixed(2),
-          minimumPaymentDue: (payload.minimumPaymentDue ?? 0).toFixed(2),
-          nextPaymentDueDate: payload.nextPaymentDueDate
-            ? DateTime.fromISO(payload.nextPaymentDueDate)
-            : null,
-          reminderDaysBefore: 5,
-          autoPayEnabled: false,
-          dataClassification: payload.dataClassification || 'business',
-          status: CreditCardStatus.ACTIVE,
-        },
-        { client: trx }
-      )
+    const cardCurrency = normalizeCurrencyCode(payload.currencyCode, 'USD')
+    const cardMoney = (value: unknown) => normalizePriceMoney(value ?? 0, cardCurrency)
 
-      if (payload.sellerAccountId) {
-        await CreditCardSellerAccount.create(
+    const card = await AuditContext.runRequest(
+      ctx,
+      'credit_card.created',
+      async (trx): Promise<CreditCard> => {
+        const createdCard = await CreditCard.create(
           {
             userId: user.id,
-            creditCardId: createdCard.id,
-            sellerAccountId: payload.sellerAccountId,
-            usagePurpose: payload.usagePurpose || 'primary_billing',
-            isPrimary: true,
+            cardLabel: payload.cardLabel,
+            brandName: payload.brandName,
+            issuerBank: payload.issuerBank ?? null,
+            cardholderName: payload.cardholderName.toUpperCase(),
+            last4Digits: payload.last4Digits,
+            expMonth: payload.expMonth,
+            expYear: payload.expYear,
+            vaultTokenReference: null,
+            creditLimit: cardMoney(payload.creditLimit ?? 0),
+            currentBalance: cardMoney(payload.currentBalance ?? 0),
+            statementBalance: cardMoney(payload.currentBalance ?? 0),
+            minimumPaymentDue: cardMoney(payload.minimumPaymentDue ?? 0),
+            nextPaymentDueDate: payload.nextPaymentDueDate
+              ? DateTime.fromISO(payload.nextPaymentDueDate)
+              : null,
+            reminderDaysBefore: 5,
+            autoPayEnabled: false,
+            dataClassification: payload.dataClassification || 'business',
+            status: CreditCardStatus.ACTIVE,
           },
           { client: trx }
         )
-      }
 
-      return createdCard
-    })
+        if (payload.sellerAccountId) {
+          await CreditCardSellerAccount.create(
+            {
+              userId: user.id,
+              creditCardId: createdCard.id,
+              sellerAccountId: payload.sellerAccountId,
+              usagePurpose: payload.usagePurpose || 'primary_billing',
+              isPrimary: true,
+            },
+            { client: trx }
+          )
+        }
+
+        return createdCard
+      }
+    )
 
     session.flash('success', `Card "${card.cardLabel}" (•••• ${card.last4Digits}) registered.`)
     return response.redirect().back()
@@ -333,11 +351,18 @@ export default class FinanceController {
     if (payload.nextPaymentDueDate && !DateTime.fromISO(payload.nextPaymentDueDate).isValid)
       return response.badRequest({ error: 'Invalid due date.' })
     if (payload.cardLabel !== undefined) card.cardLabel = payload.cardLabel
-    if (payload.creditLimit !== undefined) card.creditLimit = String(payload.creditLimit)
+    if (payload.creditLimit !== undefined)
+      card.creditLimit = normalizePriceMoney(payload.creditLimit, currencyOf(card.creditLimit))
     if (payload.currentBalance !== undefined)
-      card.currentBalance = payload.currentBalance.toFixed(2)
+      card.currentBalance = normalizePriceMoney(
+        payload.currentBalance,
+        currencyOf(card.currentBalance)
+      )
     if (payload.minimumPaymentDue !== undefined) {
-      card.minimumPaymentDue = String(payload.minimumPaymentDue)
+      card.minimumPaymentDue = normalizePriceMoney(
+        payload.minimumPaymentDue,
+        currencyOf(card.minimumPaymentDue)
+      )
     }
     if (payload.nextPaymentDueDate !== undefined) {
       card.nextPaymentDueDate = payload.nextPaymentDueDate
@@ -345,7 +370,10 @@ export default class FinanceController {
         : null
     }
     if (payload.status !== undefined) card.status = payload.status
-    await card.save()
+    await AuditContext.runRequest(ctx, 'credit_card.updated', async (trx) => {
+      card.useTransaction(trx)
+      await card.save()
+    })
     session.flash('success', `Card "${card.cardLabel}" updated.`)
     return response.redirect().back()
   }
@@ -360,7 +388,10 @@ export default class FinanceController {
     if (!(await this.checkClassification(ctx, 'delete', card.dataClassification))) return
 
     card.status = CreditCardStatus.CANCELLED
-    await card.save()
+    await AuditContext.runRequest(ctx, 'credit_card.cancelled', async (trx) => {
+      card.useTransaction(trx)
+      await card.save()
+    })
     session.flash('success', `Card "${card.cardLabel}" (•••• ${card.last4Digits}) cancelled.`)
     return response.redirect().back()
   }
@@ -434,36 +465,52 @@ export default class FinanceController {
       }
     }
     const exchangeRate = Number(payload.exchangeRate ?? 1.0)
-    const originalAmount = Number(payload.originalAmount)
-    const reportingAmount = Math.round(originalAmount * exchangeRate * 100) / 100
+    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+      return response.badRequest({ error: 'Exchange rate must be strictly positive.' })
+    }
+    const originalAmount = normalizePriceMoney(
+      payload.originalAmount,
+      normalizeCurrencyCode(payload.originalCurrencyCode, 'USD')
+    )
+    if (amountOf(originalAmount) <= 0) {
+      return response.badRequest({ error: 'Original amount must be strictly positive.' })
+    }
+    const reportingCurrency = normalizeCurrencyCode(payload.reportingCurrencyCode, 'USD')
+    const reportingAmount = money(amountOf(originalAmount) * exchangeRate, reportingCurrency)
 
-    const tx = await FinancialTransaction.create({
-      userId: user.id,
-      financialAccountId: payload.financialAccountId ?? null,
-      creditCardId: payload.creditCardId ?? null,
-      financeCategoryId: payload.financeCategoryId ?? null,
-      sellerAccountId: payload.sellerAccountId ?? null,
-      orderId: payload.orderId ?? null,
-      referenceNumber: payload.referenceNumber,
-      transactionType: payload.transactionType,
-      dataClassification: classification,
-      status: FinancialTransactionStatus.POSTED,
-      description: payload.description,
-      vendorOrPayer: payload.vendorOrPayer ?? null,
-      originalCurrencyCode: payload.originalCurrencyCode || 'USD',
-      originalAmount: originalAmount.toFixed(2),
-      exchangeRate: exchangeRate.toFixed(8),
-      reportingCurrencyCode: payload.reportingCurrencyCode || 'USD',
-      reportingAmount: reportingAmount.toFixed(2),
-      taxAmount: Number(payload.taxAmount ?? 0).toFixed(2),
-      transactionDate: DateTime.fromISO(payload.transactionDate),
-      conversionDate: DateTime.fromISO(payload.transactionDate),
-      metadata: {},
-    })
+    const tx = await AuditContext.runRequest(
+      ctx,
+      'financial_transaction.posted',
+      async (trx): Promise<FinancialTransaction> =>
+        await FinancialTransaction.create(
+          {
+            userId: user.id,
+            financialAccountId: payload.financialAccountId ?? null,
+            creditCardId: payload.creditCardId ?? null,
+            financeCategoryId: payload.financeCategoryId ?? null,
+            sellerAccountId: payload.sellerAccountId ?? null,
+            orderId: payload.orderId ?? null,
+            referenceNumber: payload.referenceNumber,
+            transactionType: payload.transactionType,
+            dataClassification: classification,
+            status: FinancialTransactionStatus.POSTED,
+            description: payload.description,
+            vendorOrPayer: payload.vendorOrPayer ?? null,
+            originalAmount,
+            exchangeRate: exchangeRate.toFixed(8),
+            reportingAmount,
+            taxTotal: normalizePriceMoney(payload.taxTotal ?? 0, originalAmount.currency_code),
+            transactionDate: DateTime.fromISO(payload.transactionDate),
+            conversionDate: DateTime.fromISO(payload.transactionDate),
+            metadata: {},
+          },
+          { client: trx }
+        )
+    )
 
     session.flash(
       'success',
-      `Ledger entry ${tx.referenceNumber} (${tx.originalAmount} ${tx.originalCurrencyCode} -> ${tx.reportingAmount} ${tx.reportingCurrencyCode}) posted.`
+      `Ledger entry ${tx.referenceNumber} (${amountOf(tx.originalAmount)} ${currencyOf(tx.originalAmount)} -> ${amountOf(tx.reportingAmount)} ${currencyOf(tx.reportingAmount)}) posted.`
     )
     return response.redirect().back()
   }
@@ -472,37 +519,79 @@ export default class FinanceController {
     const { auth, params, response, session } = ctx
     const user = auth.getUserOrFail()
     const household = await FinanceAccessService.permissions(user)
-    const result = await db.transaction(async (trx) => {
-      const tx = await FinancialTransaction.query({ client: trx })
-        .where('userId', user.id)
-        .where('id', params.id)
-        .forUpdate()
-        .first()
-      if (!tx) return { status: 404, error: 'Transaction not found.' }
-      if (!FinanceAccessService.canUse(tx.dataClassification, 'update', household))
-        return { status: 403, error: 'Household finance permission is required.' }
-      if (tx.status === 'reconciled')
-        return { status: 409, error: 'Reverse the reconciliation before voiding this transaction.' }
-      if (tx.status !== 'voided') {
-        tx.status = 'voided'
-        await tx.save()
+    const result = await AuditContext.runRequest(
+      ctx,
+      'financial_transaction.voided',
+      async (trx) => {
+        const tx = await FinancialTransaction.query({ client: trx })
+          .where('userId', user.id)
+          .where('id', params.id)
+          .forUpdate()
+          .first()
+        if (!tx) return { status: 404, error: 'Transaction not found.' }
+        if (!FinanceAccessService.canUse(tx.dataClassification, 'update', household))
+          return { status: 403, error: 'Household finance permission is required.' }
+        if (tx.status === 'reconciled')
+          return {
+            status: 409,
+            error: 'Reverse the reconciliation before voiding this transaction.',
+          }
+        if (tx.status !== 'voided') {
+          tx.status = 'voided'
+          await tx.save()
+        }
+        return { status: 200, reference: tx.referenceNumber }
       }
-      return { status: 200, reference: tx.referenceNumber }
-    })
+    )
     if (result.status !== 200) return response.status(result.status).send({ error: result.error })
     session.flash('success', `Ledger entry ${result.reference} voided.`)
     return response.redirect().back()
   }
 
+  /**
+   * Queues a finance report for the requested period.
+   *
+   * The aggregation runs in `#jobs/generate_finance_report` (queue `reports`) so a
+   * large ledger never blocks the request; the finished report lands in the
+   * operator's in-app feed.
+   */
+  async generateReport({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const periodStart = request.input('periodStart')
+    const periodEnd = request.input('periodEnd')
+    try {
+      await GenerateFinanceReport.dispatch({
+        userId: user.id,
+        periodStart: periodStart ? String(periodStart) : undefined,
+        periodEnd: periodEnd ? String(periodEnd) : undefined,
+        requestId: request.id(),
+      })
+      session.flash('success', 'Finance report queued; it will appear in your notifications.')
+      return response.redirect().back()
+    } catch (error) {
+      session.flash('error', (error as Error).message || 'Failed to queue the finance report.')
+      return response.redirect().back()
+    }
+  }
+
   async reconcileTransaction(ctx: HttpContext) {
     const { auth, request, response, params, session } = ctx
+    // The statement amount arrives as a self-contained PriceMoney object; the legacy
+    // `amount` + `currencyCode` pair is still accepted so older clients keep working.
+    const observed = request.input('observedAmount')
+    const observedMoney =
+      observed && typeof observed === 'object' && !Array.isArray(observed)
+        ? (observed as { amount?: unknown; currency_code?: unknown; currencyCode?: unknown })
+        : null
     try {
       await ManualReconciliationService.reconcile({
         user: auth.getUserOrFail(),
         transactionId: params.id,
         reference: request.input('sourceReference'),
-        amount: request.input('observedAmount'),
-        currency: request.input('currencyCode'),
+        amount: observedMoney ? observedMoney.amount : observed,
+        currency: observedMoney
+          ? (observedMoney.currency_code ?? observedMoney.currencyCode)
+          : request.input('currencyCode'),
         notes: request.input('notes'),
         requestId: request.id(),
       })
@@ -565,32 +654,38 @@ export default class FinanceController {
     if (await FinanceCategory.query().where('userId', user.id).where('slug', slug).first()) {
       return response.conflict({ error: 'A finance category with this name already exists.' })
     }
-    await FinanceCategory.create({
-      userId: user.id,
-      name,
-      slug,
-      categoryType: String(request.input('categoryType', 'expense')),
-      costBucket: [
-        'cogs',
-        'shipping',
-        'marketplace_fee',
-        'marketing',
-        'software',
-        'operations',
-        'manufacturing',
-        'tax',
-        'personal',
-        'other_income',
-        'sales_revenue',
-      ].includes(String(request.input('costBucket', 'operations')))
-        ? String(request.input('costBucket', 'operations'))
-        : String(request.input('costBucket')) === 'taxes'
-          ? 'tax'
-          : 'operations',
-      dataClassification: classification,
-      isTaxDeductible:
-        request.input('isTaxDeductible') === 'true' || request.input('isTaxDeductible') === true,
-      isActive: true,
+    await AuditContext.runRequest(ctx, 'finance_category.created', async (trx) => {
+      await FinanceCategory.create(
+        {
+          userId: user.id,
+          name,
+          slug,
+          categoryType: String(request.input('categoryType', 'expense')),
+          costBucket: [
+            'cogs',
+            'shipping',
+            'marketplace_fee',
+            'marketing',
+            'software',
+            'operations',
+            'manufacturing',
+            'tax',
+            'personal',
+            'other_income',
+            'sales_revenue',
+          ].includes(String(request.input('costBucket', 'operations')))
+            ? String(request.input('costBucket', 'operations'))
+            : String(request.input('costBucket')) === 'taxes'
+              ? 'tax'
+              : 'operations',
+          dataClassification: classification,
+          isTaxDeductible:
+            request.input('isTaxDeductible') === 'true' ||
+            request.input('isTaxDeductible') === true,
+          isActive: true,
+        },
+        { client: trx }
+      )
     })
     session.flash('success', `Finance category "${name}" saved.`)
     return response.redirect().back()
@@ -636,7 +731,10 @@ export default class FinanceController {
       category.isTaxDeductible =
         request.input('isTaxDeductible') === 'true' || request.input('isTaxDeductible') === true
     }
-    await category.save()
+    await AuditContext.runRequest(ctx, 'finance_category.updated', async (trx) => {
+      category.useTransaction(trx)
+      await category.save()
+    })
     session.flash('success', `Finance category "${category.name}" updated.`)
     return response.redirect().back()
   }
@@ -649,7 +747,10 @@ export default class FinanceController {
       .andWhere('id', params.id)
       .firstOrFail()
     if (!(await this.checkClassification(ctx, 'delete', category.dataClassification))) return
-    await category.delete()
+    await AuditContext.runRequest(ctx, 'finance_category.deleted', async (trx) => {
+      category.useTransaction(trx)
+      await category.delete()
+    })
     session.flash('success', 'Finance category deleted.')
     return response.redirect().back()
   }

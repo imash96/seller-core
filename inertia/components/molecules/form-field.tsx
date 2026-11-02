@@ -1,10 +1,16 @@
 import { PasswordField } from './password-field'
 import { MultiCurrencyPriceInput } from './multi-currency-price-input'
+import { MoneyField } from './money-field'
 
 export type FieldDef = {
   name: string
   label: string
-  kind?: 'text' | 'number' | 'email' | 'date' | 'select' | 'textarea' | 'password' | 'prices'
+  kind?:
+    'text' | 'number' | 'email' | 'date' | 'select' | 'textarea' | 'password' | 'prices' | 'money'
+  /** For `kind: 'money'` — ISO code the selector starts on (defaults to USD). */
+  defaultCurrency?: string
+  /** For `kind: 'money'` — name of another field whose value seeds the ISO code. */
+  currencyFrom?: string
   options?:
     | Array<{ value: string; label: string }>
     | ((values: Record<string, string>) => Array<{ value: string; label: string }>)
@@ -22,15 +28,22 @@ export function FormField({
   value,
   values,
   onChange,
+  onCurrencyChange,
   error,
 }: {
   field: FieldDef
   value: string
   values: Record<string, string>
   onChange: (nextValue: string) => void
+  /** For `kind: 'money'` — stores the chosen ISO code under `<name>__currency`. */
+  onCurrencyChange?: (nextCurrency: string) => void
   error?: string
 }) {
-  const isFullWidth = field.fullWidth || field.kind === 'textarea' || field.kind === 'prices'
+  const isFullWidth =
+    field.fullWidth ||
+    field.kind === 'textarea' ||
+    field.kind === 'prices' ||
+    field.kind === 'money'
   const colSpanClass = isFullWidth ? 'sm:col-span-2 lg:col-span-3' : ''
 
   if (field.kind === 'password') {
@@ -41,6 +54,30 @@ export function FormField({
           name={field.name}
           value={value}
           onChange={onChange}
+          required={field.required}
+          placeholder={field.placeholder}
+          description={field.description}
+          error={error}
+        />
+      </div>
+    )
+  }
+
+  if (field.kind === 'money') {
+    return (
+      <div className={colSpanClass}>
+        <MoneyField
+          label={field.label}
+          name={field.name}
+          amount={value}
+          currency={
+            values[`${field.name}__currency`] ||
+            (field.currencyFrom ? values[field.currencyFrom] : '') ||
+            field.defaultCurrency ||
+            'USD'
+          }
+          onAmountChange={onChange}
+          onCurrencyChange={(next) => onCurrencyChange?.(next)}
           required={field.required}
           placeholder={field.placeholder}
           description={field.description}

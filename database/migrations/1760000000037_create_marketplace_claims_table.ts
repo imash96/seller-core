@@ -65,9 +65,11 @@ export default class extends BaseSchema {
         )
         .notNullable()
         .defaultTo('opened')
-      table.string('currency_code', 3).notNullable().defaultTo('USD')
-      table.decimal('disputed_amount', 14, 2).notNullable().defaultTo(0)
-      table.decimal('seller_liability_amount', 14, 2).notNullable().defaultTo(0)
+      table.jsonb('disputed_total').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table
+        .jsonb('seller_liability_total')
+        .notNullable()
+        .defaultTo('{"currency_code":"USD","amount":0}')
       table.text('reason').nullable()
       table.jsonb('evidence_submitted').notNullable().defaultTo('{}')
       table.timestamp('respond_by_at', { useTz: true }).nullable()
@@ -76,6 +78,12 @@ export default class extends BaseSchema {
       table.timestamp('updated_at', { useTz: true }).notNullable().defaultTo(this.now())
     })
 
+    this.schema.raw(
+      'ALTER TABLE marketplace_claims ADD CONSTRAINT chk_marketplace_claims_disputed_total_money CHECK (is_valid_price_money(disputed_total, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE marketplace_claims ADD CONSTRAINT chk_marketplace_claims_seller_liability_total_money CHECK (is_valid_price_money(seller_liability_total, false))'
+    )
     this.schema.raw(
       'CREATE UNIQUE INDEX uq_marketplace_claims_user_number ON marketplace_claims (user_id, claim_number)'
     )

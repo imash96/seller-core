@@ -68,7 +68,7 @@ test.group('Local fulfillment HTTP workflow', () => {
     assert.include(login.headers.get('location') ?? '', 'dashboard')
     assert.equal((await send('/health/live')).status, 200)
     assert.equal((await send('/health/ready')).status, 200)
-    await send('/carrier-invoices', {
+    await send('/shipping-invoices', {
       carrierCode: 'ups',
       carrierName: 'UPS',
       invoiceNumber: `INV-${nonce}`,
@@ -87,10 +87,10 @@ test.group('Local fulfillment HTTP workflow', () => {
       paidAmount: '10',
       notes: 'Reviewed manually',
     }
-    assert.equal((await send(`/carrier-invoices/${invoice.id}`, manual)).status, 422)
+    assert.equal((await send(`/shipping-invoices/${invoice.id}`, manual)).status, 422)
     assert.equal(
       (
-        await send(`/carrier-invoices/${invoice.id}`, {
+        await send(`/shipping-invoices/${invoice.id}`, {
           ...manual,
           paymentReference: 'receipt-123',
           reconciliationStatus: 'matched',
@@ -100,7 +100,7 @@ test.group('Local fulfillment HTTP workflow', () => {
     )
     assert.equal(
       (
-        await send(`/carrier-invoices/${invoice.id}`, {
+        await send(`/shipping-invoices/${invoice.id}`, {
           ...manual,
           paymentReference: 'receipt-123',
         })
@@ -112,11 +112,12 @@ test.group('Local fulfillment HTTP workflow', () => {
     assert.equal(invoice.paymentReference, 'receipt-123')
     assert.lengthOf(
       await AuditLog.query()
+        .where('entityType', 'shipping_invoices')
         .where('entityId', invoice.id)
-        .where('action', 'shipping_invoice.manual_review'),
+        .whereRaw(`metadata ->> 'reason' = 'shipping_invoice.manual_review'`),
       1
     )
-    assert.equal((await send(`/carrier-invoices/${invoice.id}/delete`, {})).status, 409)
+    assert.equal((await send(`/shipping-invoices/${invoice.id}/delete`, {})).status, 409)
 
     const forged = await fetch(`${base}/orders`, {
       method: 'POST',
@@ -200,17 +201,17 @@ test.group('Local fulfillment HTTP workflow', () => {
       orderId: order.id,
       returnRequestId: rma.id,
       refundNumber: `REF-${nonce}`,
-      itemsRefundAmount: 10,
+      itemsRefundTotal: 10,
     })
     const refund = await RefundTransaction.query()
       .where('userId', user.id)
       .where('refundNumber', `REF-${nonce}`)
       .firstOrFail()
-    assert.equal(Number(refund.totalRefundAmount), 10)
+    assert.equal(refund.grandRefundTotal.amount, 10)
     await send('/refunds', {
       orderId: order.id,
       refundNumber: `OVER-${nonce}`,
-      itemsRefundAmount: 20,
+      itemsRefundTotal: 20,
     })
     assert.isNull(
       await RefundTransaction.query()

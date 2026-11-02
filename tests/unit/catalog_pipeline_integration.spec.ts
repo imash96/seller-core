@@ -84,12 +84,23 @@ test.group('Catalog pipeline integration', (group) => {
       assert.equal(product.variants.length, 10)
       for (const variant of product.variants) {
         assert.equal(variant.stockOnHand, 0)
-        assert.equal(
-          Number(variant.retailPrice),
-          variant.attributes.size_value === 'S' ? 229.99 : 239.99
-        )
+        // catalog_items is USD-only: the variant price array is derived from the USD tier price.
+        const usdPrice = variant.prices.find((price) => price.currency_code === 'USD')
+        const sizeAttribute = variant.variantAttributes.find((a) => a.attributeName === 'size')
+        assert.equal(usdPrice?.amount, sizeAttribute?.attributeValue === 'Small' ? 229.99 : 239.99)
         assert.isTrue(variant.variantAttributes.some((a) => a.attributeName === 'color'))
-        assert.isTrue(variant.variantAttributes.some((a) => a.attributeName === 'size'))
+        assert.isNotNull(sizeAttribute)
+        // product_variant_attributes is the source of truth; the JSONB map mirrors it
+        // as a clean { [dimension]: value } document with no derived duplicates.
+        assert.deepEqual(Object.keys(variant.attributes).sort(), [
+          'color',
+          'fit',
+          'material',
+          'size',
+        ])
+        for (const attribute of variant.variantAttributes) {
+          assert.equal(variant.attributes[attribute.attributeName], attribute.attributeValue)
+        }
       }
     }
     for (const platform of ['medusa', 'amazon', 'ebay', 'etsy'] as ListingPlatform[]) {

@@ -1,5 +1,10 @@
+import { Grid } from '@astryxdesign/core/Grid'
+import { Text } from '@astryxdesign/core/Text'
+import { Stack } from '@astryxdesign/core/Stack'
 import { router } from '@inertiajs/react'
+import { FeedbackBanner } from '~/modules/common/feedback-banner'
 import { getCsrfToken } from '~/lib/cookies'
+import { expandUsdPrice } from '~/lib/currency'
 import {
   PageHeader,
   PageSection,
@@ -146,7 +151,11 @@ export default function Listings({
             variantTitle: String(v.title),
             brandName: String((p.brand as any)?.name ?? 'Brand-Agnostic'),
             categoryName: String((p.category as any)?.name ?? 'Outerwear'),
-            retailPrice: Number(v.retailPrice ?? 0),
+            retailPrice: Number(
+              (Array.isArray(v.prices) ? (v.prices as PriceMoney[]) : []).find(
+                (price) => price.currency_code === 'USD'
+              )?.amount ?? 0
+            ),
             prices: Array.isArray(v.prices) ? (v.prices as PriceMoney[]) : undefined,
             stockOnHand: Number(v.stockOnHand ?? 0),
             platforms: [],
@@ -165,7 +174,7 @@ export default function Listings({
           variantTitle: String(l.variantTitle ?? sku),
           brandName: String(l.brandName ?? 'Artisan Hide'),
           categoryName: String(l.categoryName ?? 'Outerwear'),
-          retailPrice: Number(l.listedPrice ?? 0),
+          retailPrice: resolvePriceMoney(l.listedPriceMoney ?? l.listedPrice).amount,
           prices: Array.isArray(l.prices) ? (l.prices as PriceMoney[]) : undefined,
           stockOnHand: Number(l.allocatedQuantity ?? 0),
           platforms: [],
@@ -299,17 +308,15 @@ export default function Listings({
 
   const openEditModal = (listing: Row) => {
     setEditingListing(listing)
-    const cur = String(listing.currencyCode ?? 'USD').toUpperCase()
-    const baseAmt = Number(listing.listedPrice ?? 229.99)
-    const existingPrices: PriceMoney[] = Array.isArray(listing.prices)
-      ? (listing.prices as PriceMoney[])
-      : Array.isArray(listing.price)
-        ? (listing.price as PriceMoney[])
-        : [
-            { currency_code: cur, amount: baseAmt },
-            { currency_code: 'INR', amount: Number((baseAmt * 83.5).toFixed(2)) },
-            { currency_code: 'EUR', amount: Number((baseAmt * 0.92).toFixed(2)) },
-          ]
+    const listed = resolvePriceMoney(listing.listedPriceMoney ?? listing.listedPrice, 'USD')
+    const cur = listed.currency_code
+    const baseAmt = listed.amount
+    const existingPrices: PriceMoney[] =
+      Array.isArray(listing.prices) && (listing.prices as PriceMoney[]).length > 0
+        ? (listing.prices as PriceMoney[])
+        : Array.isArray(listing.price) && (listing.price as PriceMoney[]).length > 0
+          ? (listing.price as PriceMoney[])
+          : expandUsdPrice(baseAmt)
 
     setEditForm({
       externalListingId: String(listing.externalListingId ?? ''),
@@ -469,14 +476,14 @@ export default function Listings({
   const syncedCount = channelListings.filter((l) => l.syncStatus === 'synced').length
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Platform Listings Studio (/listing)"
         description="View generated e-commerce listings grouped by Variant SKU across Medusa Website, Amazon SP-API, eBay Inventory API, and Etsy Open API v3 with multi-currency ChannelListingPrice arrays."
         icon={Globe}
         badge={`${skuGroups.length} SKUs · ${channelListings.length} platform listings · ${syncedCount} synced`}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <AppButton
               label="← Catalog (/catalog)"
               variant="ghost"
@@ -503,7 +510,7 @@ export default function Listings({
               icon={Plus}
               onClick={() => setGenerateModalOpen(true)}
             />
-          </div>
+          </Stack>
         }
       />
 
@@ -547,29 +554,11 @@ export default function Listings({
       />
 
       {banner && (
-        <div
-          className={`flex items-start justify-between gap-3 rounded-2xl border p-4 text-sm ${
-            banner.tone === 'success'
-              ? 'border-success/40 bg-success-subtle text-foreground'
-              : 'border-error/40 bg-error-subtle text-foreground'
-          }`}
-        >
-          <div className="flex items-start gap-2.5">
-            {banner.tone === 'error' ? (
-              <AlertCircle className="h-5 w-5 text-error shrink-0 mt-0.5" />
-            ) : (
-              <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" />
-            )}
-            <p className="font-medium">{banner.message}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setBanner(null)}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            Dismiss
-          </button>
-        </div>
+        <FeedbackBanner
+          tone={banner.tone}
+          message={banner.message}
+          onDismiss={() => setBanner(null)}
+        />
       )}
 
       {/* Filter & View Switcher Toolbar + Card-Based SKU Listings */}
@@ -577,10 +566,15 @@ export default function Listings({
         title="Multi-Platform Listings Grouped by SKU"
         description="Each SKU card groups its generated Medusa Website, Amazon, eBay, and Etsy listings together with multi-currency ChannelListingPrice badges, draft exports and JSON download. Marketplace publishing is not configured."
       >
-        <div className="space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 rounded-2xl border border-card-border bg-muted/25 p-3.5">
-            <div className="flex items-center gap-2 flex-wrap flex-1">
-              <div className="w-full sm:w-64">
+        <Stack gap={4}>
+          <Stack
+            justify="between"
+            gap={3}
+            padding={3}
+            className="lg:flex-row lg:items-center rounded-2xl border border-card-border bg-muted/25"
+          >
+            <Stack direction="horizontal" align="center" wrap="wrap" gap={2} className="flex-1">
+              <Stack className="w-full sm:w-64">
                 <AppInput
                   icon={Search}
                   value={searchQuery}
@@ -588,7 +582,7 @@ export default function Listings({
                   onClear={() => setSearchQuery('')}
                   placeholder="Search SKU, Product, Brand..."
                 />
-              </div>
+              </Stack>
               {(['all', 'medusa', 'amazon', 'ebay', 'etsy'] as const).map((plat) => (
                 <button
                   key={plat}
@@ -603,7 +597,7 @@ export default function Listings({
                   {plat === 'all' ? 'All Platforms' : plat.toUpperCase()}
                 </button>
               ))}
-              <div className="w-40">
+              <Stack className="w-40">
                 <AppSelect
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
@@ -613,10 +607,10 @@ export default function Listings({
                     { value: 'draft', label: 'Draft' },
                   ]}
                 />
-              </div>
-            </div>
+              </Stack>
+            </Stack>
 
-            <div className="flex items-center gap-2">
+            <Stack direction="horizontal" align="center" gap={2}>
               <AppButton
                 label={`Grouped by SKU (${filteredSkuGroups.length})`}
                 variant={viewMode === 'grouped' ? 'primary' : 'outline'}
@@ -629,12 +623,16 @@ export default function Listings({
                 size="xs"
                 onClick={() => setViewMode('flat')}
               />
-            </div>
-          </div>
+            </Stack>
+          </Stack>
 
           {viewMode === 'grouped' ? (
             filteredSkuGroups.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border p-10 text-center space-y-3">
+              <Stack
+                gap={3}
+                padding={10}
+                className="rounded-2xl border border-dashed border-border text-center"
+              >
                 <p className="text-sm font-bold text-foreground">
                   No platform listings generated yet.
                 </p>
@@ -649,17 +647,23 @@ export default function Listings({
                   icon={Plus}
                   onClick={() => setGenerateModalOpen(true)}
                 />
-              </div>
+              </Stack>
             ) : (
-              <div className="space-y-4">
+              <Stack gap={4}>
                 {filteredSkuGroups.map((group) => (
-                  <div
+                  <Stack
                     key={group.sku}
                     className="rounded-2xl border border-card-border bg-card overflow-hidden shadow-xs"
                   >
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-divider bg-muted/30 px-5 py-3.5">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
+                    <Stack
+                      justify="between"
+                      gap={3}
+                      paddingInline={5}
+                      paddingBlock={3}
+                      className="md:flex-row md:items-center border-b border-divider bg-muted/30"
+                    >
+                      <Stack gap={1}>
+                        <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
                           <MonoBadge text={group.sku} />
                           <Badge label={`Brand: ${group.brandName}`} variant="purple" />
                           <Badge label={group.categoryName} variant="neutral" />
@@ -667,16 +671,16 @@ export default function Listings({
                             label={`${group.platforms.length} Platform Listings`}
                             variant="info"
                           />
-                        </div>
-                        <div className="text-sm font-extrabold text-foreground">
+                        </Stack>
+                        <Stack className="text-sm font-extrabold text-foreground">
                           {group.productTitle}{' '}
-                          <span className="text-muted-foreground font-normal">
+                          <Text color="secondary" weight="normal">
                             — {group.variantTitle}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="text-xs text-muted-foreground mr-2">
+                          </Text>
+                        </Stack>
+                      </Stack>
+                      <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
+                        <Stack className="text-xs text-muted-foreground mr-2">
                           Base Retail:{' '}
                           <strong className="text-price-current">
                             {convertToLocale({
@@ -685,7 +689,7 @@ export default function Listings({
                             })}
                           </strong>{' '}
                           · Stock: <strong>{group.stockOnHand}</strong>
-                        </div>
+                        </Stack>
                         <AppButton
                           disabled
                           label={
@@ -708,12 +712,18 @@ export default function Listings({
                             downloadJsonFile(`${group.sku}_multi_platform.json`, group)
                           }
                         />
-                      </div>
-                    </div>
+                      </Stack>
+                    </Stack>
 
                     {group.platforms.length === 0 ? (
-                      <div className="p-4 text-xs text-muted-foreground flex items-center justify-between">
-                        <span>No platform listings created for this SKU yet.</span>
+                      <Stack
+                        direction="horizontal"
+                        align="center"
+                        justify="between"
+                        padding={4}
+                        className="text-xs text-muted-foreground"
+                      >
+                        <Text>No platform listings created for this SKU yet.</Text>
                         <AppButton
                           label="+ Generate Platform Listings"
                           variant="secondary"
@@ -726,9 +736,12 @@ export default function Listings({
                             setGenerateModalOpen(true)
                           }}
                         />
-                      </div>
+                      </Stack>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-divider">
+                      <Grid
+                        columns={{ minWidth: 220, max: 1 }}
+                        className="md:grid-cols-2 xl:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-divider"
+                      >
                         {group.platforms.map((listing) => {
                           const platKey = String(listing.platform ?? 'medusa').toLowerCase()
                           const platMeta = PLATFORM_BADGES[platKey] ?? {
@@ -749,12 +762,20 @@ export default function Listings({
                                 ]
 
                           return (
-                            <div
+                            <Stack
+                              justify="between"
+                              gap={3}
+                              padding={4}
                               key={String(listing.id)}
-                              className="p-4 flex flex-col justify-between space-y-3 hover:bg-muted/15 transition-colors"
+                              className="hover:bg-muted/15 transition-colors"
                             >
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between gap-2">
+                              <Stack gap={2}>
+                                <Stack
+                                  direction="horizontal"
+                                  align="center"
+                                  justify="between"
+                                  gap={2}
+                                >
                                   <Badge label={platMeta.label} variant={platMeta.variant} />
                                   <Badge
                                     label={
@@ -764,34 +785,45 @@ export default function Listings({
                                     }
                                     variant={isSynced ? 'success' : 'warning'}
                                   />
-                                </div>
-                                <div className="font-mono text-xs font-bold text-foreground break-all">
+                                </Stack>
+                                <Stack className="font-mono text-xs font-bold text-foreground break-all">
                                   ID: {String(listing.externalListingId)}
-                                </div>
-                                <div className="space-y-1.5 pt-1">
-                                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                    <span>Multi-Currency Prices:</span>
-                                    <span>
+                                </Stack>
+                                <Stack gap={1.5} className="pt-1">
+                                  <Stack
+                                    direction="horizontal"
+                                    align="center"
+                                    justify="between"
+                                    className="text-xs text-muted-foreground"
+                                  >
+                                    <Text>Multi-Currency Prices:</Text>
+                                    <Text>
                                       Qty:{' '}
                                       <strong className="text-foreground">
                                         {String(listing.allocatedQuantity)}
                                       </strong>
-                                    </span>
-                                  </div>
+                                    </Text>
+                                  </Stack>
                                   <MultiCurrencyPriceStack
                                     prices={lPrices}
                                     primaryCurrency={lCur}
                                     maxBadges={4}
                                   />
-                                </div>
+                                </Stack>
                                 {listing.publishedUrl && (
-                                  <div className="text-[11px] font-mono text-success truncate">
+                                  <Stack className="text-2xs font-mono text-success truncate">
                                     ✓ {String(listing.publishedUrl)}
-                                  </div>
+                                  </Stack>
                                 )}
-                              </div>
+                              </Stack>
 
-                              <div className="flex items-center gap-1.5 flex-wrap pt-2.5 border-t border-divider">
+                              <Stack
+                                direction="horizontal"
+                                align="center"
+                                wrap="wrap"
+                                gap={1.5}
+                                className="pt-2.5 border-t border-divider"
+                              >
                                 <AppButton
                                   disabled
                                   label={
@@ -821,21 +853,21 @@ export default function Listings({
                                   icon={Edit3}
                                   onClick={() => openEditModal(listing)}
                                 />
-                              </div>
-                            </div>
+                              </Stack>
+                            </Stack>
                           )
                         })}
-                      </div>
+                      </Grid>
                     )}
-                  </div>
+                  </Stack>
                 ))}
-              </div>
+              </Stack>
             )
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-card-border bg-card shadow-xs">
+            <Stack className="overflow-x-auto rounded-2xl border border-card-border bg-card shadow-xs">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="border-b border-divider bg-muted/40 text-[11px] font-bold uppercase text-muted-foreground">
+                  <tr className="border-b border-divider bg-muted/40 text-2xs font-bold uppercase text-muted-foreground">
                     <th className="py-3.5 px-4">Variant SKU</th>
                     <th className="py-3.5 px-4">Platform</th>
                     <th className="py-3.5 px-4">External Listing ID</th>
@@ -868,8 +900,12 @@ export default function Listings({
                           {String(l.externalListingId)}
                         </td>
                         <td className="py-3 px-4">
-                          <div className="font-bold text-foreground">{String(l.productTitle)}</div>
-                          <div className="text-muted-foreground">Brand: {String(l.brandName)}</div>
+                          <Stack className="font-bold text-foreground">
+                            {String(l.productTitle)}
+                          </Stack>
+                          <Stack className="text-muted-foreground">
+                            Brand: {String(l.brandName)}
+                          </Stack>
                         </td>
                         <td className="py-3 px-4">
                           <MultiCurrencyPriceStack
@@ -877,12 +913,12 @@ export default function Listings({
                             primaryCurrency={lCur}
                             maxBadges={4}
                           />
-                          <div className="text-muted-foreground mt-1">
+                          <Stack className="text-muted-foreground mt-1">
                             Qty: {String(l.allocatedQuantity)}
-                          </div>
+                          </Stack>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex items-center gap-1.5">
+                          <Stack direction="horizontal" align="center" gap={1.5}>
                             <Badge
                               label={String(l.listingStatus)}
                               variant={STATUS_TONES[String(l.listingStatus)] ?? 'neutral'}
@@ -891,10 +927,10 @@ export default function Listings({
                               label={String(l.syncStatus)}
                               variant={l.syncStatus === 'synced' ? 'success' : 'warning'}
                             />
-                          </div>
+                          </Stack>
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                          <Stack direction="horizontal" align="center" justify="end" gap={1.5}>
                             <AppButton
                               disabled
                               label={
@@ -926,26 +962,39 @@ export default function Listings({
                               variant="ghost"
                               confirmText="Remove this platform listing?"
                             />
-                          </div>
+                          </Stack>
                         </td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
-            </div>
+            </Stack>
           )}
-        </div>
+        </Stack>
       </PageSection>
 
       {/* =====================================================================
           MODAL 1: GENERATE MULTI-PLATFORM LISTINGS FROM PRODUCTS + BRAND
          ===================================================================== */}
       {generateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between border-b border-divider px-6 py-4 bg-muted/30">
-              <div>
+        <Stack
+          direction="horizontal"
+          align="center"
+          justify="center"
+          padding={4}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
+        >
+          <Stack className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden">
+            <Stack
+              direction="horizontal"
+              align="center"
+              justify="between"
+              paddingInline={6}
+              paddingBlock={4}
+              className="border-b border-divider bg-muted/30"
+            >
+              <Stack>
                 <h2 className="text-lg font-bold text-foreground">
                   Generate Multi-Platform Listings
                 </h2>
@@ -953,7 +1002,7 @@ export default function Listings({
                   Link Products & Variants with a Brand and run platform transformers (including
                   multi-currency ChannelListingPrice arrays) for Medusa, Amazon, eBay, and Etsy.
                 </p>
-              </div>
+              </Stack>
               <button
                 type="button"
                 onClick={() => setGenerateModalOpen(false)}
@@ -961,9 +1010,9 @@ export default function Listings({
               >
                 <X className="h-5 w-5" />
               </button>
-            </div>
-            <div className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            </Stack>
+            <Stack gap={4} padding={6} className="text-xs">
+              <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
                 <AppSelect
                   label="1. Select Brand *"
                   value={selectedBrandId}
@@ -985,13 +1034,13 @@ export default function Listings({
                     })),
                   ]}
                 />
-              </div>
+              </Grid>
 
-              <div>
+              <Stack>
                 <label className="block font-semibold text-foreground mb-1.5">
                   2. Target E-Commerce Platforms *
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <Grid columns={{ minWidth: 220, max: 2 }}>
                   {(['medusa', 'amazon', 'ebay', 'etsy'] as const).map((plat) => {
                     const checked = selectedPlatforms.includes(plat)
                     return (
@@ -1012,18 +1061,22 @@ export default function Listings({
                             )
                           }
                         />
-                        <span>{PLATFORM_BADGES[plat].label}</span>
+                        <Text>{PLATFORM_BADGES[plat].label}</Text>
                       </label>
                     )
                   })}
-                </div>
-              </div>
+                </Grid>
+              </Stack>
 
-              <div>
+              <Stack>
                 <label className="block font-semibold text-foreground mb-1">
                   3. Filter Products (Leave unchecked to include all {products.length} products)
                 </label>
-                <div className="max-h-36 overflow-y-auto rounded-xl border border-input-border bg-muted/20 p-2.5 space-y-1.5">
+                <Stack
+                  gap={1.5}
+                  padding={2}
+                  className="max-h-36 overflow-y-auto rounded-xl border border-input-border bg-muted/20"
+                >
                   {products.map((p) => {
                     const id = String(p.id)
                     const checked = selectedProductIds.includes(id)
@@ -1038,17 +1091,19 @@ export default function Listings({
                             )
                           }
                         />
-                        <span className="text-foreground font-medium">{String(p.title)}</span>
-                        <span className="font-mono text-muted-foreground">
+                        <Text color="primary" weight="medium">
+                          {String(p.title)}
+                        </Text>
+                        <Text color="secondary" className="font-mono">
                           ({String(p.skuPrefix ?? '')})
-                        </span>
+                        </Text>
                       </label>
                     )
                   })}
-                </div>
-              </div>
+                </Stack>
+              </Stack>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+              <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
                 <AppInput
                   label="Channel Price Multiplier (1.0 = Base Tier Price)"
                   type="number"
@@ -1062,13 +1117,21 @@ export default function Listings({
                     checked={assignBrandToProduct}
                     onChange={(e) => setAssignBrandToProduct(e.target.checked)}
                   />
-                  <span className="text-foreground font-medium">
+                  <Text color="primary" weight="medium">
                     Also set selected Brand on Parent Product
-                  </span>
+                  </Text>
                 </label>
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-2 border-t border-divider px-6 py-4 bg-muted/25">
+              </Grid>
+            </Stack>
+            <Stack
+              direction="horizontal"
+              align="center"
+              justify="end"
+              gap={2}
+              paddingInline={6}
+              paddingBlock={4}
+              className="border-t border-divider bg-muted/25"
+            >
               <AppButton
                 label="Cancel"
                 variant="ghost"
@@ -1082,29 +1145,42 @@ export default function Listings({
                 loading={busyKey === 'gen-listings'}
                 onClick={handleGenerateListings}
               />
-            </div>
-          </div>
-        </div>
+            </Stack>
+          </Stack>
+        </Stack>
       )}
 
       {/* =====================================================================
           MODAL 2: COMPLETE EDIT CHANNEL LISTING MODAL (WITH MULTI-CURRENCY PRICES)
          ===================================================================== */}
       {editingListing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+        <Stack
+          direction="horizontal"
+          align="center"
+          justify="center"
+          padding={4}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs overflow-y-auto"
+        >
           <form
             onSubmit={handleSaveListingEdit}
-            className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+            className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden max-h-screen flex flex-col"
           >
-            <div className="flex items-center justify-between border-b border-divider px-6 py-4 bg-muted/30">
-              <div>
+            <Stack
+              direction="horizontal"
+              align="center"
+              justify="between"
+              paddingInline={6}
+              paddingBlock={4}
+              className="border-b border-divider bg-muted/30"
+            >
+              <Stack>
                 <h2 className="text-base font-bold text-foreground">
                   Edit Platform Listing ({String(editingListing.platform).toUpperCase()})
                 </h2>
                 <p className="text-xs text-muted-foreground font-mono">
                   SKU: {String(editingListing.externalSku)}
                 </p>
-              </div>
+              </Stack>
               <button
                 type="button"
                 onClick={() => setEditingListing(null)}
@@ -1112,9 +1188,14 @@ export default function Listings({
               >
                 <X className="h-5 w-5" />
               </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            </Stack>
+            <Stack
+              direction="horizontal"
+              gap={4}
+              padding={6}
+              className="flex-1 overflow-y-auto text-xs"
+            >
+              <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
                 <AppInput
                   label="External Listing ID / Offer ID *"
                   required
@@ -1142,16 +1223,23 @@ export default function Listings({
                   onChange={(e) => setEditForm({ ...editForm, channelCategoryId: e.target.value })}
                 />
                 <AppInput
-                  label="Primary Currency Code"
-                  value={editForm.currencyCode}
-                  onChange={(e) => setEditForm({ ...editForm, currencyCode: e.target.value })}
-                />
-                <AppInput
-                  label="Primary Listed Price"
+                  label="Listed price (USD — anchor for the other currencies)"
                   type="number"
                   step="0.01"
                   value={editForm.listedPrice}
-                  onChange={(e) => setEditForm({ ...editForm, listedPrice: e.target.value })}
+                  onChange={(e) => {
+                    const usd = Number(e.target.value)
+                    setEditForm({
+                      ...editForm,
+                      listedPrice: e.target.value,
+                      currencyCode: 'USD',
+                      // Every other currency follows the USD anchor; overrides survive.
+                      prices: expandUsdPrice(Number.isFinite(usd) ? usd : 0, {
+                        existing: editForm.prices,
+                        preserveOverrides: true,
+                      }),
+                    })
+                  }}
                 />
                 <AppInput
                   label="Allocated Quantity"
@@ -1183,7 +1271,7 @@ export default function Listings({
                     { value: 'failed', label: 'failed' },
                   ]}
                 />
-                <div className="sm:col-span-2">
+                <Stack className="sm:col-span-2">
                   <MultiCurrencyPriceInput
                     label="Multi-Currency Listing Prices (ChannelListingPrice)"
                     value={editForm.prices}
@@ -1203,15 +1291,15 @@ export default function Listings({
                       })
                     }}
                   />
-                </div>
-                <div className="sm:col-span-2">
+                </Stack>
+                <Stack className="sm:col-span-2">
                   <AppInput
                     label="Channel Title Override"
                     value={editForm.channelTitle}
                     onChange={(e) => setEditForm({ ...editForm, channelTitle: e.target.value })}
                   />
-                </div>
-                <div className="sm:col-span-2">
+                </Stack>
+                <Stack className="sm:col-span-2">
                   <AppTextarea
                     label="Channel Description Override"
                     rows={3}
@@ -1220,10 +1308,18 @@ export default function Listings({
                       setEditForm({ ...editForm, channelDescription: e.target.value })
                     }
                   />
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-2 border-t border-divider px-6 py-4 bg-muted/25">
+                </Stack>
+              </Grid>
+            </Stack>
+            <Stack
+              direction="horizontal"
+              align="center"
+              justify="end"
+              gap={2}
+              paddingInline={6}
+              paddingBlock={4}
+              className="border-t border-divider bg-muted/25"
+            >
               <AppButton
                 label="Cancel"
                 variant="ghost"
@@ -1231,9 +1327,9 @@ export default function Listings({
                 onClick={() => setEditingListing(null)}
               />
               <AppButton label="Save Listing Changes" variant="primary" size="sm" type="submit" />
-            </div>
+            </Stack>
           </form>
-        </div>
+        </Stack>
       )}
 
       {/* =====================================================================
@@ -1285,15 +1381,18 @@ export default function Listings({
         }
       >
         {inspectListing && (
-          <div className="space-y-4 text-xs">
-            <div className="grid grid-cols-2 gap-2 rounded-xl border border-card-border bg-muted/20 p-3.5">
-              <div>
+          <Stack gap={4} className="text-xs">
+            <Grid
+              columns={{ minWidth: 220, max: 2 }}
+              className="rounded-xl border border-card-border bg-muted/20 p-3.5"
+            >
+              <Stack>
                 <strong>Product:</strong> {String(inspectListing.productTitle)}
-              </div>
-              <div>
+              </Stack>
+              <Stack>
                 <strong>Brand:</strong> {String(inspectListing.brandName)}
-              </div>
-              <div className="col-span-2">
+              </Stack>
+              <Stack className="col-span-2">
                 <strong className="block mb-1">Multi-Currency Prices (ChannelListingPrice):</strong>
                 <MultiCurrencyPriceStack
                   prices={
@@ -1309,17 +1408,17 @@ export default function Listings({
                   primaryCurrency={String(inspectListing.currencyCode ?? 'USD')}
                   maxBadges={6}
                 />
-              </div>
-              <div>
+              </Stack>
+              <Stack>
                 <strong>Sync Status:</strong> {String(inspectListing.syncStatus)}
-              </div>
-            </div>
+              </Stack>
+            </Grid>
 
-            <div className="space-y-1.5">
-              <div className="font-bold text-foreground">
+            <Stack gap={1.5}>
+              <Stack className="font-bold text-foreground">
                 Generated Platform Transformer JSON Payload
-              </div>
-              <pre className="rounded-xl border border-card-border bg-muted/30 p-4 font-mono text-[11px] text-foreground overflow-x-auto">
+              </Stack>
+              <pre className="rounded-xl border border-card-border bg-muted/30 p-4 font-mono text-2xs text-foreground overflow-x-auto">
                 {JSON.stringify(
                   inspectListing.transformedPayload ??
                     inspectListing.channelAttributes ??
@@ -1328,10 +1427,10 @@ export default function Listings({
                   2
                 )}
               </pre>
-            </div>
-          </div>
+            </Stack>
+          </Stack>
         )}
       </SlideOverDrawer>
-    </div>
+    </Stack>
   )
 }

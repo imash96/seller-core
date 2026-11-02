@@ -37,8 +37,10 @@ export default class extends BaseSchema {
       table.string('channel_title', 500).nullable()
       table.text('channel_description').nullable()
       table.string('channel_category_id', 150).nullable()
-      table.string('currency_code', 3).notNullable().defaultTo('USD')
-      table.decimal('listed_price', 14, 2).notNullable().defaultTo(0)
+      // Multi-currency listing prices plus the primary listed amount as a
+      // self-contained PriceMoney object.
+      table.jsonb('prices').notNullable().defaultTo('[]')
+      table.jsonb('listed_price').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
       table.integer('allocated_quantity').notNullable().defaultTo(0)
       table
         .enum('listing_status', ['draft', 'active', 'paused', 'suppressed', 'ended', 'error'], {
@@ -71,6 +73,12 @@ export default class extends BaseSchema {
       table.timestamp('updated_at', { useTz: true }).notNullable().defaultTo(this.now())
     })
 
+    this.schema.raw(
+      'ALTER TABLE channel_listings ADD CONSTRAINT chk_channel_listings_prices_medusa CHECK (is_valid_medusa_prices_array(prices))'
+    )
+    this.schema.raw(
+      'ALTER TABLE channel_listings ADD CONSTRAINT chk_channel_listings_listed_price_money CHECK (is_valid_price_money(listed_price, false))'
+    )
     this.schema.raw(
       'CREATE UNIQUE INDEX uq_channel_listings_account_ext_variant ON channel_listings (seller_account_id, external_listing_id, product_variant_id)'
     )

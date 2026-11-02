@@ -1,4 +1,8 @@
+import { Grid } from '@astryxdesign/core/Grid'
+import { Text } from '@astryxdesign/core/Text'
+import { Stack } from '@astryxdesign/core/Stack'
 import { router } from '@inertiajs/react'
+import { FeedbackBanner } from '~/modules/common/feedback-banner'
 import { getCsrfToken } from '~/lib/cookies'
 import {
   PageHeader,
@@ -18,6 +22,7 @@ import {
   STATUS_TONES,
   convertToLocale,
   resolvePriceMoney,
+  moneyAmountString,
   type PriceMoney,
   type Row,
 } from '~/lib/ui'
@@ -278,14 +283,14 @@ export default function Products({
   const brandLinkedCount = products.filter((p) => Boolean(p.brandId)).length
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Products, Variants, Brands & Categories (/products)"
         description="Click any Product Card to open its Slide-Over Detail & Multi-Currency Variants Drawer, or click 'Convert to Listing' to link a Brand and generate multi-platform listings."
         icon={Box}
         badge={`${products.length} products · ${variantRows.length} variants · ${flatListings.length} listings`}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <AppButton
               label="← Catalog (/catalog)"
               variant="secondary"
@@ -326,7 +331,7 @@ export default function Products({
               icon={Plus}
               onClick={() => setCreateProductOpen(true)}
             />
-          </div>
+          </Stack>
         }
       />
 
@@ -375,41 +380,23 @@ export default function Products({
       {savedViews && savedViews.length > 0 && <SavedViewsBar views={savedViews} />}
 
       {banner && (
-        <div
-          className={`flex items-start justify-between gap-3 rounded-2xl border p-4 text-sm ${
-            banner.tone === 'success'
-              ? 'border-success/40 bg-success-subtle text-foreground'
-              : 'border-error/40 bg-error-subtle text-foreground'
-          }`}
-        >
-          <div className="flex items-start gap-2.5">
-            {banner.tone === 'error' ? (
-              <AlertCircle className="h-5 w-5 text-error shrink-0 mt-0.5" />
-            ) : (
-              <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" />
-            )}
-            <div className="space-y-1">
-              <p className="font-medium">{banner.message}</p>
-              {banner.tone === 'success' && (
-                <button
-                  type="button"
-                  onClick={() => router.visit('/listing')}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-primary underline cursor-pointer"
-                >
-                  <span>Open /listing to review & publish by SKU</span>
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setBanner(null)}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            Dismiss
-          </button>
-        </div>
+        <FeedbackBanner
+          tone={banner.tone}
+          message={banner.message}
+          onDismiss={() => setBanner(null)}
+          action={
+            banner.tone === 'success' ? (
+              <AppButton
+                variant="outline"
+                size="xs"
+                icon={ExternalLink}
+                onClick={() => router.visit('/listing')}
+              >
+                Review &amp; publish
+              </AppButton>
+            ) : undefined
+          }
+        />
       )}
 
       {/* =====================================================================
@@ -419,7 +406,7 @@ export default function Products({
         title="Generated Products (Click Any Card to Inspect Details & Multi-Currency Variants)"
         description="Products converted from /catalog carry multi-currency ProductPrice & ProductVariantPrice arrays (USD, INR, EUR, GBP, CAD, MXN). Click any card to inspect variants or convert to listings."
         actions={
-          <div className="flex items-center gap-2">
+          <Stack direction="horizontal" align="center" gap={2}>
             <AppButton
               label="+ Add Variant"
               variant="secondary"
@@ -434,11 +421,14 @@ export default function Products({
               icon={Plus}
               onClick={() => setCreateProductOpen(true)}
             />
-          </div>
+          </Stack>
         }
       >
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 rounded-2xl border border-card-border bg-muted/25 p-3.5">
+        <Stack gap={4}>
+          <Grid
+            columns={{ minWidth: 220, max: 1 }}
+            className="md:grid-cols-2 lg:grid-cols-4 rounded-2xl border border-card-border bg-muted/25 p-3.5"
+          >
             <AppInput
               label="Search Products"
               icon={Search}
@@ -481,14 +471,18 @@ export default function Products({
                 ...categories.map((c) => ({ value: String(c.id), label: String(c.name) })),
               ]}
             />
-          </div>
+          </Grid>
 
           {filteredProducts.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border p-10 text-center space-y-3">
+            <Stack
+              gap={3}
+              padding={10}
+              className="rounded-2xl border border-dashed border-border text-center"
+            >
               <p className="text-sm font-bold text-foreground">
                 No products match your active filters.
               </p>
-              <div className="flex items-center justify-center gap-2">
+              <Stack direction="horizontal" align="center" justify="center" gap={2}>
                 <AppButton
                   label="Convert from /catalog"
                   variant="secondary"
@@ -501,10 +495,10 @@ export default function Products({
                   size="sm"
                   onClick={() => setCreateProductOpen(true)}
                 />
-              </div>
-            </div>
+              </Stack>
+            </Stack>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <Grid columns={{ minWidth: 220, max: 1 }} className="md:grid-cols-2 xl:grid-cols-3">
               {filteredProducts.map((product) => {
                 const pVariants = (product.variants as Row[]) ?? []
                 const pImages = Array.isArray(product.images) ? product.images : []
@@ -537,22 +531,29 @@ export default function Products({
                 const catPath = (product.category as any)?.taxonomyPath ?? ''
 
                 return (
-                  <div
+                  <Stack
+                    justify="between"
                     key={String(product.id)}
                     onClick={() => setInspectProduct(product)}
-                    className="group rounded-2xl border border-card-border bg-card text-card-foreground hover:border-primary/45 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden cursor-pointer"
+                    className="group rounded-2xl border border-card-border bg-card text-card-foreground hover:border-primary/45 shadow-xs hover:shadow-md transition-all duration-200 overflow-hidden cursor-pointer"
                   >
-                    <div className="p-5 space-y-4">
-                      <div className="flex items-start gap-4">
+                    <Stack gap={4} padding={5}>
+                      <Stack direction="horizontal" align="start" gap={4}>
                         <ThumbnailStack items={thumbItems} size="md" />
-                        <div className="min-w-0 flex-1 space-y-1.5">
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <Stack direction="horizontal" gap={1.5} className="min-w-0 flex-1">
+                          <Stack
+                            direction="horizontal"
+                            align="center"
+                            justify="between"
+                            wrap="wrap"
+                            gap={2}
+                          >
                             <MonoBadge text={String(product.skuPrefix ?? product.slug ?? 'SKU')} />
                             <Badge
                               label={String(product.status ?? 'active')}
                               variant={STATUS_TONES[String(product.status)] ?? 'success'}
                             />
-                          </div>
+                          </Stack>
                           <h3 className="text-sm sm:text-base font-extrabold text-foreground group-hover:text-primary transition-colors line-clamp-2 leading-snug">
                             {String(product.title)}
                           </h3>
@@ -561,10 +562,10 @@ export default function Products({
                               {String(product.subTitle)}
                             </p>
                           )}
-                        </div>
-                      </div>
+                        </Stack>
+                      </Stack>
 
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                      <Stack direction="horizontal" align="center" wrap="wrap" gap={1.5}>
                         {brandName ? (
                           <Badge label={`Brand: ${brandName}`} variant="purple" />
                         ) : (
@@ -572,48 +573,70 @@ export default function Products({
                         )}
                         <Badge label={catName} variant="info" />
                         {catPath && (
-                          <span className="font-mono text-[10px] text-muted-foreground truncate">
+                          <Text size="3xs" color="secondary" maxLines={1} className="font-mono">
                             /{catPath}
-                          </span>
+                          </Text>
                         )}
-                      </div>
+                      </Stack>
 
-                      <div className="pt-3 border-t border-divider space-y-2.5 text-xs">
-                        <div className="flex items-center justify-between gap-2">
-                          <div>
-                            <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <Stack gap={2} className="pt-3 border-t border-divider text-xs">
+                        <Stack direction="horizontal" align="center" justify="between" gap={2}>
+                          <Stack>
+                            <Text
+                              size="3xs"
+                              color="secondary"
+                              weight="bold"
+                              className="block uppercase tracking-wider"
+                            >
                               Variants
-                            </span>
-                            <span className="font-extrabold text-foreground">
+                            </Text>
+                            <Text color="primary" className="font-extrabold">
                               {pVariants.length} SKUs
-                            </span>
-                          </div>
-                          <div className="text-right">
-                            <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            </Text>
+                          </Stack>
+                          <Stack className="text-right">
+                            <Text
+                              size="3xs"
+                              color="secondary"
+                              weight="bold"
+                              className="block uppercase tracking-wider"
+                            >
                               Total Stock
-                            </span>
-                            <span className="font-extrabold text-foreground tabular-nums">
+                            </Text>
+                            <Text color="primary" hasTabularNumbers className="font-extrabold">
                               {totalStock} units
-                            </span>
-                          </div>
-                        </div>
+                            </Text>
+                          </Stack>
+                        </Stack>
 
-                        <div className="rounded-xl border border-divider bg-muted/20 p-2.5">
-                          <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                        <Stack padding={2} className="rounded-xl border border-divider bg-muted/20">
+                          <Text
+                            size="3xs"
+                            color="secondary"
+                            weight="bold"
+                            className="block uppercase tracking-wider mb-1"
+                          >
                             Multi-Currency Prices (ProductPrice)
-                          </span>
+                          </Text>
                           <MultiCurrencyPriceStack
                             prices={productPrices}
                             primaryCurrency="USD"
                             maxBadges={5}
                           />
-                        </div>
-                      </div>
-                    </div>
+                        </Stack>
+                      </Stack>
+                    </Stack>
 
-                    <div
+                    <Stack
+                      direction="horizontal"
+                      align="center"
+                      justify="between"
+                      wrap="wrap"
+                      gap={2}
+                      paddingInline={5}
+                      paddingBlock={3}
                       onClick={(e) => e.stopPropagation()}
-                      className="px-5 py-3 bg-muted/30 border-t border-divider flex items-center justify-between gap-2 flex-wrap"
+                      className="bg-muted/30 border-t border-divider"
                     >
                       <AppButton
                         label="Convert to Listing"
@@ -622,7 +645,7 @@ export default function Products({
                         icon={Sparkles}
                         onClick={() => openConvertToListingModal(product)}
                       />
-                      <div className="flex items-center gap-1.5">
+                      <Stack direction="horizontal" align="center" gap={1.5}>
                         <AppButton
                           label="Variants"
                           variant="secondary"
@@ -644,14 +667,14 @@ export default function Products({
                           size="xs"
                           onClick={() => setAddVariantFor(product)}
                         />
-                      </div>
-                    </div>
-                  </div>
+                      </Stack>
+                    </Stack>
+                  </Stack>
                 )
               })}
-            </div>
+            </Grid>
           )}
-        </div>
+        </Stack>
       </PageSection>
 
       {/* =====================================================================
@@ -671,7 +694,7 @@ export default function Products({
         }
       >
         {brands.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border p-6 text-center">
+          <Stack padding={6} className="rounded-xl border border-dashed border-border text-center">
             <p className="text-xs text-muted-foreground mb-2">No brands registered yet.</p>
             <AppButton
               label="+ Create First Brand"
@@ -679,43 +702,52 @@ export default function Products({
               size="xs"
               onClick={() => setCreateBrandOpen(true)}
             />
-          </div>
+          </Stack>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2 lg:grid-cols-3">
             {brands.map((brand) => (
-              <div
+              <Stack
+                justify="between"
+                gap={3}
+                padding={4}
                 key={String(brand.id)}
-                className="rounded-2xl border border-card-border bg-card p-4 flex flex-col justify-between gap-3 shadow-xs hover:border-primary/35 transition-all"
+                className="rounded-2xl border border-card-border bg-card shadow-xs hover:border-primary/35 transition-all"
               >
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-extrabold text-foreground">
+                <Stack gap={1.5}>
+                  <Stack direction="horizontal" align="center" justify="between" gap={2}>
+                    <Text size="sm" color="primary" className="font-extrabold">
                       {String(brand.name)}
-                    </span>
+                    </Text>
                     <Badge
                       label={brand.isActive !== false ? 'Active' : 'Inactive'}
                       variant={brand.isActive !== false ? 'success' : 'neutral'}
                     />
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
+                  </Stack>
+                  <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
                     <MonoBadge text={String(brand.slug)} />
                     {brand.regNo && (
-                      <span className="text-[11px] text-muted-foreground font-mono">
+                      <Text size="2xs" color="secondary" className="font-mono">
                         Reg: {String(brand.regNo)}
-                      </span>
+                      </Text>
                     )}
                     {brand.serialNo && (
-                      <span className="text-[11px] text-muted-foreground font-mono">
+                      <Text size="2xs" color="secondary" className="font-mono">
                         Ser: {String(brand.serialNo)}
-                      </span>
+                      </Text>
                     )}
-                  </div>
+                  </Stack>
                   {brand.websiteUrl && (
                     <p className="text-xs text-link truncate">{String(brand.websiteUrl)}</p>
                   )}
-                </div>
+                </Stack>
 
-                <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-divider">
+                <Stack
+                  direction="horizontal"
+                  align="center"
+                  justify="end"
+                  gap={2}
+                  className="pt-2.5 border-t border-divider"
+                >
                   <AppButton
                     label="Edit Brand"
                     variant="secondary"
@@ -729,10 +761,10 @@ export default function Products({
                     variant="ghost"
                     confirmText={`Delete brand "${brand.name}"?`}
                   />
-                </div>
-              </div>
+                </Stack>
+              </Stack>
             ))}
-          </div>
+          </Grid>
         )}
       </PageSection>
 
@@ -743,7 +775,7 @@ export default function Products({
         title="Medusa Product Categories (/store/product-categories)"
         description="Hierarchical product taxonomy with platform category IDs (Amazon Browse Node, eBay Category ID, Etsy Taxonomy ID, Google Category ID)."
         actions={
-          <div className="flex items-center gap-2">
+          <Stack direction="horizontal" align="center" gap={2}>
             <AppButton
               label={syncingCategories ? 'Syncing...' : 'Sync Medusa Categories'}
               variant="secondary"
@@ -759,13 +791,13 @@ export default function Products({
               icon={Plus}
               onClick={() => setCreateCategoryOpen(true)}
             />
-          </div>
+          </Stack>
         }
       >
-        <div className="overflow-x-auto rounded-2xl border border-card-border bg-card">
+        <Stack className="overflow-x-auto rounded-2xl border border-card-border bg-card">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-divider bg-muted/40 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b border-divider bg-muted/40 text-2xs font-bold uppercase tracking-wider text-muted-foreground">
                 <th className="py-3 px-4">Category Name</th>
                 <th className="py-3 px-4">Medusa Handle / Taxonomy Path</th>
                 <th className="py-3 px-4">Platform Taxonomy Mappings</th>
@@ -784,7 +816,7 @@ export default function Products({
                       <MonoBadge text={String(cat.taxonomyPath ?? cat.slug)} />
                     </td>
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                      <Stack direction="horizontal" align="center" wrap="wrap" gap={1.5}>
                         {meta.amazon_browse_node && (
                           <Badge label={`AMZ: ${meta.amazon_browse_node}`} variant="warning" />
                         )}
@@ -803,9 +835,9 @@ export default function Products({
                         {!meta.amazon_browse_node &&
                           !meta.ebay_category_id &&
                           !meta.etsy_taxonomy_id && (
-                            <span className="text-muted-foreground">Standard Category</span>
+                            <Text color="secondary">Standard Category</Text>
                           )}
-                      </div>
+                      </Stack>
                     </td>
                     <td className="py-3 px-4">
                       <Badge
@@ -814,7 +846,7 @@ export default function Products({
                       />
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <Stack direction="horizontal" align="center" justify="end" gap={1.5}>
                         <AppButton
                           label="Edit"
                           variant="secondary"
@@ -828,14 +860,14 @@ export default function Products({
                           variant="ghost"
                           confirmText={`Delete category "${cat.name}"?`}
                         />
-                      </div>
+                      </Stack>
                     </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
-        </div>
+        </Stack>
       </PageSection>
 
       {/* =====================================================================
@@ -866,7 +898,7 @@ export default function Products({
         footer={
           inspectProduct ? (
             <>
-              <div className="flex items-center gap-2">
+              <Stack direction="horizontal" align="center" gap={2}>
                 <AppButton
                   label="Edit Product"
                   variant="secondary"
@@ -889,7 +921,7 @@ export default function Products({
                     setAddVariantFor(p)
                   }}
                 />
-              </div>
+              </Stack>
               <AppButton
                 label="Convert Product to Platform Listings"
                 variant="primary"
@@ -906,28 +938,31 @@ export default function Products({
         }
       >
         {inspectProduct && (
-          <div className="space-y-5 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-card-border bg-muted/25 p-4">
-              <div>
-                <span className="text-[10px] font-bold uppercase text-muted-foreground block">
+          <Stack gap={5} className="text-xs">
+            <Grid
+              columns={{ minWidth: 220, max: 1 }}
+              className="sm:grid-cols-2 rounded-2xl border border-card-border bg-muted/25 p-4"
+            >
+              <Stack>
+                <Text size="3xs" color="secondary" weight="bold" className="uppercase block">
                   Title (75 / 80 Char)
-                </span>
+                </Text>
                 <p className="font-semibold text-foreground mt-0.5">
                   {String(inspectProduct.title80 || inspectProduct.title75 || inspectProduct.title)}
                 </p>
-              </div>
-              <div>
-                <span className="text-[10px] font-bold uppercase text-muted-foreground block">
+              </Stack>
+              <Stack>
+                <Text size="3xs" color="secondary" weight="bold" className="uppercase block">
                   Medusa Category Path
-                </span>
+                </Text>
                 <p className="font-mono text-primary mt-0.5">
                   /{String((inspectProduct.category as any)?.taxonomyPath ?? inspectProduct.slug)}
                 </p>
-              </div>
-              <div className="sm:col-span-2">
-                <span className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">
+              </Stack>
+              <Stack className="sm:col-span-2">
+                <Text size="3xs" color="secondary" weight="bold" className="uppercase block mb-1">
                   Parent Product Multi-Currency Prices (ProductPrice)
-                </span>
+                </Text>
                 <MultiCurrencyPriceStack
                   prices={
                     Array.isArray(inspectProduct.prices)
@@ -937,19 +972,19 @@ export default function Products({
                   primaryCurrency="USD"
                   maxBadges={6}
                 />
-              </div>
-              <div className="sm:col-span-2">
-                <span className="text-[10px] font-bold uppercase text-muted-foreground block">
+              </Stack>
+              <Stack className="sm:col-span-2">
+                <Text size="3xs" color="secondary" weight="bold" className="uppercase block">
                   SEO Description
-                </span>
+                </Text>
                 <p className="text-foreground-secondary mt-0.5 leading-relaxed">
                   {String(inspectProduct.description || inspectProduct.shortDescription || '—')}
                 </p>
-              </div>
-            </div>
+              </Stack>
+            </Grid>
 
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
+            <Stack gap={2}>
+              <Stack direction="horizontal" align="center" justify="between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Product Variants ({((inspectProduct.variants as Row[]) ?? []).length} SKUs)
                 </h3>
@@ -964,11 +999,11 @@ export default function Products({
                     setAddVariantFor(p)
                   }}
                 />
-              </div>
+              </Stack>
 
-              <div className="overflow-x-auto rounded-2xl border border-card-border bg-card">
+              <Stack className="overflow-x-auto rounded-2xl border border-card-border bg-card">
                 <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-muted/40 border-b border-divider text-[11px] font-bold uppercase text-muted-foreground">
+                  <thead className="bg-muted/40 border-b border-divider text-2xs font-bold uppercase text-muted-foreground">
                     <tr>
                       <th className="py-2.5 px-3.5">Variant SKU</th>
                       <th className="py-2.5 px-3.5">Title (Color / Size)</th>
@@ -1007,7 +1042,7 @@ export default function Products({
                             {String(v.stockOnHand)}
                           </td>
                           <td className="py-2.5 px-3.5 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
+                            <Stack direction="horizontal" align="center" justify="end" gap={1.5}>
                               <AppButton
                                 label="Adjust"
                                 variant="secondary"
@@ -1023,16 +1058,16 @@ export default function Products({
                                 variant="ghost"
                                 confirmText={`Delete variant ${v.sku}?`}
                               />
-                            </div>
+                            </Stack>
                           </td>
                         </tr>
                       )
                     })}
                   </tbody>
                 </table>
-              </div>
-            </div>
-          </div>
+              </Stack>
+            </Stack>
+          </Stack>
         )}
       </SlideOverDrawer>
 
@@ -1040,17 +1075,30 @@ export default function Products({
           MODAL: CONVERT PRODUCT TO PLATFORM LISTINGS (BRAND + MULTI-PLATFORM)
          ===================================================================== */}
       {convertModalProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden">
-            <div className="flex items-start justify-between border-b border-divider px-6 py-4 bg-muted/30">
-              <div>
-                <div className="flex items-center gap-2">
+        <Stack
+          direction="horizontal"
+          align="center"
+          justify="center"
+          padding={4}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
+        >
+          <Stack className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden">
+            <Stack
+              direction="horizontal"
+              align="start"
+              justify="between"
+              paddingInline={6}
+              paddingBlock={4}
+              className="border-b border-divider bg-muted/30"
+            >
+              <Stack>
+                <Stack direction="horizontal" align="center" gap={2}>
                   <MonoBadge text={String(convertModalProduct.skuPrefix ?? 'PRODUCT')} />
                   <Badge
                     label={`${((convertModalProduct.variants as Row[]) ?? []).length} Variants`}
                     variant="info"
                   />
-                </div>
+                </Stack>
                 <h2 className="text-lg font-bold text-foreground mt-1">
                   Convert Product to Platform Listings
                 </h2>
@@ -1059,7 +1107,7 @@ export default function Products({
                   generate platform-specific listings (with multi-currency ChannelListingPrice
                   arrays) for Medusa Website, Amazon, eBay, and Etsy.
                 </p>
-              </div>
+              </Stack>
               <button
                 type="button"
                 onClick={() => setConvertModalProduct(null)}
@@ -1067,14 +1115,14 @@ export default function Products({
               >
                 <X className="h-5 w-5" />
               </button>
-            </div>
+            </Stack>
 
-            <div className="p-6 space-y-4 text-xs">
-              <div>
+            <Stack gap={4} padding={6} className="text-xs">
+              <Stack>
                 <label className="block font-semibold text-foreground mb-1">
                   1. Link Brand to Product & Listings *
                 </label>
-                <div className="flex items-center gap-2">
+                <Stack direction="horizontal" align="center" gap={2}>
                   <select
                     value={selectedBrandId}
                     onChange={(e) => setSelectedBrandId(e.target.value)}
@@ -1093,14 +1141,14 @@ export default function Products({
                     size="sm"
                     onClick={() => setCreateBrandOpen(true)}
                   />
-                </div>
-              </div>
+                </Stack>
+              </Stack>
 
-              <div>
+              <Stack>
                 <label className="block font-semibold text-foreground mb-1.5">
                   2. Select Target E-Commerce Platforms *
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
                   {PLATFORMS.map((plat) => {
                     const checked = selectedPlatforms.includes(plat.id)
                     return (
@@ -1118,15 +1166,15 @@ export default function Products({
                           onChange={() => togglePlatform(plat.id)}
                           className="rounded border-border"
                         />
-                        <span>{plat.label}</span>
+                        <Text>{plat.label}</Text>
                       </label>
                     )
                   })}
-                </div>
-              </div>
+                </Grid>
+              </Stack>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
+              <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
+                <Stack>
                   <label className="block font-medium text-muted-foreground mb-1">
                     Seller Account (Auto-resolved per platform if blank)
                   </label>
@@ -1144,8 +1192,8 @@ export default function Products({
                       </option>
                     ))}
                   </select>
-                </div>
-                <div>
+                </Stack>
+                <Stack>
                   <label className="block font-medium text-muted-foreground mb-1">
                     Channel Price Multiplier (1.0 = Catalog Tier Price)
                   </label>
@@ -1158,12 +1206,19 @@ export default function Products({
                     onChange={(e) => setPriceMultiplier(e.target.value)}
                     className="w-full rounded-xl border border-input-border bg-input-background px-3 py-2 text-xs text-foreground"
                   />
-                </div>
-              </div>
-            </div>
+                </Stack>
+              </Grid>
+            </Stack>
 
-            <div className="flex items-center justify-between border-t border-divider px-6 py-4 bg-muted/25">
-              <div className="text-xs text-muted-foreground">
+            <Stack
+              direction="horizontal"
+              align="center"
+              justify="between"
+              paddingInline={6}
+              paddingBlock={4}
+              className="border-t border-divider bg-muted/25"
+            >
+              <Stack className="text-xs text-muted-foreground">
                 Generates{' '}
                 <strong>
                   {((convertModalProduct.variants as Row[]) ?? []).length *
@@ -1171,8 +1226,8 @@ export default function Products({
                   Channel Listings
                 </strong>{' '}
                 grouped by SKU in <code>/listing</code>.
-              </div>
-              <div className="flex items-center gap-2">
+              </Stack>
+              <Stack direction="horizontal" align="center" gap={2}>
                 <AppButton
                   label="Cancel"
                   variant="ghost"
@@ -1190,10 +1245,10 @@ export default function Products({
                   loading={convertingListing}
                   onClick={handleConvertProductToListings}
                 />
-              </div>
-            </div>
-          </div>
-        </div>
+              </Stack>
+            </Stack>
+          </Stack>
+        </Stack>
       )}
 
       {/* =====================================================================
@@ -1297,14 +1352,8 @@ export default function Products({
             section: '3. Default Variant Pricing & Stock',
           },
           {
-            name: 'currencyCode',
-            label: 'Primary Currency',
-            default: 'USD',
-            section: '3. Default Variant Pricing & Stock',
-          },
-          {
-            name: 'retailPrice',
-            label: 'Primary Retail price',
+            name: 'priceUsd',
+            label: 'Retail price (USD — the anchor the other currencies convert from)',
             kind: 'number',
             required: true,
             section: '3. Default Variant Pricing & Stock',
@@ -1312,19 +1361,22 @@ export default function Products({
           {
             name: 'costPrice',
             label: 'Unit Cost price (COGS)',
-            kind: 'number',
+            kind: 'money',
+            defaultCurrency: 'USD',
             section: '3. Default Variant Pricing & Stock',
           },
           {
             name: 'manufacturingCost',
             label: 'Manufacturing cost',
-            kind: 'number',
+            kind: 'money',
+            defaultCurrency: 'USD',
             section: '3. Default Variant Pricing & Stock',
           },
           {
             name: 'packagingCost',
             label: 'Packaging cost',
-            kind: 'number',
+            kind: 'money',
+            defaultCurrency: 'USD',
             section: '3. Default Variant Pricing & Stock',
           },
           {
@@ -1501,28 +1553,17 @@ export default function Products({
           { name: 'mpn', label: 'MPN', section: '1. Variant Identity' },
           { name: 'asin', label: 'Amazon ASIN', section: '1. Variant Identity' },
           {
-            name: 'currencyCode',
-            label: 'Primary Currency',
-            default: 'USD',
-            section: '2. Pricing & Stock',
-          },
-          {
-            name: 'retailPrice',
-            label: 'Primary Retail price',
+            name: 'priceUsd',
+            label: 'Retail price (USD — the anchor the other currencies convert from)',
             kind: 'number',
             required: true,
             section: '2. Pricing & Stock',
           },
           {
-            name: 'compareAtPrice',
-            label: 'Compare-at price',
-            kind: 'number',
-            section: '2. Pricing & Stock',
-          },
-          {
             name: 'costPrice',
             label: 'Cost price (COGS)',
-            kind: 'number',
+            kind: 'money',
+            defaultCurrency: 'USD',
             section: '2. Pricing & Stock',
           },
           {
@@ -1604,19 +1645,19 @@ export default function Products({
           },
           { name: 'asin', label: 'Amazon ASIN', section: '1. Parent Product & SKU' },
           {
-            name: 'currencyCode',
-            label: 'Primary Currency',
-            default: 'USD',
-            section: '2. Pricing & Stock',
-          },
-          {
-            name: 'retailPrice',
-            label: 'Primary Retail price',
+            name: 'priceUsd',
+            label: 'Retail price (USD — the anchor the other currencies convert from)',
             kind: 'number',
             required: true,
             section: '2. Pricing & Stock',
           },
-          { name: 'costPrice', label: 'Cost price', kind: 'number', section: '2. Pricing & Stock' },
+          {
+            name: 'costPrice',
+            label: 'Cost price',
+            kind: 'money',
+            defaultCurrency: 'USD',
+            section: '2. Pricing & Stock',
+          },
           {
             name: 'stockOnHand',
             label: 'Stock on hand',
@@ -1665,8 +1706,9 @@ export default function Products({
           editStockRow
             ? {
                 stockOnHand: String(editStockRow.stockOnHand ?? 0),
-                currencyCode: String(editStockRow.currencyCode ?? 'USD'),
-                retailPrice: String(editStockRow.retailPrice ?? 0),
+                retailPrice: moneyAmountString(
+                  editStockRow.retailPriceMoney ?? editStockRow.retailPrice
+                ),
                 pricesJson: JSON.stringify(
                   Array.isArray(editStockRow.prices) ? editStockRow.prices : []
                 ),
@@ -1675,8 +1717,14 @@ export default function Products({
         }
         fields={[
           { name: 'stockOnHand', label: 'Stock on hand', kind: 'number', required: true },
-          { name: 'currencyCode', label: 'Primary Currency Code', default: 'USD' },
-          { name: 'retailPrice', label: 'Primary Retail price', kind: 'number', required: true },
+          {
+            name: 'retailPrice',
+            label: 'Retail price (USD)',
+            kind: 'number',
+            required: true,
+            description:
+              'Prices in INR, EUR, GBP, CAD and MXN are derived from this amount unless overridden below.',
+          },
           {
             name: 'pricesJson',
             label: 'Multi-Currency Price Array (ProductVariantPrice)',
@@ -1816,6 +1864,6 @@ export default function Products({
           { name: 'description', label: 'Description', kind: 'textarea', fullWidth: true },
         ]}
       />
-    </div>
+    </Stack>
   )
 }

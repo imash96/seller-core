@@ -4,9 +4,7 @@
  */
 
 export const listeners = {
+  CreateNotification: () => import('#listeners/create_notification'),
   EnqueueRiskReview: () => import('#listeners/enqueue_risk_review'),
-  NotifySlack: () => import('#listeners/notify_slack'),
   QueueFulfillment: () => import('#listeners/queue_fulfillment'),
-  UpdateSellerMetrics: () => import('#listeners/update_seller_metrics'),
-  WriteAuditTrail: () => import('#listeners/write_audit_trail'),
 }

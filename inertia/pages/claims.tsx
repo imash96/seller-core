@@ -1,3 +1,4 @@
+import { Stack } from '@astryxdesign/core/Stack'
 import {
   PageHeader,
   PageSection,
@@ -70,7 +71,7 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
   }, [claims])
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Marketplace Claims & Chargebacks"
         description="Track A-to-z Guarantee claims, INR disputes, and payment chargebacks with seller-liability exposure and response deadlines."
@@ -173,23 +174,8 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
             default: 'under_review',
             options: CLAIM_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
           },
-          {
-            name: 'currencyCode',
-            label: 'Currency Code',
-            kind: 'select',
-            default: 'USD',
-            options: ['USD', 'EUR', 'GBP', 'CAD', 'INR', 'AED'].map((c) => ({
-              value: c,
-              label: c,
-            })),
-          },
-          { name: 'disputedAmount', label: 'Disputed Amount', kind: 'number', default: '0' },
-          {
-            name: 'sellerLiabilityAmount',
-            label: 'Seller Liability Amount',
-            kind: 'number',
-            default: '0',
-          },
+          { name: 'disputedAmount', label: 'Disputed Amount', kind: 'money' },
+          { name: 'sellerLiabilityAmount', label: 'Seller Liability Amount', kind: 'money' },
           { name: 'openedAt', label: 'Opened Date', kind: 'date' },
           { name: 'respondByAt', label: 'Respond By Deadline', kind: 'date' },
           { name: 'resolvedAt', label: 'Resolved Date (if closed)', kind: 'date' },
@@ -247,8 +233,8 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
             options: CLAIM_TYPES.map((c) => ({ value: c, label: c.replace(/_/g, ' ') })),
           },
           { name: 'externalClaimId', label: 'External Marketplace Claim ID' },
-          { name: 'disputedAmount', label: 'Disputed Amount', kind: 'number' },
-          { name: 'sellerLiabilityAmount', label: 'Seller Liability Amount', kind: 'number' },
+          { name: 'disputedAmount', label: 'Disputed Amount', kind: 'money' },
+          { name: 'sellerLiabilityAmount', label: 'Seller Liability Amount', kind: 'money' },
           { name: 'respondByAt', label: 'Respond By Date', kind: 'date' },
           { name: 'resolvedAt', label: 'Resolved Date', kind: 'date' },
           { name: 'reason', label: 'Claim Reason', kind: 'textarea', fullWidth: true },
@@ -339,6 +325,6 @@ export default function Claims({ claims, orders, sellerAccounts, savedViews }: P
           ]}
         />
       </PageSection>
-    </div>
+    </Stack>
   )
 }

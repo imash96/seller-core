@@ -1,3 +1,4 @@
+import { Stack } from '@astryxdesign/core/Stack'
 import {
   PageHeader,
   PageSection,
@@ -61,7 +62,7 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
   }, [sellerAccounts])
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Marketplace Seller Accounts"
         description="Store account details and encrypted credentials. Marketplace connections and sync are not configured."
@@ -273,7 +274,7 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
               { label: 'Credentials', value: String(row.encryptedCredentials ?? '—').slice(0, 20) },
             ],
             actions: (
-              <div className="flex items-center gap-2 flex-wrap">
+              <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
                 <AppButton
                   variant="outline"
                   size="xs"
@@ -309,7 +310,7 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
                 >
                   Disconnect
                 </AppButton>
-              </div>
+              </Stack>
             ),
           })}
           columns={[
@@ -322,7 +323,7 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
             col.text('encryptedCredentials', 'Credentials', 170),
             col.date('lastSyncedAt', 'Last sync'),
             col.action('Actions', (row) => (
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <Stack direction="horizontal" align="center" wrap="wrap" gap={1.5}>
                 <AppButton
                   variant="outline"
                   size="xs"
@@ -358,11 +359,11 @@ export default function Accounts({ sellerAccounts, salesChannels, savedViews }: 
                 >
                   Disconnect
                 </AppButton>
-              </div>
+              </Stack>
             )),
           ]}
         />
       </PageSection>
-    </div>
+    </Stack>
   )
 }

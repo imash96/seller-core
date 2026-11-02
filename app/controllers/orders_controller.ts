@@ -1,15 +1,26 @@
 import { DateTime } from 'luxon'
 import { csvCell } from '../utils/csv.js'
+import db from '@adonisjs/lucid/services/db'
 import type { HttpContext } from '@adonisjs/core/http'
+import { AuditContext } from '#services/audit_context'
+import { AuditService } from '#services/audit_service'
 import Order from '#models/order'
 import Customer from '#models/customer'
 import OrderPlaced from '#events/order_placed'
 import OrderStatusChanged from '#events/order_status_changed'
+import ProcessMarketplaceImport from '#jobs/process_marketplace_import'
+
+/**
+ * Batches larger than this are handed to the durable import queue instead of being
+ * parsed inside the request; small pastes stay inline for immediate feedback.
+ */
+const INLINE_IMPORT_LIMIT = 25
 import { OrderService } from '../services/order_service.js'
 import { RbacService } from '../services/rbac_service.js'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createOrderValidator, bulkOrderImportValidator } from '#validators/operations'
 import { OrderStatus } from '../enums/index.js'
+import { amountOf, currencyOf, normalizePriceMoney } from '../types/price.js'
 
 export default class OrdersController {
   async index({ auth, inertia }: HttpContext) {
@@ -30,20 +41,15 @@ export default class OrdersController {
             )
             .preload('shippingAddress', (r) => r.where('userId', user.id))
         )
-        .if(can('integrations'), (q) =>
-          q.preload('sellerAccount', (r) => r.where('userId', user.id))
-        )
-        .preload('orderPrices', (q) => q.where('userId', user.id))
+        // The channel of an order is derived through its seller account, so the
+        // relation (and the sales channel behind it) is always loaded.
+        .preload('sellerAccount', (r) => r.where('userId', user.id).preload('salesChannel'))
         .preload('lineItems', (lq) =>
           lq
             .where('userId', user.id)
-            .preload('linePrices', (q) => q.where('userId', user.id))
             .if(can('catalog'), (q) =>
               q.preload('productVariant', (vq) =>
-                vq
-                  .where('userId', user.id)
-                  .preload('product', (r) => r.where('userId', user.id))
-                  .preload('priceRecords', (prices) => prices.where('userId', user.id))
+                vq.where('userId', user.id).preload('product', (r) => r.where('userId', user.id))
               )
             )
         )
@@ -91,6 +97,11 @@ export default class OrdersController {
     const user = auth.getUserOrFail()
     const payload = await request.validateUsing(createOrderValidator)
 
+    // Every amount is folded into a self-contained PriceMoney object in the order currency.
+    const currency = (payload.currencyCode || 'USD').toUpperCase()
+    const inCurrency = (value: unknown, fallback = 0) =>
+      normalizePriceMoney(value ?? fallback, currency)
+
     try {
       const order = await OrderService.createOrder({
         userId: user.id,
@@ -98,14 +109,27 @@ export default class OrdersController {
         sellerAccountId: payload.sellerAccountId ?? null,
         orderNumber: payload.orderNumber,
         externalOrderId: payload.externalOrderId ?? null,
+        externalDisplayId: payload.externalDisplayId ?? null,
         marketplaceCode: payload.marketplaceCode || 'direct',
-        currencyCode: payload.currencyCode || 'USD',
+        marketplaceSiteId: payload.marketplaceSiteId ?? null,
+        fulfillmentChannel: payload.fulfillmentChannel,
+        taxCollectionModel: payload.taxCollectionModel,
+        earliestShipAt: payload.earliestShipAt ?? null,
+        latestShipAt: payload.latestShipAt ?? null,
+        earliestDeliveryAt: payload.earliestDeliveryAt ?? null,
+        latestDeliveryAt: payload.latestDeliveryAt ?? null,
+        currencyCode: currency,
         reportingCurrencyCode:
           request.input('reportingCurrencyCode') || user.defaultCurrency || 'USD',
         exchangeRate: payload.exchangeRate ?? 1.0,
-        shippingCostAmount: payload.shippingCostAmount ?? 0,
-        shippingCostCurrencyCode:
-          request.input('shippingCostCurrencyCode') || payload.currencyCode || 'USD',
+        shippingCostTotal: inCurrency(payload.shippingCostTotal),
+        shippingCostCurrencyCode: payload.shippingCostCurrencyCode || currency,
+        marketplaceFeesTotal: payload.marketplaceFeesTotal
+          ? inCurrency(payload.marketplaceFeesTotal)
+          : undefined,
+        paymentProcessingFeesTotal: payload.paymentProcessingFeesTotal
+          ? inCurrency(payload.paymentProcessingFeesTotal)
+          : undefined,
         customer: {
           fullName: payload.customerFullName,
           email: payload.customerEmail ?? null,
@@ -125,30 +149,37 @@ export default class OrdersController {
             sku: payload.sku,
             title: payload.itemTitle,
             quantityOrdered: payload.quantityOrdered,
-            currencyCode: payload.currencyCode || 'USD',
-            unitPrice: payload.unitPrice,
-            unitCostAmount: payload.unitCostAmount,
-            taxAmount: payload.taxAmount ?? 0,
-            discountAmount: payload.discountAmount ?? 0,
-            shippingAmount: payload.shippingChargedAmount ?? 0,
+            unitPrice: inCurrency(payload.unitPrice),
+            unitCost: payload.unitCost ? inCurrency(payload.unitCost) : undefined,
+            taxTotal: inCurrency(payload.taxTotal),
+            discountTotal: inCurrency(payload.discountTotal),
+            promotionTotal: payload.promotionTotal ? inCurrency(payload.promotionTotal) : undefined,
+            shippingTotal: inCurrency(payload.shippingTotal),
+            shippingDiscountTotal: payload.shippingDiscountTotal
+              ? inCurrency(payload.shippingDiscountTotal)
+              : undefined,
+            shippingTaxTotal: payload.shippingTaxTotal
+              ? inCurrency(payload.shippingTaxTotal)
+              : undefined,
           },
         ],
       })
+      await order.load('sellerAccount', (accountQuery) => accountQuery.preload('salesChannel'))
       await OrderPlaced.dispatch({
         orderId: order.id,
         orderNumber: order.orderNumber,
         userId: user.id,
         customerId: order.customerId,
-        currencyCode: order.currencyCode,
-        totalAmount: String(order.totalAmount),
-        marketplaceCode: order.marketplaceCode,
+        currencyCode: currencyOf(order.grandTotal),
+        grandTotal: order.grandTotal,
+        marketplaceCode: order.channelCode,
         sellerAccountId: order.sellerAccountId,
         requestId: request.id(),
       })
 
       session.flash(
         'success',
-        `Order ${order.orderNumber} created with multi-currency OrderPrice records and P&L calculated.`
+        `Order ${order.orderNumber} created with self-contained PriceMoney totals and P&L calculated.`
       )
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to create order')
@@ -174,22 +205,28 @@ export default class OrdersController {
         return response.redirect().back()
       }
       const prevStatus = order.status
-      order.status = status
       if (status === OrderStatus.CANCELLED) {
-        order.cancelledAt = DateTime.now()
+        // Cancellation is a domain transition: it releases the reserved units.
+        const { releasedUnits } = await OrderService.cancelOrder({
+          userId: user.id,
+          orderId: order.id,
+          actorUserId: user.id,
+          requestId: request.id(),
+          reason: 'status_change',
+        })
+        await order.refresh()
+        session.flash(
+          'success',
+          `Order ${order.orderNumber} cancelled; ${releasedUnits} reserved unit(s) released.`
+        )
+      } else {
+        await AuditContext.runRequest({ auth, request }, 'order.status_updated', async (trx) => {
+          order.useTransaction(trx)
+          order.status = status
+          await order.save()
+        })
+        session.flash('success', `Order ${order.orderNumber} updated to ${status}.`)
       }
-      await order.save()
-
-      await RbacService.recordAudit({
-        actorUserId: user.id,
-        userId: user.id,
-        action: 'order.status_updated',
-        entityType: 'order',
-        entityId: order.id,
-        beforeState: { status: prevStatus },
-        afterState: { status },
-        ipAddress: request.ip(),
-      })
 
       await OrderStatusChanged.dispatch({
         orderId: order.id,
@@ -200,8 +237,6 @@ export default class OrdersController {
         actorUserId: user.id,
         requestId: request.id(),
       })
-
-      session.flash('success', `Order ${order.orderNumber} updated to ${status}.`)
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to update order status.')
     }
@@ -216,23 +251,17 @@ export default class OrdersController {
         .andWhere('id', params.id)
         .firstOrFail()
 
-      const snapshot = order.serialize()
-      order.status = OrderStatus.CANCELLED
-      order.cancelledAt = DateTime.now()
-      await order.save()
-
-      await RbacService.recordAudit({
-        actorUserId: user.id,
+      const { releasedUnits } = await OrderService.cancelOrder({
         userId: user.id,
-        action: 'order.cancelled',
-        entityType: 'order',
-        entityId: order.id,
-        beforeState: snapshot,
-        afterState: { status: OrderStatus.CANCELLED },
-        ipAddress: request.ip(),
+        orderId: order.id,
+        actorUserId: user.id,
+        requestId: request.id(),
       })
 
-      session.flash('success', `Order ${order.orderNumber} cancelled.`)
+      session.flash(
+        'success',
+        `Order ${order.orderNumber} cancelled; ${releasedUnits} reserved unit(s) released.`
+      )
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to cancel order.')
     }
@@ -273,46 +302,63 @@ export default class OrdersController {
         return response.redirect().back()
       }
 
-      const normalizedOrders = items.map((item: any, idx: number) => ({
-        orderNumber: String(item.orderNumber || `IMP-${Date.now()}-${idx + 1}`),
-        externalOrderId: item.externalOrderId ? String(item.externalOrderId) : null,
-        marketplaceCode: String(item.marketplaceCode || 'amazon'),
-        currencyCode: String(item.currencyCode || 'USD').toUpperCase(),
-        reportingCurrencyCode: user.defaultCurrency || 'USD',
-        exchangeRate: Number(item.exchangeRate || 1),
-        shippingCostAmount: Number(item.shippingCostAmount || 0),
-        customer: {
-          fullName: String(item.customerFullName || item.customer?.fullName || 'Marketplace Buyer'),
-          email: item.customerEmail || item.customer?.email || null,
-          phone: item.customerPhone || item.customer?.phone || null,
-        },
-        lines: Array.isArray(item.lines)
-          ? item.lines.map((l: any) => ({
-              sku: String(l.sku || 'SKU-001'),
-              title: String(l.title || l.sku || 'Imported Item'),
-              quantityOrdered: Math.max(1, Number(l.quantityOrdered || 1)),
-              currencyCode: String(l.currencyCode || item.currencyCode || 'USD').toUpperCase(),
-              unitPrice: Number(l.unitPrice || 0),
-              unitCostAmount: Number(l.unitCostAmount || 0),
-              taxAmount: Number(l.taxAmount || 0),
-              discountAmount: Number(l.discountAmount || 0),
-              shippingAmount: Number(l.shippingAmount || 0),
-            }))
-          : [],
+      // Each record is forwarded as a raw payload: OrderService auto-detects
+      // Amazon SP-API / eBay Fulfillment / Etsy v3 / MedusaJS v2 / canonical JSON.
+      const idempotencyKey =
+        payload.idempotencyKey || request.input('idempotencyKey') || `batch-${Date.now()}`
+      // Envelope form ({ payload, orderItemsPayload, platform }) or the raw
+      // marketplace object itself; the normalizer ignores unknown keys.
+      const resolveParts = (item: any) => ({
+        raw: item.payload ?? item,
+        orderItems: item.orderItemsPayload ?? item.orderItems,
+      })
+      const normalizedPayloads = items.map((item: any) => ({
+        payload: resolveParts(item).raw,
+        orderItemsPayload: resolveParts(item).orderItems,
+        platform: item.platform,
+        sellerAccountId: payload.sellerAccountId ?? null,
       }))
 
-      const { job, createdOrderIds, duplicateOrderNumbers } = await OrderService.importBulkOrders({
+      // A small paste is imported inline so the operator sees the result
+      // immediately; a large batch is handed to the durable import queue, which is
+      // the only path that survives a dropped request for hundreds of orders.
+      if (items.length > INLINE_IMPORT_LIMIT) {
+        await ProcessMarketplaceImport.dispatch({
+          userId: user.id,
+          sellerAccountId: payload.sellerAccountId ?? null,
+          idempotencyKey,
+          platformPayloads: items.map((item: any) => ({
+            platform: item.platform,
+            order: resolveParts(item).raw,
+            orderItems: resolveParts(item).orderItems,
+          })),
+          requestId: request.id(),
+        })
+        session.flash(
+          'success',
+          `Queued ${items.length} order(s) for background import (job ${idempotencyKey}).`
+        )
+        return response.redirect().back()
+      }
+
+      const result = await OrderService.importBulkOrders({
         userId: user.id,
         actorUserId: user.id,
         sellerAccountId: payload.sellerAccountId ?? null,
-        idempotencyKey:
-          payload.idempotencyKey || request.input('idempotencyKey') || `batch-${Date.now()}`,
-        orders: normalizedOrders,
+        idempotencyKey,
+        reportingCurrencyCode: user.defaultCurrency || 'USD',
+        payloads: normalizedPayloads,
       })
 
+      const accepted = result.createdOrderIds.length
+      const skipped = result.duplicateOrderNumbers.length
+      const rejected = result.errors.length
+      const summary = `Sync job ${result.job.id}: imported ${accepted} new orders (${skipped} duplicates skipped${rejected ? `, ${rejected} rejected` : ''}).`
       session.flash(
-        'success',
-        `Sync job ${job.id}: imported ${createdOrderIds.length} new orders (${duplicateOrderNumbers.length} duplicates skipped).`
+        rejected && !accepted ? 'error' : 'success',
+        rejected && !accepted
+          ? `Bulk import failed: ${result.errors[0]?.errorMessage ?? 'validation error'}`
+          : summary
       )
     } catch (err: any) {
       session.flash('error', `Bulk import failed: ${err.message}`)
@@ -345,24 +391,23 @@ export default class OrdersController {
       session.flash('error', 'Delivered orders cannot be changed through bulk status updates.')
       return response.redirect().back()
     }
-    for (const order of orders) {
-      const prevStatus = order.status
-      order.status = status
-      if (status === OrderStatus.CANCELLED) {
-        order.cancelledAt = DateTime.now()
-      }
-      await order.save()
-      await RbacService.recordAudit({
+    await db.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
         actorUserId: user.id,
-        userId: user.id,
-        action: 'order.bulk_status_updated',
-        entityType: 'order',
-        entityId: order.id,
-        beforeState: { status: prevStatus },
-        afterState: { status },
+        requestId: request.id(),
         ipAddress: request.ip(),
+        userAgent: request.header('user-agent') ?? null,
+        reason: 'order.bulk_status_updated',
       })
-    }
+      for (const order of orders) {
+        order.useTransaction(trx)
+        order.status = status
+        if (status === OrderStatus.CANCELLED) {
+          order.cancelledAt = DateTime.now()
+        }
+        await order.save()
+      }
+    })
 
     session.flash('success', `Updated ${orders.length} order(s) to "${status}".`)
     return response.redirect().back()
@@ -380,6 +425,9 @@ export default class OrdersController {
 
     const query = Order.query()
       .where('userId', user.id)
+      .preload('sellerAccount', (accountQuery) =>
+        accountQuery.where('userId', user.id).preload('salesChannel')
+      )
       .if(await RbacService.hasPermission(user, 'customers.read', 'customers'), (q) =>
         q.preload('customer', (r) => r.where('userId', user.id))
       )
@@ -390,19 +438,33 @@ export default class OrdersController {
     const headers = [
       'order_number',
       'external_order_id',
-      'marketplace_code',
+      'external_display_id',
+      'channel_code',
+      'marketplace_site_id',
+      'fulfillment_channel',
+      'tax_collection_model',
       'status',
       'payment_status',
       'fulfillment_status',
       'customer_name',
       'customer_email',
-      'currency_code',
-      'total_amount',
-      'cogs_amount',
-      'marketplace_fees_amount',
-      'shipping_cost_amount',
-      'net_profit_amount',
+      'order_currency',
+      'subtotal',
+      'discount_total',
+      'promotion_total',
+      'shipping_total',
+      'shipping_discount_total',
+      'tax_total',
+      'shipping_tax_total',
+      'marketplace_withheld_tax_total',
+      'grand_total',
+      'cogs_total',
+      'marketplace_fees_total',
+      'shipping_cost_total',
+      'net_profit',
       'ordered_at',
+      'latest_ship_at',
+      'latest_delivery_at',
     ]
     const lines = [
       headers.join(','),
@@ -410,24 +472,47 @@ export default class OrdersController {
         [
           o.orderNumber,
           o.externalOrderId,
-          o.marketplaceCode,
+          o.externalDisplayId,
+          o.channelCode,
+          o.marketplaceSiteId,
+          o.fulfillmentChannel,
+          o.taxCollectionModel,
           o.status,
           o.paymentStatus,
           o.fulfillmentStatus,
           o.customer?.fullName,
           o.customer?.email,
-          o.currencyCode,
-          o.totalAmount,
-          o.cogsAmount,
-          o.marketplaceFeesAmount,
-          o.shippingCostAmount,
-          o.netProfitAmount,
+          currencyOf(o.grandTotal),
+          amountOf(o.subtotal),
+          amountOf(o.discountTotal),
+          amountOf(o.promotionTotal),
+          amountOf(o.shippingTotal),
+          amountOf(o.shippingDiscountTotal),
+          amountOf(o.taxTotal),
+          amountOf(o.shippingTaxTotal),
+          amountOf(o.marketplaceWithheldTaxTotal),
+          amountOf(o.grandTotal),
+          amountOf(o.cogsTotal),
+          amountOf(o.marketplaceFeesTotal),
+          amountOf(o.shippingCostTotal),
+          amountOf(o.netProfit),
           o.orderedAt?.toISO(),
+          o.latestShipAt?.toISO(),
+          o.latestDeliveryAt?.toISO(),
         ]
           .map(csvCell)
           .join(',')
       ),
     ]
+
+    // Exports are not row mutations, so they are one of the few manual audit rows.
+    await AuditService.recordExport({
+      actorUserId: user.id,
+      entityType: 'orders',
+      requestId: request.id(),
+      ipAddress: request.ip(),
+      metadata: { orderCount: orders.length, ids },
+    })
 
     response.header('Content-Type', 'text/csv; charset=utf-8')
     response.header('Content-Disposition', `attachment; filename="orders-export-${Date.now()}.csv"`)

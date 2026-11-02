@@ -61,16 +61,12 @@ export interface CatalogVariantSpec {
 }
 
 export interface CatalogJsonEntry {
-  title: string // max 60 chars
-  title75?: string // max 75 chars
-  title80?: string // max 80 chars
-  subTitle?: string // max 60 chars
-  subTitle125?: string // max 125 chars
+  title: string // the single canonical title; channel caps are applied at publish time
+  subTitle?: string
   type?: string // e.g. "Duster Coat"
+  /** Resolved into `resolved_category_id` (taxonomy); never persisted as a code. */
   category_handle?: string // e.g. "mens/apparel/outerwear/coats/duster-coats"
-  description?: string // SEO product description
-  shortDescription?: string // max 500 chars (Amazon compatible)
-  extendedDescription?: string // max 3000 chars with emojis (eBay & Etsy compatible)
+  description?: string // the single canonical copy, reused for every channel
   pattern?: string // e.g. "Solid"
   attributes?: CatalogAttributes
   images?: string[]

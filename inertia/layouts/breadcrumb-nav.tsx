@@ -1,3 +1,5 @@
+import { Text } from '@astryxdesign/core/Text'
+import { Stack } from '@astryxdesign/core/Stack'
 import { Link } from '@adonisjs/inertia/react'
 import { usePage } from '@inertiajs/react'
 import { ChevronRight, Home } from 'lucide-react'
@@ -14,10 +16,15 @@ export function BreadcrumbNav() {
   if (segments.length === 0 || (segments.length === 1 && segments[0] === 'dashboard')) {
     return (
       <nav className="flex items-center gap-2 text-sm" aria-label="Breadcrumb">
-        <div className="flex items-center gap-2 text-foreground font-semibold">
+        <Stack
+          direction="horizontal"
+          align="center"
+          gap={2}
+          className="text-foreground font-semibold"
+        >
           <Home className="w-4 h-4 text-primary" />
-          <span>Dashboard</span>
-        </div>
+          <Text>Dashboard</Text>
+        </Stack>
       </nav>
     )
   }
@@ -29,7 +36,7 @@ export function BreadcrumbNav() {
         className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
       >
         <Home className="w-4 h-4" />
-        <span className="hidden sm:inline">Dashboard</span>
+        <Text className="hidden sm:inline">Dashboard</Text>
       </Link>
 
       {segments.map((segment, index) => {
@@ -42,12 +49,12 @@ export function BreadcrumbNav() {
         const isLast = index === segments.length - 1
 
         return (
-          <div key={href} className="flex items-center gap-1.5">
+          <Stack direction="horizontal" align="center" gap={1.5} key={href}>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
             {isLast ? (
-              <span className="font-semibold text-foreground" aria-current="page">
+              <Text color="primary" weight="semibold" aria-current="page">
                 {label}
-              </span>
+              </Text>
             ) : (
               <Link
                 href={href}
@@ -56,7 +63,7 @@ export function BreadcrumbNav() {
                 {label}
               </Link>
             )}
-          </div>
+          </Stack>
         )
       })}
     </nav>

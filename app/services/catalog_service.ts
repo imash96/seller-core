@@ -1,5 +1,6 @@
 import db from '@adonisjs/lucid/services/db'
 import CatalogItem from '#models/catalog_item'
+import type ProductCategory from '#models/product_category'
 import Product from '#models/product'
 import ProductVariant from '#models/product_variant'
 import ProductVariantAttribute from '#models/product_variant_attribute'
@@ -12,7 +13,7 @@ import {
   EntitySyncStatus,
 } from '../enums/index.js'
 import { CategorySyncService } from './category_sync_service.js'
-import { PriceService } from './price_service.js'
+import { normalizeVariantAttributes, variantAttributePairs } from '../utils/variant_attributes.js'
 import {
   extractSequenceNumber,
   buildStructuredBaseCode,
@@ -23,7 +24,6 @@ import {
   resolveColorInfo,
   resolveSizeInfo,
   resolveTierPrice,
-  resolveTierMultiCurrencyPrices,
   formatVariantSku,
 } from '../data/catalog_config/index.js'
 import type {
@@ -32,21 +32,43 @@ import type {
   PriceTierCode,
   SkuFormatMode,
 } from '../types/catalog_pipeline.js'
-import { type PriceMoney, normalizePriceMoney, normalizePriceMoneyArray } from '../types/price.js'
+import {
+  type MedusaVariantPrice,
+  type PriceMoney,
+  applyCurrencyOverrides,
+  buildMultiCurrencyPriceArray,
+  ensureCurrencyCoverage,
+  money,
+  normalizeNullablePriceMoney,
+  normalizePriceMoney,
+  normalizeCurrencyCode,
+  normalizePriceMoneyArray,
+} from '../types/price.js'
+import { AuditContext } from './audit_context.js'
 
+/**
+ * Variant input accepted by `CatalogService.createProduct` / `createVariant`.
+ *
+ * `priceUsd` is the USD base price from the catalog tier or manual entry; it is
+ * expanded into the full MedusaJS v2 multi-currency `prices` array unless an
+ * explicit `prices` array (or per-currency overrides) is supplied. Cost values
+ * are `PriceMoney` objects (a bare number is treated as USD).
+ */
 export interface VariantInput {
   sku: string
   title?: string
   barcodeUpcEan?: string | null
   mpn?: string | null
   asin?: string | null
-  currencyCode?: string
-  retailPrice: number
-  prices?: PriceMoney[]
-  compareAtPrice?: number | null
-  costPrice?: number
-  manufacturingCost?: number
-  packagingCost?: number
+  /** USD base price used to derive the multi-currency price array. */
+  priceUsd?: number
+  /** Explicit MedusaJS v2 price array (takes precedence over `priceUsd`). */
+  prices?: MedusaVariantPrice[]
+  /** Per-currency overrides applied on top of the derived array. */
+  priceOverrides?: Record<string, Partial<MedusaVariantPrice>>
+  costPrice?: PriceMoney | number
+  manufacturingCost?: PriceMoney | number
+  packagingCost?: PriceMoney | number
   stockOnHand?: number
   reorderPoint?: number
   weightGrams?: number | null
@@ -56,8 +78,9 @@ export interface VariantInput {
     externalListingId: string
     asin?: string | null
     channelTitle?: string | null
-    listedPrice?: number
-    prices?: PriceMoney[]
+    listedPrice?: PriceMoney | number
+    listedPriceUsd?: number
+    prices?: MedusaVariantPrice[]
     allocatedQuantity?: number
   }>
 }
@@ -74,11 +97,13 @@ export interface GeneratedVariantPreview {
   materialName: string
   fitCode: string
   fitName: string
-  retailPrice: number
-  costPrice: number
-  prices: PriceMoney[]
-  retailPriceMoney: PriceMoney
-  costPriceMoney: PriceMoney
+  /** USD base price this variant was derived from (catalog tier price). */
+  priceUsd: number
+  /** MedusaJS v2 multi-currency price array. */
+  prices: MedusaVariantPrice[]
+  costPrice: PriceMoney
+  manufacturingCost: PriceMoney
+  packagingCost: PriceMoney
   stockOnHand: number
   included: boolean
 }
@@ -88,18 +113,14 @@ export interface GeneratedProductPreview {
   catalogKey: string
   structuredCode: string
   title: string
-  title75: string
-  title80: string
   subTitle: string
-  subTitle125: string
   type: string
   gender: string
+  /** Relational taxonomy (`product_categories.id`) — the only category reference. */
   categoryId: string | null
   categoryName: string
   categoryHandle: string
   description: string
-  shortDescription: string
-  extendedDescription: string
   pattern: string
   materialCode: string
   materialName: string
@@ -107,7 +128,9 @@ export interface GeneratedProductPreview {
   fitName: string
   priceTier: PriceTierCode
   skuFormat: SkuFormatMode
-  prices: PriceMoney[]
+  /** Base USD price of the catalog tier (expanded into `variants[].prices`). */
+  basePriceUsd: number
+  prices: MedusaVariantPrice[]
   images: string[]
   tags: string[]
   attributes: Record<string, unknown>
@@ -139,7 +162,7 @@ export class CatalogService {
     }
 
     const savedItems: CatalogItem[] = []
-    await db.transaction(async (trx) => {
+    await AuditContext.transaction(async (trx) => {
       for (const [i, [catalogKey, entry]] of entries.entries() as IterableIterator<
         [number, [string, CatalogJsonEntry]]
       >) {
@@ -242,36 +265,25 @@ export class CatalogService {
     item.structuredCode = structuredCode
     item.fileName = fileName
     item.title = String(entry.title).slice(0, 60)
-    item.title75 = String(entry.title75 || entry.title).slice(0, 75)
-    item.title80 = String(entry.title80 || entry.title75 || entry.title).slice(0, 80)
     item.subTitle = entry.subTitle ? String(entry.subTitle).slice(0, 60) : null
-    item.subTitle125 = entry.subTitle125
-      ? String(entry.subTitle125).slice(0, 125)
-      : entry.subTitle
-        ? String(entry.subTitle).slice(0, 125)
-        : null
     item.type = entry.type || catProdInfo.productTypeName
     item.gender = genderInfo.label
-    item.categoryCode = catProdInfo.categoryCode
-    item.categoryName = catProdInfo.categoryName
-    item.productCode = catProdInfo.productCode
-    item.categoryHandle =
-      entry.category_handle || categoryMeta.handle || category?.taxonomyPath || null
+    // Taxonomy is relational only: `resolved_category_id`, never a code/label pair.
     item.resolvedCategoryId = category?.id ?? null
     item.description = entry.description ?? null
-    item.shortDescription = entry.shortDescription
-      ? String(entry.shortDescription).slice(0, 500)
-      : null
-    item.extendedDescription = entry.extendedDescription
-      ? String(entry.extendedDescription).slice(0, 3000)
-      : null
     item.pattern = entry.pattern || 'Solid'
-    item.materialCode = leatherInfo.code
-    item.fitCode = fitInfo.code
     item.priceTier = activeTier
+    // Catalog pricing is USD-only; the multi-currency array is derived later on
+    // Product / ProductVariant creation.
+    item.basePriceUsd = resolveTierPrice(activeTier, 3).toFixed(2)
     item.attributes = {
       ...(entry.attributes ?? {}),
-      prices: resolveTierMultiCurrencyPrices(activeTier, 3),
+      // SKU-scheme components are domain attributes now that the dedicated
+      // code columns are gone; they stay with the item so previews can be re-derived.
+      category_code: catProdInfo.categoryCode,
+      product_code: catProdInfo.productCode,
+      material_code: leatherInfo.code,
+      fit_code: fitInfo.code,
     }
     item.images = Array.isArray(entry.images) ? entry.images : []
     item.tags = Array.isArray(entry.tags) ? entry.tags : []
@@ -293,16 +305,12 @@ export class CatalogService {
     id?: string | null
     catalogKey: string
     title: string
-    title75?: string
-    title80?: string
     subTitle?: string
-    subTitle125?: string
     type?: string
     gender?: string
+    /** Taxonomy handle/path resolved into `resolved_category_id`. */
     categoryHandle?: string
     description?: string
-    shortDescription?: string
-    extendedDescription?: string
     pattern?: string
     material?: string
     fabric?: string
@@ -367,24 +375,21 @@ export class CatalogService {
       existing = await CatalogItem.query()
         .where('userId', params.userId)
         .andWhere('id', params.id)
+        .preload('resolvedCategory')
         .first()
     }
     const prevAttrs = (existing?.attributes ?? {}) as Record<string, any>
 
     const entry: CatalogJsonEntry = {
       title: params.title,
-      title75: params.title75 || params.title,
-      title80: params.title80 || params.title75 || params.title,
       subTitle: params.subTitle,
-      subTitle125: params.subTitle125 || params.subTitle,
       type: params.type || existing?.type || 'Duster Coat',
       category_handle:
         params.categoryHandle ||
-        existing?.categoryHandle ||
+        existing?.resolvedCategory?.taxonomyPath ||
+        existing?.resolvedCategory?.slug ||
         'mens/apparel/outerwear/coats/duster-coats',
       description: params.description ?? existing?.description ?? '',
-      shortDescription: params.shortDescription ?? existing?.shortDescription ?? '',
-      extendedDescription: params.extendedDescription ?? existing?.extendedDescription ?? '',
       pattern: params.pattern || existing?.pattern || 'Solid',
       attributes: {
         ...prevAttrs,
@@ -422,7 +427,7 @@ export class CatalogService {
       },
     }
 
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
       if (existing && existing.catalogKey !== params.catalogKey.trim()) {
         existing.useTransaction(trx)
         existing.catalogKey = params.catalogKey.trim()
@@ -462,11 +467,16 @@ export class CatalogService {
       .preload('resolvedCategory', (q) => q.where('userId', params.userId))
       .firstOrFail()
 
+    const legacyCategoryHandle =
+      typeof item.attributes?.category_handle === 'string' ? item.attributes.category_handle : null
+    const resolvedCategory = item.resolvedCategory as unknown as ProductCategory | undefined
+    const categoryHandleHint =
+      resolvedCategory?.taxonomyPath ?? resolvedCategory?.slug ?? legacyCategoryHandle
     const category =
-      item.resolvedCategory ||
+      resolvedCategory ??
       (await CategorySyncService.resolveCategory(
         params.userId,
-        item.categoryHandle,
+        categoryHandleHint,
         item.type,
         item.gender,
         undefined,
@@ -492,15 +502,20 @@ export class CatalogService {
 
     const leatherInfo = resolveLeatherCode(
       item.attributes?.fabric || item.attributes?.material,
-      item.materialCode
+      typeof item.attributes?.material_code === 'string' ? item.attributes.material_code : undefined
     )
-    const fitInfo = resolveFitCode(item.fitCode || item.attributes?.size_type)
+    const fitInfo = resolveFitCode(
+      (typeof item.attributes?.fit_code === 'string' ? item.attributes.fit_code : undefined) ||
+        item.attributes?.size_type
+    )
     const structuredCode =
       item.structuredCode ||
       buildStructuredBaseCode({
         genderCode: resolveGenderCode(item.gender).code,
-        categoryCode: item.categoryCode || 'CT',
-        productCode: item.productCode || 'DC',
+        categoryCode:
+          typeof item.attributes?.category_code === 'string' ? item.attributes.category_code : 'CT',
+        productCode:
+          typeof item.attributes?.product_code === 'string' ? item.attributes.product_code : 'DC',
         sequence: extractSequenceNumber(item.catalogKey),
       })
 
@@ -522,9 +537,13 @@ export class CatalogService {
       const colorInfo = resolveColorInfo(rawColor)
       for (const rawSize of sizes) {
         const sizeInfo = resolveSizeInfo(rawSize, sizeGroup)
-        const retailPrice = resolveTierPrice(activeTier, sizeInfo.sizeIndex)
-        const costPrice = Number((retailPrice * costRatio).toFixed(2))
-        const multiPrices = resolveTierMultiCurrencyPrices(activeTier, sizeInfo.sizeIndex)
+        // USD only in the catalog; expanded into the MedusaJS v2 price array.
+        const priceUsd = resolveTierPrice(activeTier, sizeInfo.sizeIndex)
+        const costAmount = Number((priceUsd * costRatio).toFixed(2))
+        const costPrice = money(costAmount, 'USD')
+        const manufacturingCost = money(Number((costAmount * 0.85).toFixed(2)), 'USD')
+        const packagingCost = money(Number((costAmount * 0.15).toFixed(2)), 'USD')
+        const multiPrices = buildMultiCurrencyPriceArray(priceUsd)
         const sku = formatVariantSku({
           catalogKey: item.catalogKey,
           structuredCode,
@@ -547,37 +566,33 @@ export class CatalogService {
           materialName: leatherInfo.name,
           fitCode: fitInfo.code,
           fitName: fitInfo.name,
-          retailPrice,
-          costPrice,
+          priceUsd,
           prices: multiPrices,
-          retailPriceMoney: normalizePriceMoney(retailPrice, 'USD'),
-          costPriceMoney: normalizePriceMoney(costPrice, 'USD'),
+          costPrice,
+          manufacturingCost,
+          packagingCost,
           stockOnHand,
           included: true,
         })
       }
     }
 
+    const basePriceUsd = resolveTierPrice(activeTier, 3)
     const baseProductPrices =
-      variants.length > 0 ? variants[0].prices : resolveTierMultiCurrencyPrices(activeTier, 3)
+      variants.length > 0 ? variants[0].prices : buildMultiCurrencyPriceArray(basePriceUsd)
 
     return {
       catalogItemId: item.id,
       catalogKey: item.catalogKey,
       structuredCode,
       title: item.title,
-      title75: item.title75 || item.title,
-      title80: item.title80 || item.title75 || item.title,
       subTitle: item.subTitle || '',
-      subTitle125: item.subTitle125 || item.subTitle || '',
       type: item.type || 'Duster Coat',
       gender: item.gender || 'Men',
       categoryId: category?.id ?? null,
-      categoryName: category?.name ?? item.categoryName ?? 'Coat',
-      categoryHandle: category?.taxonomyPath ?? item.categoryHandle ?? '',
+      categoryName: category?.name ?? 'Coat',
+      categoryHandle: category?.taxonomyPath ?? category?.slug ?? '',
       description: item.description || '',
-      shortDescription: item.shortDescription || '',
-      extendedDescription: item.extendedDescription || '',
       pattern: item.pattern || 'Solid',
       materialCode: leatherInfo.code,
       materialName: leatherInfo.name,
@@ -585,6 +600,7 @@ export class CatalogService {
       fitName: fitInfo.name,
       priceTier: activeTier,
       skuFormat,
+      basePriceUsd,
       prices: baseProductPrices,
       images: Array.isArray(item.images) ? item.images : [],
       tags: Array.isArray(item.tags) ? item.tags : [],
@@ -608,7 +624,7 @@ export class CatalogService {
     }
 
     let variantsCreated = 0
-    const product = await db.transaction(async (trx) => {
+    const product = await AuditContext.transaction(async (trx) => {
       const catalogItem = await CatalogItem.query({ client: trx })
         .where('userId', userId)
         .andWhere('id', preview.catalogItemId)
@@ -648,30 +664,21 @@ export class CatalogService {
         prod.useTransaction(trx)
       }
 
-      const firstVarUsd = Number(includedVariants[0]?.retailPrice ?? 239.99)
+      const firstVarUsd = Number(includedVariants[0]?.priceUsd ?? preview.basePriceUsd ?? 239.99)
+      // USD catalog price -> MedusaJS v2 multi-currency array.
       const productPrices = normalizePriceMoneyArray(preview.prices, firstVarUsd, 'USD')
 
       if (!prod.$isPersisted) prod.brandId = null
       prod.categoryId = category ? category.id : preview.categoryId || null
       prod.skuPrefix = preview.catalogKey
-      prod.title = String(preview.title).slice(0, 60)
-      prod.title75 = String(preview.title75 || preview.title).slice(0, 75)
-      prod.title80 = String(preview.title80 || preview.title75 || preview.title).slice(0, 80)
-      prod.subTitle = preview.subTitle ? String(preview.subTitle).slice(0, 60) : null
-      prod.subTitle125 = preview.subTitle125 ? String(preview.subTitle125).slice(0, 125) : null
+      prod.title = String(preview.title).slice(0, 255)
+      prod.subTitle = preview.subTitle ? String(preview.subTitle).slice(0, 255) : null
       prod.description = preview.description || null
-      prod.shortDescription = preview.shortDescription
-        ? String(preview.shortDescription).slice(0, 500)
-        : null
-      prod.extendedDescription = preview.extendedDescription
-        ? String(preview.extendedDescription).slice(0, 3000)
-        : null
       prod.type = preview.type || 'Coat'
       prod.status = ProductStatus.ACTIVE
       prod.hasVariants = true
       prod.variationDimensions = ['color', 'size']
-      prod.listPrice = productPrices
-      prod.salePrice = []
+      prod.prices = productPrices
       prod.images = Array.isArray(preview.images) ? preview.images : []
       prod.tags = Array.isArray(preview.tags) ? preview.tags : []
       prod.dimensionsCm = {}
@@ -687,27 +694,19 @@ export class CatalogService {
         priceTier: preview.priceTier,
         skuFormat: preview.skuFormat,
         pattern: preview.pattern || 'Solid',
-        category_handle: preview.categoryHandle,
-        resolved_category_handle: preview.categoryHandle,
-        prices: productPrices,
         attributes: preview.attributes ?? {},
       }
       await prod.save()
 
-      await PriceService.syncProductPrices({
-        userId,
-        productId: prod.id,
-        prices: productPrices,
-        priceType: 'retail',
-        trx,
-      })
-
       for (const [i, vPrev] of includedVariants.entries()) {
-        const retailPrice = Number(vPrev.retailPrice ?? 239.99)
-        const costPrice = Number(vPrev.costPrice ?? (retailPrice * 0.42).toFixed(2))
-        const manufacturingCost = Number((costPrice * 0.85).toFixed(2))
-        const packagingCost = Number((costPrice * 0.15).toFixed(2))
-        const variantPrices = normalizePriceMoneyArray(vPrev.prices, retailPrice, 'USD')
+        const priceUsd = Number(vPrev.priceUsd ?? firstVarUsd)
+        const costPrice = normalizePriceMoney(vPrev.costPrice, 'USD')
+        const manufacturingCost = normalizePriceMoney(
+          vPrev.manufacturingCost,
+          costPrice.currency_code
+        )
+        const packagingCost = normalizePriceMoney(vPrev.packagingCost, costPrice.currency_code)
+        const variantPrices = normalizePriceMoneyArray(vPrev.prices, priceUsd, 'USD')
 
         let variant = await ProductVariant.query({ client: trx })
           .where('userId', userId)
@@ -731,28 +730,17 @@ export class CatalogService {
         ).slice(0, 255)
         variant.isDefault = i === 0
         variant.mpn = variant.sku
-        variant.attributes = {
-          color_code: vPrev.colorCode,
+        const dimensionAttributes = normalizeVariantAttributes({
           color: vPrev.colorName,
-          color_name: vPrev.colorName,
-          color_map: vPrev.colorMap,
-          size_code: vPrev.sizeValue,
           size: vPrev.sizeKey,
-          size_value: vPrev.sizeValue,
-          size_key: vPrev.sizeKey,
-          material_code: vPrev.materialCode,
-          material_name: vPrev.materialName,
-          fit_code: vPrev.fitCode,
-          fit_name: vPrev.fitName,
-          structured_code: preview.structuredCode,
-          prices: variantPrices,
-        }
-        variant.currencyCode = variantPrices[0]?.currency_code || 'USD'
-        variant.retailPrice = retailPrice.toFixed(2)
-        variant.compareAtPrice = (retailPrice + 40).toFixed(2)
-        variant.costPrice = costPrice.toFixed(2)
-        variant.manufacturingCost = manufacturingCost.toFixed(2)
-        variant.packagingCost = packagingCost.toFixed(2)
+          material: vPrev.materialName,
+          fit: vPrev.fitName,
+        })
+        variant.attributes = dimensionAttributes
+        variant.prices = variantPrices
+        variant.costPrice = costPrice
+        variant.manufacturingCost = manufacturingCost
+        variant.packagingCost = packagingCost
         variant.stockOnHand = Math.max(0, Number(vPrev.stockOnHand ?? 25))
         if (!variant.$isPersisted) variant.stockReserved = 0
         variant.reorderPoint = 5
@@ -761,37 +749,17 @@ export class CatalogService {
         await variant.save()
         variantsCreated += 1
 
-        await PriceService.syncVariantPrices({
-          userId,
-          productId: prod.id,
-          productVariantId: variant.id,
-          prices: variantPrices,
-          baseCostUsd: costPrice,
-          manufacturingCostUsd: manufacturingCost,
-          packagingCostUsd: packagingCost,
-          trx,
-        })
-
         await ProductVariantAttribute.query({ client: trx })
           .where('productVariantId', variant.id)
           .delete()
 
-        const pairs: Array<[string, string]> = [
-          ['color', vPrev.colorName],
-          ['color_code', vPrev.colorCode],
-          ['color_map', vPrev.colorMap],
-          ['size', vPrev.sizeKey],
-          ['size_value', vPrev.sizeValue],
-          ['material', vPrev.materialName],
-          ['fit', vPrev.fitName],
-        ]
-        for (const [attrName, attrValue] of pairs) {
+        for (const pair of variantAttributePairs(dimensionAttributes)) {
           const attrRow = new ProductVariantAttribute()
           attrRow.useTransaction(trx)
           attrRow.userId = userId
           attrRow.productVariantId = variant.id
-          attrRow.attributeName = attrName
-          attrRow.attributeValue = attrValue
+          attrRow.attributeName = pair.name
+          attrRow.attributeValue = pair.value
           await attrRow.save()
         }
       }
@@ -799,13 +767,8 @@ export class CatalogService {
       if (catalogItem) {
         catalogItem.useTransaction(trx)
         catalogItem.title = prod.title
-        catalogItem.title75 = prod.title75
-        catalogItem.title80 = prod.title80
         catalogItem.subTitle = prod.subTitle
-        catalogItem.subTitle125 = prod.subTitle125
         catalogItem.description = prod.description
-        catalogItem.shortDescription = prod.shortDescription
-        catalogItem.extendedDescription = prod.extendedDescription
         catalogItem.resolvedCategoryId = prod.categoryId
         catalogItem.priceTier = preview.priceTier
         catalogItem.status = 'converted'
@@ -822,6 +785,152 @@ export class CatalogService {
   /**
    * Creates a product with zero (standalone) or multiple variations, persisting `ProductPrice` and `ProductVariantPrice`.
    */
+  /**
+   * Resolves the MedusaJS v2 price array for one variant input.
+   *
+   * Priority: explicit `prices` array -> derived array from the USD base price
+   * (`buildMultiCurrencyPriceArray`) -> USD list fallback. Per-currency
+   * `priceOverrides` are applied on top of the derived array.
+   */
+  static resolveVariantPrices(
+    input: VariantInput,
+    fallbackUsdAmount = 239.99
+  ): MedusaVariantPrice[] {
+    if (Array.isArray(input.prices) && input.prices.length > 0) {
+      // Explicit amounts always win, but a partial array (say USD only) is expanded
+      // to the default currency set so every variant is buyable in every market.
+      const explicitUsd = input.prices.find(
+        (price) => normalizeCurrencyCode(price?.currency_code) === 'USD'
+      )?.amount
+      const baseUsd = Number.isFinite(Number(input.priceUsd))
+        ? Number(input.priceUsd)
+        : Number.isFinite(Number(explicitUsd))
+          ? Number(explicitUsd)
+          : Number(fallbackUsdAmount)
+      const covered = ensureCurrencyCoverage(input.prices, baseUsd)
+      return applyCurrencyOverrides(covered, input.priceOverrides)
+    }
+    const baseUsd = Number.isFinite(Number(input.priceUsd))
+      ? Number(input.priceUsd)
+      : Number(fallbackUsdAmount)
+    return applyCurrencyOverrides(buildMultiCurrencyPriceArray(baseUsd), input.priceOverrides)
+  }
+
+  /**
+   * Creates one sellable ProductVariant (plus its attribute rows and channel
+   * listings) and derives the multi-currency `prices` array from a USD amount
+   * when only a USD price is provided.
+   */
+  static async createVariant(params: {
+    userId: string
+    product: Product
+    variant: VariantInput
+    index?: number
+    hasVariants?: boolean
+    trx?: any
+  }): Promise<ProductVariant> {
+    const { userId, product, variant: vInput } = params
+    const index = params.index ?? 0
+    const hasVariants = params.hasVariants ?? product.hasVariants
+    if (!vInput?.sku || !String(vInput.sku).trim()) {
+      throw new Error('VALIDATION_ERROR: A variant SKU is required.')
+    }
+
+    const varPrices = this.resolveVariantPrices(
+      vInput,
+      Number(vInput.priceUsd ?? product.prices?.[0]?.amount ?? 239.99)
+    )
+    // Cost fields are self-contained PriceMoney objects; a bare number is USD.
+    const costPrice = normalizePriceMoney(vInput.costPrice ?? 0, 'USD')
+    const manufacturingCost = normalizePriceMoney(
+      vInput.manufacturingCost ?? 0,
+      costPrice.currency_code
+    )
+    const packagingCost = normalizePriceMoney(vInput.packagingCost ?? 0, costPrice.currency_code)
+
+    const variant = new ProductVariant()
+    if (params.trx) variant.useTransaction(params.trx)
+    variant.userId = userId
+    variant.productId = product.id
+    variant.sku = vInput.sku.trim()
+    variant.title = (vInput.title || product.title).trim()
+    variant.isDefault = !hasVariants || index === 0
+    variant.barcodeUpcEan = vInput.barcodeUpcEan ?? null
+    variant.mpn = vInput.mpn ?? null
+    variant.asin = vInput.asin ?? null
+    const dimensionAttributes = normalizeVariantAttributes(vInput.attributes)
+    variant.attributes = dimensionAttributes
+    variant.prices = varPrices
+    variant.costPrice = costPrice
+    variant.manufacturingCost = manufacturingCost
+    variant.packagingCost = packagingCost
+    variant.stockOnHand = Math.max(0, Number(vInput.stockOnHand ?? 0))
+    if (!variant.$isPersisted) variant.stockReserved = 0
+    variant.reorderPoint = Number(vInput.reorderPoint ?? 5)
+    variant.weightGrams =
+      vInput.weightGrams !== undefined && vInput.weightGrams !== null
+        ? Number(vInput.weightGrams).toFixed(2)
+        : product.weightGrams
+    variant.dimensionsCm = {}
+    variant.images = []
+    variant.status = VariantStatus.ACTIVE
+    await variant.save()
+
+    for (const pair of variantAttributePairs(dimensionAttributes)) {
+      const attrRow = new ProductVariantAttribute()
+      if (params.trx) attrRow.useTransaction(params.trx)
+      attrRow.userId = userId
+      attrRow.productVariantId = variant.id
+      attrRow.attributeName = pair.name
+      attrRow.attributeValue = pair.value
+      await attrRow.save()
+    }
+
+    for (const lInput of vInput.listings ?? []) {
+      const listingPrices =
+        Array.isArray(lInput.prices) && lInput.prices.length > 0
+          ? normalizePriceMoneyArray(lInput.prices, Number(lInput.listedPriceUsd ?? 0))
+          : varPrices
+      // The primary listed amount falls back to the first entry of the listing's
+      // own price array, so a CAD-only listing never inherits a USD amount.
+      const listed =
+        normalizeNullablePriceMoney(lInput.listedPrice, listingPrices[0]?.currency_code ?? 'USD') ??
+        money(
+          listingPrices[0]?.amount ?? vInput.priceUsd ?? 0,
+          listingPrices[0]?.currency_code ?? 'USD'
+        )
+
+      const listing = new ChannelListing()
+      if (params.trx) listing.useTransaction(params.trx)
+      listing.userId = userId
+      listing.sellerAccountId = lInput.sellerAccountId
+      listing.productVariantId = variant.id
+      listing.externalListingId = lInput.externalListingId
+      listing.externalSku = variant.sku
+      // ASIN is the variant's marketplace identity; a listing never stores a copy.
+      if (lInput.asin && !variant.asin) {
+        variant.asin = lInput.asin
+        await variant.save()
+      }
+      listing.channelTitle = lInput.channelTitle ?? variant.title
+      listing.prices = listingPrices
+      listing.listedPrice = listed
+      listing.allocatedQuantity = Number(lInput.allocatedQuantity ?? variant.stockOnHand)
+      listing.listingStatus = ListingStatus.ACTIVE
+      listing.publicationStatus = PublicationStatus.PUBLISHED
+      listing.syncStatus = EntitySyncStatus.SYNCED
+      listing.channelAttributes = {}
+      await listing.save()
+    }
+
+    return variant
+  }
+
+  /**
+   * Creates a product with zero (standalone) or multiple variations. When only a
+   * USD price is known it is expanded into the MedusaJS v2 multi-currency array
+   * for the product and every variant.
+   */
   static async createProduct(input: {
     userId: string
     brandId?: string | null
@@ -834,16 +943,19 @@ export class CatalogService {
     hasVariants: boolean
     variationDimensions?: string[]
     weightGrams?: number | null
-    prices?: PriceMoney[]
+    prices?: MedusaVariantPrice[]
     variants: VariantInput[]
   }): Promise<Product> {
+    if (!input.title || !input.title.trim()) {
+      throw new Error('VALIDATION_ERROR: A product title is required.')
+    }
     if (!input.variants || input.variants.length === 0) {
       throw new Error(
         'VALIDATION_ERROR: Product must provide at least one sellable SKU definition.'
       )
     }
 
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
       const baseSlug =
         (input.slug || input.title)
           .trim()
@@ -851,13 +963,11 @@ export class CatalogService {
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/^-|-$/g, '') || `prod-${Date.now()}`
 
-      const firstRetail = Number(input.variants[0]?.retailPrice ?? 149.99)
-      const firstCur = (input.variants[0]?.currencyCode || 'USD').toUpperCase()
-      const productPrices = normalizePriceMoneyArray(
-        input.prices ?? input.variants[0]?.prices,
-        firstRetail,
-        firstCur
-      )
+      const firstUsd = Number(input.variants[0]?.priceUsd ?? 149.99)
+      const productPrices =
+        Array.isArray(input.prices) && input.prices.length > 0
+          ? normalizePriceMoneyArray(input.prices, firstUsd)
+          : buildMultiCurrencyPriceArray(firstUsd)
 
       const product = new Product()
       product.useTransaction(trx)
@@ -871,7 +981,7 @@ export class CatalogService {
       product.status = input.status || ProductStatus.ACTIVE
       product.hasVariants = Boolean(input.hasVariants && input.variants.length > 0)
       product.variationDimensions = input.variationDimensions ?? []
-      product.listPrice = productPrices
+      product.prices = productPrices
       product.weightGrams =
         input.weightGrams !== undefined && input.weightGrams !== null
           ? Number(input.weightGrams).toFixed(2)
@@ -879,122 +989,18 @@ export class CatalogService {
       product.dimensionsCm = {}
       product.images = []
       product.tags = []
-      product.metadata = { prices: productPrices }
+      product.metadata = {}
       await product.save()
 
-      await PriceService.syncProductPrices({
-        userId: input.userId,
-        productId: product.id,
-        prices: productPrices,
-        priceType: 'retail',
-        trx,
-      })
-
       for (let i = 0; i < input.variants.length; i++) {
-        const vInput = input.variants[i]
-        const varCur = (vInput.currencyCode || 'USD').toUpperCase()
-        const varPrices = normalizePriceMoneyArray(
-          vInput.prices ?? input.prices,
-          Number(vInput.retailPrice),
-          varCur
-        )
-
-        const variant = new ProductVariant()
-        variant.useTransaction(trx)
-        variant.userId = input.userId
-        variant.productId = product.id
-        variant.sku = vInput.sku.trim()
-        variant.title = (vInput.title || input.title).trim()
-        variant.isDefault = !input.hasVariants || i === 0
-        variant.barcodeUpcEan = vInput.barcodeUpcEan ?? null
-        variant.mpn = vInput.mpn ?? null
-        variant.asin = vInput.asin ?? null
-        variant.attributes = {
-          ...(vInput.attributes ?? {}),
-          prices: varPrices,
-        }
-        variant.currencyCode = varCur
-        variant.retailPrice = Number(vInput.retailPrice).toFixed(2)
-        variant.compareAtPrice =
-          vInput.compareAtPrice !== undefined && vInput.compareAtPrice !== null
-            ? Number(vInput.compareAtPrice).toFixed(2)
-            : null
-        variant.costPrice = Number(vInput.costPrice ?? 0).toFixed(2)
-        variant.manufacturingCost = Number(vInput.manufacturingCost ?? 0).toFixed(2)
-        variant.packagingCost = Number(vInput.packagingCost ?? 0).toFixed(2)
-        variant.stockOnHand = Number(vInput.stockOnHand ?? 0)
-        variant.stockReserved = 0
-        variant.reorderPoint = Number(vInput.reorderPoint ?? 5)
-        variant.weightGrams =
-          vInput.weightGrams !== undefined && vInput.weightGrams !== null
-            ? Number(vInput.weightGrams).toFixed(2)
-            : product.weightGrams
-        variant.dimensionsCm = {}
-        variant.images = []
-        variant.status = VariantStatus.ACTIVE
-        await variant.save()
-
-        await PriceService.syncVariantPrices({
+        await this.createVariant({
           userId: input.userId,
-          productId: product.id,
-          productVariantId: variant.id,
-          prices: varPrices,
-          baseCostUsd: Number(vInput.costPrice ?? 0),
-          manufacturingCostUsd: Number(vInput.manufacturingCost ?? 0),
-          packagingCostUsd: Number(vInput.packagingCost ?? 0),
+          product,
+          variant: input.variants[i],
+          index: i,
+          hasVariants: product.hasVariants,
           trx,
         })
-
-        if (vInput.attributes) {
-          for (const [attrName, attrValue] of Object.entries(vInput.attributes)) {
-            if (attrName && attrValue) {
-              const attrRow = new ProductVariantAttribute()
-              attrRow.useTransaction(trx)
-              attrRow.userId = input.userId
-              attrRow.productVariantId = variant.id
-              attrRow.attributeName = attrName.trim().toLowerCase()
-              attrRow.attributeValue = String(attrValue).trim()
-              await attrRow.save()
-            }
-          }
-        }
-
-        if (vInput.listings && vInput.listings.length > 0) {
-          for (const lInput of vInput.listings) {
-            const lPrices = normalizePriceMoneyArray(
-              lInput.prices ?? varPrices,
-              Number(lInput.listedPrice ?? vInput.retailPrice),
-              varCur
-            )
-            const listing = new ChannelListing()
-            listing.useTransaction(trx)
-            listing.userId = input.userId
-            listing.sellerAccountId = lInput.sellerAccountId
-            listing.productId = product.id
-            listing.productVariantId = variant.id
-            listing.externalListingId = lInput.externalListingId
-            listing.externalSku = variant.sku
-            listing.asin = lInput.asin ?? variant.asin
-            listing.channelTitle = lInput.channelTitle ?? variant.title
-            listing.currencyCode = variant.currencyCode
-            listing.listedPrice = Number(lInput.listedPrice ?? vInput.retailPrice).toFixed(2)
-            listing.allocatedQuantity = Number(lInput.allocatedQuantity ?? variant.stockOnHand)
-            listing.listingStatus = ListingStatus.ACTIVE
-            listing.publicationStatus = PublicationStatus.PUBLISHED
-            listing.syncStatus = EntitySyncStatus.SYNCED
-            listing.channelAttributes = { prices: lPrices }
-            await listing.save()
-
-            await PriceService.syncChannelListingPrices({
-              userId: input.userId,
-              channelListingId: listing.id,
-              productVariantId: variant.id,
-              prices: lPrices,
-              priceType: 'listed',
-              trx,
-            })
-          }
-        }
       }
 
       return product

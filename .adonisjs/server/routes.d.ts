@@ -70,15 +70,12 @@ export type ScannedRoutes = {
     'seller_accounts.store': { paramsTuple?: []; params?: {} }
     'seller_accounts.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'seller_accounts.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'seller_accounts.sync': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'shipments.store': { paramsTuple?: []; params?: {} }
     'shipments.bulk_status': { paramsTuple?: []; params?: {} }
     'shipments.bulk_export': { paramsTuple?: []; params?: {} }
     'shipments.update_status': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'shipments.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'carrier_invoices.store': { paramsTuple?: []; params?: {} }
-    'carrier_invoices.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'carrier_invoices.update_status': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'carrier_invoices.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'shipping_invoices.store': { paramsTuple?: []; params?: {} }
     'shipping_invoices.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'shipping_invoices.update_status': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -94,9 +91,6 @@ export type ScannedRoutes = {
     'financial_accounts.store': { paramsTuple?: []; params?: {} }
     'financial_accounts.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'financial_accounts.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'finance_accounts.store': { paramsTuple?: []; params?: {} }
-    'finance_accounts.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'finance_accounts.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'credit_cards.store': { paramsTuple?: []; params?: {} }
     'credit_cards.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'credit_cards.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -223,15 +217,12 @@ export type ScannedRoutes = {
     'seller_accounts.store': { paramsTuple?: []; params?: {} }
     'seller_accounts.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'seller_accounts.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'seller_accounts.sync': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'shipments.store': { paramsTuple?: []; params?: {} }
     'shipments.bulk_status': { paramsTuple?: []; params?: {} }
     'shipments.bulk_export': { paramsTuple?: []; params?: {} }
     'shipments.update_status': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'shipments.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'carrier_invoices.store': { paramsTuple?: []; params?: {} }
-    'carrier_invoices.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'carrier_invoices.update_status': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'carrier_invoices.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'shipping_invoices.store': { paramsTuple?: []; params?: {} }
     'shipping_invoices.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'shipping_invoices.update_status': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -247,9 +238,6 @@ export type ScannedRoutes = {
     'financial_accounts.store': { paramsTuple?: []; params?: {} }
     'financial_accounts.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'financial_accounts.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'finance_accounts.store': { paramsTuple?: []; params?: {} }
-    'finance_accounts.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'finance_accounts.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'credit_cards.store': { paramsTuple?: []; params?: {} }
     'credit_cards.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'credit_cards.delete': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }

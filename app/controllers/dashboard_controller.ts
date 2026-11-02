@@ -26,7 +26,7 @@ import TasksReminder from '#models/tasks_reminder'
 import SavedView from '#models/saved_view'
 import AuditLog from '#models/audit_log'
 import { RbacService } from '../services/rbac_service.js'
-import { normalizePriceMoney } from '../types/price.js'
+import { amountOf, currencyOf, normalizePriceMoney } from '../types/price.js'
 
 export default class DashboardController {
   async index({ auth, inertia }: HttpContext) {
@@ -78,13 +78,8 @@ export default class DashboardController {
         ? Order.query()
             .where('userId', user.id)
             .if(can('customers'), (q) => q.preload('customer', (r) => r.where('userId', user.id)))
-            .if(can('integrations'), (q) =>
-              q.preload('sellerAccount', (r) => r.where('userId', user.id))
-            )
-            .preload('orderPrices', (q) => q.where('userId', user.id))
-            .preload('lineItems', (lq) =>
-              lq.where('userId', user.id).preload('linePrices', (q) => q.where('userId', user.id))
-            )
+            .preload('sellerAccount', (r) => r.where('userId', user.id).preload('salesChannel'))
+            .preload('lineItems', (lq) => lq.where('userId', user.id))
             .if(can('shipments'), (q) => q.preload('shipments', (r) => r.where('userId', user.id)))
             .orderBy('orderedAt', 'desc')
             .limit(50)
@@ -109,12 +104,10 @@ export default class DashboardController {
             .where('userId', user.id)
             .preload('brand', (q) => q.where('userId', user.id))
             .preload('category', (q) => q.where('userId', user.id))
-            .preload('priceRecords', (q) => q.where('userId', user.id))
             .preload('variants', (q) =>
               q
                 .where('userId', user.id)
                 .preload('variantAttributes', (r) => r.where('userId', user.id))
-                .preload('priceRecords', (r) => r.where('userId', user.id))
                 .preload('listings', (r) => r.where('userId', user.id))
             )
             .orderBy('createdAt', 'desc')
@@ -162,10 +155,15 @@ export default class DashboardController {
             .where('userId', user.id)
             .if(can('orders'), (q) =>
               q
-                .preload('order', (r) => r.where('userId', user.id))
+                .preload('order', (r) =>
+                  r
+                    .where('userId', user.id)
+                    .if(can('customers'), (oq) =>
+                      oq.preload('customer', (cr) => cr.where('userId', user.id))
+                    )
+                )
                 .preload('orderLineItem', (r) => r.where('userId', user.id))
             )
-            .if(can('customers'), (q) => q.preload('customer', (r) => r.where('userId', user.id)))
             .orderBy('requestedAt', 'desc')
             .limit(40)
         : [],
@@ -265,61 +263,77 @@ export default class DashboardController {
         .orderBy('createdAt', 'desc'),
     ])
 
-    // Monetary aggregates are limited to a single reporting currency; never sum mixed currencies.
-    const usdOrders = orders.filter((o) => o.reportingCurrencyCode === 'USD')
-    const grossSales = usdOrders.reduce(
-      (sum, o) => sum + Number(o.reportingTotalAmount || o.totalAmount || 0),
-      0
-    )
-    const totalRefunded = usdOrders.reduce(
-      (sum, o) => sum + Number(o.refundedAmount || 0) * Number(o.exchangeRate || 1),
-      0
-    )
-    const totalMarketplaceFees = usdOrders.reduce(
-      (sum, o) =>
-        sum +
-        (Number(o.marketplaceFeesAmount || 0) + Number(o.paymentProcessingFeesAmount || 0)) *
-          Number(o.exchangeRate || 1),
-      0
-    )
-    const totalCogs = usdOrders.reduce(
-      (sum, o) => sum + Number(o.cogsAmount || 0) * Number(o.exchangeRate || 1),
-      0
-    )
-    const totalShippingCost = usdOrders.reduce(
-      (sum, o) => sum + Number(o.shippingCostAmount || 0) * Number(o.exchangeRate || 1),
-      0
-    )
-    const netProfit = usdOrders.reduce(
-      (sum, o) => sum + Number(o.netProfitAmount || 0) * Number(o.exchangeRate || 1),
-      0
-    )
-
-    const businessExpenses = financialTransactions
-      .filter(
-        (t) =>
-          t.transactionType === 'expense' &&
-          t.dataClassification === 'business' &&
-          t.status !== 'voided' &&
-          t.reportingCurrencyCode === 'USD'
-      )
-      .reduce((sum, t) => sum + Number(t.reportingAmount || 0), 0)
-
-    const householdExpenses = financialTransactions
-      .filter(
-        (t) =>
-          t.dataClassification === 'household_personal' &&
-          t.status !== 'voided' &&
-          t.transactionType === 'expense' &&
-          t.reportingCurrencyCode === 'USD'
-      )
-      .reduce((sum, t) => sum + Number(t.reportingAmount || 0), 0)
-
-    const invoiceVarianceVal = shippingInvoices
-      .filter((inv) => inv.currencyCode === 'USD')
-      .reduce((sum, inv) => sum + Number(inv.varianceAmount || 0), 0)
-
+    // Monetary aggregates are limited to one reporting currency; mixed currencies are never summed.
+    // Each PriceMoney carries its own currency_code, so the filter is on the amount itself.
     const repCur = 'USD'
+    const inRep = (value: unknown) =>
+      currencyOf(value, repCur) === repCur ? amountOf(value) : null
+    const sumInRep = (values: Array<number | null>) =>
+      values.reduce<number>((sum, value) => (value === null ? sum : sum + value), 0)
+    const rateOf = (order: (typeof orders)[number]) => Number(order.exchangeRate || 1) || 1
+
+    const grossSales = sumInRep(
+      orders.map((o) => {
+        const reporting = inRep(o.reportingTotal)
+        return reporting === null ? null : reporting
+      })
+    )
+    const totalRefunded = sumInRep(
+      orders.map((o) => {
+        const refunded = inRep(o.refundedTotal)
+        return refunded === null ? null : refunded * rateOf(o)
+      })
+    )
+    const totalMarketplaceFees = sumInRep(
+      orders.map((o) => {
+        const marketplace = inRep(o.marketplaceFeesTotal)
+        const processing = inRep(o.paymentProcessingFeesTotal)
+        if (marketplace === null && processing === null) return null
+        return ((marketplace ?? 0) + (processing ?? 0)) * rateOf(o)
+      })
+    )
+    const totalCogs = sumInRep(
+      orders.map((o) => {
+        const cogs = inRep(o.cogsTotal)
+        return cogs === null ? null : cogs * rateOf(o)
+      })
+    )
+    const totalShippingCost = sumInRep(
+      orders.map((o) => {
+        const shippingCost = inRep(o.shippingCostTotal)
+        return shippingCost === null ? null : shippingCost * rateOf(o)
+      })
+    )
+    const netProfit = sumInRep(
+      orders.map((o) => {
+        const profit = inRep(o.netProfit)
+        return profit === null ? null : profit * rateOf(o)
+      })
+    )
+
+    const businessExpenses = sumInRep(
+      financialTransactions
+        .filter(
+          (t) =>
+            t.transactionType === 'expense' &&
+            t.dataClassification === 'business' &&
+            t.status !== 'voided'
+        )
+        .map((t) => inRep(t.reportingAmount))
+    )
+
+    const householdExpenses = sumInRep(
+      financialTransactions
+        .filter(
+          (t) =>
+            t.dataClassification === 'household_personal' &&
+            t.status !== 'voided' &&
+            t.transactionType === 'expense'
+        )
+        .map((t) => inRep(t.reportingAmount))
+    )
+
+    const invoiceVarianceVal = sumInRep(shippingInvoices.map((inv) => inRep(inv.varianceTotal)))
 
     const kpis = {
       totalOrders: orders.length,

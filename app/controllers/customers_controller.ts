@@ -5,11 +5,12 @@ import Customer from '#models/customer'
 import CustomerAddress from '#models/customer_address'
 import CustomerRiskSignal from '#models/customer_risk_signal'
 import Order from '#models/order'
-import ReturnRequest from '#models/return_request'
-import { RbacService } from '../services/rbac_service.js'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createCustomerValidator, updateCustomerValidator } from '#validators/operations'
 import { RiskReviewStatus } from '../enums/index.js'
+import { money } from '../types/price.js'
+import { AuditContext } from '#services/audit_context'
+import { CustomerMergeError, CustomerService } from '#services/customer_service'
 
 export default class CustomersController {
   async index({ auth, inertia }: HttpContext) {
@@ -39,36 +40,48 @@ export default class CustomersController {
     const user = auth.getUserOrFail()
     const payload = await request.validateUsing(createCustomerValidator)
 
-    const customer = await Customer.create({
-      userId: user.id,
-      fullName: payload.fullName,
-      email: payload.email ?? null,
-      proxyEmail: payload.proxyEmail ?? null,
-      phone: payload.phone ?? null,
-      preferredCurrency: payload.preferredCurrency || 'USD',
-      riskLevel: payload.riskLevel || 'low',
-      ordersCount: 0,
-      totalSpent: '0.00',
-      isRepeatCustomer: false,
-      riskScore: 0,
-      metadata: {},
-    })
+    const customer = await AuditContext.runRequest(
+      { auth, request },
+      'customer.created',
+      async (trx): Promise<Customer> => {
+        const created = await Customer.create(
+          {
+            userId: user.id,
+            fullName: payload.fullName,
+            email: payload.email ?? null,
+            proxyEmail: payload.proxyEmail ?? null,
+            phone: payload.phone ?? null,
+            riskLevel: payload.riskLevel || 'low',
+            ordersCount: 0,
+            totalSpent: money(0, user.defaultCurrency || 'USD'),
+            riskScore: 0,
+            metadata: {},
+          },
+          { client: trx }
+        )
 
-    if (payload.line1 && payload.city && payload.postalCode) {
-      await customer.related('addresses').create({
-        userId: user.id,
-        addressType: 'both',
-        recipientName: payload.fullName,
-        line1: payload.line1,
-        city: payload.city,
-        stateProvince: payload.stateProvince ?? null,
-        postalCode: payload.postalCode,
-        countryCode: payload.countryCode || 'US',
-        phone: payload.phone ?? null,
-        isDefault: true,
-        isVerified: false,
-      })
-    }
+        if (payload.line1 && payload.city && payload.postalCode) {
+          await CustomerAddress.create(
+            {
+              userId: user.id,
+              customerId: created.id,
+              addressType: 'both',
+              recipientName: payload.fullName,
+              line1: payload.line1,
+              city: payload.city,
+              stateProvince: payload.stateProvince ?? null,
+              postalCode: payload.postalCode,
+              countryCode: payload.countryCode || 'US',
+              phone: payload.phone ?? null,
+              isDefault: true,
+              isVerified: false,
+            },
+            { client: trx }
+          )
+        }
+        return created
+      }
+    )
 
     session.flash('success', `Customer ${customer.fullName} saved.`)
     return response.redirect().back()
@@ -87,20 +100,20 @@ export default class CustomersController {
         return response.redirect().back()
       }
       const beforeRisk = customer.riskLevel
-      customer.merge(payload)
-      await customer.save()
-      if (payload.riskLevel && payload.riskLevel !== beforeRisk) {
-        await RbacService.recordAudit({
+      await db.transaction(async (trx) => {
+        await AuditContext.apply(trx, {
           actorUserId: user.id,
-          userId: user.id,
-          action: 'customer.risk_level_changed',
-          entityType: 'customers',
-          entityId: customer.id,
           requestId: request.id(),
-          beforeState: { riskLevel: beforeRisk },
-          afterState: { riskLevel: payload.riskLevel },
-        }).catch(() => {})
-      }
+          ipAddress: request.ip(),
+          reason:
+            payload.riskLevel && payload.riskLevel !== beforeRisk
+              ? 'customer.risk_level_changed'
+              : 'customer.updated',
+        })
+        customer.useTransaction(trx)
+        customer.merge(payload)
+        await customer.save()
+      })
       session.flash('success', `Customer "${customer.fullName}" updated.`)
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to update customer')
@@ -108,7 +121,7 @@ export default class CustomersController {
     return response.redirect().back()
   }
 
-  async deleteCustomer({ auth, params, response, session }: HttpContext) {
+  async deleteCustomer({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     try {
       const customer = await Customer.query()
@@ -128,7 +141,10 @@ export default class CustomersController {
         return response.redirect().back()
       }
 
-      await customer.delete()
+      await AuditContext.runRequest({ auth, request }, 'customer.deleted', async (trx) => {
+        customer.useTransaction(trx)
+        await customer.delete()
+      })
       session.flash('success', `Customer "${customer.fullName}" removed.`)
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to delete customer.')
@@ -138,73 +154,26 @@ export default class CustomersController {
 
   async mergeCustomers({ auth, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const sourceCustomerId = String(request.input('sourceCustomerId', '')).trim()
-    const targetCustomerId = String(request.input('targetCustomerId', '')).trim()
-
-    if (!sourceCustomerId || !targetCustomerId || sourceCustomerId === targetCustomerId) {
-      session.flash('error', 'Select two distinct customers to merge.')
-      return response.redirect().back()
-    }
-
-    const [source, target] = await Promise.all([
-      Customer.query().where('userId', user.id).andWhere('id', sourceCustomerId).first(),
-      Customer.query().where('userId', user.id).andWhere('id', targetCustomerId).first(),
-    ])
-    if (!source || !target) {
-      session.flash('error', 'Merge failed — source or target customer not found.')
-      return response.redirect().back()
-    }
-
-    await db.transaction(async (trx) => {
-      await Order.query({ client: trx })
-        .where('userId', user.id)
-        .andWhere('customerId', source.id)
-        .update({ customerId: target.id })
-
-      await CustomerAddress.query({ client: trx })
-        .where('userId', user.id)
-        .andWhere('customerId', source.id)
-        .update({ customerId: target.id, isDefault: false })
-
-      await CustomerRiskSignal.query({ client: trx })
-        .where('userId', user.id)
-        .andWhere('customerId', source.id)
-        .update({ customerId: target.id })
-
-      await ReturnRequest.query({ client: trx })
-        .where('userId', user.id)
-        .andWhere('customerId', source.id)
-        .update({ customerId: target.id })
-
-      target.useTransaction(trx)
-      target.ordersCount = Number(target.ordersCount || 0) + Number(source.ordersCount || 0)
-      target.totalSpent = (Number(target.totalSpent || 0) + Number(source.totalSpent || 0)).toFixed(
-        2
+    try {
+      // The service owns the row locks, the FX conversion of lifetime spend and the
+      // child-record re-pointing; the controller only maps the outcome to a flash.
+      const result = await CustomerService.mergeCustomers({
+        userId: user.id,
+        actorUserId: user.id,
+        requestId: request.id() ?? null,
+        sourceCustomerId: String(request.input('sourceCustomerId', '')).trim(),
+        targetCustomerId: String(request.input('targetCustomerId', '')).trim(),
+      })
+      session.flash(
+        'success',
+        `Merged duplicate customer "${result.source.fullName}" into "${result.target.fullName}": ` +
+          `${result.ordersMoved} orders, ${result.addressesMoved} addresses and ` +
+          `${result.riskSignalsMoved} risk signals moved.`
       )
-      target.isRepeatCustomer = target.ordersCount > 1
-      await target.save()
-
-      source.useTransaction(trx)
-      source.mergedIntoCustomerId = target.id
-      source.ordersCount = 0
-      await source.save()
-    })
-
-    await RbacService.recordAudit({
-      actorUserId: user.id,
-      userId: user.id,
-      action: 'customer.merged',
-      entityType: 'customers',
-      entityId: target.id,
-      requestId: request.id(),
-      beforeState: { sourceCustomerId: source.id, sourceName: source.fullName },
-      afterState: { targetCustomerId: target.id, targetName: target.fullName },
-    })
-
-    session.flash(
-      'success',
-      `Merged duplicate customer "${source.fullName}" into "${target.fullName}" with zero data loss.`
-    )
+    } catch (error) {
+      if (!(error instanceof CustomerMergeError)) throw error
+      session.flash('error', error.message)
+    }
     return response.redirect().back()
   }
 
@@ -219,11 +188,18 @@ export default class CustomersController {
       const reviewStatus = request.input('reviewStatus', RiskReviewStatus.RESOLVED)
       const reviewNotes = request.input('reviewNotes', 'Reviewed by operations team.')
 
-      signal.reviewStatus = reviewStatus
-      signal.reviewNotes = reviewNotes
-      signal.reviewedByUserId = user.id
-      signal.reviewedAt = DateTime.now()
-      await signal.save()
+      await AuditContext.runRequest(
+        { auth, request },
+        'customer_risk_signal.reviewed',
+        async (trx) => {
+          signal.useTransaction(trx)
+          signal.reviewStatus = reviewStatus
+          signal.reviewNotes = reviewNotes
+          signal.reviewedByUserId = user.id
+          signal.reviewedAt = DateTime.now()
+          await signal.save()
+        }
+      )
 
       session.flash('success', `Risk signal marked as ${reviewStatus}.`)
     } catch (err: any) {

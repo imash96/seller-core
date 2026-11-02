@@ -27,11 +27,13 @@ export default class extends BaseSchema {
       table.integer('exp_year').notNullable()
       table.string('vault_token_reference', 255).nullable()
       table.text('logo_url').nullable()
-      table.string('currency_code', 3).notNullable().defaultTo('USD')
-      table.decimal('credit_limit', 14, 2).notNullable().defaultTo(0)
-      table.decimal('current_balance', 14, 2).notNullable().defaultTo(0)
-      table.decimal('statement_balance', 14, 2).notNullable().defaultTo(0)
-      table.decimal('minimum_payment_due', 14, 2).notNullable().defaultTo(0)
+      table.jsonb('credit_limit').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('current_balance').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table.jsonb('statement_balance').notNullable().defaultTo('{"currency_code":"USD","amount":0}')
+      table
+        .jsonb('minimum_payment_due')
+        .notNullable()
+        .defaultTo('{"currency_code":"USD","amount":0}')
       table.integer('billing_cycle_day').nullable()
       table.integer('payment_due_day').nullable()
       table.date('next_payment_due_date').nullable()
@@ -61,7 +63,16 @@ export default class extends BaseSchema {
       "ALTER TABLE credit_cards ADD CONSTRAINT chk_credit_cards_metadata_valid CHECK (exp_month BETWEEN 1 AND 12 AND exp_year BETWEEN 2000 AND 2100 AND last_4_digits ~ '^[0-9]{4}$')"
     )
     this.schema.raw(
-      'ALTER TABLE credit_cards ADD CONSTRAINT chk_credit_cards_amounts_nonneg CHECK (credit_limit >= 0 AND current_balance >= 0 AND statement_balance >= 0 AND minimum_payment_due >= 0)'
+      'ALTER TABLE credit_cards ADD CONSTRAINT chk_credit_cards_credit_limit_money CHECK (is_valid_price_money(credit_limit, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE credit_cards ADD CONSTRAINT chk_credit_cards_current_balance_money CHECK (is_valid_price_money(current_balance, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE credit_cards ADD CONSTRAINT chk_credit_cards_statement_balance_money CHECK (is_valid_price_money(statement_balance, false))'
+    )
+    this.schema.raw(
+      'ALTER TABLE credit_cards ADD CONSTRAINT chk_credit_cards_minimum_payment_due_money CHECK (is_valid_price_money(minimum_payment_due, false))'
     )
     this.schema.raw('CREATE INDEX idx_credit_cards_user ON credit_cards (user_id)')
     this.schema.raw(

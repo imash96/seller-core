@@ -1,3 +1,4 @@
+import { Stack } from '@astryxdesign/core/Stack'
 import { Head } from '@inertiajs/react'
 import { MapPin } from 'lucide-react'
 import { ModulePageHeader } from '~/modules/common/module-page-header'
@@ -7,7 +8,7 @@ export default function AddressCleanupPage() {
   return (
     <>
       <Head title="Address Cleanup Tool" />
-      <div className="space-y-6">
+      <Stack gap={6}>
         <ModulePageHeader
           title="Address Cleanup & Carrier Compliance Tool"
           description="Normalize raw marketplace addresses, enforce 35-character line limits, convert state names to 2-letter codes, extract VAT/IOSS/Phone metadata, and export to CSV or Customer Addresses."
@@ -15,7 +16,7 @@ export default function AddressCleanupPage() {
         />
 
         <AddressCleanerModule />
-      </div>
+      </Stack>
     </>
   )
 }

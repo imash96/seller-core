@@ -25,6 +25,7 @@ import { OrderService } from '../../app/services/order_service.js'
 import { FulfillmentAndReturnsService } from '../../app/services/fulfillment_and_returns_service.js'
 import { RbacService } from '../../app/services/rbac_service.js'
 import { OrganizationService } from '../../app/services/organization_service.js'
+import { money, type MedusaVariantPrice } from '../../app/types/price.js'
 import {
   UserStatus,
   PermissionEffect,
@@ -52,6 +53,17 @@ import {
   RiskSeverity,
   RiskReviewStatus,
 } from '../../app/enums/index.js'
+
+/**
+ * Builds a MedusaJS v2 price array from an explicit `currency → amount` map.
+ *
+ * The seeder never relies on FX derivation: every seeded price array states the
+ * exact amount charged per currency, so the demo data doubles as a fixture for
+ * the MedusaJS v2 `prices` contract (`[{ currency_code, amount }]`).
+ */
+function priceArray(amounts: Record<string, number>): MedusaVariantPrice[] {
+  return Object.entries(amounts).map(([currency_code, amount]) => ({ currency_code, amount }))
+}
 
 export default class MainSeeder extends BaseSeeder {
   async run() {
@@ -406,6 +418,46 @@ export default class MainSeeder extends BaseSeeder {
       attributesSchema: ['color', 'size', 'storage'],
     })
 
+    // Catalog pipeline items are USD-only by design: `base_price_usd` is a plain
+    // numeric column plus a `price_tier` code, never a multi-currency array. The
+    // multi-currency MedusaJS price array is derived only when the draft item is
+    // converted into a product/variant above.
+    await CatalogService.saveCatalogJsonToDb({
+      userId: adminUser.id,
+      priceTier: '02',
+      catalogPayload: {
+        'AST-CABLE-001': {
+          title: 'Astryx Braided USB-C Cable 2m',
+          subTitle: '240W PD 3.1 fast-charge braided cable',
+          type: 'Charging Cable',
+          category_handle: 'men/outerwear/coats/duster',
+          description: 'Nylon-braided 240W USB-C cable rated for 40Gbps data transfer.',
+          pattern: 'Braided',
+          attributes: {
+            material: 'Nylon',
+            gender: 'Unisex',
+            price_tier: '02',
+            special_feature: ['240W PD', '40Gbps'],
+          },
+          images: [],
+          tags: ['usb-c', 'charging'],
+          varaints: { color: ['Slate', 'Ivory'], size: ['2m'] },
+        },
+        'AST-CASE-002': {
+          title: 'Astryx Travel Case for Horizon X1',
+          subTitle: 'Hard-shell headset travel case',
+          type: 'Travel Case',
+          category_handle: 'women/outerwear/coats/trench',
+          description: 'Impact-resistant EVA case with a molded headset cradle and cable pocket.',
+          pattern: 'Solid',
+          attributes: { material: 'EVA', gender: 'Unisex', price_tier: '01' },
+          images: [],
+          tags: ['travel', 'case'],
+          varaints: { color: ['Obsidian Black'], size: ['One Size'] },
+        },
+      },
+    })
+
     // Standalone Product (hasVariants = false)
     const standaloneDock = await CatalogService.createProduct({
       userId: adminUser.id,
@@ -423,11 +475,18 @@ export default class MainSeeder extends BaseSeeder {
           barcodeUpcEan: '840192837101',
           mpn: 'MPN-DOCK-01',
           asin: 'B09ASTRYX1',
-          currencyCode: 'USD',
-          retailPrice: 89.0,
-          costPrice: 24.5,
-          manufacturingCost: 6.0,
-          packagingCost: 2.5,
+          // MedusaJS v2 price array: one self-contained amount per currency.
+          prices: priceArray({
+            USD: 89.0,
+            CAD: 122.0,
+            EUR: 82.0,
+            GBP: 71.0,
+            INR: 7499.0,
+            MXN: 1590.0,
+          }),
+          costPrice: money(24.5, 'USD'),
+          manufacturingCost: money(6.0, 'USD'),
+          packagingCost: money(2.5, 'USD'),
           stockOnHand: 185,
           reorderPoint: 25,
           listings: [
@@ -436,14 +495,24 @@ export default class MainSeeder extends BaseSeeder {
               externalListingId: 'AMZ-LIST-B09ASTRYX1',
               asin: 'B09ASTRYX1',
               channelTitle: 'Astryx Magnetic Fast Charging Dock Pro - Official',
-              listedPrice: 89.0,
+              prices: priceArray({ USD: 89.0 }),
+              listedPrice: money(89.0, 'USD'),
               allocatedQuantity: 120,
             },
             {
               sellerAccountId: dtcWeb.id,
               externalListingId: 'WEB-DOCK-PRO-01',
               channelTitle: 'Magnetic Charging Dock Pro',
-              listedPrice: 85.0,
+              // The DTC storefront lists the full multi-currency array.
+              prices: priceArray({
+                USD: 85.0,
+                CAD: 118.0,
+                EUR: 78.0,
+                GBP: 68.0,
+                INR: 7199.0,
+                MXN: 1520.0,
+              }),
+              listedPrice: money(85.0, 'USD'),
               allocatedQuantity: 65,
             },
           ],
@@ -469,11 +538,17 @@ export default class MainSeeder extends BaseSeeder {
           barcodeUpcEan: '840192837201',
           mpn: 'MPN-HX1-BLK-S',
           asin: 'B09ASTRYX2',
-          currencyCode: 'USD',
-          retailPrice: 349.0,
-          costPrice: 118.0,
-          manufacturingCost: 22.0,
-          packagingCost: 5.5,
+          prices: priceArray({
+            USD: 349.0,
+            CAD: 479.0,
+            EUR: 322.0,
+            GBP: 279.0,
+            INR: 29999.0,
+            MXN: 6290.0,
+          }),
+          costPrice: money(118.0, 'USD'),
+          manufacturingCost: money(22.0, 'USD'),
+          packagingCost: money(5.5, 'USD'),
           stockOnHand: 92,
           reorderPoint: 15,
           attributes: { color: 'Obsidian Black', size: 'Standard' },
@@ -483,7 +558,8 @@ export default class MainSeeder extends BaseSeeder {
               externalListingId: 'AMZ-LIST-B09ASTRYX2',
               asin: 'B09ASTRYX2',
               channelTitle: 'Astryx Horizon X1 Spatial Headset (Obsidian Black)',
-              listedPrice: 349.0,
+              prices: priceArray({ USD: 349.0 }),
+              listedPrice: money(349.0, 'USD'),
               allocatedQuantity: 70,
             },
           ],
@@ -494,11 +570,17 @@ export default class MainSeeder extends BaseSeeder {
           barcodeUpcEan: '840192837202',
           mpn: 'MPN-HX1-SLV-L',
           asin: 'B09ASTRYX3',
-          currencyCode: 'USD',
-          retailPrice: 369.0,
-          costPrice: 124.0,
-          manufacturingCost: 24.0,
-          packagingCost: 5.5,
+          prices: priceArray({
+            USD: 369.0,
+            CAD: 489.0,
+            EUR: 341.0,
+            GBP: 296.0,
+            INR: 31999.0,
+            MXN: 6650.0,
+          }),
+          costPrice: money(124.0, 'USD'),
+          manufacturingCost: money(24.0, 'USD'),
+          packagingCost: money(5.5, 'USD'),
           stockOnHand: 64,
           reorderPoint: 15,
           attributes: { color: 'Lunar Silver', size: 'Large' },
@@ -508,7 +590,9 @@ export default class MainSeeder extends BaseSeeder {
               externalListingId: 'EBAY-ITEM-33920184',
               asin: 'B09ASTRYX3',
               channelTitle: 'Astryx Horizon X1 Spatial Headset - Lunar Silver Large',
-              listedPrice: 489.0,
+              // eBay Canada lists in CAD only — a per-listing currency override.
+              prices: priceArray({ CAD: 489.0 }),
+              listedPrice: money(489.0, 'CAD'),
               allocatedQuantity: 40,
             },
           ],
@@ -529,14 +613,31 @@ export default class MainSeeder extends BaseSeeder {
       sellerAccountId: amzUs.id,
       orderNumber: 'ORD-AMZ-2026-1001',
       externalOrderId: '114-8920411-7721042',
+      externalDisplayId: 'AMZ-1001',
       sourceType: 'marketplace_import',
       marketplaceCode: 'amazon',
+      marketplaceSiteId: 'ATVPDKIKX0DER',
+      fulfillmentChannel: 'AFN',
+      taxCollectionModel: 'marketplace_facilitator',
       status: 'confirmed',
       paymentStatus: 'paid',
+      // Every amount below is a self-contained PriceMoney: `currencyCode` only
+      // documents the marketplace transaction currency for defaults.
       currencyCode: 'USD',
       reportingCurrencyCode: 'USD',
       exchangeRate: 1.0,
-      shippingCostAmount: 14.5,
+      shippingCostTotal: money(14.5, 'USD'),
+      orderedAt: '2026-10-15T14:22:00Z',
+      earliestShipAt: '2026-10-16T00:00:00Z',
+      latestShipAt: '2026-10-18T23:59:59Z',
+      earliestDeliveryAt: '2026-10-19T00:00:00Z',
+      latestDeliveryAt: '2026-10-22T23:59:59Z',
+      channelMetadata: {
+        salesChannel: 'Amazon.com',
+        isPrime: true,
+        isBusinessOrder: false,
+        taxCollection: { Model: 'MarketplaceFacilitator', ResponsibleParty: 'Marketplace' },
+      },
       customer: {
         externalCustomerId: 'AMZ-CUST-9910',
         fullName: 'Marcus Vance',
@@ -557,28 +658,58 @@ export default class MainSeeder extends BaseSeeder {
         {
           productVariantId: headsetBlackVariant.id,
           externalOrderLineId: 'AMZ-LINE-01',
+          externalListingId: 'B09ASTRYX2',
+          externalVariantId: headsetBlackVariant.sku,
           sku: headsetBlackVariant.sku,
           title: headsetBlackVariant.title,
           quantityOrdered: 2,
-          unitPrice: 349.0,
-          taxAmount: 62.82,
-          shippingAmount: 0,
+          unitPrice: money(349.0, 'USD'),
+          taxTotal: money(62.82, 'USD'),
+          shippingTotal: money(0, 'USD'),
+          taxLines: [
+            {
+              code: 'ITEM_TAX',
+              description: 'Washington state sales tax',
+              rate: 9.0,
+              total: money(62.82, 'USD'),
+            },
+          ],
+          customAttributes: { asin: 'B09ASTRYX2', conditionId: 'New' },
         },
         {
           productVariantId: dockVariant.id,
           externalOrderLineId: 'AMZ-LINE-02',
+          externalListingId: 'B09ASTRYX1',
+          externalVariantId: dockVariant.sku,
           sku: dockVariant.sku,
           title: dockVariant.title,
           quantityOrdered: 1,
-          unitPrice: 89.0,
-          taxAmount: 8.01,
-          shippingAmount: 0,
+          unitPrice: money(89.0, 'USD'),
+          taxTotal: money(8.01, 'USD'),
+          shippingTotal: money(0, 'USD'),
+          adjustments: [
+            {
+              code: 'PromotionDiscount',
+              description: 'Dock bundle promotion',
+              amount: money(0, 'USD'),
+            },
+          ],
+          taxLines: [
+            {
+              code: 'ITEM_TAX',
+              description: 'Washington state sales tax',
+              rate: 9.0,
+              total: money(8.01, 'USD'),
+            },
+          ],
+          customAttributes: { asin: 'B09ASTRYX1', conditionId: 'New' },
         },
       ],
       rawPayload: {
         AmazonOrderId: '114-8920411-7721042',
         PurchaseDate: '2026-10-15T14:22:00Z',
-        FulfillmentChannel: 'MFN',
+        FulfillmentChannel: 'AFN',
+        MarketplaceId: 'ATVPDKIKX0DER',
       },
     })
 
@@ -596,7 +727,7 @@ export default class MainSeeder extends BaseSeeder {
       currencyCode: 'USD',
       reportingCurrencyCode: 'USD',
       exchangeRate: 1.0,
-      shippingCostAmount: 9.25,
+      shippingCostTotal: money(9.25, 'USD'),
       customer: {
         fullName: 'Marcus Vance',
         email: 'marcus.vance@example.com',
@@ -616,10 +747,10 @@ export default class MainSeeder extends BaseSeeder {
           sku: dockVariant.sku,
           title: dockVariant.title,
           quantityOrdered: 2,
-          unitPrice: 85.0,
-          discountAmount: 10.0,
-          taxAmount: 14.4,
-          shippingAmount: 12.0,
+          unitPrice: money(85.0, 'USD'),
+          discountTotal: money(10.0, 'USD'),
+          taxTotal: money(14.4, 'USD'),
+          shippingTotal: money(12.0, 'USD'),
         },
       ],
     })
@@ -638,7 +769,7 @@ export default class MainSeeder extends BaseSeeder {
       currencyCode: 'CAD',
       reportingCurrencyCode: 'USD',
       exchangeRate: 0.73529412,
-      shippingCostAmount: 22.0,
+      shippingCostTotal: money(22.0, 'CAD'),
       customer: {
         externalCustomerId: 'EBAY-CA-4410',
         fullName: 'Sophie Tremblay',
@@ -660,9 +791,9 @@ export default class MainSeeder extends BaseSeeder {
           sku: headsetSilverVariant.sku,
           title: headsetSilverVariant.title,
           quantityOrdered: 1,
-          unitPrice: 489.0,
-          taxAmount: 63.57,
-          shippingAmount: 25.0,
+          unitPrice: money(489.0, 'CAD'),
+          taxTotal: money(63.57, 'CAD'),
+          shippingTotal: money(25.0, 'CAD'),
         },
       ],
     })
@@ -681,7 +812,7 @@ export default class MainSeeder extends BaseSeeder {
       currencyCode: 'INR',
       reportingCurrencyCode: 'USD',
       exchangeRate: 0.01190476,
-      shippingCostAmount: 450.0,
+      shippingCostTotal: money(450.0, 'INR'),
       customer: {
         externalCustomerId: 'AMZ-IN-8821',
         fullName: 'Rohan Deshmukh',
@@ -703,10 +834,11 @@ export default class MainSeeder extends BaseSeeder {
           sku: dockVariant.sku,
           title: dockVariant.title,
           quantityOrdered: 3,
-          unitPrice: 7499.0,
-          unitCostAmount: 2650.0,
-          taxAmount: 4049.46,
-          shippingAmount: 0,
+          unitPrice: money(7499.0, 'INR'),
+          // COGS is booked in the sourcing currency, independent of revenue.
+          unitCost: money(2650.0, 'INR'),
+          taxTotal: money(4049.46, 'INR'),
+          shippingTotal: money(0, 'INR'),
         },
       ],
     })
@@ -745,7 +877,7 @@ export default class MainSeeder extends BaseSeeder {
       widthCm: 28,
       heightCm: 18,
       deadWeightGrams: 1850,
-      estimatedShippingCost: 14.5,
+      estimatedShippingCost: money(14.5, 'USD'),
       status: ShipmentStatus.DELIVERED,
       items: order1Lines.map((l) => ({
         orderLineItemId: l.id,
@@ -761,8 +893,7 @@ export default class MainSeeder extends BaseSeeder {
       accountType: FinancialAccountType.BANK_CHECKING,
       institutionName: 'Mercury / Choice Financial',
       accountNumberLast4: '8841',
-      currencyCode: 'USD',
-      currentBalance: '148250.00',
+      currentBalance: money(148250, 'USD'),
       dataClassification: DataClassification.BUSINESS,
       isActive: true,
     })
@@ -773,8 +904,7 @@ export default class MainSeeder extends BaseSeeder {
       accountType: FinancialAccountType.BANK_CHECKING,
       institutionName: 'Chase Private Client',
       accountNumberLast4: '2109',
-      currencyCode: 'USD',
-      currentBalance: '34900.00',
+      currentBalance: money(34900, 'USD'),
       dataClassification: DataClassification.HOUSEHOLD_PERSONAL,
       isActive: true,
     })
@@ -787,25 +917,23 @@ export default class MainSeeder extends BaseSeeder {
       carrierName: 'UPS Supply Chain Billing',
       invoiceNumber: 'UPS-INV-2026-1091',
       currencyCode: 'USD',
-      taxAmount: 1.2,
+      taxAmount: money(1.2, 'USD'),
       invoiceDate: '2026-10-16',
       dueDate: '2026-10-30',
       lines: [
         {
           shipmentId: shipment1.id,
-          trackingNumber: shipment1.trackingNumber,
           chargeType: ShippingChargeType.BASE_FREIGHT,
           description: 'UPS Ground Commercial Zone 4',
-          expectedAmount: 12.5,
-          billedAmount: 13.75,
+          expectedAmount: money(12.5, 'USD'),
+          billedAmount: money(13.75, 'USD'),
         },
         {
           shipmentId: shipment1.id,
-          trackingNumber: shipment1.trackingNumber,
           chargeType: ShippingChargeType.FUEL_SURCHARGE,
           description: 'Fuel Surcharge 11.5%',
-          expectedAmount: 2.0,
-          billedAmount: 2.45,
+          expectedAmount: money(2.0, 'USD'),
+          billedAmount: money(2.45, 'USD'),
         },
       ],
     })
@@ -819,8 +947,8 @@ export default class MainSeeder extends BaseSeeder {
       returnReason: ReturnReason.CHANGED_MIND,
       resolutionType: 'partial_refund',
       quantityRequested: 1,
-      restockingFeeAmount: 25.0,
-      returnShippingCost: 8.5,
+      restockingFeeAmount: money(25.0, 'USD'),
+      returnShippingCost: money(8.5, 'USD'),
       customerComments: 'Ordered 2 headsets by mistake; returning 1 unopened unit.',
     })
 
@@ -832,25 +960,22 @@ export default class MainSeeder extends BaseSeeder {
       returnRequestId: returnReq.id,
       financialAccountId: businessBank.id,
       refundNumber: 'REF-2026-001',
-      itemsRefundAmount: 349.0,
-      shippingRefundAmount: 0,
-      taxRefundAmount: 31.41,
-      restockingFeeDeducted: 25.0,
+      itemsRefundTotal: money(349.0, 'USD'),
+      shippingRefundTotal: money(0, 'USD'),
+      taxRefundTotal: money(31.41, 'USD'),
+      restockingFeeTotal: money(25.0, 'USD'),
       reason: 'Customer returned 1 unit; 25 USD restocking fee applied per policy.',
     })
 
     await MarketplaceClaim.create({
       userId: adminUser.id,
       orderId: order2.id,
-      sellerAccountId: dtcWeb.id,
-      customerId: order2.customerId,
       claimNumber: 'CLM-2026-041',
       externalClaimId: 'DP-8819201',
       claimType: ClaimType.ITEM_NOT_RECEIVED,
       status: ClaimStatus.UNDER_REVIEW,
-      currencyCode: 'USD',
-      disputedAmount: '186.40',
-      sellerLiabilityAmount: '0.00',
+      disputedTotal: money(186.4, 'USD'),
+      sellerLiabilityTotal: money(0, 'USD'),
       reason: 'Carrier scan delayed at regional hub; proof of dispatch uploaded.',
       evidenceSubmitted: { carrierReceipt: 'UPS-SCAN-9912', signedProof: false },
       respondByAt: DateTime.now().plus({ days: 5 }),
@@ -868,11 +993,10 @@ export default class MainSeeder extends BaseSeeder {
       expMonth: 9,
       expYear: 2029,
       vaultTokenReference: 'tok_vault_amex_biz_1008',
-      currencyCode: 'USD',
-      creditLimit: '75000.00',
-      currentBalance: '14280.50',
-      statementBalance: '11400.00',
-      minimumPaymentDue: '1140.00',
+      creditLimit: money(75000, 'USD'),
+      currentBalance: money(14280.5, 'USD'),
+      statementBalance: money(11400, 'USD'),
+      minimumPaymentDue: money(1140, 'USD'),
       billingCycleDay: 22,
       paymentDueDay: 25,
       nextPaymentDueDate: DateTime.now().plus({ days: 8 }),
@@ -893,11 +1017,10 @@ export default class MainSeeder extends BaseSeeder {
       expMonth: 11,
       expYear: 2028,
       vaultTokenReference: 'tok_vault_visa_ink_4492',
-      currencyCode: 'USD',
-      creditLimit: '50000.00',
-      currentBalance: '6840.00',
-      statementBalance: '6840.00',
-      minimumPaymentDue: '684.00',
+      creditLimit: money(50000, 'USD'),
+      currentBalance: money(6840, 'USD'),
+      statementBalance: money(6840, 'USD'),
+      minimumPaymentDue: money(684, 'USD'),
       billingCycleDay: 1,
       paymentDueDay: 21,
       nextPaymentDueDate: DateTime.now().plus({ days: 4 }),
@@ -968,12 +1091,10 @@ export default class MainSeeder extends BaseSeeder {
       status: FinancialTransactionStatus.RECONCILED,
       description: 'Amazon North America Bi-Weekly Settlement Transfer',
       vendorOrPayer: 'Amazon Services LLC',
-      originalCurrencyCode: 'USD',
-      originalAmount: '18420.00',
+      originalAmount: money(18420, 'USD'),
       exchangeRate: '1.00000000',
-      reportingCurrencyCode: 'USD',
-      reportingAmount: '18420.00',
-      taxAmount: '0.00',
+      reportingAmount: money(18420, 'USD'),
+      taxTotal: money(0, 'USD'),
       transactionDate: DateTime.now().minus({ days: 2 }),
       settledAt: DateTime.now().minus({ days: 2 }),
       reconciledAt: DateTime.now().minus({ days: 1 }),
@@ -991,12 +1112,10 @@ export default class MainSeeder extends BaseSeeder {
       status: FinancialTransactionStatus.POSTED,
       description: 'Amazon Advertising PPC Campaign - Horizon X1 Launch',
       vendorOrPayer: 'Amazon Advertising LLC',
-      originalCurrencyCode: 'USD',
-      originalAmount: '1450.00',
+      originalAmount: money(1450, 'USD'),
       exchangeRate: '1.00000000',
-      reportingCurrencyCode: 'USD',
-      reportingAmount: '1450.00',
-      taxAmount: '0.00',
+      reportingAmount: money(1450, 'USD'),
+      taxTotal: money(0, 'USD'),
       transactionDate: DateTime.now().minus({ days: 1 }),
     })
 
@@ -1010,12 +1129,10 @@ export default class MainSeeder extends BaseSeeder {
       status: FinancialTransactionStatus.POSTED,
       description: 'Home Fiber Internet & Household Electricity Bill',
       vendorOrPayer: 'Pacific Gas & Fiber',
-      originalCurrencyCode: 'USD',
-      originalAmount: '310.00',
+      originalAmount: money(310, 'USD'),
       exchangeRate: '1.00000000',
-      reportingCurrencyCode: 'USD',
-      reportingAmount: '310.00',
-      taxAmount: '18.50',
+      reportingAmount: money(310, 'USD'),
+      taxTotal: money(18.5, 'USD'),
       transactionDate: DateTime.now(),
     })
 
@@ -1051,7 +1168,7 @@ export default class MainSeeder extends BaseSeeder {
       name: 'High-Value Unfulfilled Orders',
       filters: { fulfillmentStatus: 'unfulfilled', minTotal: 200 },
       sortConfig: { field: 'orderedAt', direction: 'desc' },
-      columnsConfig: ['orderNumber', 'marketplaceCode', 'totalAmount', 'netProfitAmount', 'status'],
+      columnsConfig: ['orderNumber', 'channelCode', 'grandTotal', 'netProfit', 'status'],
       isDefault: true,
     })
 
@@ -1063,8 +1180,15 @@ export default class MainSeeder extends BaseSeeder {
       variants: [
         {
           sku: 'ELENA-MUG-01',
-          retailPrice: 32.0,
-          costPrice: 8.0,
+          prices: priceArray({
+            USD: 32.0,
+            CAD: 44.0,
+            EUR: 29.5,
+            GBP: 25.5,
+            INR: 2699.0,
+            MXN: 570.0,
+          }),
+          costPrice: money(8.0, 'USD'),
           stockOnHand: 50,
         },
       ],

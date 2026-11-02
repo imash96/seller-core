@@ -1,28 +1,25 @@
-import crypto from 'node:crypto'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
-import UserSession from '#models/user_session'
+import { SessionRegistryService } from '../services/session_registry_service.js'
 import { UserStatus } from '../enums/index.js'
 
-/** Validate the session registry on every authenticated request, including guest routes. */
+/**
+ * Validates the live session registry on every request.
+ *
+ * The registry lives on the same `sessions` row the browser's cookie points at, so
+ * a session revoked by logout, a password change, a suspension or the janitor
+ * stops working immediately — there is no second table to expire. The check also
+ * refreshes `last_active_at` / `ip_address` / `user_agent` (at most once a minute
+ * per session) for active-session auditing.
+ */
 export default class SilentAuthMiddleware {
   async handle(ctx: HttpContext, next: NextFn) {
     const authenticated = await ctx.auth.check()
     if (authenticated) {
       const user = ctx.auth.getUserOrFail()
-      const token = ctx.session.get('sessionRegistryToken')
-      const tokenHash =
-        typeof token === 'string' ? crypto.createHash('sha256').update(token).digest('hex') : null
-      const activeSession =
-        tokenHash && user.status === UserStatus.ACTIVE
-          ? await UserSession.query()
-              .where('userId', user.id)
-              .andWhere('sessionTokenHash', tokenHash)
-              .andWhere('isRevoked', false)
-              .andWhere('expiresAt', '>', new Date())
-              .first()
-          : null
-      if (!activeSession) {
+      const alive =
+        user.status === UserStatus.ACTIVE && (await SessionRegistryService.touch(ctx, user.id))
+      if (!alive) {
         await ctx.auth.use('web').logout()
         ctx.session.forget('sessionRegistryToken')
       }

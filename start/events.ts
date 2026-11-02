@@ -20,28 +20,28 @@ import OrderStatusChanged from '#events/order_status_changed'
 import ShipmentDispatched from '#events/shipment_dispatched'
 import RiskSignalFlagged from '#events/risk_signal_flagged'
 import PaymentReconciled from '#events/payment_reconciled'
+import PaymentReconciliationReversed from '#events/payment_reconciliation_reversed'
 import UserOnboarded from '#events/user_onboarded'
 
-// Orders — audit trail + notifications + downstream jobs
-emitter.on(OrderPlaced, () => import('#listeners/write_audit_trail'))
-emitter.on(OrderPlaced, () => import('#listeners/notify_slack'))
+// Row-level auditing is done by the `trg_audit_capture` PostgreSQL trigger, so no
+// listener writes audit rows: the bus only drives side effects (notification feed,
+// downstream jobs). Every listener is idempotent and never throws into the caller.
+
+// Orders — notification feed + fulfillment preparation
+emitter.on(OrderPlaced, () => import('#listeners/create_notification'))
 emitter.on(OrderPlaced, () => import('#listeners/queue_fulfillment'))
 
-emitter.on(OrderStatusChanged, () => import('#listeners/write_audit_trail'))
-emitter.on(OrderStatusChanged, () => import('#listeners/notify_slack'))
+emitter.on(OrderStatusChanged, () => import('#listeners/create_notification'))
 
 // Fulfillment — tracking notifications
-emitter.on(ShipmentDispatched, () => import('#listeners/write_audit_trail'))
-emitter.on(ShipmentDispatched, () => import('#listeners/notify_slack'))
+emitter.on(ShipmentDispatched, () => import('#listeners/create_notification'))
 
-// Risk — create review tasks
-emitter.on(RiskSignalFlagged, () => import('#listeners/write_audit_trail'))
+// Risk — create the human review task
 emitter.on(RiskSignalFlagged, () => import('#listeners/enqueue_risk_review'))
 
-// Finance — reconcile + metrics
-emitter.on(PaymentReconciled, () => import('#listeners/write_audit_trail'))
-emitter.on(PaymentReconciled, () => import('#listeners/update_seller_metrics'))
+// Finance — reconciliation notification
+emitter.on(PaymentReconciled, () => import('#listeners/create_notification'))
+emitter.on(PaymentReconciliationReversed, () => import('#listeners/create_notification'))
 
-// Identity — welcome + audit
-emitter.on(UserOnboarded as any, () => import('#listeners/write_audit_trail') as any)
-emitter.on(UserOnboarded as any, () => import('#listeners/notify_slack') as any)
+// Identity — welcome notification
+emitter.on(UserOnboarded, () => import('#listeners/create_notification'))

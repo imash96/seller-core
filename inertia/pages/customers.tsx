@@ -1,3 +1,4 @@
+import { Stack } from '@astryxdesign/core/Stack'
 import {
   PageHeader,
   PageSection,
@@ -49,14 +50,14 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
   }, [customers, riskSignals])
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
         title="Customers & Fraud Risk Signals"
         description="Per-user buyer directory, non-destructive duplicate merging, and explainable risk signal reviews."
         icon={Users}
         badge={`${customers.length} customers · ${riskSignals.length} risk signals`}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
             <AppButton
               variant="secondary"
               size="sm"
@@ -68,7 +69,7 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             <AppButton variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>
               Create Customer
             </AppButton>
-          </div>
+          </Stack>
         }
       />
 
@@ -131,16 +132,6 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
           { name: 'proxyEmail', label: 'Marketplace Proxy Email', kind: 'email' },
           { name: 'phone', label: 'Phone Number' },
           {
-            name: 'preferredCurrency',
-            label: 'Preferred Currency',
-            kind: 'select',
-            default: 'USD',
-            options: ['USD', 'EUR', 'GBP', 'CAD', 'JPY', 'INR', 'AED'].map((c) => ({
-              value: c,
-              label: c,
-            })),
-          },
-          {
             name: 'riskLevel',
             label: 'Risk Level',
             kind: 'select',
@@ -199,7 +190,6 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
                 email: String(editRow.email ?? ''),
                 proxyEmail: String(editRow.proxyEmail ?? ''),
                 phone: String(editRow.phone ?? ''),
-                preferredCurrency: String(editRow.preferredCurrency ?? 'USD'),
                 riskLevel: String(editRow.riskLevel ?? 'low'),
                 riskScore: String(editRow.riskScore ?? 0),
                 notes: String(editRow.notes ?? ''),
@@ -212,15 +202,6 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
           { name: 'email', label: 'Email', kind: 'email' },
           { name: 'proxyEmail', label: 'Proxy Email', kind: 'email' },
           { name: 'phone', label: 'Phone' },
-          {
-            name: 'preferredCurrency',
-            label: 'Currency',
-            kind: 'select',
-            options: ['USD', 'EUR', 'GBP', 'CAD', 'JPY', 'INR', 'AED'].map((c) => ({
-              value: c,
-              label: c,
-            })),
-          },
           {
             name: 'riskLevel',
             label: 'Risk Level',
@@ -339,13 +320,13 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
               { label: 'Orders', value: String(row.ordersCount ?? 0) },
               {
                 label: 'Lifetime spend',
-                value: money(String(row.preferredCurrency ?? 'USD'), row.totalSpent),
+                value: money('USD', row.totalSpent),
               },
               { label: 'Risk score', value: String(row.riskScore ?? 0) },
               { label: 'Repeat buyer', value: row.isRepeatCustomer ? 'Yes' : 'No' },
             ],
             actions: (
-              <div className="flex items-center gap-2">
+              <Stack direction="horizontal" align="center" gap={2}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -366,7 +347,7 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             ),
           })}
           columns={[
@@ -382,10 +363,10 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
             }),
             col.text('riskScore', 'Score', 70),
             col.text('ordersCount', 'Orders', 70),
-            col.money('totalSpent', 'Lifetime spend', 'preferredCurrency'),
+            col.money('totalSpent', 'Lifetime spend'),
             col.text('isRepeatCustomer', 'Repeat', 80),
             col.action('Actions', (row) => (
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <Stack direction="horizontal" align="center" wrap="wrap" gap={1.5}>
                 <AppButton
                   variant="secondary"
                   size="xs"
@@ -406,7 +387,7 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
                 >
                   Delete
                 </AppButton>
-              </div>
+              </Stack>
             )),
           ]}
         />
@@ -490,6 +471,6 @@ export default function Customers({ customers, riskSignals, savedViews }: Props)
           ]}
         />
       </PageSection>
-    </div>
+    </Stack>
   )
 }

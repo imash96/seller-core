@@ -10,8 +10,9 @@ import { RbacService } from '../services/rbac_service.js'
 import { createUserValidator } from '#validators/user'
 import { UserStatus, ModuleKeys } from '../enums/index.js'
 import db from '@adonisjs/lucid/services/db'
-import AuditLog from '#models/audit_log'
+import { AuditContext } from '#services/audit_context'
 import Organization from '#models/organization'
+import UserOnboarded from '#events/user_onboarded'
 
 export default class AdminController {
   async index({ auth, inertia, response }: HttpContext) {
@@ -39,9 +40,9 @@ export default class AdminController {
     const payload = await request.validateUsing(createUserValidator)
 
     try {
+      // The form posts a single `roleSlug`; API clients may post `roleSlugs`.
       const roleSlugs =
-        (payload as any).roleSlugs ??
-        ((payload as any).roleSlug ? [(payload as any).roleSlug] : ['operations_manager'])
+        payload.roleSlugs ?? (payload.roleSlug ? [payload.roleSlug] : ['operations_manager'])
       const created = await RbacService.createUserBySuperAdmin(
         actor,
         {
@@ -61,6 +62,20 @@ export default class AdminController {
           userAgent: request.header('user-agent') ?? undefined,
         }
       )
+      // Onboarding is announced only after the account exists; the notification
+      // listener is best-effort and must not undo a completed provisioning.
+      try {
+        await UserOnboarded.dispatch({
+          userId: created.id,
+          email: created.email,
+          fullName: created.fullName,
+          actorUserId: actor.id,
+          requestId: request.id(),
+        })
+      } catch {
+        // The account is provisioned either way; the feed entry can be replayed.
+      }
+
       session.flash('success', `User ${created.email} provisioned by Super Administrator.`)
     } catch (err: any) {
       session.flash(
@@ -91,22 +106,19 @@ export default class AdminController {
         })
         session.flash('success', 'User suspended and all active sessions revoked.')
       } else {
-        const target = await User.findOrFail(params.id)
-        const prev = target.status
-        target.status = targetStatus
-        target.failedLoginAttempts = 0
-        target.lockedUntil = null
-        await target.save()
-
-        await RbacService.recordAudit({
-          actorUserId: actor.id,
-          userId: target.id,
-          action: 'user.status_changed',
-          entityType: 'users',
-          entityId: target.id,
-          requestId: request.id(),
-          beforeState: { status: prev },
-          afterState: { status: targetStatus },
+        const target = await db.transaction(async (trx) => {
+          await AuditContext.apply(trx, {
+            actorUserId: actor.id,
+            requestId: request.id(),
+            ipAddress: request.ip(),
+            reason: 'user.status_changed',
+          })
+          const user = await User.query({ client: trx }).where('id', params.id).firstOrFail()
+          user.status = targetStatus
+          user.failedLoginAttempts = 0
+          user.lockedUntil = null
+          await user.save()
+          return user
         })
         session.flash('success', `User ${target.email} status updated to ${targetStatus}.`)
       }
@@ -156,17 +168,16 @@ export default class AdminController {
     const hasOrders = Number((orderCount[0] as any).$extras.total) > 0
     const hasTx = Number((txCount[0] as any).$extras.total) > 0
     if (hasOrders || hasTx) {
-      target.status = UserStatus.SUSPENDED
-      await target.save()
-      await RbacService.recordAudit({
-        actorUserId: actor.id,
-        userId: target.id,
-        action: 'user.suspended_instead_of_delete',
-        entityType: 'users',
-        entityId: target.id,
-        requestId: request.id(),
-        beforeState: { hasOrders, hasTx },
-        afterState: { status: UserStatus.SUSPENDED },
+      await db.transaction(async (trx) => {
+        await AuditContext.apply(trx, {
+          actorUserId: actor.id,
+          requestId: request.id(),
+          ipAddress: request.ip(),
+          reason: 'user.suspended_instead_of_delete',
+        })
+        const user = await User.query({ client: trx }).where('id', target.id).firstOrFail()
+        user.status = UserStatus.SUSPENDED
+        await user.save()
       })
       session.flash(
         'success',
@@ -174,15 +185,14 @@ export default class AdminController {
       )
       return response.redirect().back()
     }
-    await target.delete()
-    await RbacService.recordAudit({
-      actorUserId: actor.id,
-      userId: target.id,
-      action: 'user.deleted',
-      entityType: 'users',
-      entityId: params.id,
-      requestId: request.id(),
-      beforeState: { email: target.email },
+    await db.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
+        actorUserId: actor.id,
+        requestId: request.id(),
+        ipAddress: request.ip(),
+        reason: 'user.deleted',
+      })
+      await trx.from('users').where('id', target.id).delete()
     })
     session.flash('success', `User "${target.email}" deleted.`)
     return response.redirect().back()
@@ -200,31 +210,30 @@ export default class AdminController {
     const roleSlug = String(request.input('roleSlug', '')).trim()
     const role = await Role.findByOrFail('slug', roleSlug)
 
-    const existing = await UserRole.query()
-      .where('userId', target.id)
-      .andWhere('roleId', role.id)
-      .first()
+    await db.transaction(async (trx) => {
+      const existing = await UserRole.query({ client: trx })
+        .where('userId', target.id)
+        .andWhere('roleId', role.id)
+        .first()
 
-    if (existing) {
-      await existing.delete()
-      session.flash('success', `Removed role "${role.slug}" from ${target.email}.`)
-    } else {
-      await UserRole.create({
-        userId: target.id,
-        roleId: role.id,
-        assignedByUserId: actor.id,
+      await AuditContext.apply(trx, {
+        actorUserId: actor.id,
+        requestId: request.id(),
+        ipAddress: request.ip(),
+        reason: existing ? 'rbac.role_revoked' : 'rbac.role_assigned',
       })
-      session.flash('success', `Assigned role "${role.slug}" to ${target.email}.`)
-    }
 
-    await RbacService.recordAudit({
-      actorUserId: actor.id,
-      userId: target.id,
-      action: existing ? 'rbac.role_revoked' : 'rbac.role_assigned',
-      entityType: 'user_roles',
-      entityId: target.id,
-      requestId: request.id(),
-      afterState: { roleSlug: role.slug },
+      if (existing) {
+        await existing.delete()
+        session.flash('success', `Removed role "${role.slug}" from ${target.email}.`)
+      } else {
+        await UserRole.create({
+          userId: target.id,
+          roleId: role.id,
+          assignedByUserId: actor.id,
+        })
+        session.flash('success', `Assigned role "${role.slug}" to ${target.email}.`)
+      }
     })
 
     return response.redirect().back()
@@ -241,28 +250,20 @@ export default class AdminController {
     const actor = auth.getUserOrFail()
     await bouncer.authorize('manageEntitlements')
     const entitlement = await db.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
+        actorUserId: actor.id,
+        requestId: request.id(),
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') ?? null,
+        reason: `rbac.entitlement_changed`,
+      })
       const record = await ModuleEntitlement.query({ client: trx })
         .where('id', params.id)
         .forUpdate()
         .firstOrFail()
-      const before = record.isEnabled
-      record.isEnabled = !before
+      record.isEnabled = !record.isEnabled
       record.updatedByUserId = actor.id
       await record.save()
-      await AuditLog.create(
-        {
-          actorUserId: actor.id,
-          userId: record.userId,
-          action: 'rbac.entitlement_changed',
-          entityType: 'module_entitlements',
-          entityId: record.id,
-          requestId: request.id(),
-          beforeState: { isEnabled: before },
-          afterState: { isEnabled: record.isEnabled, moduleKey: record.moduleKey },
-          metadata: {},
-        },
-        { client: trx }
-      )
       return record
     })
     session.flash(
@@ -283,6 +284,13 @@ export default class AdminController {
     )
       return response.badRequest({ error: 'Provide a valid moduleKey and boolean isEnabled.' })
     await db.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
+        actorUserId: actor.id,
+        requestId: request.id(),
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') ?? null,
+        reason: 'rbac.entitlement_changed',
+      })
       // Lock the parent even when no entitlement row exists yet.
       await User.query({ client: trx }).where('id', params.id).forUpdate().firstOrFail()
       const existing = await ModuleEntitlement.query({ client: trx })
@@ -290,7 +298,6 @@ export default class AdminController {
         .where('moduleKey', moduleKey)
         .forUpdate()
         .first()
-      const before = existing?.isEnabled ?? null
       const record = existing ?? new ModuleEntitlement()
       record.useTransaction(trx)
       record.userId = params.id
@@ -299,20 +306,6 @@ export default class AdminController {
       record.planTier = record.planTier || 'enterprise'
       record.updatedByUserId = actor.id
       await record.save()
-      await AuditLog.create(
-        {
-          actorUserId: actor.id,
-          userId: params.id,
-          action: 'rbac.entitlement_changed',
-          entityType: 'module_entitlements',
-          entityId: record.id,
-          requestId: request.id(),
-          beforeState: { isEnabled: before },
-          afterState: { isEnabled, moduleKey },
-          metadata: {},
-        },
-        { client: trx }
-      )
     })
     return response.ok({ message: `Module ${moduleKey} ${isEnabled ? 'enabled' : 'disabled'}.` })
   }

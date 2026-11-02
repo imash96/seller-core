@@ -3,6 +3,7 @@ import { Form } from '@adonisjs/inertia/react'
 import { Button } from '@astryxdesign/core/Button'
 import { X, Sparkles } from 'lucide-react'
 import { FormField, type FieldDef } from '../molecules/form-field'
+import { moneyAwareDefaults, withMoneyPairs } from '~/lib/money-form'
 import { VStack } from '@astryxdesign/core'
 
 function stripEmpty<T extends Record<string, unknown>>(data: T): Record<string, unknown> {
@@ -14,6 +15,11 @@ function stripEmpty<T extends Record<string, unknown>>(data: T): Record<string, 
   return out
 }
 
+/**
+ * Collapses `<name>__amount` + `<name>__currency` pairs into a single
+ * `name: { amount, currencyCode }`, the shape every money validator accepts.
+ * Pairs left empty are dropped entirely so partial updates stay partial.
+ */
 export function SmartForm({
   action,
   method = 'post',
@@ -35,10 +41,7 @@ export function SmartForm({
   actionFor?: (values: Record<string, string>) => string
   allowEmpty?: boolean
 }) {
-  const initial = useMemo(
-    () => Object.fromEntries(fields.map((f) => [f.name, f.default ?? ''])),
-    [fields]
-  )
+  const initial = useMemo(() => moneyAwareDefaults(fields), [fields])
   const [values, setValues] = useState<Record<string, string>>(initial)
 
   const handleFieldChange = (name: string, nextVal: string) => {
@@ -61,10 +64,9 @@ export function SmartForm({
       action={actionFor ? actionFor(values) : action}
       method={method}
       transform={(data: Record<string, any>) =>
-        (allowEmpty ? { ...data, ...values } : stripEmpty({ ...data, ...values })) as Record<
-          string,
-          any
-        >
+        withMoneyPairs(
+          allowEmpty ? { ...data, ...values } : stripEmpty({ ...data, ...values })
+        ) as Record<string, any>
       }
       resetOnSuccess
       onSuccess={() => {
@@ -87,6 +89,7 @@ export function SmartForm({
                 value={values[f.name] ?? ''}
                 values={values}
                 onChange={(v) => handleFieldChange(f.name, v)}
+                onCurrencyChange={(v) => handleFieldChange(`${f.name}__currency`, v)}
                 error={(errors as Record<string, string | undefined>)?.[f.name]}
               />
             ))}
@@ -133,10 +136,7 @@ export function FormModal({
   presetActions?: Array<{ label: string; values: Record<string, string> }>
   children?: ReactNode
 }) {
-  const defaults = useMemo(
-    () => Object.fromEntries(fields.map((f) => [f.name, f.default ?? ''])),
-    [fields]
-  )
+  const defaults = useMemo(() => moneyAwareDefaults(fields), [fields])
   const [values, setValues] = useState<Record<string, string>>(() => ({
     ...defaults,
     ...(initialValues ?? {}),
@@ -219,7 +219,7 @@ export function FormModal({
           action={actionFor ? actionFor(values) : action}
           method="post"
           transform={(data: Record<string, any>) =>
-            stripEmpty({ ...data, ...values }) as Record<string, any>
+            withMoneyPairs(stripEmpty({ ...data, ...values })) as Record<string, any>
           }
           onSuccess={() => {
             onSuccess?.()
@@ -294,6 +294,7 @@ export function FormModal({
                           value={values[f.name] ?? ''}
                           values={values}
                           onChange={(v) => handleFieldChange(f.name, v)}
+                          onCurrencyChange={(v) => handleFieldChange(`${f.name}__currency`, v)}
                           error={(errors as Record<string, string | undefined>)?.[f.name]}
                         />
                       ))}

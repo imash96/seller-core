@@ -1,8 +1,8 @@
 import User from '#models/user'
 import Role from '#models/role'
 import ModuleEntitlement from '#models/module_entitlement'
-import AuditLog from '#models/audit_log'
-import UserSession from '#models/user_session'
+import { SessionRegistryService } from './session_registry_service.js'
+import { AuditContext } from './audit_context.js'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import { PermissionEffect, UserStatus } from '../enums/index.js'
@@ -136,13 +136,23 @@ export class RbacService {
       roleSlugs?: string[]
       enabledModules?: string[]
     },
-    context?: { requestId?: string; ipAddress?: string; userAgent?: string }
+    context?: { requestId?: string; ipAddress?: string; userAgent?: string; correlationId?: string }
   ): Promise<User> {
     if (!actor.isSuperAdmin || actor.status !== UserStatus.ACTIVE) {
       throw new Error('FORBIDDEN: Only an active system super administrator can create users.')
     }
 
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
+      // Row-level audit rows (users, user_roles, module_entitlements) are written by
+      // the audit trigger; the context only says who did it and why.
+      await AuditContext.apply(trx, {
+        actorUserId: actor.id,
+        requestId: context?.requestId ?? null,
+        correlationId: context?.correlationId ?? null,
+        ipAddress: context?.ipAddress ?? null,
+        userAgent: context?.userAgent ?? null,
+        reason: 'user.created',
+      })
       const newUser = new User()
       newUser.useTransaction(trx)
       newUser.email = input.email.trim().toLowerCase()
@@ -197,28 +207,6 @@ export class RbacService {
         })
       }
 
-      const audit = new AuditLog()
-      audit.useTransaction(trx)
-      audit.actorUserId = actor.id
-      audit.userId = newUser.id
-      audit.action = 'user.created'
-      audit.entityType = 'users'
-      audit.entityId = newUser.id
-      audit.requestId = context?.requestId ?? null
-      audit.ipAddress = context?.ipAddress ?? null
-      audit.userAgent = context?.userAgent ?? null
-      audit.beforeState = null
-      audit.afterState = {
-        email: newUser.email,
-        fullName: newUser.fullName,
-        status: newUser.status,
-        isSuperAdmin: newUser.isSuperAdmin,
-        roleSlugs: input.roleSlugs ?? [],
-        enabledModules: modulesToEnable,
-      }
-      audit.metadata = {}
-      await audit.save()
-
       return newUser
     })
   }
@@ -230,7 +218,7 @@ export class RbacService {
     actor: User,
     targetUserId: string,
     reason: string,
-    context?: { requestId?: string; ipAddress?: string }
+    context?: { requestId?: string; ipAddress?: string; correlationId?: string }
   ): Promise<User> {
     if (!actor.isSuperAdmin) {
       throw new Error('FORBIDDEN: Only a super administrator can suspend user accounts.')
@@ -239,68 +227,22 @@ export class RbacService {
       throw new Error('INVALID_OPERATION: Super administrator cannot suspend their own account.')
     }
 
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
+      await AuditContext.apply(trx, {
+        actorUserId: actor.id,
+        requestId: context?.requestId ?? null,
+        correlationId: context?.correlationId ?? null,
+        ipAddress: context?.ipAddress ?? null,
+        reason: `user.suspended: ${reason}`.slice(0, 200),
+      })
       const target = await User.query({ client: trx }).where('id', targetUserId).firstOrFail()
-      const previousStatus = target.status
       target.status = UserStatus.SUSPENDED
       await target.save()
 
-      await UserSession.query({ client: trx })
-        .where('userId', target.id)
-        .andWhere('isRevoked', false)
-        .update({
-          isRevoked: true,
-          revokedAt: DateTime.now().toSQL(),
-        })
-
-      const audit = new AuditLog()
-      audit.useTransaction(trx)
-      audit.actorUserId = actor.id
-      audit.userId = target.id
-      audit.action = 'user.suspended'
-      audit.entityType = 'users'
-      audit.entityId = target.id
-      audit.requestId = context?.requestId ?? null
-      audit.ipAddress = context?.ipAddress ?? null
-      audit.beforeState = { status: previousStatus }
-      audit.afterState = { status: target.status, reason }
-      audit.metadata = { sessionsRevoked: true }
-      await audit.save()
+      // Suspension kills every live session of the user in one statement.
+      await SessionRegistryService.revokeAllForUser(target.id, trx)
 
       return target
-    })
-  }
-
-  /**
-   * Records a tamper-evident audit log entry.
-   */
-  static async recordAudit(input: {
-    actorUserId: string | null
-    userId: string | null
-    action: string
-    entityType: string
-    entityId?: string | null
-    requestId?: string | null
-    correlationId?: string | null
-    ipAddress?: string | null
-    userAgent?: string | null
-    beforeState?: Record<string, unknown> | null
-    afterState?: Record<string, unknown> | null
-    metadata?: Record<string, unknown>
-  }): Promise<AuditLog> {
-    return await AuditLog.create({
-      actorUserId: input.actorUserId,
-      userId: input.userId,
-      action: input.action,
-      entityType: input.entityType,
-      entityId: input.entityId ?? null,
-      requestId: input.requestId ?? null,
-      correlationId: input.correlationId ?? null,
-      ipAddress: input.ipAddress ?? null,
-      userAgent: input.userAgent ?? null,
-      beforeState: input.beforeState ?? null,
-      afterState: input.afterState ?? null,
-      metadata: input.metadata ?? {},
     })
   }
 }

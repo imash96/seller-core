@@ -19,6 +19,7 @@ import { RbacService } from '../../app/services/rbac_service.js'
 import { CatalogService } from '../../app/services/catalog_service.js'
 import { OrderService } from '../../app/services/order_service.js'
 import { FulfillmentAndReturnsService } from '../../app/services/fulfillment_and_returns_service.js'
+import { amountOf, money } from '../../app/types/price.js'
 import {
   PermissionEffect,
   UserStatus,
@@ -278,7 +279,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
         {
           sku: simpleSku,
           title: `Simple USB-C Cable ${nonce}`,
-          retailPrice: 19.99,
+          priceUsd: 19.99,
           costPrice: 4.5,
           manufacturingCost: 3.0,
           packagingCost: 0.5,
@@ -303,7 +304,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
         {
           sku: multiSku1,
           title: `Ergonomic Laptop Stand - Black / Medium ${nonce}`,
-          retailPrice: 89.0,
+          priceUsd: 89.0,
           costPrice: 25.0,
           stockOnHand: 30,
           attributes: { color: 'Black', size: 'Medium' },
@@ -311,7 +312,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
         {
           sku: multiSku2,
           title: `Ergonomic Laptop Stand - Silver / Large ${nonce}`,
-          retailPrice: 99.0,
+          priceUsd: 99.0,
           costPrice: 28.0,
           stockOnHand: 20,
           attributes: { color: 'Silver', size: 'Large' },
@@ -339,7 +340,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
       currencyCode: 'CAD',
       reportingCurrencyCode: 'USD',
       exchangeRate: 0.74,
-      shippingCostAmount: 10.0,
+      shippingCostTotal: 10.0,
       customer: {
         fullName: 'Jean-Luc Picard',
         email: 'picard@starfleet.ca',
@@ -358,19 +359,23 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
           sku: 'TEST-CAD-SKU-1',
           title: 'Precision Chronograph',
           quantityOrdered: 2,
-          unitPrice: 100.0, // subtotal 200.00 CAD
-          unitCostAmount: 30.0, // COGS 60.00 CAD
-          taxAmount: 20.0,
-          shippingAmount: 15.0, // Total 235.00 CAD -> 173.90 USD
-          marketplaceFeeAmount: 30.0,
+          unitPrice: { currency_code: 'CAD', amount: 100 }, // subtotal 200.00 CAD
+          unitCost: { currency_code: 'CAD', amount: 30 }, // COGS 60.00 CAD
+          taxTotal: { currency_code: 'CAD', amount: 20 },
+          shippingTotal: { currency_code: 'CAD', amount: 15 }, // Total 235.00 CAD -> 173.90 USD
+          marketplaceFee: { currency_code: 'CAD', amount: 30 },
         },
       ],
     })
 
-    assert.equal(orderA.subtotalAmount, '200.00')
-    assert.equal(orderA.totalAmount, '235.00')
-    assert.equal(orderA.reportingTotalAmount, '173.90')
-    assert.equal(orderA.cogsAmount, '60.00')
+    // Every monetary column is a self-contained PriceMoney, never a bare number.
+    assert.deepEqual(orderA.subtotal, { currency_code: 'CAD', amount: 200 })
+    assert.deepEqual(orderA.grandTotal, { currency_code: 'CAD', amount: 235 })
+    assert.deepEqual(orderA.reportingTotal, { currency_code: 'USD', amount: 173.9 })
+    assert.deepEqual(orderA.cogsTotal, { currency_code: 'CAD', amount: 60 })
+    // Reporting total is converted at the order's exchange rate and keeps its own currency.
+    assert.equal(orderA.reportingTotal.currency_code, 'USD')
+    assert.equal(orderA.grandTotal.currency_code, 'CAD')
 
     // Strict user isolation: Merchant B querying by their userId cannot see Merchant A's order
     const leakedOrder = await Order.query()
@@ -407,7 +412,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
               title: 'Bulk Item 1',
               quantityOrdered: 2,
               unitPrice: 50.0,
-              unitCostAmount: 15.0,
+              unitCost: 15.0,
             },
           ],
           rawPayload: {
@@ -484,7 +489,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
           title: 'Multi-Parcel Monitor Arm',
           quantityOrdered: 3,
           unitPrice: 120.0,
-          unitCostAmount: 40.0,
+          unitCost: 40.0,
         },
       ],
     })
@@ -526,7 +531,10 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
 
     await order.refresh()
     assert.equal(order.status, 'fulfilled')
-    assert.isNull(order.deliveryNotificationSentAt)
+    // Delivery notification state lives on the shipment, not the order: a queued
+    // outbox event is not evidence that the customer was notified.
+    await shipment2.refresh()
+    assert.isFalse(shipment2.deliveryNotificationSent)
     await FulfillmentAndReturnsService.updateShipmentStatuses({
       userId: merchantA.id,
       shipmentIds: [shipment1.id],
@@ -534,7 +542,8 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
     })
     await order.refresh()
     assert.equal(order.status, 'delivered')
-    assert.isNull(order.deliveryNotificationSentAt)
+    await shipment1.refresh()
+    assert.isFalse(shipment1.deliveryNotificationSent)
 
     const outbox = await OutboxEvent.query()
       .where('aggregateId', shipment2.id)
@@ -559,7 +568,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
       ],
     })
     assert.equal(invoice1.reconciliationStatus, 'variance_detected')
-    assert.equal(Number(invoice1.varianceAmount), 2.5)
+    assert.deepEqual(invoice1.varianceTotal, { currency_code: 'USD', amount: 2.5 })
 
     // Re-billing the exact same (shipmentId, chargeType) on another invoice MUST be rejected!
     await assert.rejects(async () => {
@@ -595,7 +604,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
           title: 'Mechanical Keyboard',
           quantityOrdered: 2,
           unitPrice: 100.0,
-          unitCostAmount: 35.0,
+          unitCost: 35.0,
         },
       ],
     })
@@ -634,9 +643,9 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
       orderId: order.id,
       returnRequestId: rma1.id,
       refundNumber: `REF-1-${Date.now()}`,
-      itemsRefundAmount: 100.0,
+      itemsRefundTotal: 100.0,
     })
-    assert.equal(Number(refund1.totalRefundAmount), 100)
+    assert.deepEqual(refund1.grandRefundTotal, { currency_code: 'USD', amount: 100 })
 
     // Attempting to refund $150 when only $100 remains refundable -> rejected!
     await assert.rejects(async () => {
@@ -644,7 +653,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
         userId: merchantA.id,
         orderId: order.id,
         refundNumber: `REF-OVER-${Date.now()}`,
-        itemsRefundAmount: 150.0,
+        itemsRefundTotal: 150.0,
       })
     }, /DOUBLE_REFUND_PREVENTED/)
   })
@@ -662,11 +671,10 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
       expMonth: 12,
       expYear: 2029,
       vaultTokenReference: 'tok_amex_8899',
-      currencyCode: 'USD',
-      creditLimit: '50000.00',
-      currentBalance: '1200.00',
-      statementBalance: '1200.00',
-      minimumPaymentDue: '120.00',
+      creditLimit: money(50000, 'USD'),
+      currentBalance: money(1200, 'USD'),
+      statementBalance: money(1200, 'USD'),
+      minimumPaymentDue: money(120, 'USD'),
       nextPaymentDueDate: DateTime.fromISO('2026-11-01'),
       reminderDaysBefore: 5,
       autoPayEnabled: true,
@@ -692,12 +700,10 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
       dataClassification: DataClassification.BUSINESS,
       status: FinancialTransactionStatus.POSTED,
       description: 'Amazon Sponsored Products Ad Campaign',
-      originalCurrencyCode: 'CAD',
-      originalAmount: '1000.0000',
+      originalAmount: money(1000, 'CAD'),
       exchangeRate: '0.73500000',
-      reportingCurrencyCode: 'USD',
-      reportingAmount: '735.0000',
-      taxAmount: '0.0000',
+      reportingAmount: money(735, 'USD'),
+      taxTotal: money(0, 'CAD'),
       transactionDate: DateTime.now(),
       metadata: {},
     })
@@ -709,18 +715,19 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
       dataClassification: DataClassification.HOUSEHOLD_PERSONAL,
       status: FinancialTransactionStatus.POSTED,
       description: 'Personal Household Utility Bill',
-      originalCurrencyCode: 'USD',
-      originalAmount: '210.0000',
+      originalAmount: money(210, 'USD'),
       exchangeRate: '1.00000000',
-      reportingCurrencyCode: 'USD',
-      reportingAmount: '210.0000',
-      taxAmount: '0.0000',
+      reportingAmount: money(210, 'USD'),
+      taxTotal: money(0, 'USD'),
       transactionDate: DateTime.now(),
       metadata: {},
     })
 
     assert.equal(bizTx.dataClassification, 'business')
     assert.equal(householdTx.dataClassification, 'household_personal')
+    // The ledger keeps each side of the conversion in its own currency.
+    assert.deepEqual(bizTx.originalAmount, { currency_code: 'CAD', amount: 1000 })
+    assert.deepEqual(bizTx.reportingAmount, { currency_code: 'USD', amount: 735 })
   })
 
   test('10. Database CHECK constraints reject invalid monetary values and invalid credit card last_4_digits', async ({
@@ -763,10 +770,8 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
       user_id: merchantA.id,
       full_name: 'Audit Trail Customer',
       email: 'audit.trail@example.com',
-      preferred_currency: 'USD',
       orders_count: 0,
-      total_spent: 0,
-      is_repeat_customer: false,
+      total_spent: JSON.stringify({ currency_code: 'USD', amount: 0 }),
       risk_level: 'low',
       risk_score: 0,
       created_at: new Date(),
@@ -811,7 +816,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
       userId: merchantA.id,
       title: `Reservation ${nonce}`,
       hasVariants: false,
-      variants: [{ sku: `RES-${nonce}`, title: 'Item', retailPrice: 10, stockOnHand: 20 }],
+      variants: [{ sku: `RES-${nonce}`, title: 'Item', priceUsd: 10, stockOnHand: 20 }],
     })
     await product.load('variants')
     const variant = product.variants[0]
@@ -899,7 +904,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
           userId: merchantA.id,
           orderId: order.id,
           refundNumber: `REF-${nonce}-${n}`,
-          itemsRefundAmount: 70,
+          itemsRefundTotal: 70,
         })
       )
     )
@@ -910,7 +915,9 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
     ) as PromiseRejectedResult
     assert.match(refundsFailure.reason.message, /DOUBLE_REFUND_PREVENTED/)
     await order.refresh()
-    assert.equal(Number(order.refundedAmount), 70)
+    // The refunded total is a PriceMoney in the order currency, not a bare number.
+    assert.equal(amountOf(order.refundedTotal), 70)
+    assert.equal(order.refundedTotal.currency_code, order.grandTotal.currency_code)
   })
 
   test('refunds reject unrelated and already refunded returns and invalid amounts', async ({
@@ -938,7 +945,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
       returnReason: ReturnReason.DEFECTIVE,
       quantityRequested: 1,
     })
-    const refund = { userId: merchantA.id, refundNumber: `REF-${nonce}`, itemsRefundAmount: 50 }
+    const refund = { userId: merchantA.id, refundNumber: `REF-${nonce}`, itemsRefundTotal: 50 }
     await assert.rejects(() =>
       FulfillmentAndReturnsService.processRefund({
         ...refund,
@@ -958,7 +965,7 @@ test.group('Multi-User E-Commerce SaaS Architecture & Domain Verification', (gro
         FulfillmentAndReturnsService.processRefund({
           ...refund,
           orderId: order.id,
-          shippingRefundAmount: -1,
+          shippingRefundTotal: -1,
         }),
       /VALIDATION_ERROR/
     )
