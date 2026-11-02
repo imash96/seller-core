@@ -27,6 +27,7 @@ import {
   MultiCurrencyPriceStack,
   convertToLocale,
   resolvePriceMoney,
+  moneyAmountString,
   type PriceMoney,
   type Row,
 } from '~/lib/ui'
@@ -392,7 +393,9 @@ export default function InventoryPage({ products }: Props) {
               ? {
                   stockOnHand: String(editStockRow.stockOnHand ?? 0),
                   currencyCode: String(editStockRow.currencyCode ?? 'USD'),
-                  retailPrice: String(editStockRow.retailPrice ?? 0),
+                  retailPrice: moneyAmountString(
+                    editStockRow.retailPriceMoney ?? editStockRow.retailPrice
+                  ),
                   pricesJson: JSON.stringify(
                     Array.isArray(editStockRow.prices)
                       ? editStockRow.prices
@@ -408,8 +411,14 @@ export default function InventoryPage({ products }: Props) {
           }
           fields={[
             { name: 'stockOnHand', label: 'Stock on hand', kind: 'number', required: true },
-            { name: 'currencyCode', label: 'Primary Currency Code', default: 'USD' },
-            { name: 'retailPrice', label: 'Primary Retail Price', kind: 'number', required: true },
+            {
+              name: 'retailPrice',
+              label: 'Retail price (USD)',
+              kind: 'number',
+              required: true,
+              description:
+                'Prices in INR, EUR, GBP, CAD and MXN are derived from this amount unless overridden below.',
+            },
             {
               name: 'pricesJson',
               label: 'Multi-Currency Price Array (ProductVariantPrice)',
@@ -436,9 +445,18 @@ export default function InventoryPage({ products }: Props) {
             },
             { name: 'sku', label: 'Variant SKU', required: true },
             { name: 'title', label: 'Variant title', required: true },
-            { name: 'currencyCode', label: 'Primary Currency Code', default: 'USD' },
-            { name: 'retailPrice', label: 'Primary Retail price', kind: 'number', required: true },
-            { name: 'costPrice', label: 'Unit cost price (COGS)', kind: 'number' },
+            {
+              name: 'priceUsd',
+              label: 'Retail price (USD — the anchor the other currencies convert from)',
+              kind: 'number',
+              required: true,
+            },
+            {
+              name: 'costPrice',
+              label: 'Unit cost price (COGS)',
+              kind: 'money',
+              defaultCurrency: 'USD',
+            },
             { name: 'stockOnHand', label: 'Initial stock on hand', kind: 'number', default: '25' },
             { name: 'attributeName', label: 'Attribute dimension (e.g. color)' },
             { name: 'attributeValue', label: 'Attribute value (e.g. Obsidian)' },

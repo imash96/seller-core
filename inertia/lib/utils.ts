@@ -148,6 +148,24 @@ export function formatMoney(
  * Formats a multi-currency price array `[{ currency_code: 'USD', amount: 149.99 }, ...]`
  * using `convertToLocale`.
  */
+/**
+ * Amount of a serialized `PriceMoney` as a plain string, for prefilling form inputs.
+ * Accepts the canonical object, the aliased `{ amount, currencyCode }` shape, or a
+ * bare scalar (legacy rows), and always returns `''` for missing values so an empty
+ * field stays empty instead of becoming `NaN`.
+ */
+export function moneyAmountString(input: unknown): string {
+  if (input === null || input === undefined || input === '') return ''
+  const value = resolvePriceMoney(input, 'USD')
+  if (!Number.isFinite(value.amount)) return ''
+  return String(value.amount)
+}
+
+/** ISO code of a serialized `PriceMoney`, uppercased, defaulting to USD. */
+export function moneyCurrencyCode(input: unknown, fallback = 'USD'): string {
+  return resolvePriceMoney(input, fallback).currency_code
+}
+
 export function formatPriceArray(
   prices: unknown,
   locale = 'en-US'

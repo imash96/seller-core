@@ -10,6 +10,8 @@ import {
   col,
   STATUS_TONES,
   money,
+  moneyAmountString,
+  moneyCurrencyCode,
   type Row,
 } from '~/lib/ui'
 import { useState, useMemo } from 'react'
@@ -211,18 +213,6 @@ export default function Returns({
           },
           { name: 'rmaNumber', label: 'RMA Number', required: true, placeholder: 'RMA-2026-001' },
           {
-            name: 'externalReturnId',
-            label: 'External Marketplace Return ID',
-            placeholder: 'AMZ-RET-9910',
-          },
-          {
-            name: 'status',
-            label: 'Initial RMA Status',
-            kind: 'select',
-            default: 'requested',
-            options: RETURN_STATUS.map((s) => ({ value: s, label: s.replace(/_/g, ' ') })),
-          },
-          {
             name: 'returnReason',
             label: 'Return Reason',
             kind: 'select',
@@ -251,33 +241,17 @@ export default function Returns({
             default: '1',
           },
           {
-            name: 'quantityApproved',
-            label: 'Quantity Approved',
-            kind: 'number',
-            default: '1',
-          },
-          {
-            name: 'quantityReceived',
-            label: 'Quantity Received',
-            kind: 'number',
+            name: 'restockingFeeTotal',
+            label: 'Restocking Fee',
+            kind: 'money',
+            defaultCurrency: 'USD',
             default: '0',
           },
           {
-            name: 'currencyCode',
-            label: 'Currency Code',
-            kind: 'select',
-            default: 'USD',
-            options: ['USD', 'EUR', 'GBP', 'CAD', 'INR', 'AED'].map((c) => ({
-              value: c,
-              label: c,
-            })),
-          },
-          { name: 'refundAmount', label: 'Estimated Refund Amount', kind: 'number', default: '0' },
-          { name: 'restockingFeeAmount', label: 'Restocking Fee', kind: 'number', default: '0' },
-          {
             name: 'returnShippingCost',
             label: 'Return Shipping Cost',
-            kind: 'number',
+            kind: 'money',
+            defaultCurrency: 'USD',
             default: '0',
           },
           { name: 'returnCarrier', label: 'Return Carrier (UPS / FedEx / USPS)' },
@@ -315,9 +289,18 @@ export default function Returns({
             updateRmaRow?.quantityApproved ?? updateRmaRow?.quantityRequested ?? 1
           ),
           quantityReceived: String(updateRmaRow?.quantityReceived ?? 0),
-          refundAmount: String(updateRmaRow?.refundAmount ?? 0),
-          restockingFeeAmount: String(updateRmaRow?.restockingFeeAmount ?? 0),
-          returnShippingCost: String(updateRmaRow?.returnShippingCost ?? 0),
+          refundTotal: moneyAmountString(updateRmaRow?.refundTotal ?? updateRmaRow?.refundAmount),
+          refundTotal__currency: moneyCurrencyCode(
+            updateRmaRow?.refundTotal ?? updateRmaRow?.refundAmount
+          ),
+          restockingFeeTotal: moneyAmountString(
+            updateRmaRow?.restockingFeeTotal ?? updateRmaRow?.restockingFeeAmount
+          ),
+          restockingFeeTotal__currency: moneyCurrencyCode(
+            updateRmaRow?.restockingFeeTotal ?? updateRmaRow?.restockingFeeAmount
+          ),
+          returnShippingCost: moneyAmountString(updateRmaRow?.returnShippingCost),
+          returnShippingCost__currency: moneyCurrencyCode(updateRmaRow?.returnShippingCost),
           returnCarrier: String(updateRmaRow?.returnCarrier ?? ''),
           returnTrackingNumber: String(updateRmaRow?.returnTrackingNumber ?? ''),
           internalNotes: String(updateRmaRow?.internalNotes ?? ''),
@@ -344,9 +327,9 @@ export default function Returns({
           },
           { name: 'quantityApproved', label: 'Quantity Approved', kind: 'number' },
           { name: 'quantityReceived', label: 'Quantity Received', kind: 'number' },
-          { name: 'refundAmount', label: 'Refund Amount', kind: 'number' },
-          { name: 'restockingFeeAmount', label: 'Restocking Fee', kind: 'number' },
-          { name: 'returnShippingCost', label: 'Return Shipping Cost', kind: 'number' },
+          { name: 'refundTotal', label: 'Refund Amount', kind: 'money' },
+          { name: 'restockingFeeTotal', label: 'Restocking Fee', kind: 'money' },
+          { name: 'returnShippingCost', label: 'Return Shipping Cost', kind: 'money' },
           { name: 'returnCarrier', label: 'Return Carrier' },
           { name: 'returnTrackingNumber', label: 'Return Tracking Number' },
           {
@@ -394,22 +377,22 @@ export default function Returns({
             placeholder: 'REF-2026-001',
           },
           {
-            name: 'itemsRefundAmount',
+            name: 'itemsRefundTotal',
             label: 'Items Refund Amount',
-            kind: 'number',
+            kind: 'money',
             required: true,
           },
           {
-            name: 'shippingRefundAmount',
+            name: 'shippingRefundTotal',
             label: 'Shipping Refund Amount',
-            kind: 'number',
+            kind: 'money',
             default: '0',
           },
-          { name: 'taxRefundAmount', label: 'Tax Refund Amount', kind: 'number', default: '0' },
+          { name: 'taxRefundTotal', label: 'Tax Refund Amount', kind: 'money', default: '0' },
           {
-            name: 'restockingFeeDeducted',
+            name: 'restockingFeeTotal',
             label: 'Restocking Fee Deducted',
-            kind: 'number',
+            kind: 'money',
             default: '0',
           },
           { name: 'reason', label: 'Refund Reason / Notes', kind: 'textarea', fullWidth: true },

@@ -4,6 +4,7 @@ import { Stack } from '@astryxdesign/core/Stack'
 import { router } from '@inertiajs/react'
 import { FeedbackBanner } from '~/modules/common/feedback-banner'
 import { getCsrfToken } from '~/lib/cookies'
+import { expandUsdPrice } from '~/lib/currency'
 import {
   PageHeader,
   PageSection,
@@ -307,17 +308,15 @@ export default function Listings({
 
   const openEditModal = (listing: Row) => {
     setEditingListing(listing)
-    const cur = String(listing.currencyCode ?? 'USD').toUpperCase()
-    const baseAmt = Number(listing.listedPrice ?? 229.99)
-    const existingPrices: PriceMoney[] = Array.isArray(listing.prices)
-      ? (listing.prices as PriceMoney[])
-      : Array.isArray(listing.price)
-        ? (listing.price as PriceMoney[])
-        : [
-            { currency_code: cur, amount: baseAmt },
-            { currency_code: 'INR', amount: Number((baseAmt * 83.5).toFixed(2)) },
-            { currency_code: 'EUR', amount: Number((baseAmt * 0.92).toFixed(2)) },
-          ]
+    const listed = resolvePriceMoney(listing.listedPriceMoney ?? listing.listedPrice, 'USD')
+    const cur = listed.currency_code
+    const baseAmt = listed.amount
+    const existingPrices: PriceMoney[] =
+      Array.isArray(listing.prices) && (listing.prices as PriceMoney[]).length > 0
+        ? (listing.prices as PriceMoney[])
+        : Array.isArray(listing.price) && (listing.price as PriceMoney[]).length > 0
+          ? (listing.price as PriceMoney[])
+          : expandUsdPrice(baseAmt)
 
     setEditForm({
       externalListingId: String(listing.externalListingId ?? ''),
@@ -1224,16 +1223,23 @@ export default function Listings({
                   onChange={(e) => setEditForm({ ...editForm, channelCategoryId: e.target.value })}
                 />
                 <AppInput
-                  label="Primary Currency Code"
-                  value={editForm.currencyCode}
-                  onChange={(e) => setEditForm({ ...editForm, currencyCode: e.target.value })}
-                />
-                <AppInput
-                  label="Primary Listed Price"
+                  label="Listed price (USD — anchor for the other currencies)"
                   type="number"
                   step="0.01"
                   value={editForm.listedPrice}
-                  onChange={(e) => setEditForm({ ...editForm, listedPrice: e.target.value })}
+                  onChange={(e) => {
+                    const usd = Number(e.target.value)
+                    setEditForm({
+                      ...editForm,
+                      listedPrice: e.target.value,
+                      currencyCode: 'USD',
+                      // Every other currency follows the USD anchor; overrides survive.
+                      prices: expandUsdPrice(Number.isFinite(usd) ? usd : 0, {
+                        existing: editForm.prices,
+                        preserveOverrides: true,
+                      }),
+                    })
+                  }}
                 />
                 <AppInput
                   label="Allocated Quantity"

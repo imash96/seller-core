@@ -12,6 +12,7 @@ import FinancialAccount from '#models/financial_account'
 import OutboxEvent from '#models/outbox_event'
 import ProductVariant from '#models/product_variant'
 import { AuditContext } from './audit_context.js'
+import { ProfitabilityService } from './profitability_service.js'
 import {
   OrderStatus,
   OrderPaymentStatus,
@@ -28,7 +29,11 @@ import {
 } from '../enums/index.js'
 import {
   type PriceMoney,
+  DEFAULT_CURRENCY_RATES,
   amountOf,
+  convertMoney,
+  currencyOf,
+  exchangeRateBetween,
   money,
   normalizeCurrencyCode,
   normalizeNullablePriceMoney,
@@ -78,12 +83,30 @@ export class FulfillmentAndReturnsService {
     }
 
     return await AuditContext.transaction(async (trx) => {
+      // Lock the order row first: every fulfillment path (shipments, status updates,
+      // refunds) takes this same lock, which serializes split-shipment creation for one
+      // order so two concurrent parcels can never both consume the last unit.
       const order = await Order.query({ client: trx })
         .where('userId', input.userId)
         .andWhere('id', input.orderId)
         .forUpdate()
         .preload('lineItems')
         .firstOrFail()
+
+      // Lock the affected order lines in a deterministic (id-sorted) order so the
+      // remaining-quantity check below reads committed values, not a stale snapshot.
+      const lockedLinesById = new Map<string, OrderLineItem>()
+      const requestedLineIds = [...new Set(input.items.map((item) => item.orderLineItemId))]
+        .filter((id) => typeof id === 'string' && id.length > 0)
+        .sort()
+      if (requestedLineIds.length > 0) {
+        const lockedLines = await OrderLineItem.query({ client: trx })
+          .where('userId', input.userId)
+          .whereIn('id', requestedLineIds)
+          .orderBy('id')
+          .forUpdate()
+        for (const line of lockedLines) lockedLinesById.set(line.id, line)
+      }
 
       if ([OrderStatus.CANCELLED, OrderStatus.DELIVERED].includes(order.status as any)) {
         throw new Error('Cannot create a shipment for a cancelled or delivered order.')
@@ -130,7 +153,7 @@ export class FulfillmentAndReturnsService {
 
       const lineMap = new Map<string, OrderLineItem>()
       for (const l of order.lineItems) {
-        lineMap.set(l.id, l)
+        lineMap.set(l.id, lockedLinesById.get(l.id) ?? l)
       }
 
       for (const itemInput of input.items) {
@@ -166,6 +189,14 @@ export class FulfillmentAndReturnsService {
             ? FulfillmentStatus.FULFILLED
             : FulfillmentStatus.PARTIALLY_FULFILLED
         await line.save()
+        // The locked row can be a different instance than the order's preloaded
+        // snapshot; keep that snapshot in step so the fulfillment-status roll-up below
+        // sees this shipment.
+        const snapshot = order.lineItems.find((entry) => entry.id === line.id)
+        if (snapshot && snapshot !== line) {
+          snapshot.quantityFulfilled = line.quantityFulfilled
+          snapshot.fulfillmentStatus = line.fulfillmentStatus
+        }
 
         // Dispatch moves units out of the warehouse: the reservation created at
         // order time is consumed and the on-hand count drops by the same amount.
@@ -209,15 +240,21 @@ export class FulfillmentAndReturnsService {
         order.status = OrderStatus.PARTIALLY_FULFILLED
         order.shippedAt = order.shippedAt ?? DateTime.now()
       }
-      // Accumulate carrier cost; mixed-currency costs stay in their own currency.
+      // Accumulate the carrier cost into the order's own currency. A shipment booked in
+      // another currency (MXN parcel on a USD order) is FX-converted and the applied
+      // rate is recorded on `channel_metadata.fxConversions` instead of silently
+      // replacing the previously accumulated cost.
       const shippingCostTotal = normalizePriceMoney(order.shippingCostTotal, order.currencyCode)
-      order.shippingCostTotal =
-        shippingCostTotal.currency_code === estimatedShippingCost.currency_code
-          ? money(
-              amountOf(shippingCostTotal) + amountOf(estimatedShippingCost),
-              shippingCostTotal.currency_code
-            )
-          : estimatedShippingCost
+      const carrierCost = this.carrierCostInOrderCurrency(
+        estimatedShippingCost,
+        order.currencyCode,
+        order.channelMetadata
+      )
+      order.channelMetadata = carrierCost.metadata
+      order.shippingCostTotal = money(
+        roundMoney(amountOf(shippingCostTotal) + amountOf(carrierCost.amount)),
+        order.currencyCode
+      )
       OrderService.recomputeProfitability(order)
       await order.save()
 
@@ -351,6 +388,41 @@ export class FulfillmentAndReturnsService {
   }
 
   /**
+   * Expresses a carrier cost in the order currency, recording the FX rate used.
+   *
+   * Orders keep one `shipping_cost_total`, so a shipment invoiced in MXN on a USD order
+   * has to be converted — never relabelled. The applied `source->USD` quote is folded
+   * into `channel_metadata.fxConversions` so `OrderService.recomputeProfitability`
+   * reproduces exactly the same numbers later.
+   */
+  private static carrierCostInOrderCurrency(
+    cost: PriceMoney,
+    orderCurrency: string,
+    metadata: Record<string, any> | null | undefined
+  ): { amount: PriceMoney; metadata: Record<string, any> } {
+    const target = normalizeCurrencyCode(orderCurrency)
+    const source = currencyOf(cost, target)
+    const nextMetadata: Record<string, any> = { ...(metadata ?? {}) }
+    if (source === target) return { amount: money(amountOf(cost), target), metadata: nextMetadata }
+
+    const rate = exchangeRateBetween(source, target)
+    if (!(rate > 0)) {
+      // Without a usable rate the amount cannot be expressed in the order currency;
+      // dropping it would understate cost, so the caller gets a loud failure instead.
+      throw new Error(
+        `FX_RATE_MISSING: no ${source}->${target} rate is available to book the ${source} carrier cost.`
+      )
+    }
+    const converted = money(roundMoney(amountOf(cost) * rate), target)
+    const fxConversions = { ...(nextMetadata.fxConversions ?? {}) }
+    fxConversions[`${source}->${target}`] = rate
+    const usdRate = exchangeRateBetween(source, 'USD')
+    if (usdRate > 0) fxConversions[`${source}->USD`] = usdRate
+    nextMetadata.fxConversions = fxConversions
+    return { amount: converted, metadata: nextMetadata }
+  }
+
+  /**
    * Consumes a reservation when units physically leave the warehouse.
    *
    * `stock_available` is a generated column (`stock_on_hand - stock_reserved`), so
@@ -410,12 +482,33 @@ export class FulfillmentAndReturnsService {
     trx?: TransactionClientContract
   }): Promise<{ returnRequest: ReturnRequest; restockedUnits: number }> {
     const run = async (trx: TransactionClientContract) => {
+      // Global lock order is order → return request → line → variant, exactly like
+      // processRefund. Reading the order id unlocked first (and re-reading the RMA with
+      // FOR UPDATE afterwards) is what keeps that order without racing the value.
+      const locator = await ReturnRequest.query({ client: trx })
+        .where('userId', input.userId)
+        .andWhere('id', input.returnRequestId)
+        .firstOrFail()
+      await Order.query({ client: trx })
+        .where('userId', input.userId)
+        .andWhere('id', locator.orderId)
+        .forUpdate()
+        .first()
+
       const returnRequest = await ReturnRequest.query({ client: trx })
         .where('userId', input.userId)
         .andWhere('id', input.returnRequestId)
         .preload('orderLineItem')
         .forUpdate()
         .firstOrFail()
+      const lineId = returnRequest.orderLineItem?.id
+      const lockedLine = lineId
+        ? await OrderLineItem.query({ client: trx })
+            .where('userId', input.userId)
+            .andWhere('id', lineId)
+            .forUpdate()
+            .first()
+        : null
 
       const approved = Number(
         returnRequest.quantityApproved ?? returnRequest.quantityRequested ?? 0
@@ -433,7 +526,7 @@ export class FulfillmentAndReturnsService {
       const delta = received - previousReceived
       let restockedUnits = 0
       if (delta > 0 && returnRequest.restockInventory) {
-        const line = returnRequest.orderLineItem
+        const line = lockedLine
         if (line?.productVariantId) {
           await this.restockUnits(input.userId, line.productVariantId, delta, trx)
           if (line.quantityReturned !== undefined) {
@@ -509,12 +602,34 @@ export class FulfillmentAndReturnsService {
     }
     assertAmount(input.taxAmount, 'Invalid tax amount')
 
+    // Every amount carries its own currency, so the invoice currency is derived from the
+    // amounts themselves (the declared fallback only applies to bare numbers). Summing a
+    // total across currencies is never valid, so mixed-currency lines are rejected here
+    // instead of being added up as if they shared a unit.
+    const declaredCurrency = normalizeCurrencyCode(input.currencyCode, 'USD')
+    const currencyCode = currencyOf(input.lines[0].billedAmount, declaredCurrency)
+    const assertSameCurrency = (value: unknown, label: string) => {
+      if (value === undefined || value === null || value === '') return
+      const used = currencyOf(value, currencyCode)
+      if (used !== currencyCode) {
+        throw new Error(
+          `VALIDATION_ERROR: ${label} is in ${used} but the invoice totals are in ${currencyCode}. ` +
+            'A carrier invoice is settled in a single currency.'
+        )
+      }
+    }
+    assertSameCurrency(input.taxAmount, 'Invoice tax amount')
+    for (const line of input.lines) {
+      assertSameCurrency(line.billedAmount, 'Invoice amount')
+      assertSameCurrency(line.expectedAmount, 'Expected amount')
+      assertSameCurrency(line.taxAmount, 'Line tax amount')
+    }
+
     return await AuditContext.transaction(async (trx) => {
       await AuditContext.apply(trx, {
         actorUserId: input.userId,
         reason: 'shipping_invoice.created',
       })
-      const currencyCode = normalizeCurrencyCode(input.currencyCode, 'USD')
       let subtotalTotal = money(0, currencyCode)
       let taxTotal = toMoney(input.taxAmount ?? 0, currencyCode)
       let totalVariance = money(0, currencyCode)
@@ -554,10 +669,12 @@ export class FulfillmentAndReturnsService {
         if (lineInput.expectedAmount === undefined || lineInput.expectedAmount === null)
           hasUnknownExpected = true
         const expected = normalizeNullablePriceMoney(lineInput.expectedAmount, currencyCode)
+        // The variance keeps the billed currency; a line without tax books a zero tax in
+        // that same currency rather than falling back to the invoice's default.
         const variance = expected
-          ? money(amountOf(billed) - amountOf(expected), currencyCode)
+          ? money(amountOf(billed) - amountOf(expected), billed.currency_code)
           : null
-        const lineTax = toMoney(lineInput.taxAmount ?? 0, currencyCode)
+        const lineTax = toMoney(lineInput.taxAmount ?? 0, billed.currency_code)
 
         subtotalTotal = money(
           amountOf(subtotalTotal) + amountOf(billed),
@@ -641,10 +758,14 @@ export class FulfillmentAndReturnsService {
         .forUpdate()
         .firstOrFail()
 
+      // The order lock above serializes RMA creation per order; locking the line item
+      // as well keeps a direct line-level writer from slipping between the read and
+      // the over-return check.
       const line = await OrderLineItem.query({ client: trx })
         .where('userId', input.userId)
         .andWhere('orderId', order.id)
         .andWhere('id', input.orderLineItemId)
+        .forUpdate()
         .firstOrFail()
 
       // Calculate active requested quantities across existing non-rejected return requests
@@ -652,6 +773,7 @@ export class FulfillmentAndReturnsService {
         .where('userId', input.userId)
         .andWhere('orderLineItemId', line.id)
         .whereNot('status', ReturnStatus.REJECTED)
+        .forUpdate()
 
       const alreadyRequestedQty = existingReturns.reduce(
         (sum, r) => sum + Number(r.quantityRequested || 0),
@@ -747,10 +869,14 @@ export class FulfillmentAndReturnsService {
       if (amounts.some((amount) => !Number.isFinite(amountOf(amount)) || amountOf(amount) < 0)) {
         throw new Error('VALIDATION_ERROR: Refund amounts must be finite and non-negative.')
       }
+      // These rows are locked (not just read): a concurrent refund or reconciliation
+      // must observe the post-refund balances, and the ledger account must not be
+      // mutated underneath us while the refund transaction is being booked.
       if (input.financialAccountId) {
         await FinancialAccount.query({ client: trx })
           .where('userId', input.userId)
           .andWhere('id', input.financialAccountId)
+          .forUpdate()
           .firstOrFail()
       }
       if (input.orderLineItemId) {
@@ -758,6 +884,7 @@ export class FulfillmentAndReturnsService {
           .where('userId', input.userId)
           .andWhere('orderId', order.id)
           .andWhere('id', input.orderLineItemId)
+          .forUpdate()
           .firstOrFail()
       }
       const returnReq = input.returnRequestId
@@ -765,6 +892,7 @@ export class FulfillmentAndReturnsService {
             .where('userId', input.userId)
             .andWhere('orderId', order.id)
             .andWhere('id', input.returnRequestId)
+            .forUpdate()
             .firstOrFail()
         : null
       if (
@@ -783,16 +911,39 @@ export class FulfillmentAndReturnsService {
         throw new Error('INVALID_ORDER_LINE: Return request does not match the order line.')
       }
 
+      // Each component keeps its own currency on the refund row, but they are only
+      // comparable after conversion into the order currency. Without a usable rate the
+      // refund is rejected rather than summed as if all amounts shared a unit.
+      // Order-level rates recorded at import time win; the published FX table fills in
+      // every currency the order never converted before.
+      const refundRates = {
+        ...DEFAULT_CURRENCY_RATES,
+        ...ProfitabilityService.ratesFromMetadata(order.channelMetadata),
+      }
+      const fxApplied: Record<string, number> = {}
+      const inRefundCurrency = (value: PriceMoney): number => {
+        const source = currencyOf(value, refundCurrency)
+        if (source === refundCurrency) return amountOf(value)
+        const rate = exchangeRateBetween(source, refundCurrency, refundRates)
+        if (!(rate > 0)) {
+          throw new Error(
+            `FX_RATE_MISSING: no ${source}->${refundCurrency} rate is available to book this refund component.`
+          )
+        }
+        fxApplied[`${source}->${refundCurrency}`] = rate
+        return roundMoney(amountOf(value) * rate)
+      }
+
       const itemsRefund = toMoney(input.itemsRefundTotal, refundCurrency)
       const shippingRefund = toMoney(input.shippingRefundTotal ?? 0, refundCurrency)
       const taxRefund = toMoney(input.taxRefundTotal ?? 0, refundCurrency)
       const restockingFee = toMoney(input.restockingFeeTotal ?? 0, refundCurrency)
       const totalRefund = money(
         roundMoney(
-          amountOf(itemsRefund) +
-            amountOf(shippingRefund) +
-            amountOf(taxRefund) -
-            amountOf(restockingFee)
+          inRefundCurrency(itemsRefund) +
+            inRefundCurrency(shippingRefund) +
+            inRefundCurrency(taxRefund) -
+            inRefundCurrency(restockingFee)
         ),
         refundCurrency
       )
@@ -843,9 +994,16 @@ export class FulfillmentAndReturnsService {
               line.quantityOrdered,
               (line.quantityReturned || 0) + returnReq.quantityApproved
             )
+            // The line's refunded total is denominated in the line's own currency, so a
+            // refund booked in another currency is converted before being added.
+            const lineCurrency = currencyOf(line.refundedTotal, order.currencyCode)
+            const refundOnLine =
+              totalRefund.currency_code === lineCurrency
+                ? amountOf(totalRefund)
+                : roundMoney(amountOf(convertMoney(totalRefund, lineCurrency, refundRates)))
             line.refundedTotal = money(
-              roundMoney(amountOf(line.refundedTotal) + amountOf(totalRefund)),
-              line.currencyCode
+              roundMoney(amountOf(line.refundedTotal) + refundOnLine),
+              lineCurrency
             )
             await line.save()
           }

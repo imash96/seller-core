@@ -19,10 +19,12 @@ import {
   Badge,
   MonoBadge,
   MultiCurrencyPriceStack,
+  MultiCurrencyPriceBadges,
   convertToLocale,
   type PriceMoney,
   type Row,
 } from '~/lib/ui'
+import { expandUsdPrice } from '~/lib/currency'
 import type React from 'react'
 import { useState, useMemo } from 'react'
 import {
@@ -667,11 +669,16 @@ export default function Catalogs({
   ) => {
     if (!previewData) return
     const nextVariants = [...previewData.variants]
+    const current = nextVariants[idx]
     nextVariants[idx] = {
-      ...nextVariants[idx],
+      ...current,
       [field]: value,
       ...(field === 'sizeLabel' ? { sizeKey: String(value) } : {}),
       ...(field === 'sizeCode' ? { sizeValue: String(value) } : {}),
+      // The catalog only edits the USD anchor; the price array is derived from it.
+      ...(field === 'retailPrice'
+        ? { prices: expandUsdPrice(Number(value), { existing: current.prices }) }
+        : {}),
     }
     setPreviewData({
       ...previewData,
@@ -1609,13 +1616,10 @@ export default function Catalogs({
                               }
                               className="w-24 rounded border border-input-border bg-input-background px-2 py-1 text-xs font-bold text-price-current"
                             />
-                            {Array.isArray(v.prices) && v.prices.length > 0 && (
-                              <MultiCurrencyPriceStack
-                                prices={v.prices}
-                                primaryCurrency="USD"
-                                maxBadges={3}
-                              />
-                            )}
+                            <MultiCurrencyPriceBadges
+                              prices={v.prices?.length ? v.prices : expandUsdPrice(v.retailPrice)}
+                              primaryCurrency="USD"
+                            />
                           </td>
                           <td className="py-2 px-3">
                             <input

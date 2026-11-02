@@ -100,6 +100,83 @@ test.group('Serialized money carries its own currency', () => {
     assert.equal(Number(variant.stockAvailable), 4)
   })
 
+  test('an order serializes every amount as its own PriceMoney, never a bare number', async ({
+    assert,
+  }) => {
+    const user = await makeUser('serialize-order')
+    const order = await OrderService.createOrder({
+      userId: user.id,
+      orderNumber: `ORD-SER-FX-${Date.now()}`,
+      marketplaceCode: 'ebay',
+      currencyCode: 'USD',
+      customer: { fullName: 'Serialization Buyer', email: 'serialize-fx@buyer.io' },
+      lines: [
+        {
+          sku: 'SER-FX-1',
+          title: 'Serialized coat',
+          quantityOrdered: 2,
+          unitPrice: money(150, 'USD'),
+          // COGS sourced in India: the line keeps INR, the order total converts to USD.
+          unitCost: money(4200, 'INR'),
+          taxLines: [{ code: 'US-TX', rate: 8.25, total: money(12.38, 'USD') }],
+        },
+      ],
+      subtotal: money(300, 'USD'),
+      shippingTotal: money(15, 'USD'),
+      taxTotal: money(24.75, 'USD'),
+      grandTotal: money(339.75, 'USD'),
+      marketplaceFeesTotal: money(34, 'USD'),
+      paymentProcessingFeesTotal: money(0, 'USD'),
+      shippingCostTotal: money(340, 'MXN'),
+    })
+    await order.load('lineItems')
+
+    const serialized = order.serialize()
+    const orderMoneyFields = [
+      'subtotal',
+      'discountTotal',
+      'promotionTotal',
+      'shippingTotal',
+      'shippingDiscountTotal',
+      'taxTotal',
+      'shippingTaxTotal',
+      'grandTotal',
+      'marketplaceFeesTotal',
+      'paymentProcessingFeesTotal',
+      'refundedTotal',
+      'cogsTotal',
+      'shippingCostTotal',
+      'netProceeds',
+      'grossProfit',
+      'netProfit',
+      'marketplaceWithheldTaxTotal',
+      'reportingTotal',
+    ] as const
+    for (const field of orderMoneyFields) {
+      const value = serialized[field]
+      assert.isObject(value, `${field} must serialize as a PriceMoney object`)
+      assert.match(value.currency_code, /^[A-Z]{3}$/, `${field} needs an ISO currency`)
+      assert.isNumber(value.amount, `${field} needs a numeric amount`)
+    }
+    assert.equal(serialized.currencyCode, 'USD')
+    assert.notProperty(serialized, 'currency_code')
+    // A cost booked in another currency is stored as booked; only the P&L converts it.
+    assert.equal(serialized.shippingCostTotal.currency_code, 'MXN')
+    assert.equal(serialized.shippingCostTotal.amount, 340)
+    assert.equal(serialized.grandTotal.amount, 339.75)
+    // 339.75 − 34 fees − 340/17.15 carrier − COGS(₹4200) ⇒ a numeric, USD-denominated profit.
+    assert.equal(serialized.netProfit.currency_code, 'USD')
+    assert.isNumber(serialized.netProfit.amount)
+
+    const [line] = serialized.lineItems
+    assert.equal(line.unitPrice.currency_code, 'USD')
+    // Line-level COGS keeps the currency it was booked in — only order roll-ups convert.
+    assert.equal(line.unitCost.currency_code, 'INR')
+    assert.equal(line.unitCost.amount, 4200)
+    assert.equal(line.taxLines[0].total.currency_code, 'USD')
+    assert.equal(line.grandTotal.currency_code, 'USD')
+  })
+
   test('models without a monetary identity do not invent a currencyCode', async ({ assert }) => {
     const user = await makeUser('serialize-shipment')
     const order = await OrderService.createOrder({

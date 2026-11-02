@@ -5,6 +5,7 @@ import { AuditContext } from '../services/audit_context.js'
 import type OrderPlaced from '#events/order_placed'
 import type OrderStatusChanged from '#events/order_status_changed'
 import type PaymentReconciled from '#events/payment_reconciled'
+import type PaymentReconciliationReversed from '#events/payment_reconciliation_reversed'
 import type ShipmentDispatched from '#events/shipment_dispatched'
 import type UserOnboarded from '#events/user_onboarded'
 
@@ -12,6 +13,7 @@ type DomainEvent =
   | InstanceType<typeof OrderPlaced>
   | InstanceType<typeof OrderStatusChanged>
   | InstanceType<typeof PaymentReconciled>
+  | InstanceType<typeof PaymentReconciliationReversed>
   | InstanceType<typeof ShipmentDispatched>
   | InstanceType<typeof UserOnboarded>
 
@@ -107,6 +109,15 @@ export default class CreateNotification {
           type: 'payment.reconciled',
           title: 'Ledger entry reconciled',
           body: `Matched ${Number(payload.amount?.amount ?? 0).toFixed(2)} ${payload.amount?.currency_code ?? ''} against an external statement.`,
+          entityType: 'financial_transactions',
+          entityId: payload.financialTransactionId ?? null,
+        }
+      case 'PaymentReconciliationReversed':
+        return {
+          userId,
+          type: 'payment.reconciliation_reversed',
+          title: 'Ledger reconciliation reversed',
+          body: `The ${Number(payload.amount?.amount ?? 0).toFixed(2)} ${payload.amount?.currency_code ?? ''} match was reversed: ${payload.reason}`,
           entityType: 'financial_transactions',
           entityId: payload.financialTransactionId ?? null,
         }

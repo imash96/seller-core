@@ -1,31 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, Sparkles } from 'lucide-react'
 import { convertToLocale, type PriceMoney } from '~/lib/utils'
-
-const SUPPORTED_CURRENCIES = ['USD', 'INR', 'EUR', 'GBP', 'CAD', 'MXN', 'AED', 'JPY']
-
-const DEFAULT_RATES: Record<string, number> = {
-  USD: 1,
-  INR: 83.5,
-  EUR: 0.92,
-  GBP: 0.79,
-  CAD: 1.36,
-  MXN: 17.15,
-  AED: 3.67,
-  JPY: 152,
-}
-
-function roundRetail(usd: number, code: string): number {
-  const rate = DEFAULT_RATES[code] ?? 1
-  const raw = usd * rate
-  if (raw <= 0) return 0
-  if (code === 'USD') return Number(usd.toFixed(2))
-  if (code === 'INR' || code === 'MXN') {
-    return Number((Math.max(99, Math.round(raw / 50) * 50) - 0.01).toFixed(2))
-  }
-  if (code === 'JPY') return Math.round(raw / 100) * 100
-  return Number((Math.max(1, Math.round(raw)) - 0.01).toFixed(2))
-}
+import { SUPPORTED_CURRENCIES, expandUsdPrice, roundRetail } from '~/lib/currency'
 
 export function MultiCurrencyPriceInput({
   label = 'Multi-Currency Prices ({ currency_code, amount })',
@@ -63,14 +39,7 @@ export function MultiCurrencyPriceInput({
           // Fallback below
         }
       }
-      return [
-        { currency_code: 'USD', amount: defaultUsdAmount },
-        { currency_code: 'INR', amount: roundRetail(defaultUsdAmount, 'INR') },
-        { currency_code: 'EUR', amount: roundRetail(defaultUsdAmount, 'EUR') },
-        { currency_code: 'GBP', amount: roundRetail(defaultUsdAmount, 'GBP') },
-        { currency_code: 'CAD', amount: roundRetail(defaultUsdAmount, 'CAD') },
-        { currency_code: 'MXN', amount: roundRetail(defaultUsdAmount, 'MXN') },
-      ]
+      return expandUsdPrice(defaultUsdAmount)
     },
     [defaultUsdAmount]
   )
@@ -125,11 +94,9 @@ export function MultiCurrencyPriceInput({
       entries.find((e) => e.currency_code === 'USD')?.amount ??
       entries[0]?.amount ??
       defaultUsdAmount
-    const next: PriceMoney[] = ['USD', 'INR', 'EUR', 'GBP', 'CAD', 'MXN'].map((code) => ({
-      currency_code: code,
-      amount: roundRetail(baseUsd, code),
-    }))
-    emit(next)
+    // Auto-fill is deliberately destructive: it re-derives every expansion currency from
+    // the USD anchor, discarding manual overrides the seller may have set earlier.
+    emit(expandUsdPrice(baseUsd))
   }
 
   const jsonValue = JSON.stringify(entries)

@@ -8,8 +8,9 @@ import Order from '#models/order'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createCustomerValidator, updateCustomerValidator } from '#validators/operations'
 import { RiskReviewStatus } from '../enums/index.js'
-import { amountOf, money, normalizePriceMoney } from '../types/price.js'
+import { money } from '../types/price.js'
 import { AuditContext } from '#services/audit_context'
+import { CustomerMergeError, CustomerService } from '#services/customer_service'
 
 export default class CustomersController {
   async index({ auth, inertia }: HttpContext) {
@@ -153,65 +154,26 @@ export default class CustomersController {
 
   async mergeCustomers({ auth, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
-    const sourceCustomerId = String(request.input('sourceCustomerId', '')).trim()
-    const targetCustomerId = String(request.input('targetCustomerId', '')).trim()
-
-    if (!sourceCustomerId || !targetCustomerId || sourceCustomerId === targetCustomerId) {
-      session.flash('error', 'Select two distinct customers to merge.')
-      return response.redirect().back()
-    }
-
-    const [source, target] = await Promise.all([
-      Customer.query().where('userId', user.id).andWhere('id', sourceCustomerId).first(),
-      Customer.query().where('userId', user.id).andWhere('id', targetCustomerId).first(),
-    ])
-    if (!source || !target) {
-      session.flash('error', 'Merge failed — source or target customer not found.')
-      return response.redirect().back()
-    }
-
-    await AuditContext.runRequest({ auth, request }, 'customer.merged', async (trx) => {
-      // Context is set before the first mutation so every row the trigger writes
-      // below is attributed to this actor and request.
-      await Order.query({ client: trx })
-        .where('userId', user.id)
-        .andWhere('customerId', source.id)
-        .update({ customerId: target.id })
-
-      await CustomerAddress.query({ client: trx })
-        .where('userId', user.id)
-        .andWhere('customerId', source.id)
-        .update({ customerId: target.id, isDefault: false })
-
-      await CustomerRiskSignal.query({ client: trx })
-        .where('userId', user.id)
-        .andWhere('customerId', source.id)
-        .update({ customerId: target.id })
-
-      // Return requests and shipments have no `customer_id`: they are reached
-      // through the order, so moving the orders above moves them as well.
-
-      target.useTransaction(trx)
-      target.ordersCount = Number(target.ordersCount || 0) + Number(source.ordersCount || 0)
-      // Lifetime spend is a self-contained PriceMoney; merge into the target's currency.
-      const targetCurrency = target.totalSpent?.currency_code || user.defaultCurrency || 'USD'
-      target.totalSpent = money(
-        amountOf(normalizePriceMoney(target.totalSpent, targetCurrency)) +
-          amountOf(normalizePriceMoney(source.totalSpent, targetCurrency)),
-        targetCurrency
+    try {
+      // The service owns the row locks, the FX conversion of lifetime spend and the
+      // child-record re-pointing; the controller only maps the outcome to a flash.
+      const result = await CustomerService.mergeCustomers({
+        userId: user.id,
+        actorUserId: user.id,
+        requestId: request.id() ?? null,
+        sourceCustomerId: String(request.input('sourceCustomerId', '')).trim(),
+        targetCustomerId: String(request.input('targetCustomerId', '')).trim(),
+      })
+      session.flash(
+        'success',
+        `Merged duplicate customer "${result.source.fullName}" into "${result.target.fullName}": ` +
+          `${result.ordersMoved} orders, ${result.addressesMoved} addresses and ` +
+          `${result.riskSignalsMoved} risk signals moved.`
       )
-      await target.save()
-
-      source.useTransaction(trx)
-      source.mergedIntoCustomerId = target.id
-      source.ordersCount = 0
-      await source.save()
-    })
-
-    session.flash(
-      'success',
-      `Merged duplicate customer "${source.fullName}" into "${target.fullName}" with zero data loss.`
-    )
+    } catch (error) {
+      if (!(error instanceof CustomerMergeError)) throw error
+      session.flash('error', error.message)
+    }
     return response.redirect().back()
   }
 

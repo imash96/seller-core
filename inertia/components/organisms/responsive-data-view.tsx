@@ -11,6 +11,7 @@ import { convertToLocale, resolvePriceMoney, formatDate, shortId } from '~/lib/u
 import { StatusBadge } from '../atoms/status-badge'
 import { MonoBadge } from '../atoms/mono-badge'
 import { MultiCurrencyPriceStack } from '../atoms/currency-text'
+import { MoneyDisplay } from '../atoms/money-display'
 import { SearchInputBar } from '../molecules/search-input-bar'
 import { FilterPillGroup, type FilterPill } from '../molecules/filter-pill-group'
 import { ViewModeSwitcher, type ViewModeOption } from '../molecules/view-mode-switcher'
@@ -99,15 +100,8 @@ export const col = {
       const moneyKey = key.endsWith('Amount') ? `${key.slice(0, -6)}Money` : `${key}Money`
       const moneyObj = row[moneyKey] ?? row[`${key}Money`] ?? row[key]
       const fallbackCur = String(row[currencyKey] ?? row.currencyCode ?? 'USD')
-      const resolved = resolvePriceMoney(moneyObj, fallbackCur)
-      return (
-        <Text type="body" size="sm" weight="semibold" hasTabularNumbers>
-          {convertToLocale({
-            amount: resolved.amount,
-            currency_code: resolved.currency_code,
-          })}
-        </Text>
-      )
+      // MoneyDisplay always renders the currency carried by the amount itself.
+      return <MoneyDisplay value={moneyObj} fallbackCurrency={fallbackCur} />
     },
   }),
   multiPrice: (key = 'prices', header = 'Multi-Currency Prices'): TableColumn<Row> => ({

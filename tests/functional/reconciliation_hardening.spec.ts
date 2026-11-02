@@ -5,6 +5,8 @@ import User from '#models/user'
 import FinancialTransaction from '#models/financial_transaction'
 import ManualReconciliation from '#models/manual_reconciliation'
 import AuditLog from '#models/audit_log'
+import emitter from '@adonisjs/core/services/emitter'
+import PaymentReconciliationReversed from '../../app/events/payment_reconciliation_reversed.js'
 import ShippingInvoiceLine from '#models/shipping_invoice_line'
 import { ManualReconciliationService } from '#services/manual_reconciliation_service'
 import { FulfillmentAndReturnsService } from '#services/fulfillment_and_returns_service'
@@ -93,11 +95,23 @@ test.group('Reconciliation hardening', () => {
     )
     await other.refresh()
     assert.equal(other.status, 'posted')
+    // The reversal is announced only after it commits, carrying the ledger's own
+    // PriceMoney and the operator's reason.
+    const reversedEvents: any[] = []
+    const off = emitter.on(PaymentReconciliationReversed, (event) => {
+      reversedEvents.push(event.payload)
+    })
     await ManualReconciliationService.reverse({
       user,
       transactionId: tx.id,
       reason: 'Incorrect statement',
     })
+    off()
+    assert.lengthOf(reversedEvents, 1)
+    assert.equal(reversedEvents[0].financialTransactionId, tx.id)
+    assert.equal(reversedEvents[0].status, 'reversed')
+    assert.equal(reversedEvents[0].reason, 'Incorrect statement')
+    assert.equal(reversedEvents[0].amount.currency_code, tx.originalAmount.currency_code)
     await tx.refresh()
     assert.equal(tx.status, 'posted')
     const history = await ManualReconciliation.query()
@@ -123,6 +137,7 @@ test.group('Reconciliation hardening', () => {
     assert.equal((txAudits[1].beforeState as any)?.status, 'reconciled')
     assert.equal((txAudits[1].afterState as any)?.status, 'posted')
     assert.deepEqual(Array.from(new Set(txAudits.map((entry) => entry.actorUserId))), [user.id])
+
     await ManualReconciliationService.reconcile({ ...base, transactionId: other.id })
   })
 

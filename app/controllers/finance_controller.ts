@@ -576,13 +576,22 @@ export default class FinanceController {
 
   async reconcileTransaction(ctx: HttpContext) {
     const { auth, request, response, params, session } = ctx
+    // The statement amount arrives as a self-contained PriceMoney object; the legacy
+    // `amount` + `currencyCode` pair is still accepted so older clients keep working.
+    const observed = request.input('observedAmount')
+    const observedMoney =
+      observed && typeof observed === 'object' && !Array.isArray(observed)
+        ? (observed as { amount?: unknown; currency_code?: unknown; currencyCode?: unknown })
+        : null
     try {
       await ManualReconciliationService.reconcile({
         user: auth.getUserOrFail(),
         transactionId: params.id,
         reference: request.input('sourceReference'),
-        amount: request.input('observedAmount'),
-        currency: request.input('currencyCode'),
+        amount: observedMoney ? observedMoney.amount : observed,
+        currency: observedMoney
+          ? (observedMoney.currency_code ?? observedMoney.currencyCode)
+          : request.input('currencyCode'),
         notes: request.input('notes'),
         requestId: request.id(),
       })

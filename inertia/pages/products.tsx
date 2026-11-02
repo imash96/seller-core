@@ -22,6 +22,7 @@ import {
   STATUS_TONES,
   convertToLocale,
   resolvePriceMoney,
+  moneyAmountString,
   type PriceMoney,
   type Row,
 } from '~/lib/ui'
@@ -1351,14 +1352,8 @@ export default function Products({
             section: '3. Default Variant Pricing & Stock',
           },
           {
-            name: 'currencyCode',
-            label: 'Primary Currency',
-            default: 'USD',
-            section: '3. Default Variant Pricing & Stock',
-          },
-          {
-            name: 'retailPrice',
-            label: 'Primary Retail price',
+            name: 'priceUsd',
+            label: 'Retail price (USD — the anchor the other currencies convert from)',
             kind: 'number',
             required: true,
             section: '3. Default Variant Pricing & Stock',
@@ -1366,19 +1361,22 @@ export default function Products({
           {
             name: 'costPrice',
             label: 'Unit Cost price (COGS)',
-            kind: 'number',
+            kind: 'money',
+            defaultCurrency: 'USD',
             section: '3. Default Variant Pricing & Stock',
           },
           {
             name: 'manufacturingCost',
             label: 'Manufacturing cost',
-            kind: 'number',
+            kind: 'money',
+            defaultCurrency: 'USD',
             section: '3. Default Variant Pricing & Stock',
           },
           {
             name: 'packagingCost',
             label: 'Packaging cost',
-            kind: 'number',
+            kind: 'money',
+            defaultCurrency: 'USD',
             section: '3. Default Variant Pricing & Stock',
           },
           {
@@ -1555,28 +1553,17 @@ export default function Products({
           { name: 'mpn', label: 'MPN', section: '1. Variant Identity' },
           { name: 'asin', label: 'Amazon ASIN', section: '1. Variant Identity' },
           {
-            name: 'currencyCode',
-            label: 'Primary Currency',
-            default: 'USD',
-            section: '2. Pricing & Stock',
-          },
-          {
-            name: 'retailPrice',
-            label: 'Primary Retail price',
+            name: 'priceUsd',
+            label: 'Retail price (USD — the anchor the other currencies convert from)',
             kind: 'number',
             required: true,
             section: '2. Pricing & Stock',
           },
           {
-            name: 'compareAtPrice',
-            label: 'Compare-at price',
-            kind: 'number',
-            section: '2. Pricing & Stock',
-          },
-          {
             name: 'costPrice',
             label: 'Cost price (COGS)',
-            kind: 'number',
+            kind: 'money',
+            defaultCurrency: 'USD',
             section: '2. Pricing & Stock',
           },
           {
@@ -1658,19 +1645,19 @@ export default function Products({
           },
           { name: 'asin', label: 'Amazon ASIN', section: '1. Parent Product & SKU' },
           {
-            name: 'currencyCode',
-            label: 'Primary Currency',
-            default: 'USD',
-            section: '2. Pricing & Stock',
-          },
-          {
-            name: 'retailPrice',
-            label: 'Primary Retail price',
+            name: 'priceUsd',
+            label: 'Retail price (USD — the anchor the other currencies convert from)',
             kind: 'number',
             required: true,
             section: '2. Pricing & Stock',
           },
-          { name: 'costPrice', label: 'Cost price', kind: 'number', section: '2. Pricing & Stock' },
+          {
+            name: 'costPrice',
+            label: 'Cost price',
+            kind: 'money',
+            defaultCurrency: 'USD',
+            section: '2. Pricing & Stock',
+          },
           {
             name: 'stockOnHand',
             label: 'Stock on hand',
@@ -1719,8 +1706,9 @@ export default function Products({
           editStockRow
             ? {
                 stockOnHand: String(editStockRow.stockOnHand ?? 0),
-                currencyCode: String(editStockRow.currencyCode ?? 'USD'),
-                retailPrice: String(editStockRow.retailPrice ?? 0),
+                retailPrice: moneyAmountString(
+                  editStockRow.retailPriceMoney ?? editStockRow.retailPrice
+                ),
                 pricesJson: JSON.stringify(
                   Array.isArray(editStockRow.prices) ? editStockRow.prices : []
                 ),
@@ -1729,8 +1717,14 @@ export default function Products({
         }
         fields={[
           { name: 'stockOnHand', label: 'Stock on hand', kind: 'number', required: true },
-          { name: 'currencyCode', label: 'Primary Currency Code', default: 'USD' },
-          { name: 'retailPrice', label: 'Primary Retail price', kind: 'number', required: true },
+          {
+            name: 'retailPrice',
+            label: 'Retail price (USD)',
+            kind: 'number',
+            required: true,
+            description:
+              'Prices in INR, EUR, GBP, CAD and MXN are derived from this amount unless overridden below.',
+          },
           {
             name: 'pricesJson',
             label: 'Multi-Currency Price Array (ProductVariantPrice)',

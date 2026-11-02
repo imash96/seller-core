@@ -3,6 +3,7 @@ import FinancialTransaction from '#models/financial_transaction'
 import ManualReconciliation from '#models/manual_reconciliation'
 import { AuditContext } from './audit_context.js'
 import PaymentReconciled from '#events/payment_reconciled'
+import PaymentReconciliationReversed from '#events/payment_reconciliation_reversed'
 import type User from '#models/user'
 import { FinanceAccessService } from '#services/finance_access_service'
 import {
@@ -147,36 +148,64 @@ export class ManualReconciliationService {
     if (reason.length < 3 || reason.length > 2000)
       throw new ReconciliationError('Provide a reversal reason (3–2000 characters).')
     const household = await FinanceAccessService.permissions(input.user)
-    return AuditContext.transaction(async (trx) => {
-      await AuditContext.apply(trx, {
-        actorUserId: input.user.id,
-        requestId: input.requestId ?? null,
-        reason: 'finance.manual_reconciliation_reversed',
+    // Captured inside the transaction and published only once it commits, exactly like
+    // `reconcile`: a listener can never observe a half-written reversal.
+    const committed: {
+      value: { transactionId: string; userId: string; amount: PriceMoney } | null
+    } = { value: null }
+    try {
+      return await AuditContext.transaction(async (trx) => {
+        await AuditContext.apply(trx, {
+          actorUserId: input.user.id,
+          requestId: input.requestId ?? null,
+          reason: 'finance.manual_reconciliation_reversed',
+        })
+        const tx = await FinancialTransaction.query({ client: trx })
+          .where('userId', input.user.id)
+          .where('id', input.transactionId)
+          .forUpdate()
+          .first()
+        if (!tx) throw new ReconciliationError('Transaction not found.', 404)
+        if (!FinanceAccessService.canUse(tx.dataClassification, 'update', household))
+          throw new ReconciliationError('Household finance permission is required.', 403)
+        const match = await ManualReconciliation.query({ client: trx })
+          .where('userId', input.user.id)
+          .where('financialTransactionId', tx.id)
+          .whereNull('reversedAt')
+          .forUpdate()
+          .first()
+        if (!match || tx.status !== 'reconciled')
+          throw new ReconciliationError('No active manual match is available to reverse.', 409)
+        match.reversedAt = DateTime.now()
+        match.reversedByUserId = input.user.id
+        match.reversalReason = reason
+        await match.save()
+        tx.status = match.previousStatus
+        tx.reconciledAt = null
+        await tx.save()
+        committed.value = {
+          transactionId: tx.id,
+          userId: tx.userId,
+          amount: tx.originalAmount,
+        }
+        return match
       })
-      const tx = await FinancialTransaction.query({ client: trx })
-        .where('userId', input.user.id)
-        .where('id', input.transactionId)
-        .forUpdate()
-        .first()
-      if (!tx) throw new ReconciliationError('Transaction not found.', 404)
-      if (!FinanceAccessService.canUse(tx.dataClassification, 'update', household))
-        throw new ReconciliationError('Household finance permission is required.', 403)
-      const match = await ManualReconciliation.query({ client: trx })
-        .where('userId', input.user.id)
-        .where('financialTransactionId', tx.id)
-        .whereNull('reversedAt')
-        .forUpdate()
-        .first()
-      if (!match || tx.status !== 'reconciled')
-        throw new ReconciliationError('No active manual match is available to reverse.', 409)
-      match.reversedAt = DateTime.now()
-      match.reversedByUserId = input.user.id
-      match.reversalReason = reason
-      await match.save()
-      tx.status = match.previousStatus
-      tx.reconciledAt = null
-      await tx.save()
-      return match
-    })
+    } finally {
+      const published = committed.value
+      if (published) {
+        try {
+          await PaymentReconciliationReversed.dispatch({
+            financialTransactionId: published.transactionId,
+            userId: published.userId,
+            status: 'reversed',
+            amount: published.amount,
+            reason,
+            requestId: input.requestId,
+          })
+        } catch {
+          // The event bus is best-effort: the reversal already committed.
+        }
+      }
+    }
   }
 }

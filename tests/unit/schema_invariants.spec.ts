@@ -3,6 +3,12 @@ import { readFile } from 'node:fs/promises'
 import db from '@adonisjs/lucid/services/db'
 import User from '#models/user'
 import { generateEntityId } from '../../app/utils/generate_entity_id.js'
+import {
+  MONEY_TABLES,
+  isMoneyColumn,
+  moneyChecksOf,
+  moneyColumnsOf,
+} from '../utils/money_schema.js'
 
 /**
  * Phase 4 database invariants: single-column `is_valid_price_money` CHECKs are not
@@ -102,6 +108,45 @@ test.group('Schema invariants: money, quantities and tenant indexes', () => {
         db.rawQuery('UPDATE order_line_items SET quantity_fulfilled = 3 WHERE id = ?', [lineId]),
       /chk_order_line_items_qty_bounds/
     )
+  })
+
+  test('every money column is guarded by an is_valid_price_money CHECK', async ({ assert }) => {
+    // The CHECK constraints, not the application layer, are the last line of defence:
+    // a raw `UPDATE` or a migration that forgets the constraint would otherwise let a
+    // malformed amount (bare number, missing currency, negative where disallowed) in.
+    const checks = await moneyChecksOf(MONEY_TABLES)
+    const offenders: string[] = []
+    for (const table of MONEY_TABLES) {
+      const moneyColumns = await moneyColumnsOf(table)
+      const definitions = (checks.get(table) ?? []).map((check) => check.definition)
+      for (const column of moneyColumns.filter(isMoneyColumn)) {
+        const guarded = definitions.some((definition) => definition.includes(column))
+        if (!guarded) offenders.push(`${table}.${column}`)
+      }
+    }
+    assert.deepEqual(offenders, [], 'every money column needs an is_valid_price_money CHECK')
+  })
+
+  test('the money CHECK rejects malformed amounts on every table', async ({ assert }) => {
+    // Behavioural counterpart to the structural check: a JSONB blob that is not a
+    // `{ currency_code, amount }` object is refused by PostgreSQL itself.
+    const { orderId } = await seedOrder(`inv-check-${Date.now()}@example.com`)
+    const now = new Date().toISOString()
+    for (const bad of [
+      JSON.stringify({ currency_code: 'USD', amount: -5 }),
+      JSON.stringify({ amount: 10 }),
+      JSON.stringify({ currency_code: 'usd', amount: 10 }),
+      JSON.stringify({ currency_code: 'USD' }),
+    ]) {
+      await assert.rejects(
+        () =>
+          db.rawQuery(
+            'UPDATE orders SET updated_at = ?, shipping_cost_total = ?::jsonb WHERE id = ?',
+            [now, bad, orderId]
+          ),
+        /chk_orders_shipping_cost_total_price_money/
+      )
+    }
   })
 
   test('schema_rules.ts maps every PostgreSQL enum and jsonb column', async ({ assert }) => {

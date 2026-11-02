@@ -7,6 +7,7 @@ import Base from '#events/base'
 import OrderPlaced from '#events/order_placed'
 import OrderStatusChanged from '#events/order_status_changed'
 import PaymentReconciled from '#events/payment_reconciled'
+import PaymentReconciliationReversed from '#events/payment_reconciliation_reversed'
 import RiskSignalFlagged from '#events/risk_signal_flagged'
 import ShipmentDispatched from '#events/shipment_dispatched'
 import UserOnboarded from '#events/user_onboarded'
@@ -16,6 +17,7 @@ export const events = {
   OrderPlaced: OrderPlaced,
   OrderStatusChanged: OrderStatusChanged,
   PaymentReconciled: PaymentReconciled,
+  PaymentReconciliationReversed: PaymentReconciliationReversed,
   RiskSignalFlagged: RiskSignalFlagged,
   ShipmentDispatched: ShipmentDispatched,
   UserOnboarded: UserOnboarded,

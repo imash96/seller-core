@@ -1,4 +1,6 @@
 import { test } from '@japa/runner'
+import fs from 'node:fs'
+import path from 'node:path'
 import { CleanAdd } from '../../app/services/address_cleanup_service.js'
 import { COUNTRY_ISO_MAP, COUNTRY_LIST } from '../../app/utils/country_list.js'
 
@@ -169,6 +171,75 @@ Phone: 210-728-4548
     assert.isTrue(csv.startsWith('name,companyName,line1,line2,line3,city,state'))
     assert.isTrue(csv.includes('John Belcastro'))
     assert.isTrue(csv.includes('Baltimore'))
+  })
+
+  test('parses a full multi-address Amazon export batch without merging records', ({ assert }) => {
+    // The batch previously lived in a throwaway console script (tests/test_address_cleanup.ts);
+    // it is the only fixture that exercises blank-line separated multi-address splitting.
+    const fixture = fs.readFileSync(
+      path.join(import.meta.dirname, '..', 'fixtures', 'address_batch_sample.txt'),
+      'utf8'
+    )
+    const results = new CleanAdd().main(fixture)
+    assert.lengthOf(results, 15, 'every block in the batch must become its own address')
+
+    const [john, , andrew, mark, , , , , , stefan, , , abdi, jorge, alexis] = results
+
+    // US Amazon row with an extension, a reference and an address type.
+    assert.equal(john.name, 'John Belcastro')
+    assert.equal(john.line1, '4422 Glenmore Ave')
+    assert.equal(john.city, 'Baltimore')
+    assert.equal(john.state, 'Maryland')
+    assert.equal(john.zipCode, '21206')
+    assert.equal(john.countryCode, 'US')
+    assert.equal(john.ext, '56535')
+    assert.equal(john.ref, '114-5610173-1564218-JCAM')
+    assert.equal(john.buyerName, 'John')
+    assert.equal(john.addressType, 'Residential')
+
+    // Single-word recipient names are flagged, never silently accepted.
+    assert.isTrue(andrew.isSingleName)
+    assert.match(andrew.warnings.join(' '), /single-word recipient name/i)
+
+    // A reference-only block still resolves a US state.
+    assert.equal(mark.name, 'Mark Ponder')
+    assert.equal(mark.state, 'Alabama')
+    assert.equal(mark.ref, '4208118056')
+
+    // ZIP-first European formatting.
+    assert.equal(stefan.countryCode, 'DE')
+    assert.equal(stefan.zipCode, '85072')
+    assert.equal(stefan.city.toLowerCase(), 'eichstatt')
+
+    // User-entered foreign phones must never be replaced by the 000-000-0000 placeholder.
+    for (const address of results) {
+      if (address.countryCode !== 'US') assert.notEqual(address.phone, '000-000-0000')
+    }
+
+    // IOSS VAT id on a German import.
+    assert.equal(abdi.countryCode, 'DE')
+    assert.isTrue(abdi.isVATorIOSS)
+    assert.equal(abdi.vatOrIoss, 'IM3720000224')
+    assert.equal(abdi.city.toLowerCase(), 'freising')
+    assert.notEqual(abdi.line2, 'Germany')
+
+    // Chilean RUT lands in the national-id field, not the VAT field.
+    assert.equal(jorge.countryCode, 'CL')
+    assert.equal(jorge.buyerNationalId, '592553600')
+    assert.isUndefined(jorge.vatOrIoss)
+
+    // Canadian alphanumeric postal code with a province.
+    assert.equal(alexis.countryCode, 'CA')
+    assert.equal(alexis.state, 'Alberta')
+    assert.match(alexis.zipCode, /^[A-Z]\d[A-Z] ?\d[A-Z]\d$/)
+    assert.equal(alexis.line2, 'Apartment 506')
+
+    // Every wrapped line respects the 35-character carrier limit.
+    for (const address of results) {
+      for (const line of [address.line1, address.line2, address.line3]) {
+        if (line && line !== '-') assert.isAtMost(line.length, 35)
+      }
+    }
   })
 
   test('CleanAdd.toDocxBuffer produces valid binary Buffer matching DTDC DOCX zip format', ({

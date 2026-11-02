@@ -620,7 +620,7 @@ export default function Shipments({
             required: true,
             default: '1',
           },
-          { name: 'estimatedShippingCost', label: 'Estimated cost', kind: 'number' },
+          { name: 'estimatedShippingCost', label: 'Estimated cost', kind: 'money', default: '0' },
           {
             name: 'status',
             label: 'Status',
@@ -685,8 +685,8 @@ export default function Shipments({
             default: 'base_freight',
             options: CHARGE_TYPES.map((c) => ({ value: c, label: c.replace(/_/g, ' ') })),
           },
-          { name: 'expectedAmount', label: 'Expected amount (optional)', kind: 'number' },
-          { name: 'billedAmount', label: 'Billed amount', kind: 'number', required: true },
+          { name: 'expectedAmount', label: 'Expected amount (optional)', kind: 'money' },
+          { name: 'billedAmount', label: 'Billed amount', kind: 'money', required: true },
         ]}
       />
 

@@ -20,6 +20,7 @@ import OrderStatusChanged from '#events/order_status_changed'
 import ShipmentDispatched from '#events/shipment_dispatched'
 import RiskSignalFlagged from '#events/risk_signal_flagged'
 import PaymentReconciled from '#events/payment_reconciled'
+import PaymentReconciliationReversed from '#events/payment_reconciliation_reversed'
 import UserOnboarded from '#events/user_onboarded'
 
 // Row-level auditing is done by the `trg_audit_capture` PostgreSQL trigger, so no
@@ -40,6 +41,7 @@ emitter.on(RiskSignalFlagged, () => import('#listeners/enqueue_risk_review'))
 
 // Finance — reconciliation notification
 emitter.on(PaymentReconciled, () => import('#listeners/create_notification'))
+emitter.on(PaymentReconciliationReversed, () => import('#listeners/create_notification'))
 
 // Identity — welcome notification
 emitter.on(UserOnboarded, () => import('#listeners/create_notification'))

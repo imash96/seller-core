@@ -12,6 +12,7 @@ import OutboxEvent from '#models/outbox_event'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 import { AuditContext } from './audit_context.js'
 import { RiskSignalService } from './risk_signal_service.js'
+import { ProfitabilityService } from './profitability_service.js'
 import {
   OrderSourceType,
   OrderStatus,
@@ -234,6 +235,12 @@ export interface CreateOrderInput {
   marketplaceFeesTotal?: MoneyLike
   promotionsTotal?: MoneyLike
   shippingDiscountTotal?: MoneyLike
+  /**
+   * Allows reserving more units than are on hand (a deliberate backorder). Defaults to
+   * `false`: a tracked variant that cannot cover the ordered quantity rejects the whole
+   * order with `INSUFFICIENT_STOCK` instead of driving `stock_available` negative.
+   */
+  allowOversell?: boolean
   /** Tax withheld and remitted by the marketplace (facilitator tax). */
   marketplaceWithheldTaxTotal?: MoneyLike
   /** Only the seller collects tax; marketplaces may remit on the seller's behalf. */
@@ -446,7 +453,28 @@ export class OrderService {
         variantToReserve: ProductVariant | null
       }> = []
 
+      // 3a. Lock every referenced variant in a deterministic order before pricing.
+      //
+      // Two concurrent orders that mention the same variants in opposite order would
+      // otherwise take the row locks in opposite order and deadlock. The lock pass is
+      // sorted by variant id and runs before any pricing read, so every transaction
+      // acquires variant locks in exactly the same sequence.
+      const sortedVariantIds = [
+        ...new Set(
+          input.lines
+            .map((line) => line.productVariantId)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0)
+        ),
+      ].sort()
       const variantsById = new Map<string, ProductVariant>()
+      if (sortedVariantIds.length > 0) {
+        const locked = await ProductVariant.query({ client: trx })
+          .where('userId', input.userId)
+          .whereIn('id', sortedVariantIds)
+          .orderBy('id')
+          .forUpdate()
+        for (const variant of locked) variantsById.set(variant.id, variant)
+      }
       let subtotal = money(0, currency)
       let lineDiscounts = money(0, currency)
       let linePromotions = money(0, currency)
@@ -474,14 +502,12 @@ export class OrderService {
           )
         }
 
-        let variant: ProductVariant | null = null
-        if (lineInput.productVariantId) {
-          variant = await ProductVariant.query({ client: trx })
-            .where('userId', input.userId)
-            .andWhere('id', lineInput.productVariantId)
-            .forUpdate()
-            .first()
-        } else if (lineInput.sku) {
+        // Variants referenced by id were already locked in step 3a; a SKU lookup is
+        // the only case that needs a fresh (locking) read.
+        let variant: ProductVariant | null = lineInput.productVariantId
+          ? (variantsById.get(lineInput.productVariantId) ?? null)
+          : null
+        if (!lineInput.productVariantId && lineInput.sku) {
           variant = await ProductVariant.query({ client: trx })
             .where('userId', input.userId)
             .andWhere('sku', lineInput.sku)
@@ -613,6 +639,38 @@ export class OrderService {
         preparedLines.push({ lineModel, variantToReserve: variant })
       }
 
+      // 3b. Availability guard. The variants above were locked, so the numbers read
+      // here cannot move underneath us. A variant is inventory-tracked once it has any
+      // stock history (`stock_on_hand` or `stock_reserved` above zero); zero-stock rows
+      // are treated as untracked placeholders so historical marketplace imports keep
+      // working. Demand is aggregated per variant because the same variant may appear
+      // on several lines of one order.
+      if (!input.allowOversell) {
+        const demandByVariant = new Map<string, number>()
+        for (const { lineModel } of preparedLines) {
+          if (!lineModel.productVariantId) continue
+          const current = demandByVariant.get(lineModel.productVariantId) ?? 0
+          demandByVariant.set(
+            lineModel.productVariantId,
+            current + Number(lineModel.quantityOrdered)
+          )
+        }
+        for (const [variantId, demand] of demandByVariant) {
+          const variant = variantsById.get(variantId)
+          if (!variant) continue
+          const onHand = Number(variant.stockOnHand ?? 0)
+          const reserved = Number(variant.stockReserved ?? 0)
+          const tracked = onHand > 0 || reserved > 0
+          if (!tracked) continue
+          const available = onHand - reserved
+          if (demand > available) {
+            throw new Error(
+              `INSUFFICIENT_STOCK: SKU ${variant.sku} needs ${demand} unit(s) but only ${Math.max(0, available)} are available.`
+            )
+          }
+        }
+      }
+
       // Order-level totals: a marketplace payload is authoritative for what the
       // buyer was charged; the line sums are the fallback for manual orders.
       const pick = (value: MoneyLike | undefined, fallback: PriceMoney) =>
@@ -632,14 +690,16 @@ export class OrderService {
       const noteConversion = (source: string): number => {
         if (source === currency) return 1
         const rate = exchangeRateBetween(source, currency, fxRates)
-        if (rate > 0) fxApplied[`${source}->${currency}`] = rate
+        if (rate > 0) {
+          fxApplied[`${source}->${currency}`] = rate
+          // Also record the USD quote: `ProfitabilityService.ratesFromMetadata`
+          // rebuilds the USD-quoted FX table from it on every recompute, so the
+          // order keeps the rates it was priced with forever.
+          const usdRate = exchangeRateBetween(source, 'USD', fxRates)
+          if (usdRate > 0) fxApplied[`${source}->USD`] = usdRate
+        }
         return rate
       }
-      const toOrderCurrency = (value: PriceMoney): number => {
-        const rate = noteConversion(value.currency_code)
-        return rate <= 0 ? 0 : roundMoney(amountOf(value) * rate)
-      }
-
       // COGS may be booked per line in a different currency (e.g. INR warehouse
       // cost on a USD order), so each entry is converted before summing.
       for (const line of lineBreakdown) noteConversion(line.cogs.currency_code)
@@ -719,34 +779,38 @@ export class OrderService {
         }
       }
 
-      const netSales =
-        amountOf(subtotalMoney) -
-        amountOf(discountMoney) -
-        amountOf(promotionMoney) +
-        amountOf(shippingMoney) -
-        amountOf(shippingDiscountMoney)
-      // A fresh order starts with no refunds; net proceeds still mirror
-      // recomputeProfitability() so the formula lives in exactly one shape.
+      // A fresh order starts with no refunds. The P&L itself lives in exactly one
+      // place (ProfitabilityService) so create-time and recompute-time figures can
+      // never diverge, and Marketplace Facilitator Tax is never deducted twice.
       const refundedTotal = money(0, currency)
-      const netProceeds = roundMoney(
-        amountOf(grandTotal) -
-          toOrderCurrency(marketplaceFeesTotal) -
-          toOrderCurrency(paymentProcessingFeesTotal) -
-          toOrderCurrency(refundedTotal)
-      )
-      const grossProfit = roundMoney(
-        netSales - toOrderCurrency(cogsTotal) - toOrderCurrency(shippingCostTotal)
-      )
-      const netProfit = roundMoney(
-        netProceeds -
-          toOrderCurrency(cogsTotal) -
-          toOrderCurrency(shippingCostTotal) -
-          toOrderCurrency(taxMoney) -
-          toOrderCurrency(shippingTaxMoney)
-      )
+      const profitability = ProfitabilityService.compute({
+        currency,
+        subtotal: subtotalMoney,
+        discountTotal: discountMoney,
+        promotionTotal: promotionMoney,
+        shippingTotal: shippingMoney,
+        shippingDiscountTotal: shippingDiscountMoney,
+        taxTotal: taxMoney,
+        shippingTaxTotal: shippingTaxMoney,
+        grandTotal,
+        marketplaceFeesTotal,
+        paymentProcessingFeesTotal,
+        refundedTotal,
+        cogsTotal,
+        shippingCostTotal,
+        marketplaceWithheldTaxTotal,
+        taxCollectionModel,
+        exchangeRates: fxRates,
+      })
+      const { netProceeds, grossProfit, netProfit } = {
+        netProceeds: roundMoney(amountOf(profitability.netProceeds)),
+        grossProfit: roundMoney(amountOf(profitability.grossProfit)),
+        netProfit: roundMoney(amountOf(profitability.netProfit)),
+      }
       const reportingTotal = money(amountOf(grandTotal) * exchangeRate, reportingCurrency)
-      if (Object.keys(fxApplied).length > 0) {
-        channelMetadata.fxConversions = { ...fxApplied, reporting: exchangeRate }
+      const appliedRates = { ...fxApplied, ...profitability.fxApplied }
+      if (Object.keys(appliedRates).length > 0) {
+        channelMetadata.fxConversions = { ...appliedRates, reporting: exchangeRate }
       }
 
       // 4. Create Order header
@@ -946,6 +1010,16 @@ export class OrderService {
 
         if (order.status === OrderStatus.CANCELLED) return { order, releasedUnits: 0 }
 
+        // Money already went back to the buyer, so the sale is settled: cancelling it
+        // would strand those refunds and re-open stock that a return may have restocked.
+        // Refunded lines are handled through a return request or a claim instead.
+        const alreadyRefunded = roundMoney(amountOf(order.refundedTotal))
+        if (alreadyRefunded > 0) {
+          throw new Error(
+            `ALREADY_REFUNDED: order ${order.orderNumber} has ${alreadyRefunded} ${currencyOf(order.refundedTotal)} refunded; record a return/claim instead of cancelling.`
+          )
+        }
+
         let releasedUnits = 0
         for (const line of order.lineItems) {
           const releasable =
@@ -1003,40 +1077,36 @@ export class OrderService {
    * profitability can never drift from the recorded amounts.
    */
   static recomputeProfitability(order: Order): Order {
-    const grand = order.grandTotal
-    const currency = currencyOf(grand)
-    const inCurrency = (value: PriceMoney | undefined) =>
-      value && value.currency_code === currency ? amountOf(value) : 0
-
-    const netSales =
-      amountOf(order.subtotal) -
-      amountOf(order.discountTotal) -
-      amountOf(order.promotionTotal) +
-      amountOf(order.shippingTotal) -
-      amountOf(order.shippingDiscountTotal)
-
-    const netProceeds = roundMoney(
-      amountOf(grand) -
-        inCurrency(order.marketplaceFeesTotal) -
-        inCurrency(order.paymentProcessingFeesTotal) -
-        inCurrency(order.refundedTotal)
-    )
-    order.netProceeds = money(netProceeds, currency)
-    order.grossProfit = money(
-      netSales - inCurrency(order.cogsTotal) - inCurrency(order.shippingCostTotal),
-      currency
-    )
-    order.netProfit = money(
-      netProceeds -
-        inCurrency(order.cogsTotal) -
-        inCurrency(order.shippingCostTotal) -
-        inCurrency(order.taxTotal) -
-        inCurrency(order.shippingTaxTotal),
-      currency
-    )
+    // Reuse the FX rates recorded at import time so a recompute (after a refund, a
+    // shipment or an invoice line) can never drift from the rates the order was
+    // priced with; a currency without a recorded rate falls back to the FX table.
+    const rates = ProfitabilityService.ratesFromMetadata(order.channelMetadata)
+    const currency = currencyOf(order.grandTotal)
+    const result = ProfitabilityService.compute({
+      currency,
+      subtotal: order.subtotal,
+      discountTotal: order.discountTotal,
+      promotionTotal: order.promotionTotal,
+      shippingTotal: order.shippingTotal,
+      shippingDiscountTotal: order.shippingDiscountTotal,
+      taxTotal: order.taxTotal,
+      shippingTaxTotal: order.shippingTaxTotal,
+      grandTotal: order.grandTotal,
+      marketplaceFeesTotal: order.marketplaceFeesTotal,
+      paymentProcessingFeesTotal: order.paymentProcessingFeesTotal,
+      refundedTotal: order.refundedTotal,
+      cogsTotal: order.cogsTotal,
+      shippingCostTotal: order.shippingCostTotal,
+      marketplaceWithheldTaxTotal: order.marketplaceWithheldTaxTotal,
+      taxCollectionModel: order.taxCollectionModel,
+      exchangeRates: rates,
+    })
+    order.netProceeds = result.netProceeds
+    order.grossProfit = result.grossProfit
+    order.netProfit = result.netProfit
     const exchangeRate = Number(order.exchangeRate || 1) || 1
     order.reportingTotal = money(
-      amountOf(grand) * exchangeRate,
+      amountOf(order.grandTotal) * exchangeRate,
       currencyOf(order.reportingTotal, currency)
     )
     return order

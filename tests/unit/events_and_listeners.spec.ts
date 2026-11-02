@@ -4,6 +4,7 @@ import OrderStatusChanged from '../../app/events/order_status_changed.js'
 import ShipmentDispatched from '../../app/events/shipment_dispatched.js'
 import RiskSignalFlagged from '../../app/events/risk_signal_flagged.js'
 import PaymentReconciled from '../../app/events/payment_reconciled.js'
+import PaymentReconciliationReversed from '../../app/events/payment_reconciliation_reversed.js'
 import UserOnboarded from '../../app/events/user_onboarded.js'
 import CreateNotification from '../../app/listeners/create_notification.js'
 import Notification from '#models/notification'
@@ -211,6 +212,20 @@ test.group('Domain Events & Listeners', () => {
     assert.equal(reconciled?.type, 'payment.reconciled')
     // The body reads the amount's own currency, never a tenant default.
     assert.include(String(reconciled?.body), '42.50 CAD')
+
+    const reversed = listener.notificationFor(
+      new PaymentReconciliationReversed({
+        financialTransactionId: 'ftx_1',
+        userId: 'usr_1',
+        status: 'reversed',
+        amount: { currency_code: 'MXN', amount: 1234.5 },
+        reason: 'Duplicate statement line',
+      })
+    )
+    assert.equal(reversed?.type, 'payment.reconciliation_reversed')
+    assert.equal(reversed?.entityId, 'ftx_1')
+    assert.include(String(reversed?.body), '1234.50 MXN')
+    assert.include(String(reversed?.body), 'Duplicate statement line')
 
     const onboarded = listener.notificationFor(
       new UserOnboarded({

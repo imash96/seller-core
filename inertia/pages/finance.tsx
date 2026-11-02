@@ -12,6 +12,8 @@ import {
   col,
   STATUS_TONES,
   money,
+  moneyAmountString,
+  moneyCurrencyCode,
   type Row,
 } from '~/lib/ui'
 import { useState, useMemo } from 'react'
@@ -312,7 +314,13 @@ export default function Finance({
                 : []),
             ],
           },
-          { name: 'currentBalance', label: 'Opening Balance', kind: 'number', default: '0' },
+          {
+            name: 'currentBalance',
+            label: 'Opening Balance',
+            kind: 'money',
+            currencyFrom: 'currencyCode',
+            default: '0',
+          },
           { name: 'currencyCode', label: 'Currency', default: 'USD' },
           {
             name: 'isActive',
@@ -348,7 +356,8 @@ export default function Finance({
                 institutionName: String(editAccountRow.institutionName ?? ''),
                 accountNumberLast4: String(editAccountRow.accountNumberLast4 ?? ''),
                 dataClassification: String(editAccountRow.dataClassification ?? 'business'),
-                currentBalance: String(editAccountRow.currentBalance ?? 0),
+                currentBalance: moneyAmountString(editAccountRow.currentBalance),
+                currentBalance__currency: moneyCurrencyCode(editAccountRow.currentBalance),
                 currencyCode: String(editAccountRow.currencyCode ?? 'USD'),
                 isActive: String(editAccountRow.isActive ?? 'true'),
               }
@@ -410,9 +419,25 @@ export default function Finance({
           { name: 'expMonth', label: 'Exp Month (1–12)', kind: 'number', required: true },
           { name: 'expYear', label: 'Exp Year (e.g. 2028)', kind: 'number', required: true },
           { name: 'currencyCode', label: 'Currency Code', default: 'USD' },
-          { name: 'creditLimit', label: 'Credit Limit', kind: 'number' },
-          { name: 'currentBalance', label: 'Current Balance', kind: 'number', default: '0' },
-          { name: 'minimumPaymentDue', label: 'Minimum Payment Due', kind: 'number' },
+          {
+            name: 'creditLimit',
+            label: 'Credit Limit',
+            kind: 'money',
+            currencyFrom: 'currencyCode',
+          },
+          {
+            name: 'currentBalance',
+            label: 'Current Balance',
+            kind: 'money',
+            currencyFrom: 'currencyCode',
+            default: '0',
+          },
+          {
+            name: 'minimumPaymentDue',
+            label: 'Minimum Payment Due',
+            kind: 'money',
+            currencyFrom: 'currencyCode',
+          },
           { name: 'nextPaymentDueDate', label: 'Next Due Date', kind: 'date' },
           {
             name: 'dataClassification',
@@ -458,9 +483,12 @@ export default function Finance({
           editCardRow
             ? {
                 cardLabel: String(editCardRow.cardLabel ?? ''),
-                creditLimit: String(editCardRow.creditLimit ?? 0),
-                currentBalance: String(editCardRow.currentBalance ?? 0),
-                minimumPaymentDue: String(editCardRow.minimumPaymentDue ?? 0),
+                creditLimit: moneyAmountString(editCardRow.creditLimit),
+                creditLimit__currency: moneyCurrencyCode(editCardRow.creditLimit),
+                currentBalance: moneyAmountString(editCardRow.currentBalance),
+                currentBalance__currency: moneyCurrencyCode(editCardRow.currentBalance),
+                minimumPaymentDue: moneyAmountString(editCardRow.minimumPaymentDue),
+                minimumPaymentDue__currency: moneyCurrencyCode(editCardRow.minimumPaymentDue),
                 nextPaymentDueDate: editCardRow.nextPaymentDueDate
                   ? String(editCardRow.nextPaymentDueDate).slice(0, 10)
                   : '',
@@ -470,9 +498,9 @@ export default function Finance({
         }
         fields={[
           { name: 'cardLabel', label: 'Card Label', required: true },
-          { name: 'creditLimit', label: 'Credit Limit', kind: 'number' },
-          { name: 'currentBalance', label: 'Current Balance', kind: 'number' },
-          { name: 'minimumPaymentDue', label: 'Minimum Payment Due', kind: 'number' },
+          { name: 'creditLimit', label: 'Credit Limit', kind: 'money' },
+          { name: 'currentBalance', label: 'Current Balance', kind: 'money' },
+          { name: 'minimumPaymentDue', label: 'Minimum Payment Due', kind: 'money' },
           { name: 'nextPaymentDueDate', label: 'Next Due Date', kind: 'date' },
           {
             name: 'status',
@@ -514,9 +542,20 @@ export default function Finance({
           },
           { name: 'vendorOrPayer', label: 'Vendor / Payer' },
           { name: 'originalCurrencyCode', label: 'Currency', default: 'USD' },
-          { name: 'originalAmount', label: 'Amount', kind: 'number', required: true },
+          {
+            name: 'originalAmount',
+            label: 'Amount',
+            kind: 'money',
+            currencyFrom: 'originalCurrencyCode',
+            required: true,
+          },
           { name: 'exchangeRate', label: 'Exchange Rate to USD', kind: 'number', default: '1' },
-          { name: 'taxAmount', label: 'Tax Amount', kind: 'number' },
+          {
+            name: 'taxAmount',
+            label: 'Tax Amount',
+            kind: 'money',
+            currencyFrom: 'originalCurrencyCode',
+          },
           { name: 'transactionDate', label: 'Transaction Date', kind: 'date', required: true },
           {
             name: 'financialAccountId',
@@ -984,8 +1023,8 @@ export default function Finance({
         initialValues={
           matchRow
             ? {
-                observedAmount: String(matchRow.originalAmount),
-                currencyCode: String(matchRow.originalCurrencyCode),
+                observedAmount: moneyAmountString(matchRow.originalAmount),
+                observedAmount__currency: moneyCurrencyCode(matchRow.originalAmount),
               }
             : undefined
         }
@@ -996,8 +1035,7 @@ export default function Finance({
             required: true,
             description: 'Must be unique among active matches in this workspace.',
           },
-          { name: 'observedAmount', label: 'Statement amount', kind: 'number', required: true },
-          { name: 'currencyCode', label: 'Statement currency', required: true },
+          { name: 'observedAmount', label: 'Statement amount', kind: 'money', required: true },
           { name: 'notes', label: 'Verification notes', kind: 'textarea' },
         ]}
       />

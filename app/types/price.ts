@@ -524,6 +524,81 @@ export function convertMoney(
 }
 
 /**
+ * Raised when a caller tries to aggregate amounts that are denominated in
+ * different currencies without an explicit conversion.
+ *
+ * Silently adding 2 300 INR to 40 USD is how a P&L report becomes fiction, so the
+ * money layer refuses the operation instead of guessing. Callers that legitimately
+ * need a cross-currency total must convert first (`sumMoneyConverted`) or ask for a
+ * single-currency assertion with a target to convert into.
+ */
+export class MixedCurrencyError extends Error {
+  readonly currencies: string[]
+  readonly target: string
+
+  constructor(operation: string, currencies: string[], target: string) {
+    super(
+      `${operation}: cannot combine ${currencies.join(', ')} into a single ${target} amount without an explicit FX conversion.`
+    )
+    this.name = 'MixedCurrencyError'
+    this.currencies = [...new Set(currencies)]
+    this.target = target
+  }
+}
+
+/**
+ * Asserts that every money-ish value is already denominated in `targetCurrency`.
+ *
+ * Empty values (`null`, `undefined`, `''`) are ignored: an unspecified amount is
+ * not a currency mismatch. Use this before adding amounts together so a mixed
+ * currency payload fails loudly with the offending currencies listed.
+ */
+export function assertSingleCurrency(
+  values: Array<unknown>,
+  targetCurrency: string,
+  operation: string = 'Money aggregation'
+): string {
+  const target = normalizeCurrencyCode(targetCurrency)
+  const foreign = values
+    .filter((value) => value !== null && value !== undefined && value !== '')
+    .map((value) => currencyOf(value, target))
+    .filter((code) => code !== target)
+  if (foreign.length > 0) throw new MixedCurrencyError(operation, [target, ...foreign], target)
+  return target
+}
+
+/**
+ * Adds money-ish values together, converting every entry into `targetCurrency`
+ * with the supplied rates and recording which source currencies were converted.
+ *
+ * This is the safe default for totals that legitimately span currencies (COGS in
+ * INR on a USD order, a MXN carrier cost on a CAD order): each amount is
+ * FX-converted, never relabelled, and the caller gets the applied rates back so
+ * they can be stored for auditability.
+ */
+export function sumMoneyInCurrency(
+  values: Array<unknown>,
+  targetCurrency: string,
+  rates: Record<string, number> = DEFAULT_CURRENCY_RATES
+): { total: PriceMoney; fxApplied: Record<string, number> } {
+  const target = normalizeCurrencyCode(targetCurrency)
+  const fxApplied: Record<string, number> = {}
+  let total = 0
+  for (const value of values) {
+    if (value === null || value === undefined || value === '') continue
+    const source = currencyOf(value, target)
+    if (source === target) {
+      total += amountOf(value)
+      continue
+    }
+    const rate = exchangeRateBetween(source, target, rates)
+    if (rate > 0) fxApplied[`${source}->${target}`] = rate
+    total += roundMoney(amountOf(value) * rate)
+  }
+  return { total: money(total, target), fxApplied }
+}
+
+/**
  * Sums money values after converting each one into `targetCurrency`.
  *
  * This is the multi-currency-safe replacement for `sumMoney` when the entries may
