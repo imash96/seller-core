@@ -198,21 +198,28 @@ export default class OrdersController {
         return response.redirect().back()
       }
       const prevStatus = order.status
-      await db.transaction(async (trx) => {
-        await AuditContext.apply(trx, {
+      if (status === OrderStatus.CANCELLED) {
+        // Cancellation is a domain transition: it releases the reserved units.
+        const { releasedUnits } = await OrderService.cancelOrder({
+          userId: user.id,
+          orderId: order.id,
           actorUserId: user.id,
           requestId: request.id(),
-          ipAddress: request.ip(),
-          userAgent: request.header('user-agent') ?? null,
-          reason: 'order.status_updated',
+          reason: 'status_change',
         })
-        order.useTransaction(trx)
-        order.status = status
-        if (status === OrderStatus.CANCELLED) {
-          order.cancelledAt = DateTime.now()
-        }
-        await order.save()
-      })
+        await order.refresh()
+        session.flash(
+          'success',
+          `Order ${order.orderNumber} cancelled; ${releasedUnits} reserved unit(s) released.`
+        )
+      } else {
+        await AuditContext.runRequest({ auth, request }, 'order.status_updated', async (trx) => {
+          order.useTransaction(trx)
+          order.status = status
+          await order.save()
+        })
+        session.flash('success', `Order ${order.orderNumber} updated to ${status}.`)
+      }
 
       await OrderStatusChanged.dispatch({
         orderId: order.id,
@@ -223,8 +230,6 @@ export default class OrdersController {
         actorUserId: user.id,
         requestId: request.id(),
       })
-
-      session.flash('success', `Order ${order.orderNumber} updated to ${status}.`)
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to update order status.')
     }
@@ -239,21 +244,17 @@ export default class OrdersController {
         .andWhere('id', params.id)
         .firstOrFail()
 
-      await db.transaction(async (trx) => {
-        await AuditContext.apply(trx, {
-          actorUserId: user.id,
-          requestId: request.id(),
-          ipAddress: request.ip(),
-          userAgent: request.header('user-agent') ?? null,
-          reason: 'order.cancelled',
-        })
-        order.useTransaction(trx)
-        order.status = OrderStatus.CANCELLED
-        order.cancelledAt = DateTime.now()
-        await order.save()
+      const { releasedUnits } = await OrderService.cancelOrder({
+        userId: user.id,
+        orderId: order.id,
+        actorUserId: user.id,
+        requestId: request.id(),
       })
 
-      session.flash('success', `Order ${order.orderNumber} cancelled.`)
+      session.flash(
+        'success',
+        `Order ${order.orderNumber} cancelled; ${releasedUnits} reserved unit(s) released.`
+      )
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to cancel order.')
     }

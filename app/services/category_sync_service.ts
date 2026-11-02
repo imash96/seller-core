@@ -1,8 +1,8 @@
-import db from '@adonisjs/lucid/services/db'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 import ProductCategory from '#models/product_category'
 import { PRODUCT_CATEGORIES, flattenMedusaCategories } from '../data/data_category.js'
 import type { MedusaCategoryMetadata, MedusaProductCategory } from '../types/catalog_pipeline.js'
+import { AuditContext } from './audit_context.js'
 
 export interface ResolvedCategoryMetadata extends MedusaCategoryMetadata {
   medusaId?: string
@@ -190,7 +190,7 @@ export class CategorySyncService {
     }
 
     let syncedCount = 0
-    await db.transaction(async (trx) => {
+    await AuditContext.transaction(async (trx) => {
       syncedCount = await this.upsertCategoryTree(userId, tree, null, trx)
     })
 

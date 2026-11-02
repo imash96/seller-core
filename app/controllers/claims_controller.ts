@@ -4,6 +4,7 @@ import MarketplaceClaim from '#models/marketplace_claim'
 import Order from '#models/order'
 import SellerAccount from '#models/seller_account'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
+import { AuditContext } from '../services/audit_context.js'
 import { amountOf, currencyOf, normalizePriceMoney } from '../types/price.js'
 
 export default class ClaimsController {
@@ -61,19 +62,27 @@ export default class ClaimsController {
       const status = String(request.input('status', 'under_review'))
 
       // The marketplace account and customer are derived through the order.
-      const claim = await MarketplaceClaim.create({
-        userId: user.id,
-        orderId: order.id,
-        claimNumber,
-        externalClaimId: request.input('externalClaimId') || claimNumber,
-        claimType,
-        status,
-        disputedTotal,
-        sellerLiabilityTotal,
-        reason: request.input('reason') || 'Customer marketplace claim opened',
-        evidenceSubmitted: { resolutionNotes: request.input('resolutionNotes') || null },
-        respondByAt: respondByAt ? DateTime.fromISO(String(respondByAt)) : null,
-      })
+      const claim = await AuditContext.runRequest(
+        { auth, request },
+        'marketplace_claim.created',
+        async (trx): Promise<MarketplaceClaim> =>
+          await MarketplaceClaim.create(
+            {
+              userId: user.id,
+              orderId: order.id,
+              claimNumber,
+              externalClaimId: request.input('externalClaimId') || claimNumber,
+              claimType,
+              status,
+              disputedTotal,
+              sellerLiabilityTotal,
+              reason: request.input('reason') || 'Customer marketplace claim opened',
+              evidenceSubmitted: { resolutionNotes: request.input('resolutionNotes') || null },
+              respondByAt: respondByAt ? DateTime.fromISO(String(respondByAt)) : null,
+            },
+            { client: trx }
+          )
+      )
 
       session.flash('success', `Marketplace Claim ${claim.claimNumber} logged.`)
     } catch (err: any) {
@@ -95,40 +104,47 @@ export default class ClaimsController {
         .firstOrFail()
 
       const status = String(request.input('status', 'won'))
-      claim.status = status
-      if (request.input('claimType')) {
-        claim.claimType = String(request.input('claimType'))
-      }
-      if (request.input('externalClaimId')) {
-        claim.externalClaimId = String(request.input('externalClaimId'))
-      }
-      const disputed = request.input('disputedAmount')
-      if (disputed !== undefined && disputed !== null && disputed !== '') {
-        claim.disputedTotal = normalizePriceMoney(disputed, claim.disputedTotal.currency_code)
-      }
-      const liability = request.input('sellerLiabilityAmount')
-      if (liability !== undefined && liability !== null && liability !== '') {
-        claim.sellerLiabilityTotal = normalizePriceMoney(
-          liability,
-          claim.sellerLiabilityTotal.currency_code
-        )
-      }
-      if (request.input('reason')) {
-        claim.reason = String(request.input('reason'))
-      }
-      const notes = request.input('resolutionNotes')
-      if (notes !== undefined && notes !== null && notes !== '') {
-        claim.evidenceSubmitted = {
-          ...(claim.evidenceSubmitted || {}),
-          resolutionNotes: String(notes),
+      await AuditContext.runRequest(
+        { auth, request },
+        'marketplace_claim.status_updated',
+        async (trx) => {
+          claim.useTransaction(trx)
+          claim.status = status
+          if (request.input('claimType')) {
+            claim.claimType = String(request.input('claimType'))
+          }
+          if (request.input('externalClaimId')) {
+            claim.externalClaimId = String(request.input('externalClaimId'))
+          }
+          const disputed = request.input('disputedAmount')
+          if (disputed !== undefined && disputed !== null && disputed !== '') {
+            claim.disputedTotal = normalizePriceMoney(disputed, claim.disputedTotal.currency_code)
+          }
+          const liability = request.input('sellerLiabilityAmount')
+          if (liability !== undefined && liability !== null && liability !== '') {
+            claim.sellerLiabilityTotal = normalizePriceMoney(
+              liability,
+              claim.sellerLiabilityTotal.currency_code
+            )
+          }
+          if (request.input('reason')) {
+            claim.reason = String(request.input('reason'))
+          }
+          const notes = request.input('resolutionNotes')
+          if (notes !== undefined && notes !== null && notes !== '') {
+            claim.evidenceSubmitted = {
+              ...(claim.evidenceSubmitted || {}),
+              resolutionNotes: String(notes),
+            }
+          }
+          const respondByAt = request.input('respondByAt')
+          if (respondByAt) claim.respondByAt = DateTime.fromISO(String(respondByAt))
+          if (['won', 'lost', 'closed'].includes(status)) {
+            claim.resolvedAt = DateTime.now()
+          }
+          await claim.save()
         }
-      }
-      const respondByAt = request.input('respondByAt')
-      if (respondByAt) claim.respondByAt = DateTime.fromISO(String(respondByAt))
-      if (['won', 'lost', 'closed'].includes(status)) {
-        claim.resolvedAt = DateTime.now()
-      }
-      await claim.save()
+      )
 
       session.flash('success', `Claim ${claim.claimNumber} status updated to ${status}.`)
     } catch (err: any) {
@@ -141,14 +157,17 @@ export default class ClaimsController {
     return this.updateClaimStatus(ctx)
   }
 
-  async deleteClaim({ auth, params, response, session }: HttpContext) {
+  async deleteClaim({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     try {
       const claim = await MarketplaceClaim.query()
         .where('userId', user.id)
         .andWhere('id', params.id)
         .firstOrFail()
-      await claim.delete()
+      await AuditContext.runRequest({ auth, request }, 'marketplace_claim.deleted', async (trx) => {
+        claim.useTransaction(trx)
+        await claim.delete()
+      })
       session.flash('success', `Claim ${claim.claimNumber} deleted.`)
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to delete claim')

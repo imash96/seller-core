@@ -472,3 +472,99 @@ export function applyCurrencyOverrides(
   }
   return Array.from(byCurrency.values())
 }
+
+/**
+ * FX rate from one currency into another, both quoted against USD.
+ *
+ * Rates come from `DEFAULT_CURRENCY_RATES` (or an explicit override map), which is
+ * good enough for reporting and derived retail prices. Settlement-critical
+ * conversions keep using the marketplace's own `exchangeRate` on the order —
+ * this helper is the fallback when no explicit rate was supplied.
+ */
+export function exchangeRateBetween(
+  from: unknown,
+  to: unknown,
+  rates: Record<string, number> = DEFAULT_CURRENCY_RATES
+): number {
+  const source = normalizeCurrencyCode(from)
+  const target = normalizeCurrencyCode(to)
+  if (source === target) return 1
+
+  const sourceRate = Number(rates[source])
+  const targetRate = Number(rates[target])
+  if (
+    !Number.isFinite(sourceRate) ||
+    !Number.isFinite(targetRate) ||
+    sourceRate <= 0 ||
+    targetRate <= 0
+  ) {
+    return 0
+  }
+  // 1 unit of `source` is worth `sourceRate` USD, i.e. sourceRate/targetRate of `target`.
+  return sourceRate / targetRate
+}
+
+/**
+ * Converts any money-ish value into `targetCurrency` using the FX table.
+ *
+ * A value already in the target currency is returned untouched (rate 1), so
+ * callers never see a rounding drift on single-currency data.
+ */
+export function convertMoney(
+  value: unknown,
+  targetCurrency: string,
+  rates: Record<string, number> = DEFAULT_CURRENCY_RATES
+): PriceMoney {
+  const target = normalizeCurrencyCode(targetCurrency)
+  const source = currencyOf(value, target)
+  const rate = exchangeRateBetween(source, target, rates)
+  return money(roundMoney(amountOf(value) * rate), target)
+}
+
+/**
+ * Sums money values after converting each one into `targetCurrency`.
+ *
+ * This is the multi-currency-safe replacement for `sumMoney` when the entries may
+ * carry different currencies (e.g. COGS in INR on a USD order): unlike a plain
+ * numeric sum it never adds 2 300 INR to 40 USD.
+ */
+export function sumMoneyConverted(
+  values: Array<unknown>,
+  targetCurrency: string,
+  rates: Record<string, number> = DEFAULT_CURRENCY_RATES
+): PriceMoney {
+  const target = normalizeCurrencyCode(targetCurrency)
+  const total = values.reduce<number>(
+    (sum, value) => sum + amountOf(convertMoney(value, target, rates)),
+    0
+  )
+  return money(total, target)
+}
+
+/**
+ * Expands a (possibly partial) MedusaJS v2 price array so it covers every
+ * currency in `DEFAULT_MULTI_CURRENCIES`.
+ *
+ * Explicit entries always win — a hand-set EUR price is never recalculated — and
+ * the missing currencies are derived from the USD base with the same
+ * psychological rounding and `compare_at_amount` markup as the catalog pipeline.
+ */
+export function ensureCurrencyCoverage(
+  prices: unknown,
+  usdBaseAmount: number,
+  options: MultiCurrencyPriceOptions = {}
+): MedusaVariantPrice[] {
+  const explicit = normalizePriceMoneyArray(prices, usdBaseAmount)
+  const derived = buildMultiCurrencyPriceArray(usdBaseAmount, options)
+  const byCurrency = new Map(derived.map((price) => [price.currency_code, price] as const))
+  for (const price of explicit) byCurrency.set(price.currency_code, price)
+  const currencies = options.currencies?.length ? options.currencies : DEFAULT_MULTI_CURRENCIES
+  const ordered = currencies
+    .map((code) => byCurrency.get(normalizeCurrencyCode(code)))
+    .filter((price): price is MedusaVariantPrice => Boolean(price))
+  // Any explicit currency outside the default set keeps its place at the end.
+  for (const price of explicit) {
+    if (!ordered.some((entry) => entry.currency_code === price.currency_code)) ordered.push(price)
+  }
+  return ordered
+}

@@ -77,11 +77,14 @@ export default class ShipmentsController {
           },
         ],
       })
+      // The order number comes from the relation, not from a cast: the shipment
+      // response never carried it.
+      await shipment.load('order')
       await ShipmentDispatched.dispatch({
         shipmentId: shipment.id,
         shipmentNumber: shipment.shipmentNumber,
         orderId: payload.orderId,
-        orderNumber: (shipment as any).orderNumber ?? String(shipment.shipmentNumber),
+        orderNumber: shipment.order.orderNumber,
         userId: user.id,
         carrierCode: payload.carrierCode,
         trackingNumber: payload.trackingNumber ?? null,

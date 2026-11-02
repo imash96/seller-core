@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import type { HttpContext } from '@adonisjs/core/http'
+import { AuditContext } from '#services/audit_context'
 import Brand from '#models/brand'
 import ProductCategory from '#models/product_category'
 import Product from '#models/product'
@@ -1018,7 +1019,10 @@ export default class ProductsController {
       // ASIN belongs to the sellable unit; the listing reads it through the variant.
       const variant = await ProductVariant.findByOrFail('id', listing.productVariantId)
       variant.asin = String(request.input('asin')).trim() || null
-      await variant.save()
+      await AuditContext.transaction(async (trx) => {
+        variant.useTransaction(trx)
+        await variant.save()
+      })
     }
     if (request.input('channelCategoryId') !== undefined) {
       listing.channelCategoryId = String(request.input('channelCategoryId')).trim() || null
@@ -1068,7 +1072,10 @@ export default class ProductsController {
       }
     }
 
-    await listing.save()
+    await AuditContext.transaction(async (trx) => {
+      listing.useTransaction(trx)
+      await listing.save()
+    })
     const msg = `Listing ${listing.externalListingId} (${listing.externalSku}) updated.`
     if (wantsJson(request)) {
       return response.json({ ok: true, success: true, message: msg, listing: listing.serialize() })
@@ -1150,7 +1157,10 @@ export default class ProductsController {
       const normalizedPrices = normalizePriceMoneyArray(rawPrices, 239.99, 'USD')
       product.prices = normalizedPrices
     }
-    await product.save()
+    await AuditContext.transaction(async (trx) => {
+      product.useTransaction(trx)
+      await product.save()
+    })
     session.flash('success', `Product "${product.title}" updated.`)
     return response.redirect().back()
   }
@@ -1163,7 +1173,10 @@ export default class ProductsController {
       .firstOrFail()
 
     product.status = 'archived'
-    await product.save()
+    await AuditContext.transaction(async (trx) => {
+      product.useTransaction(trx)
+      await product.save()
+    })
     session.flash('success', `Product "${product.title}" archived.`)
     return response.redirect().back()
   }
@@ -1235,7 +1248,10 @@ export default class ProductsController {
         ? String(request.input('currencyCode')).trim().toUpperCase()
         : currentPrice.currency_code
     )
-    await variant.save()
+    await AuditContext.transaction(async (trx) => {
+      variant.useTransaction(trx)
+      await variant.save()
+    })
 
     session.flash(
       'success',
@@ -1250,7 +1266,10 @@ export default class ProductsController {
       .where('id', params.id)
       .andWhere('userId', user.id)
       .firstOrFail()
-    await variant.delete()
+    await AuditContext.transaction(async (trx) => {
+      variant.useTransaction(trx)
+      await variant.delete()
+    })
     session.flash('success', 'Variant deleted.')
     return response.redirect().back()
   }
@@ -1268,18 +1287,21 @@ export default class ProductsController {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
-    await Brand.updateOrCreate(
-      { userId: user.id, slug },
-      {
-        userId: user.id,
-        name,
-        slug,
-        regNo: request.input('regNo') || null,
-        serialNo: request.input('serialNo') || null,
-        websiteUrl: request.input('websiteUrl') || null,
-        isActive: true,
-      }
-    )
+    await AuditContext.transaction(async (trx) => {
+      await Brand.updateOrCreate(
+        { userId: user.id, slug },
+        {
+          userId: user.id,
+          name,
+          slug,
+          regNo: request.input('regNo') || null,
+          serialNo: request.input('serialNo') || null,
+          websiteUrl: request.input('websiteUrl') || null,
+          isActive: true,
+        },
+        { client: trx }
+      )
+    })
     session.flash('success', `Brand "${name}" saved.`)
     return response.redirect().back()
   }
@@ -1298,7 +1320,10 @@ export default class ProductsController {
     if (request.input('serialNo') !== undefined) {
       brand.serialNo = request.input('serialNo') || null
     }
-    await brand.save()
+    await AuditContext.transaction(async (trx) => {
+      brand.useTransaction(trx)
+      await brand.save()
+    })
     session.flash('success', `Brand "${brand.name}" updated.`)
     return response.redirect().back()
   }
@@ -1309,7 +1334,10 @@ export default class ProductsController {
       .where('id', params.id)
       .andWhere('userId', user.id)
       .firstOrFail()
-    await brand.delete()
+    await AuditContext.transaction(async (trx) => {
+      brand.useTransaction(trx)
+      await brand.delete()
+    })
     session.flash('success', 'Brand deleted.')
     return response.redirect().back()
   }
@@ -1327,17 +1355,20 @@ export default class ProductsController {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
-    await ProductCategory.updateOrCreate(
-      { userId: user.id, slug },
-      {
-        userId: user.id,
-        name,
-        slug,
-        parentCategoryId: request.input('parentCategoryId') || null,
-        taxonomyPath: request.input('taxonomyPath') || slug,
-        attributesSchema: [],
-      }
-    )
+    await AuditContext.transaction(async (trx) => {
+      await ProductCategory.updateOrCreate(
+        { userId: user.id, slug },
+        {
+          userId: user.id,
+          name,
+          slug,
+          parentCategoryId: request.input('parentCategoryId') || null,
+          taxonomyPath: request.input('taxonomyPath') || slug,
+          attributesSchema: [],
+        },
+        { client: trx }
+      )
+    })
     session.flash('success', `Category "${name}" saved.`)
     return response.redirect().back()
   }
@@ -1350,7 +1381,10 @@ export default class ProductsController {
       .andWhere('userId', user.id)
       .firstOrFail()
     category.merge(payload)
-    await category.save()
+    await AuditContext.transaction(async (trx) => {
+      category.useTransaction(trx)
+      await category.save()
+    })
     session.flash('success', `Category "${category.name}" updated.`)
     return response.redirect().back()
   }
@@ -1361,7 +1395,10 @@ export default class ProductsController {
       .where('id', params.id)
       .andWhere('userId', user.id)
       .firstOrFail()
-    await category.delete()
+    await AuditContext.transaction(async (trx) => {
+      category.useTransaction(trx)
+      await category.delete()
+    })
     session.flash('success', 'Category deleted.')
     return response.redirect().back()
   }
@@ -1396,25 +1433,31 @@ export default class ProductsController {
       lPrices[0] ??
       money(effPrice, sellerAccount.defaultCurrency || 'USD')
 
-    await ChannelListing.create({
-      userId: user.id,
-      sellerAccountId: sellerAccount.id,
-      productId: variant.productId,
-      productVariantId: variant.id,
-      externalListingId: externalListingId || `LST-${Date.now()}`,
-      externalSku: channelSku || variant.sku,
-      listedPrice: listedMoney,
-      prices: lPrices,
-      allocatedQuantity: Number(request.input('allocatedQuantity', variant.stockOnHand)),
-      listingStatus: 'draft',
-      publicationStatus: 'unpublished',
-      syncStatus: 'pending',
-      lastSyncedAt: null,
+    // `channel_listings` has no `product_id`: the product is derived through the
+    // variant, so the listing never stores a duplicate of that reference.
+    await AuditContext.transaction(async (trx) => {
+      await ChannelListing.create(
+        {
+          userId: user.id,
+          sellerAccountId: sellerAccount.id,
+          productVariantId: variant.id,
+          externalListingId: externalListingId || `LST-${Date.now()}`,
+          externalSku: channelSku || variant.sku,
+          listedPrice: listedMoney,
+          prices: lPrices,
+          allocatedQuantity: Number(request.input('allocatedQuantity', variant.stockOnHand)),
+          listingStatus: 'draft',
+          publicationStatus: 'unpublished',
+          syncStatus: 'pending',
+          lastSyncedAt: null,
+        },
+        { client: trx }
+      )
     })
 
     session.flash(
       'success',
-      `Published SKU ${variant.sku} to ${sellerAccount.accountName} (${externalListingId || variant.sku}).`
+      `Draft listing ${externalListingId || variant.sku} created for SKU ${variant.sku} on ${sellerAccount.accountName}.`
     )
     return response.redirect().back()
   }
@@ -1425,7 +1468,10 @@ export default class ProductsController {
       .where('id', params.id)
       .andWhere('userId', user.id)
       .firstOrFail()
-    await listing.delete()
+    await AuditContext.transaction(async (trx) => {
+      listing.useTransaction(trx)
+      await listing.delete()
+    })
     session.flash('success', 'Channel listing removed.')
     return response.redirect().back()
   }

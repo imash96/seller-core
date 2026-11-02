@@ -142,7 +142,7 @@ export class RbacService {
       throw new Error('FORBIDDEN: Only an active system super administrator can create users.')
     }
 
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
       // Row-level audit rows (users, user_roles, module_entitlements) are written by
       // the audit trigger; the context only says who did it and why.
       await AuditContext.apply(trx, {
@@ -227,7 +227,7 @@ export class RbacService {
       throw new Error('INVALID_OPERATION: Super administrator cannot suspend their own account.')
     }
 
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
       await AuditContext.apply(trx, {
         actorUserId: actor.id,
         requestId: context?.requestId ?? null,

@@ -12,6 +12,7 @@ import { UserStatus, ModuleKeys } from '../enums/index.js'
 import db from '@adonisjs/lucid/services/db'
 import { AuditContext } from '#services/audit_context'
 import Organization from '#models/organization'
+import UserOnboarded from '#events/user_onboarded'
 
 export default class AdminController {
   async index({ auth, inertia, response }: HttpContext) {
@@ -39,9 +40,9 @@ export default class AdminController {
     const payload = await request.validateUsing(createUserValidator)
 
     try {
+      // The form posts a single `roleSlug`; API clients may post `roleSlugs`.
       const roleSlugs =
-        (payload as any).roleSlugs ??
-        ((payload as any).roleSlug ? [(payload as any).roleSlug] : ['operations_manager'])
+        payload.roleSlugs ?? (payload.roleSlug ? [payload.roleSlug] : ['operations_manager'])
       const created = await RbacService.createUserBySuperAdmin(
         actor,
         {
@@ -61,6 +62,20 @@ export default class AdminController {
           userAgent: request.header('user-agent') ?? undefined,
         }
       )
+      // Onboarding is announced only after the account exists; the notification
+      // listener is best-effort and must not undo a completed provisioning.
+      try {
+        await UserOnboarded.dispatch({
+          userId: created.id,
+          email: created.email,
+          fullName: created.fullName,
+          actorUserId: actor.id,
+          requestId: request.id(),
+        })
+      } catch {
+        // The account is provisioned either way; the feed entry can be replayed.
+      }
+
       session.flash('success', `User ${created.email} provisioned by Super Administrator.`)
     } catch (err: any) {
       session.flash(

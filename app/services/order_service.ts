@@ -1,5 +1,4 @@
 import crypto from 'node:crypto'
-import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import Order from '#models/order'
 import OrderLineItem from '#models/order_line_item'
@@ -10,7 +9,9 @@ import ProductVariant from '#models/product_variant'
 import SyncJob from '#models/sync_job'
 import SyncJobError from '#models/sync_job_error'
 import OutboxEvent from '#models/outbox_event'
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 import { AuditContext } from './audit_context.js'
+import { RiskSignalService } from './risk_signal_service.js'
 import {
   OrderSourceType,
   OrderStatus,
@@ -26,6 +27,7 @@ import {
   type TaxCollectionModelValue,
 } from '../enums/index.js'
 import { generateEntityId } from '../utils/generate_entity_id.js'
+import RiskSignalFlagged from '#events/risk_signal_flagged'
 import {
   OrderSyncNormalizerService,
   OrderSyncNormalizationError,
@@ -40,11 +42,14 @@ import {
   amountOf,
   currencyOf,
   money,
+  exchangeRateBetween,
+  DEFAULT_CURRENCY_RATES,
   normalizeCurrencyCode,
   normalizeMoneyEntryArray,
   normalizePriceMoney,
   roundMoney,
   sumMoney,
+  sumMoneyConverted,
   sumMoneyEntries,
 } from '../types/price.js'
 
@@ -201,6 +206,12 @@ export interface CreateOrderInput {
   /** Currency used for the `reporting_total` P&L roll-up. */
   reportingCurrencyCode?: string
   exchangeRate?: number
+  /**
+   * FX overrides merged over `DEFAULT_CURRENCY_RATES`, keyed by ISO currency and
+   * quoted against USD (e.g. `{ INR: 84.1 }`). Used when neither an explicit
+   * `exchangeRate` nor a stored rate is available.
+   */
+  exchangeRates?: Record<string, number>
   fulfillmentChannel?: FulfillmentChannelCode
   /** Amazon MarketplaceId / eBay marketplace id / Etsy shop_id / Medusa region_id. */
   marketplaceSiteId?: string | null
@@ -311,9 +322,19 @@ export class OrderService {
 
     const currency = normalizeCurrencyCode(input.currencyCode, 'USD')
     const reportingCurrency = normalizeCurrencyCode(input.reportingCurrencyCode, 'USD')
-    const exchangeRate = Number(input.exchangeRate ?? 1.0)
+    // A marketplace supplies its settlement rate; without one the reporting rate is
+    // derived from the FX table instead of silently assuming 1:1.
+    const fxRates: Record<string, number> = {
+      ...DEFAULT_CURRENCY_RATES,
+      ...(input.exchangeRates ?? {}),
+    }
+    const exchangeRate = Number(
+      input.exchangeRate ?? exchangeRateBetween(currency, reportingCurrency, fxRates)
+    )
     if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
-      throw new Error('VALIDATION_ERROR: exchangeRate must be strictly positive.')
+      throw new Error(
+        `VALIDATION_ERROR: no exchange rate available for ${currency} -> ${reportingCurrency}.`
+      )
     }
     const fieldOverrides = input.fieldCurrencyOverrides ?? {}
     const currencyFor = (field: string, fallback = currency) =>
@@ -323,7 +344,7 @@ export class OrderService {
       currency
     )
 
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
       // Every row written below (customer, order, lines, payload, outbox) is audited
       // by the trg_audit_capture trigger with this actor/request context.
       await AuditContext.apply(trx, {
@@ -604,9 +625,11 @@ export class OrderService {
       const shippingDiscountMoney = pick(input.shippingDiscountTotal, lineShippingDiscounts)
       const taxMoney = pick(input.taxTotal, lineTaxes)
       const shippingTaxMoney = pick(input.shippingTaxTotal, lineShippingTaxes)
+      // COGS may be booked per line in a different currency (e.g. INR warehouse
+      // cost on a USD order), so each entry is converted before summing.
       const cogsTotal = pick(
         input.cogsTotal,
-        sumMoney(
+        sumMoneyConverted(
           lineBreakdown.map((line) => line.cogs),
           currency
         )
@@ -628,7 +651,7 @@ export class OrderService {
       const shippingCostTotal = toMoney(input.shippingCostTotal ?? 0, shippingCostCurrency)
       const marketplaceFeesTotal = toMoney(
         input.marketplaceFeesTotal ??
-          sumMoney(
+          sumMoneyConverted(
             lineBreakdown.map((line) => line.marketplaceFee),
             currency
           ),
@@ -680,10 +703,17 @@ export class OrderService {
         }
       }
 
-      // Only same-currency values are netted together; mixed-currency costs keep
-      // their own currency code and are excluded from the primary-currency P&L.
-      const inGrandCurrency = (value: PriceMoney, fallbackAmount = 0) =>
-        value.currency_code === grandTotal.currency_code ? amountOf(value) : fallbackAmount
+      // P&L is expressed in the order currency. Values booked in another currency
+      // (INR carrier cost, CAD COGS, …) are FX-converted instead of being dropped,
+      // and every conversion is recorded on the order for auditability.
+      const fxApplied: Record<string, number> = {}
+      const toOrderCurrency = (value: PriceMoney): number => {
+        if (value.currency_code === currency) return amountOf(value)
+        const rate = exchangeRateBetween(value.currency_code, currency, fxRates)
+        if (rate <= 0) return 0
+        fxApplied[`${value.currency_code}->${currency}`] = rate
+        return roundMoney(amountOf(value) * rate)
+      }
 
       const netSales =
         amountOf(subtotalMoney) -
@@ -696,21 +726,24 @@ export class OrderService {
       const refundedTotal = money(0, currency)
       const netProceeds = roundMoney(
         amountOf(grandTotal) -
-          inGrandCurrency(marketplaceFeesTotal) -
-          inGrandCurrency(paymentProcessingFeesTotal) -
-          inGrandCurrency(refundedTotal)
+          toOrderCurrency(marketplaceFeesTotal) -
+          toOrderCurrency(paymentProcessingFeesTotal) -
+          toOrderCurrency(refundedTotal)
       )
       const grossProfit = roundMoney(
-        netSales - inGrandCurrency(cogsTotal) - inGrandCurrency(shippingCostTotal)
+        netSales - toOrderCurrency(cogsTotal) - toOrderCurrency(shippingCostTotal)
       )
       const netProfit = roundMoney(
         netProceeds -
-          inGrandCurrency(cogsTotal) -
-          inGrandCurrency(shippingCostTotal) -
-          inGrandCurrency(taxMoney) -
-          inGrandCurrency(shippingTaxMoney)
+          toOrderCurrency(cogsTotal) -
+          toOrderCurrency(shippingCostTotal) -
+          toOrderCurrency(taxMoney) -
+          toOrderCurrency(shippingTaxMoney)
       )
       const reportingTotal = money(amountOf(grandTotal) * exchangeRate, reportingCurrency)
+      if (Object.keys(fxApplied).length > 0) {
+        channelMetadata.fxConversions = { ...fxApplied, reporting: exchangeRate }
+      }
 
       // 4. Create Order header
       const order = new Order()
@@ -839,8 +872,125 @@ export class OrderService {
       outbox.status = OutboxEventStatus.PENDING
       await outbox.save()
 
+      // 9. Explainable risk signals for this order (never an automatic block).
+      const riskSignals = await this.collectRiskSignals(order, trx)
+
+      return { order, riskSignals }
+    }).then(async ({ order, riskSignals }) => {
+      // Events fire after the transaction commits so listeners never read
+      // half-written rows; a listener failure cannot roll the order back.
+      for (const signal of riskSignals) {
+        try {
+          await RiskSignalFlagged.dispatch({
+            signalId: signal.id,
+            customerId: signal.customerId,
+            userId: signal.userId,
+            reason: signal.reason ?? '',
+            severity: signal.severity,
+            requestId: input.requestId ?? undefined,
+          })
+        } catch {
+          // The signal is already persisted; the notification/task is best-effort.
+        }
+      }
       return order
     })
+  }
+
+  /** Persists the risk signals the rules detected (empty when the order is clean). */
+  private static async collectRiskSignals(order: Order, trx: TransactionClientContract) {
+    try {
+      return await RiskSignalService.evaluateOrder({ order, trx })
+    } catch {
+      // Risk evaluation must never block a legitimate order from being recorded.
+      return []
+    }
+  }
+
+  /**
+   * Cancels an order and releases the inventory it was holding.
+   *
+   * Cancellation is a domain transition, not a status write: units that were
+   * reserved at order creation but never shipped go back to `stockAvailable`
+   * (`stock_reserved` is decremented, `stock_on_hand` is untouched because those
+   * units never left the warehouse), and every line records how many units were
+   * cancelled. Already-shipped units are *not* released — they are returned
+   * through an RMA, which restocks them.
+   *
+   * Idempotent: cancelling an already-cancelled order is a no-op.
+   */
+  static async cancelOrder(input: {
+    userId: string
+    orderId: string
+    reason?: string | null
+    actorUserId?: string
+    requestId?: string | null
+  }): Promise<{ order: Order; releasedUnits: number }> {
+    return await AuditContext.run(
+      {
+        actorUserId: input.actorUserId ?? input.userId,
+        requestId: input.requestId ?? null,
+        reason: 'order.cancelled',
+      },
+      async (trx) => {
+        const order = await Order.query({ client: trx })
+          .where('userId', input.userId)
+          .andWhere('id', input.orderId)
+          .preload('lineItems')
+          .forUpdate()
+          .firstOrFail()
+
+        if (order.status === OrderStatus.CANCELLED) return { order, releasedUnits: 0 }
+
+        let releasedUnits = 0
+        for (const line of order.lineItems) {
+          const releasable =
+            Number(line.quantityOrdered ?? 0) -
+            Number(line.quantityFulfilled ?? 0) -
+            Number(line.quantityCancelled ?? 0)
+          if (releasable <= 0) continue
+
+          line.useTransaction(trx)
+          line.quantityCancelled = Number(line.quantityCancelled ?? 0) + releasable
+          line.fulfillmentStatus =
+            Number(line.quantityFulfilled ?? 0) > 0
+              ? FulfillmentStatus.PARTIALLY_FULFILLED
+              : FulfillmentStatus.CANCELLED
+          await line.save()
+
+          if (line.productVariantId) {
+            const variant = await ProductVariant.query({ client: trx })
+              .where('userId', input.userId)
+              .andWhere('id', line.productVariantId)
+              .forUpdate()
+              .first()
+            if (variant) {
+              variant.stockReserved = Math.max(0, Number(variant.stockReserved ?? 0) - releasable)
+              await variant.save()
+            }
+          }
+          releasedUnits += releasable
+        }
+
+        order.useTransaction(trx)
+        order.status = OrderStatus.CANCELLED
+        order.cancelledAt = DateTime.now()
+        order.fulfillmentStatus = order.lineItems.some(
+          (line) => Number(line.quantityFulfilled ?? 0) > 0
+        )
+          ? FulfillmentStatus.PARTIALLY_FULFILLED
+          : FulfillmentStatus.CANCELLED
+        if (input.reason) {
+          order.internalNotes = [order.internalNotes, `Cancelled: ${input.reason}`]
+            .filter(Boolean)
+            .join('\n')
+            .slice(0, 4000)
+        }
+        await order.save()
+
+        return { order, releasedUnits }
+      }
+    )
   }
 
   /**

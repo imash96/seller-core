@@ -68,7 +68,7 @@ test.group('Local fulfillment HTTP workflow', () => {
     assert.include(login.headers.get('location') ?? '', 'dashboard')
     assert.equal((await send('/health/live')).status, 200)
     assert.equal((await send('/health/ready')).status, 200)
-    await send('/carrier-invoices', {
+    await send('/shipping-invoices', {
       carrierCode: 'ups',
       carrierName: 'UPS',
       invoiceNumber: `INV-${nonce}`,
@@ -87,10 +87,10 @@ test.group('Local fulfillment HTTP workflow', () => {
       paidAmount: '10',
       notes: 'Reviewed manually',
     }
-    assert.equal((await send(`/carrier-invoices/${invoice.id}`, manual)).status, 422)
+    assert.equal((await send(`/shipping-invoices/${invoice.id}`, manual)).status, 422)
     assert.equal(
       (
-        await send(`/carrier-invoices/${invoice.id}`, {
+        await send(`/shipping-invoices/${invoice.id}`, {
           ...manual,
           paymentReference: 'receipt-123',
           reconciliationStatus: 'matched',
@@ -100,7 +100,7 @@ test.group('Local fulfillment HTTP workflow', () => {
     )
     assert.equal(
       (
-        await send(`/carrier-invoices/${invoice.id}`, {
+        await send(`/shipping-invoices/${invoice.id}`, {
           ...manual,
           paymentReference: 'receipt-123',
         })
@@ -117,7 +117,7 @@ test.group('Local fulfillment HTTP workflow', () => {
         .whereRaw(`metadata ->> 'reason' = 'shipping_invoice.manual_review'`),
       1
     )
-    assert.equal((await send(`/carrier-invoices/${invoice.id}/delete`, {})).status, 409)
+    assert.equal((await send(`/shipping-invoices/${invoice.id}/delete`, {})).status, 409)
 
     const forged = await fetch(`${base}/orders`, {
       method: 'POST',

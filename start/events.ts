@@ -23,23 +23,23 @@ import PaymentReconciled from '#events/payment_reconciled'
 import UserOnboarded from '#events/user_onboarded'
 
 // Row-level auditing is done by the `trg_audit_capture` PostgreSQL trigger, so no
-// listener writes audit rows any more: the event bus only drives side effects
-// (notifications, downstream jobs, metrics).
+// listener writes audit rows: the bus only drives side effects (notification feed,
+// downstream jobs). Every listener is idempotent and never throws into the caller.
 
-// Orders — notifications + downstream jobs
-emitter.on(OrderPlaced, () => import('#listeners/notify_slack'))
+// Orders — notification feed + fulfillment preparation
+emitter.on(OrderPlaced, () => import('#listeners/create_notification'))
 emitter.on(OrderPlaced, () => import('#listeners/queue_fulfillment'))
 
-emitter.on(OrderStatusChanged, () => import('#listeners/notify_slack'))
+emitter.on(OrderStatusChanged, () => import('#listeners/create_notification'))
 
 // Fulfillment — tracking notifications
-emitter.on(ShipmentDispatched, () => import('#listeners/notify_slack'))
+emitter.on(ShipmentDispatched, () => import('#listeners/create_notification'))
 
-// Risk — create review tasks
+// Risk — create the human review task
 emitter.on(RiskSignalFlagged, () => import('#listeners/enqueue_risk_review'))
 
-// Finance — reconcile + metrics
-emitter.on(PaymentReconciled, () => import('#listeners/update_seller_metrics'))
+// Finance — reconciliation notification
+emitter.on(PaymentReconciled, () => import('#listeners/create_notification'))
 
-// Identity — welcome
-emitter.on(UserOnboarded as any, () => import('#listeners/notify_slack') as any)
+// Identity — welcome notification
+emitter.on(UserOnboarded, () => import('#listeners/create_notification'))

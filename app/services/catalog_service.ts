@@ -42,6 +42,7 @@ import {
   normalizePriceMoney,
   normalizePriceMoneyArray,
 } from '../types/price.js'
+import { AuditContext } from './audit_context.js'
 
 /**
  * Variant input accepted by `CatalogService.createProduct` / `createVariant`.
@@ -159,7 +160,7 @@ export class CatalogService {
     }
 
     const savedItems: CatalogItem[] = []
-    await db.transaction(async (trx) => {
+    await AuditContext.transaction(async (trx) => {
       for (const [i, [catalogKey, entry]] of entries.entries() as IterableIterator<
         [number, [string, CatalogJsonEntry]]
       >) {
@@ -424,7 +425,7 @@ export class CatalogService {
       },
     }
 
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
       if (existing && existing.catalogKey !== params.catalogKey.trim()) {
         existing.useTransaction(trx)
         existing.catalogKey = params.catalogKey.trim()
@@ -621,7 +622,7 @@ export class CatalogService {
     }
 
     let variantsCreated = 0
-    const product = await db.transaction(async (trx) => {
+    const product = await AuditContext.transaction(async (trx) => {
       const catalogItem = await CatalogItem.query({ client: trx })
         .where('userId', userId)
         .andWhere('id', preview.catalogItemId)
@@ -941,7 +942,7 @@ export class CatalogService {
       )
     }
 
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
       const baseSlug =
         (input.slug || input.title)
           .trim()

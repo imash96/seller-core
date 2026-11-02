@@ -1,4 +1,3 @@
-import db from '@adonisjs/lucid/services/db'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 import Brand from '#models/brand'
 import Product from '#models/product'
@@ -15,6 +14,7 @@ import {
   normalizePriceMoneyArray,
 } from '../types/price.js'
 import { resolveColorInfoFromValue, resolveSizeInfo } from '../data/catalog_config/index.js'
+import { AuditContext } from './audit_context.js'
 
 /**
  * Marketplace character caps applied at publish time.
@@ -243,7 +243,7 @@ export class ListingTransformerService {
     let totalVariants = 0
     const payloadsByPlatform: Record<string, Record<string, unknown>> = {}
 
-    await db.transaction(async (trx) => {
+    await AuditContext.transaction(async (trx) => {
       if (assignBrandToProduct) {
         for (const product of products) {
           product.useTransaction(trx)

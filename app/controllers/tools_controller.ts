@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon'
 import type { HttpContext } from '@adonisjs/core/http'
+import { AuditContext } from '../services/audit_context.js'
 import TasksReminder from '#models/tasks_reminder'
 import SavedView from '#models/saved_view'
 import SyncJob from '#models/sync_job'
@@ -40,14 +41,19 @@ export default class ToolsController {
     const user = auth.getUserOrFail()
     const payload = await request.validateUsing(createTaskValidator)
 
-    await TasksReminder.create({
-      userId: user.id,
-      taskType: payload.taskType ?? TaskType.GENERAL,
-      priority: payload.priority ?? TaskPriority.MEDIUM,
-      status: (request.input('status') as any) || TaskStatus.PENDING,
-      title: payload.title,
-      description: payload.description || null,
-      dueAt: payload.dueAt ? DateTime.fromISO(payload.dueAt) : DateTime.now().plus({ days: 3 }),
+    await AuditContext.runRequest({ auth, request }, 'task.created', async (trx) => {
+      await TasksReminder.create(
+        {
+          userId: user.id,
+          taskType: payload.taskType ?? TaskType.GENERAL,
+          priority: payload.priority ?? TaskPriority.MEDIUM,
+          status: (request.input('status') as any) || TaskStatus.PENDING,
+          title: payload.title,
+          description: payload.description || null,
+          dueAt: payload.dueAt ? DateTime.fromISO(payload.dueAt) : DateTime.now().plus({ days: 3 }),
+        },
+        { client: trx }
+      )
     })
 
     session.flash('success', `Task "${payload.title}" added.`)
@@ -71,7 +77,10 @@ export default class ToolsController {
         if (payload.status === 'completed') task.completedAt = DateTime.now()
       }
       if (payload.dueAt !== undefined) task.dueAt = DateTime.fromISO(payload.dueAt)
-      await task.save()
+      await AuditContext.runRequest({ auth, request }, 'task.updated', async (trx) => {
+        task.useTransaction(trx)
+        await task.save()
+      })
       session.flash('success', 'Task updated.')
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to update task.')
@@ -83,7 +92,7 @@ export default class ToolsController {
     return this.updateTask(ctx)
   }
 
-  async completeTask({ auth, params, response, session }: HttpContext) {
+  async completeTask({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     try {
       const task = await TasksReminder.query()
@@ -91,9 +100,12 @@ export default class ToolsController {
         .andWhere('id', params.id)
         .firstOrFail()
 
-      task.status = TaskStatus.COMPLETED
-      task.completedAt = DateTime.now()
-      await task.save()
+      await AuditContext.runRequest({ auth, request }, 'task.completed', async (trx) => {
+        task.useTransaction(trx)
+        task.status = TaskStatus.COMPLETED
+        task.completedAt = DateTime.now()
+        await task.save()
+      })
 
       session.flash('success', `Task "${task.title}" marked completed.`)
     } catch (err: any) {
@@ -102,14 +114,17 @@ export default class ToolsController {
     return response.redirect().back()
   }
 
-  async deleteTask({ auth, params, response, session }: HttpContext) {
+  async deleteTask({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     try {
       const task = await TasksReminder.query()
         .where('id', params.id)
         .andWhere('userId', user.id)
         .firstOrFail()
-      await task.delete()
+      await AuditContext.runRequest({ auth, request }, 'task.deleted', async (trx) => {
+        task.useTransaction(trx)
+        await task.delete()
+      })
       session.flash('success', 'Task deleted.')
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to delete task.')
@@ -130,18 +145,21 @@ export default class ToolsController {
     }
 
     try {
-      await SavedView.updateOrCreate(
-        { userId: user.id, moduleKey, name },
-        {
-          userId: user.id,
-          moduleKey,
-          name,
-          isDefault: request.input('isDefault') === 'true' || request.input('isDefault') === true,
-          filters: { status: request.input('filterStatus', 'all') },
-          sortConfig: { field: 'created_at', direction: 'desc' },
-          columnsConfig: ['order_number', 'status', 'total_amount', 'net_profit_amount'],
-        }
-      )
+      await AuditContext.runRequest({ auth, request }, 'saved_view.saved', async (trx) => {
+        await SavedView.updateOrCreate(
+          { userId: user.id, moduleKey, name },
+          {
+            userId: user.id,
+            moduleKey,
+            name,
+            isDefault: request.input('isDefault') === 'true' || request.input('isDefault') === true,
+            filters: { status: request.input('filterStatus', 'all') },
+            sortConfig: { field: 'created_at', direction: 'desc' },
+            columnsConfig: ['order_number', 'status', 'total_amount', 'net_profit_amount'],
+          },
+          { client: trx }
+        )
+      })
 
       session.flash('success', `Saved View "${name}" created for module ${moduleKey}.`)
     } catch (err: any) {
@@ -150,7 +168,7 @@ export default class ToolsController {
     return response.redirect().back()
   }
 
-  async deleteSavedView({ auth, params, response, session }: HttpContext) {
+  async deleteSavedView({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     try {
       const view = await SavedView.query()
@@ -160,7 +178,10 @@ export default class ToolsController {
       const resource = SAVED_VIEW_RESOURCES[view.moduleKey]
       if (!resource || !(await RbacService.hasPermission(user, `${resource}.read`, resource)))
         return response.forbidden({ error: 'Access to this saved view module is required.' })
-      await view.delete()
+      await AuditContext.runRequest({ auth, request }, 'saved_view.deleted', async (trx) => {
+        view.useTransaction(trx)
+        await view.delete()
+      })
       session.flash('success', `Saved view "${view.name}" removed.`)
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to delete saved view.')

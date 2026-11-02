@@ -402,6 +402,12 @@ const routes = {
     tokens: [[0,"seller-accounts"],[1,"id"],[0,"delete"]],
     types: placeholder as Registry['seller_accounts.delete']['types'],
   },
+  'seller_accounts.sync': {
+    methods: ["POST"],
+    pattern: '/seller-accounts/:id/sync',
+    tokens: [[0,"seller-accounts"],[1,"id"],[0,"sync"]],
+    types: placeholder as Registry['seller_accounts.sync']['types'],
+  },
   'shipments.store': {
     methods: ["POST"],
     pattern: '/shipments',
@@ -431,30 +437,6 @@ const routes = {
     pattern: '/shipments/:id/delete',
     tokens: [[0,"shipments"],[1,"id"],[0,"delete"]],
     types: placeholder as Registry['shipments.delete']['types'],
-  },
-  'carrier_invoices.store': {
-    methods: ["POST"],
-    pattern: '/carrier-invoices',
-    tokens: [[0,"carrier-invoices"]],
-    types: placeholder as Registry['carrier_invoices.store']['types'],
-  },
-  'carrier_invoices.update': {
-    methods: ["POST"],
-    pattern: '/carrier-invoices/:id',
-    tokens: [[0,"carrier-invoices"],[1,"id"]],
-    types: placeholder as Registry['carrier_invoices.update']['types'],
-  },
-  'carrier_invoices.update_status': {
-    methods: ["POST"],
-    pattern: '/carrier-invoices/:id/status',
-    tokens: [[0,"carrier-invoices"],[1,"id"],[0,"status"]],
-    types: placeholder as Registry['carrier_invoices.update_status']['types'],
-  },
-  'carrier_invoices.delete': {
-    methods: ["POST"],
-    pattern: '/carrier-invoices/:id/delete',
-    tokens: [[0,"carrier-invoices"],[1,"id"],[0,"delete"]],
-    types: placeholder as Registry['carrier_invoices.delete']['types'],
   },
   'shipping_invoices.store': {
     methods: ["POST"],
@@ -545,24 +527,6 @@ const routes = {
     pattern: '/financial-accounts/:id/delete',
     tokens: [[0,"financial-accounts"],[1,"id"],[0,"delete"]],
     types: placeholder as Registry['financial_accounts.delete']['types'],
-  },
-  'finance_accounts.store': {
-    methods: ["POST"],
-    pattern: '/finance-accounts',
-    tokens: [[0,"finance-accounts"]],
-    types: placeholder as Registry['finance_accounts.store']['types'],
-  },
-  'finance_accounts.update': {
-    methods: ["POST"],
-    pattern: '/finance-accounts/:id',
-    tokens: [[0,"finance-accounts"],[1,"id"]],
-    types: placeholder as Registry['finance_accounts.update']['types'],
-  },
-  'finance_accounts.delete': {
-    methods: ["POST"],
-    pattern: '/finance-accounts/:id/delete',
-    tokens: [[0,"finance-accounts"],[1,"id"],[0,"delete"]],
-    types: placeholder as Registry['finance_accounts.delete']['types'],
   },
   'credit_cards.store': {
     methods: ["POST"],

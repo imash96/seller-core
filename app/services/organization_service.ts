@@ -105,7 +105,7 @@ export class OrganizationService {
     const name = String(nameInput ?? '').trim()
     if (name.length < 2 || name.length > 150)
       throw new OrganizationError('Organization name must be 2–150 characters.')
-    return db.transaction(async (trx) => {
+    return AuditContext.transaction(async (trx) => {
       await AuditContext.apply(trx, {
         actorUserId: actor.id,
         requestId: requestId ?? null,
@@ -148,7 +148,7 @@ export class OrganizationService {
     const roleId = String(input.roleId ?? '').trim()
     if (!email || email.length > 254 || !['true', 'false'].includes(String(input.isAdmin)))
       throw new OrganizationError('Provide a valid email and administrator setting.')
-    return db.transaction(async (trx) => {
+    return AuditContext.transaction(async (trx) => {
       const org = await this.lockAdmin(actor, organizationId, trx)
       await AuditContext.apply(trx, {
         actorUserId: actor.id,
@@ -189,7 +189,7 @@ export class OrganizationService {
     membershipId: string,
     requestId?: string
   ) {
-    return db.transaction(async (trx) => {
+    return AuditContext.transaction(async (trx) => {
       const org = await this.lockAdmin(actor, organizationId, trx)
       await AuditContext.apply(trx, {
         actorUserId: actor.id,

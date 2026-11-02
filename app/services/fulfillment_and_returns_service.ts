@@ -1,4 +1,3 @@
-import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import Order from '#models/order'
 import OrderLineItem from '#models/order_line_item'
@@ -11,6 +10,7 @@ import RefundTransaction from '#models/refund_transaction'
 import FinancialTransaction from '#models/financial_transaction'
 import FinancialAccount from '#models/financial_account'
 import OutboxEvent from '#models/outbox_event'
+import ProductVariant from '#models/product_variant'
 import { AuditContext } from './audit_context.js'
 import {
   OrderStatus,
@@ -36,6 +36,7 @@ import {
   roundMoney,
 } from '../types/price.js'
 import { OrderService } from './order_service.js'
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 
 /** Money-ish input accepted by the fulfillment services. */
 type MoneyLike = PriceMoney | number | string | null | undefined
@@ -76,7 +77,7 @@ export class FulfillmentAndReturnsService {
       throw new Error('VALIDATION_ERROR: A shipment must contain at least one order line item.')
     }
 
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
       const order = await Order.query({ client: trx })
         .where('userId', input.userId)
         .andWhere('id', input.orderId)
@@ -165,6 +166,17 @@ export class FulfillmentAndReturnsService {
             ? FulfillmentStatus.FULFILLED
             : FulfillmentStatus.PARTIALLY_FULFILLED
         await line.save()
+
+        // Dispatch moves units out of the warehouse: the reservation created at
+        // order time is consumed and the on-hand count drops by the same amount.
+        if (line.productVariantId) {
+          await this.moveReservedToShipped(
+            input.userId,
+            line.productVariantId,
+            itemInput.quantityShipped,
+            trx
+          )
+        }
       }
 
       // Recalculate Order fulfillment status
@@ -242,7 +254,7 @@ export class FulfillmentAndReturnsService {
     const ids = [...new Set(input.shipmentIds)]
     if (!ids.length || ids.length > 500 || ids.some((id) => typeof id !== 'string' || !id))
       throw new Error('Select between 1 and 500 shipments.')
-    return db.transaction(async (trx) => {
+    return AuditContext.transaction(async (trx) => {
       // Lock orders first, in stable order, matching createShipment's lock order.
       const selected = await Shipment.query({ client: trx })
         .where('userId', input.userId)
@@ -269,7 +281,30 @@ export class FulfillmentAndReturnsService {
         )
           throw new Error('Delivered shipments cannot be changed.')
         if (shipment.status === input.status) continue
+        const previousStatus = shipment.status
         shipment.status = input.status
+        if (
+          input.status === ShipmentStatus.RETURNED_TO_SENDER &&
+          previousStatus !== ShipmentStatus.RETURNED_TO_SENDER
+        ) {
+          // Parcels that come back to the warehouse are sellable again.
+          const items = await ShipmentItem.query({ client: trx })
+            .where('userId', input.userId)
+            .where('shipmentId', shipment.id)
+          for (const item of items) {
+            const line = orders
+              .find((order) => order.id === shipment.orderId)
+              ?.lineItems.find((orderLine) => orderLine.id === item.orderLineItemId)
+            if (line?.productVariantId) {
+              await this.restockUnits(
+                input.userId,
+                line.productVariantId,
+                Number(item.quantityShipped ?? 0),
+                trx
+              )
+            }
+          }
+        }
         if (input.status === ShipmentStatus.DELIVERED) {
           shipment.deliveredAt = DateTime.now()
           // Queued delivery events are not evidence of a sent notification.
@@ -313,6 +348,115 @@ export class FulfillmentAndReturnsService {
       }
       return shipments.length
     })
+  }
+
+  /**
+   * Consumes a reservation when units physically leave the warehouse.
+   *
+   * `stock_available` is a generated column (`stock_on_hand - stock_reserved`), so
+   * both sides must move together for the sellable count to stay correct:
+   * dispatching 2 units removes 2 from `stock_on_hand` and 2 from `stock_reserved`.
+   * Both are clamped at zero: legacy rows and manually adjusted stock must never
+   * produce a negative count.
+   */
+  private static async moveReservedToShipped(
+    userId: string,
+    productVariantId: string,
+    quantity: number,
+    trx: TransactionClientContract
+  ): Promise<void> {
+    const variant = await ProductVariant.query({ client: trx })
+      .where('userId', userId)
+      .andWhere('id', productVariantId)
+      .forUpdate()
+      .first()
+    if (!variant) return
+    const moved = Math.max(0, Number(quantity))
+    variant.stockReserved = Math.max(0, Number(variant.stockReserved ?? 0) - moved)
+    variant.stockOnHand = Math.max(0, Number(variant.stockOnHand ?? 0) - moved)
+    await variant.save()
+  }
+
+  /** Adds units back to `stock_on_hand` (return-to-sender, RMA restock). */
+  private static async restockUnits(
+    userId: string,
+    productVariantId: string,
+    quantity: number,
+    trx: TransactionClientContract
+  ): Promise<void> {
+    const variant = await ProductVariant.query({ client: trx })
+      .where('userId', userId)
+      .andWhere('id', productVariantId)
+      .forUpdate()
+      .first()
+    if (!variant) return
+    variant.stockOnHand = Math.max(0, Number(variant.stockOnHand ?? 0) + Math.max(0, quantity))
+    await variant.save()
+  }
+
+  /**
+   * Marks a return as received and restocks the units that came back in sellable
+   * condition.
+   *
+   * Only the delta between the previously received quantity and the new one is
+   * restocked, so calling this twice for the same RMA cannot inflate inventory.
+   * `restock_inventory = false` (damaged / disposed goods) skips the restock.
+   */
+  static async receiveReturn(input: {
+    userId: string
+    returnRequestId: string
+    quantityReceived: number
+    itemCondition?: string | null
+    trx?: TransactionClientContract
+  }): Promise<{ returnRequest: ReturnRequest; restockedUnits: number }> {
+    const run = async (trx: TransactionClientContract) => {
+      const returnRequest = await ReturnRequest.query({ client: trx })
+        .where('userId', input.userId)
+        .andWhere('id', input.returnRequestId)
+        .preload('orderLineItem')
+        .forUpdate()
+        .firstOrFail()
+
+      const approved = Number(
+        returnRequest.quantityApproved ?? returnRequest.quantityRequested ?? 0
+      )
+      const previousReceived = Number(returnRequest.quantityReceived ?? 0)
+      const received = Math.max(
+        0,
+        Math.min(approved, Math.trunc(Number(input.quantityReceived ?? 0)))
+      )
+      if (received < previousReceived) {
+        throw new Error(
+          'VALIDATION_ERROR: received quantity cannot be lower than what was received.'
+        )
+      }
+      const delta = received - previousReceived
+      let restockedUnits = 0
+      if (delta > 0 && returnRequest.restockInventory) {
+        const line = returnRequest.orderLineItem
+        if (line?.productVariantId) {
+          await this.restockUnits(input.userId, line.productVariantId, delta, trx)
+          if (line.quantityReturned !== undefined) {
+            line.useTransaction(trx)
+            line.quantityReturned = Number(line.quantityReturned ?? 0) + delta
+            await line.save()
+          }
+          restockedUnits = delta
+        }
+      }
+
+      returnRequest.useTransaction(trx)
+      returnRequest.quantityReceived = received
+      returnRequest.status = ReturnStatus.RECEIVED
+      returnRequest.receivedAt = returnRequest.receivedAt ?? DateTime.now()
+      if (input.itemCondition) returnRequest.itemCondition = input.itemCondition
+      await returnRequest.save()
+
+      return { returnRequest, restockedUnits }
+    }
+
+    if (input.trx) return await run(input.trx)
+    return await AuditContext.transaction(run)
   }
 
   /**
@@ -365,7 +509,7 @@ export class FulfillmentAndReturnsService {
     }
     assertAmount(input.taxAmount, 'Invalid tax amount')
 
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
       await AuditContext.apply(trx, {
         actorUserId: input.userId,
         reason: 'shipping_invoice.created',
@@ -490,7 +634,7 @@ export class FulfillmentAndReturnsService {
       throw new Error('VALIDATION_ERROR: quantityRequested must be greater than 0.')
     }
 
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
       const order = await Order.query({ client: trx })
         .where('userId', input.userId)
         .andWhere('id', input.orderId)
@@ -582,7 +726,7 @@ export class FulfillmentAndReturnsService {
     restockingFeeTotal?: MoneyLike
     reason?: string
   }): Promise<RefundTransaction> {
-    return await db.transaction(async (trx) => {
+    return await AuditContext.transaction(async (trx) => {
       await AuditContext.apply(trx, {
         actorUserId: input.actorUserId ?? input.userId,
         reason: 'refund.processed',

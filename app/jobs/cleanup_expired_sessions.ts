@@ -20,13 +20,17 @@ export default class CleanupExpiredSessions extends Job<void> {
     const purgedSessions = await SessionRegistryService.purgeExpired()
     logger.info({ purgedSessions }, '[job] expired sessions purged')
 
-    // Prune completed queue jobs older than 7 days (keeps table small)
+    // Prune completed queue jobs older than 7 days (keeps the history table small).
+    // The queue package owns this table, so a missing/renamed table is logged
+    // rather than silently swallowed.
     try {
       await db
         .from('queue_jobs')
         .where('status', 'completed')
         .where('completed_at', '<', DateTime.now().minus({ days: 7 }).toSQL()!)
         .del()
-    } catch {}
+    } catch (err) {
+      logger.warn({ err }, '[job] queue job history not pruned')
+    }
   }
 }

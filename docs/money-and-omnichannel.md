@@ -222,3 +222,92 @@ single canonical `PriceMoney` and no consumer sees two shapes.
 | `node ace test`                       | 148 passed (148)                                          |
 | `node ace migration:run` → `db:seed` ×2 | seeded once, second run a no-op; counts stable           |
 | `pnpm db:schema:check`                | both artifacts in sync                                    |
+
+## 6. Phase 6 — services, controllers, jobs and events
+
+### 6.1 Money and FX in `OrderService`
+
+- `createOrder` no longer assumes `1:1` when a marketplace omits its settlement rate:
+  `input.exchangeRate ?? exchangeRateBetween(currency, reportingCurrency, rates)` derives
+  the reporting rate from `DEFAULT_CURRENCY_RATES`, overridable per call through
+  `exchangeRates` (`{ INR: 84.1 }`). No rate at all is a hard error, never a silent parity.
+- The P&L block is expressed in the order currency. Money booked in another currency
+  (INR warehouse cost on a USD order, CAD COGS on a USD order) is FX-converted by
+  `toOrderCurrency()` and the applied rates are recorded on the order as
+  `channelMetadata.fxConversions` for auditability. `cogsTotal` and
+  `marketplaceFeesTotal` use `sumMoneyConverted()` for the same reason.
+- `app/types/price.ts` gains the additive FX helpers `exchangeRateBetween`,
+  `convertMoney`, `sumMoneyConverted` and `ensureCurrencyCoverage` (USD-base, explicit
+  prices always win over derived ones). Source-currency columns (`grandTotal`,
+  `subtotal`, `cogsTotal`) keep their own currency; only `reportingTotal` converts.
+
+### 6.2 Inventory and cancellation
+
+Inventory used to be reserved on order creation and never released. Now every transition
+that moves physical units keeps `stock_on_hand` and the reservation in step, so the
+generated `stock_available` column stays truthful:
+
+| Transition                              | `stock_reserved` | `stock_on_hand` |
+| :-------------------------------------- | :--------------- | :-------------- |
+| `createOrder` (reservation)             | `+qty`           | —               |
+| `createShipment` (units dispatched)     | `-qty`           | `-qty`          |
+| `updateShipmentStatuses → returned_to_sender` | —         | `+qty`          |
+| `receiveReturn` (RMA received, `restock_inventory`) | —    | `+qty` (delta)  |
+| `cancelOrder` (unshipped units)         | `-qty`           | —               |
+
+`OrderService.cancelOrder()` is the single cancellation path used by
+`OrdersController.updateOrderStatus` and `deleteOrder`: it locks the order, releases the
+reservation of every still-cancellable line, stamps `quantity_cancelled`, sets
+`cancelled_at` and is idempotent (a second call releases `0`). Units already shipped are
+never released — they come back through an RMA.
+
+`FulfillmentAndReturnsService.receiveReturn()` restocks only the **delta** between the
+previously received and the newly received quantity, clamps to `quantity_approved`, and
+skips restocking when `restock_inventory = false` (damaged goods). Returning the same
+quantity twice restocks nothing.
+
+### 6.3 Transactional outbox
+
+`order.created` and `shipment.delivered.notify_customer` are written in the same
+transaction as their aggregate change. `OutboxService.drain()` is the other half:
+
+- **Claim** — `UPDATE … FROM (SELECT … FOR UPDATE SKIP LOCKED)` moves due `pending` /
+  `failed` rows (`next_retry_at` elapsed) plus stale `processing` rows (worker died) to
+  `processing`, so concurrent workers never publish the same event twice.
+- **Publish** — `order.created` ensures the seller's `order.placed` feed entry exists;
+  `shipment.delivered.notify_customer` writes the delivery notification and flips
+  `shipments.delivery_notification_sent`. Publishers dedupe on
+  (`user_id`, `type`, `entity_type`, `entity_id`), so a re-claimed row cannot fan out twice.
+- **Settle** — success sets `published` + `processed_at`; failure increments `retry_count`
+  and schedules `next_retry_at` with 30 s → 1 h exponential backoff; `max_retries`
+  exhaustion (or an event type with no publisher) moves the row to `dead_letter` with the
+  error preserved.
+
+`app/jobs/drain_outbox.ts` is the queue entry point (queue `outbox`, one attempt per run —
+the service owns retry policy).
+
+### 6.4 Events, listeners and jobs
+
+- `ShipmentDispatched`, `PaymentReconciled` and `UserOnboarded` are now actually
+  dispatched (shipment creation, manual reconciliation commit, super-admin user
+  provisioning), so none of the wired listeners is dead code.
+- `CreateNotification` exposes `notificationFor()` — a pure event → feed-entry mapping
+  (`order.placed`, `order.status_changed`, `shipment.dispatched`, `payment.reconciled`,
+  `user.onboarded`), unit-tested without touching the database.
+- `QueueFulfillment` drops events with no order/user identity instead of poisoning the
+  queue; `PrepareFulfillment` creates one idempotent pick/pack task per order.
+- `SendNotification` writes a fully typed `notifications` row inside an audited
+  transaction (no `as any`, no non-existent columns); `webhook` is normalized to the
+  constraint-allowed `in_app` channel with the callback URL as the recipient address.
+- `ProcessMarketplaceImport` uses static imports and logs per-order event dispatch
+  failures instead of swallowing them; `CleanupExpiredSessions` logs a failed
+  `queue_jobs` prune instead of hiding it.
+
+### 6.5 Verification
+
+| Check                     | Result                                                    |
+| :------------------------ | :-------------------------------------------------------- |
+| `tsc --noEmit`            | 0 errors                                                  |
+| `eslint app tests`        | 0 errors, 0 warnings                                      |
+| `node ace test`           | 162 passed (162)                                          |
+| `node ace db:seed` ×2     | seeded once, second run a no-op; counts stable            |

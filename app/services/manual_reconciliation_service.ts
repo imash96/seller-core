@@ -1,8 +1,8 @@
-import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import FinancialTransaction from '#models/financial_transaction'
 import ManualReconciliation from '#models/manual_reconciliation'
 import { AuditContext } from './audit_context.js'
+import PaymentReconciled from '#events/payment_reconciled'
 import type User from '#models/user'
 import { FinanceAccessService } from '#services/finance_access_service'
 import {
@@ -56,8 +56,13 @@ export class ManualReconciliationService {
     // The observed statement amount is its own self-contained PriceMoney object.
     const observedAmount: PriceMoney = money(normalizeAmount(input.amount), currency)
     const household = await FinanceAccessService.permissions(input.user)
+    // Captured inside the transaction and published only once it commits. The
+    // holder keeps the assignment visible across the callback boundary.
+    const committed: {
+      value: { transactionId: string; userId: string; amount: PriceMoney } | null
+    } = { value: null }
     try {
-      return await db.transaction(async (trx) => {
+      return await AuditContext.transaction(async (trx) => {
         await AuditContext.apply(trx, {
           actorUserId: input.user.id,
           requestId: input.requestId ?? null,
@@ -97,6 +102,11 @@ export class ManualReconciliationService {
         tx.status = 'reconciled'
         tx.reconciledAt = DateTime.now()
         await tx.save()
+        committed.value = {
+          transactionId: tx.id,
+          userId: tx.userId,
+          amount: tx.originalAmount,
+        }
         return match
       })
     } catch (error) {
@@ -106,6 +116,24 @@ export class ManualReconciliationService {
           409
         )
       throw error
+    } finally {
+      // Publishing happens after the transaction settles, so a listener can never
+      // observe a half-written reconciliation. Only a committed match is announced.
+      const published = committed.value
+      if (published) {
+        try {
+          await PaymentReconciled.dispatch({
+            financialTransactionId: published.transactionId,
+            userId: published.userId,
+            status: 'reconciled',
+            amount: published.amount,
+            requestId: input.requestId,
+          })
+        } catch {
+          // The event bus is best-effort: the ledger change already committed and
+          // must not be undone by a listener problem.
+        }
+      }
     }
   }
 
@@ -119,7 +147,7 @@ export class ManualReconciliationService {
     if (reason.length < 3 || reason.length > 2000)
       throw new ReconciliationError('Provide a reversal reason (3–2000 characters).')
     const household = await FinanceAccessService.permissions(input.user)
-    return db.transaction(async (trx) => {
+    return AuditContext.transaction(async (trx) => {
       await AuditContext.apply(trx, {
         actorUserId: input.user.id,
         requestId: input.requestId ?? null,

@@ -3,10 +3,11 @@ import type { HttpContext } from '@adonisjs/core/http'
 import { RbacService } from '#services/rbac_service'
 import ReturnRequest from '#models/return_request'
 import RefundTransaction from '#models/refund_transaction'
+import { AuditContext } from '../services/audit_context.js'
 import { FulfillmentAndReturnsService } from '../services/fulfillment_and_returns_service.js'
 import { WorkspaceLookupService } from '../services/workspace_lookup_service.js'
 import { createReturnRequestValidator, createRefundValidator } from '#validators/operations'
-import { ReturnItemCondition } from '../enums/index.js'
+import { ReturnItemCondition, ReturnStatus } from '../enums/index.js'
 import { amountOf, currencyOf, normalizePriceMoney } from '../types/price.js'
 
 const VALID_RETURN_CONDITIONS = new Set<string>(Object.values(ReturnItemCondition))
@@ -78,20 +79,27 @@ export default class ReturnsController {
         customerComments: payload.customerComments,
       })
 
-      const normalizedCond = normalizeReturnItemCondition(request.input('itemCondition'))
-      if (normalizedCond) {
-        rma.itemCondition = normalizedCond
-      }
-      if (request.input('returnCarrier')) {
-        rma.returnCarrier = String(request.input('returnCarrier')).trim()
-      }
-      if (request.input('returnTrackingNumber')) {
-        rma.returnTrackingNumber = String(request.input('returnTrackingNumber')).trim()
-      }
-      if (request.input('internalNotes')) {
-        rma.internalNotes = String(request.input('internalNotes')).trim()
-      }
-      await rma.save()
+      await AuditContext.runRequest(
+        { auth, request },
+        'return_request.details_recorded',
+        async (trx) => {
+          rma.useTransaction(trx)
+          const normalizedCond = normalizeReturnItemCondition(request.input('itemCondition'))
+          if (normalizedCond) {
+            rma.itemCondition = normalizedCond
+          }
+          if (request.input('returnCarrier')) {
+            rma.returnCarrier = String(request.input('returnCarrier')).trim()
+          }
+          if (request.input('returnTrackingNumber')) {
+            rma.returnTrackingNumber = String(request.input('returnTrackingNumber')).trim()
+          }
+          if (request.input('internalNotes')) {
+            rma.internalNotes = String(request.input('internalNotes')).trim()
+          }
+          await rma.save()
+        }
+      )
 
       session.flash('success', `Return Request ${rma.rmaNumber} authorized.`)
     } catch (err: any) {
@@ -167,31 +175,63 @@ export default class ReturnsController {
       if (request.input('internalNotes') !== undefined) {
         rma.internalNotes = String(request.input('internalNotes')).trim() || null
       }
-      if (status === 'received') {
-        rma.receivedAt = DateTime.now()
-        if (!rma.quantityReceived) {
-          rma.quantityReceived = rma.quantityRequested
-        }
-      } else if (status === 'closed') {
-        rma.closedAt = DateTime.now()
+      // Receiving an RMA restocks the returned units; the service owns that
+      // side effect (and the delta math) so the UI cannot double-restock.
+      let restockedUnits = 0
+      if (status === ReturnStatus.RECEIVED) {
+        const requested = Math.max(0, Number(request.input('quantityReceived') ?? 0))
+        const target =
+          requested || Number(rma.quantityReceived ?? 0) || Number(rma.quantityRequested ?? 0)
+        const received = await FulfillmentAndReturnsService.receiveReturn({
+          userId: user.id,
+          returnRequestId: rma.id,
+          quantityReceived: target,
+          itemCondition: rma.itemCondition,
+        })
+        restockedUnits = received.restockedUnits
+        await rma.refresh()
       }
-      await rma.save()
 
-      session.flash('success', `RMA ${rma.rmaNumber} updated to ${status}.`)
+      await AuditContext.runRequest(
+        { auth, request },
+        'return_request.status_updated',
+        async (trx) => {
+          rma.useTransaction(trx)
+          if (status === ReturnStatus.RECEIVED) {
+            rma.receivedAt = DateTime.now()
+            if (!rma.quantityReceived) {
+              rma.quantityReceived = rma.quantityRequested
+            }
+          } else if (status === 'closed') {
+            rma.closedAt = DateTime.now()
+          }
+          await rma.save()
+        }
+      )
+
+      session.flash(
+        'success',
+        restockedUnits > 0
+          ? `RMA ${rma.rmaNumber} updated to ${status}; ${restockedUnits} unit(s) restocked.`
+          : `RMA ${rma.rmaNumber} updated to ${status}.`
+      )
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to update return request.')
     }
     return response.redirect().back()
   }
 
-  async deleteReturn({ auth, params, response, session }: HttpContext) {
+  async deleteReturn({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     try {
       const rma = await ReturnRequest.query()
         .where('userId', user.id)
         .andWhere('id', params.id)
         .firstOrFail()
-      await rma.delete()
+      await AuditContext.runRequest({ auth, request }, 'return_request.deleted', async (trx) => {
+        rma.useTransaction(trx)
+        await rma.delete()
+      })
       session.flash('success', `RMA ${rma.rmaNumber} deleted.`)
     } catch (err: any) {
       session.flash('error', err.message || 'Failed to delete return request.')

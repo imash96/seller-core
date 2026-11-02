@@ -501,7 +501,7 @@ export default function Shipments({
                             onClick={() => setUpdateInvoiceRow(inv)}
                           />
                           <RowAction
-                            action={`/carrier-invoices/${inv.id}/delete`}
+                            action={`/shipping-invoices/${inv.id}/delete`}
                             label="Delete"
                             variant="ghost"
                             confirmText={`Delete invoice ${inv.invoiceNumber}?`}
@@ -604,7 +604,7 @@ export default function Shipments({
         title="Record Carrier Invoice (local only)"
         subtitle="An omitted expected amount remains unverified. No carrier or payment provider is contacted."
         submitLabel="Create Invoice"
-        action="/carrier-invoices"
+        action="/shipping-invoices"
         fields={[
           { name: 'carrierCode', label: 'Carrier code', required: true },
           { name: 'carrierName', label: 'Carrier name', required: true },
@@ -642,8 +642,8 @@ export default function Shipments({
         submitLabel="Update Invoice"
         action={
           updateInvoiceRow
-            ? `/carrier-invoices/${updateInvoiceRow.id}`
-            : '/carrier-invoices/placeholder'
+            ? `/shipping-invoices/${updateInvoiceRow.id}`
+            : '/shipping-invoices/placeholder'
         }
         initialValues={{
           paymentStatus: String(updateInvoiceRow?.paymentStatus ?? 'unpaid'),
