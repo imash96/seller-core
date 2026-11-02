@@ -309,32 +309,30 @@ export default function Dashboard(props: Props) {
               justify="between"
               className="text-2xs text-muted-foreground"
             >
-              <Text>Cost Stack (COGS / Fees / Ship)</Text>
-              <Text hasTabularNumbers>Ship: {money('USD', activeKpis.totalShippingCost)}</Text>
+              <Text>Cost Stack Breakdown</Text>
+              <Text hasTabularNumbers>{activeKpis.totalOrders} orders</Text>
             </Stack>
-            <Stack direction="horizontal" className="h-2 rounded-full overflow-hidden bg-muted">
-              <Stack
-                style={{
-                  width: `${(Number(activeKpis.totalCogs) / totalCostBurden) * 100}%`,
-                }}
-                aria-label="COGS"
-                className="bg-amber-500"
-              />
-              <Stack
-                style={{
-                  width: `${(Number(activeKpis.totalMarketplaceFees) / totalCostBurden) * 100}%`,
-                }}
-                aria-label="Marketplace & Payment Fees"
-                className="bg-orange-500"
-              />
-              <Stack
-                style={{
-                  width: `${(Number(activeKpis.totalShippingCost) / totalCostBurden) * 100}%`,
-                }}
-                aria-label="Shipping Cost"
-                className="bg-cyan-500"
-              />
-            </Stack>
+            <ProgressMeter
+              label={`COGS ${money('USD', activeKpis.totalCogs)}`}
+              value={(Number(activeKpis.totalCogs) / totalCostBurden) * 100}
+              showValue
+              variant="warning"
+              size="sm"
+            />
+            <ProgressMeter
+              label={`Fees ${money('USD', activeKpis.totalMarketplaceFees)}`}
+              value={(Number(activeKpis.totalMarketplaceFees) / totalCostBurden) * 100}
+              showValue
+              variant="error"
+              size="sm"
+            />
+            <ProgressMeter
+              label={`Shipping ${money('USD', activeKpis.totalShippingCost)}`}
+              value={(Number(activeKpis.totalShippingCost) / totalCostBurden) * 100}
+              showValue
+              variant="info"
+              size="sm"
+            />
           </Stack>
         </KpiScorecard>
 

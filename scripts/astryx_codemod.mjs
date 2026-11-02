@@ -269,7 +269,10 @@ function translate(tag, className, hasColumnSpanChild, hasChildren) {
     if (dir === 'horizontal') layoutProps.push('direction="horizontal"')
     if (align) layoutProps.push(`align="${ALIGN[align]}"`)
     if (justify) layoutProps.push(`justify="${JUSTIFY[justify]}"`)
-    if (wrap) layoutProps.push(`wrap="${wrap.replace('flex-wrap-reverse', 'wrap-reverse').replace('flex-wrap', 'wrap')}"`)
+    if (wrap)
+      layoutProps.push(
+        `wrap="${wrap.replace('flex-wrap-reverse', 'wrap-reverse').replace('flex-wrap', 'wrap')}"`
+      )
     if (gap !== null) layoutProps.push(`gap={${gap}}`)
     if (rowGap !== null) layoutProps.push(`rowGap={${rowGap}}`)
     if (columnGap !== null) layoutProps.push(`columnGap={${columnGap}}`)
@@ -300,7 +303,9 @@ function sizeUtilities(classes) {
   const consumed = new Set()
   const swapped = []
   for (const cls of classes) {
-    const arbitrary = /^(w|h|min-w|max-w|min-h|max-h)-\[(\d+(?:\.\d+)?)(px|vh|vw|%|rem)\]$/.exec(cls)
+    const arbitrary = /^(w|h|min-w|max-w|min-h|max-h)-\[(\d+(?:\.\d+)?)(px|vh|vw|%|rem)\]$/.exec(
+      cls
+    )
     if (!arbitrary) continue
     const [, prefix, value, unit] = arbitrary
     // Keep the value, drop the arbitrary brackets by mapping onto the spacing scale
@@ -338,7 +343,13 @@ const skipped = []
 
 for (const file of collectFiles()) {
   const source = fs.readFileSync(file, 'utf8')
-  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX
+  )
   const edits = []
   const needed = new Set()
 
@@ -385,7 +396,8 @@ for (const file of collectFiles()) {
             // Any non-className attribute (onClick, key, aria-*) is preserved verbatim.
             const others = opening.attributes.properties
               .filter(
-                (attr) => !(ts.isJsxAttribute(attr) && attr.name.getText(sourceFile) === 'className')
+                (attr) =>
+                  !(ts.isJsxAttribute(attr) && attr.name.getText(sourceFile) === 'className')
               )
               .map((attr) => {
                 const text = attr.getText(sourceFile)
@@ -420,7 +432,8 @@ for (const file of collectFiles()) {
   if (edits.length === 0) continue
   edits.sort((a, b) => b.start - a.start)
   let output = source
-  for (const edit of edits) output = output.slice(0, edit.start) + edit.text + output.slice(edit.end)
+  for (const edit of edits)
+    output = output.slice(0, edit.start) + edit.text + output.slice(edit.end)
   output = addImports(output, file, needed)
   for (const [from, to] of Object.entries(TOKEN_REPLACEMENTS)) {
     output = output.split(from).join(to)

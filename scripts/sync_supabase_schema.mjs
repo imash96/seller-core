@@ -12,7 +12,19 @@
  * Usage: node ./scripts/sync_supabase_schema.mjs [--check]
  */
 import { readFile, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import pg from 'pg'
+
+/**
+ * AdonisJS loads `.env` for `node ace …`, but these scripts are plain node entry
+ * points: without this they would silently fall back to the `postgres` maintenance
+ * database and report every table as stale (destructive in write mode).
+ * `process.loadEnvFile` never overrides an already-exported variable.
+ */
+const envFile = new URL('../.env', import.meta.url)
+if (!process.env.DATABASE_URL && existsSync(envFile)) {
+  process.loadEnvFile(envFile)
+}
 
 const CONNECTION =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@127.0.0.1:5432/postgres'

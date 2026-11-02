@@ -8,8 +8,20 @@
  * Usage: node ./scripts/sync_schema_dbml.mjs [--check]
  */
 import { readFile, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import pg from 'pg'
 import { Parser, exporter } from '@dbml/core'
+
+/**
+ * AdonisJS loads `.env` for `node ace …`, but these scripts are plain node entry
+ * points: without this they would silently fall back to the `postgres` maintenance
+ * database and report every table as stale (destructive in write mode).
+ * `process.loadEnvFile` never overrides an already-exported variable.
+ */
+const envFile = new URL('../.env', import.meta.url)
+if (!process.env.DATABASE_URL && existsSync(envFile)) {
+  process.loadEnvFile(envFile)
+}
 
 const CONNECTION =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@127.0.0.1:5432/postgres'
@@ -314,10 +326,14 @@ if (check) {
     console.log('database/schema.dbml is in sync with the database.')
   }
   const validated = validateDbml(file)
-  console.log(`database/schema.dbml parses cleanly (${validated.tables} tables, ${validated.ddlLength} DDL chars).`)
+  console.log(
+    `database/schema.dbml parses cleanly (${validated.tables} tables, ${validated.ddlLength} DDL chars).`
+  )
 } else {
   await writeFile(FILE, rendered)
   const validated = validateDbml(rendered)
   console.log(`Synced ${emittedTables.size} tables into database/schema.dbml`)
-  console.log(`database/schema.dbml parses cleanly (${validated.tables} tables, ${validated.ddlLength} DDL chars).`)
+  console.log(
+    `database/schema.dbml parses cleanly (${validated.tables} tables, ${validated.ddlLength} DDL chars).`
+  )
 }
