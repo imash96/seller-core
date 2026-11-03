@@ -1,6 +1,5 @@
 import React from 'react'
 import { Stack } from '@astryxdesign/core/Stack'
-import { Grid } from '@astryxdesign/core/Grid'
 import {
   Badge,
   MonoBadge,
@@ -48,7 +47,7 @@ export function ProductPreviewModal({
       padding={4}
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs overflow-y-auto"
     >
-      <Stack className="relative w-full max-w-5xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl">
+      <Stack className="relative w-full max-w-5xl max-h-[90dvh] flex flex-col overflow-hidden rounded-2xl border border-card-border bg-card text-foreground shadow-2xl">
         <Stack
           direction="horizontal"
           align="start"
@@ -85,12 +84,12 @@ export function ProductPreviewModal({
           </button>
         </Stack>
 
-        <Stack direction="horizontal" gap={6} padding={6} className="flex-1 overflow-y-auto">
+        <Stack gap={6} padding={6} className="flex-1 overflow-y-auto">
           <Stack gap={4} padding={4} className="rounded-xl border border-card-border bg-muted/20">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               1. Parent Product Metadata (Brand-Agnostic)
             </h3>
-            <Grid columns={{ minWidth: 220, max: 1 }} className="md:grid-cols-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
               <Stack className="md:col-span-2">
                 <AppInput
                   label="Product Title (channel caps applied at publish)"
@@ -145,7 +144,7 @@ export function ProductPreviewModal({
                   onChange={(e) => setPreviewData({ ...previewData, description: e.target.value })}
                 />
               </Stack>
-            </Grid>
+            </div>
           </Stack>
 
           <Stack gap={3}>

@@ -1,6 +1,5 @@
 import React from 'react'
 import { Stack } from '@astryxdesign/core/Stack'
-import { Grid } from '@astryxdesign/core/Grid'
 import { Text } from '@astryxdesign/core/Text'
 import { AppButton, AppInput, AppSelect, type Row } from '~/lib/ui'
 import { X } from 'lucide-react'
@@ -58,7 +57,7 @@ export function GenerateListingsModal({
       padding={4}
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
     >
-      <Stack className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden">
+      <Stack className="relative w-full max-w-2xl max-h-[90dvh] flex flex-col overflow-hidden rounded-2xl border border-card-border bg-card text-foreground shadow-2xl">
         <Stack
           direction="horizontal"
           align="center"
@@ -83,7 +82,7 @@ export function GenerateListingsModal({
           </button>
         </Stack>
         <Stack gap={4} padding={6} className="text-xs">
-          <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <AppSelect
               label="1. Select Brand *"
               value={selectedBrandId}
@@ -105,13 +104,13 @@ export function GenerateListingsModal({
                 })),
               ]}
             />
-          </Grid>
+          </div>
 
           <Stack>
             <label className="block font-semibold text-foreground mb-1.5">
               2. Target E-Commerce Platforms *
             </label>
-            <Grid columns={{ minWidth: 220, max: 2 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {(['medusa', 'amazon', 'ebay', 'etsy'] as const).map((plat) => {
                 const checked = selectedPlatforms.includes(plat)
                 return (
@@ -136,7 +135,7 @@ export function GenerateListingsModal({
                   </label>
                 )
               })}
-            </Grid>
+            </div>
           </Stack>
 
           <Stack>
@@ -174,7 +173,7 @@ export function GenerateListingsModal({
             </Stack>
           </Stack>
 
-          <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <AppInput
               label="Channel Price Multiplier (1.0 = Base Tier Price)"
               type="number"
@@ -192,7 +191,7 @@ export function GenerateListingsModal({
                 Also set selected Brand on Parent Product
               </Text>
             </label>
-          </Grid>
+          </div>
         </Stack>
         <Stack
           direction="horizontal"

@@ -1,6 +1,5 @@
 import React from 'react'
 import { Stack } from '@astryxdesign/core/Stack'
-import { Grid } from '@astryxdesign/core/Grid'
 import {
   AppButton,
   Badge,
@@ -77,10 +76,7 @@ export function ListingDetailDrawer({
     >
       {listing && (
         <Stack gap={4} className="text-xs">
-          <Grid
-            columns={{ minWidth: 220, max: 2 }}
-            className="rounded-xl border border-card-border bg-muted/20 p-3.5"
-          >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 rounded-xl border border-card-border bg-muted/20 p-3.5">
             <Stack>
               <strong>Product:</strong> {String(listing.productTitle)}
             </Stack>
@@ -107,7 +103,7 @@ export function ListingDetailDrawer({
             <Stack>
               <strong>Sync Status:</strong> {String(listing.syncStatus)}
             </Stack>
-          </Grid>
+          </div>
 
           <Stack gap={1.5}>
             <Stack className="font-bold text-foreground">

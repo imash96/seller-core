@@ -1,4 +1,3 @@
-/* eslint-disable @unicorn/no-await-expression-member -- Response status assertions */
 import { test } from '@japa/runner'
 import User from '#models/user'
 import Product from '#models/product'
@@ -56,7 +55,6 @@ test.group('Per-amount currency editing', () => {
     const { send } = makeJar()
     await send('/store/product-categories')
     const loginRes = await send('/', { email: user.email, password: 'Password123!' })
-    console.log('LOGIN STATUS:', loginRes.status, 'LOCATION:', loginRes.headers.get('location'), 'COOKIES:', [...loginRes.headers.getSetCookie()])
     assert.equal(loginRes.status, 302)
 
     const sku = `MONEY-${nonce}`
@@ -74,7 +72,6 @@ test.group('Per-amount currency editing', () => {
         { currency_code: 'MXN', amount: 2699.99 },
       ]),
     })
-    console.log('CREATE STATUS:', create.status, 'LOCATION:', create.headers.get('location'))
     assert.equal(create.status, 302)
 
     const product = await Product.query()
@@ -109,7 +106,6 @@ test.group('Per-amount currency editing', () => {
     const { send } = makeJar()
     await send('/store/product-categories')
     const loginRes = await send('/', { email: user.email, password: 'Password123!' })
-    console.log('LOGIN STATUS:', loginRes.status, 'LOCATION:', loginRes.headers.get('location'), 'COOKIES:', [...loginRes.headers.getSetCookie()])
     assert.equal(loginRes.status, 302)
 
     const orderNumber = `ORD-MONEY-${nonce}`
@@ -127,7 +123,6 @@ test.group('Per-amount currency editing', () => {
       // Booked in another currency on purpose: shipping is paid to a Mexican carrier.
       shippingCostTotal: { amount: 240, currencyCode: 'MXN' },
     })
-    console.log('CREATE STATUS:', create.status, 'LOCATION:', create.headers.get('location'))
     assert.equal(create.status, 302)
 
     const order = await Order.query()
@@ -156,7 +151,6 @@ test.group('Per-amount currency editing', () => {
     const { send } = makeJar()
     await send('/store/product-categories')
     const loginRes = await send('/', { email: user.email, password: 'Password123!' })
-    console.log('LOGIN STATUS:', loginRes.status, 'LOCATION:', loginRes.headers.get('location'), 'COOKIES:', [...loginRes.headers.getSetCookie()])
     assert.equal(loginRes.status, 302)
 
     const orderNumber = `ORD-RET-${nonce}`
@@ -214,7 +208,6 @@ test.group('Per-amount currency editing', () => {
     const { send } = makeJar()
     await send('/store/product-categories')
     const loginRes = await send('/', { email: user.email, password: 'Password123!' })
-    console.log('LOGIN STATUS:', loginRes.status, 'LOCATION:', loginRes.headers.get('location'), 'COOKIES:', [...loginRes.headers.getSetCookie()])
     assert.equal(loginRes.status, 302)
 
     const invoiceResponse = await send('/shipping-invoices', {

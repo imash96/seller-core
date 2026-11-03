@@ -4,11 +4,10 @@ import { FormModal, moneyAmountString, moneyCurrencyCode, type Row } from '~/lib
 export const CARD_STATUS = ['active', 'frozen', 'expired', 'cancelled'] as const
 export const CARD_USAGE = [
   'primary_billing',
-  'backup_billing',
   'ad_spend',
-  'inventory_purchase',
-  'travel_ops',
-  'general_expense',
+  'subscription_fee',
+  'chargeback_backup',
+  'shipping_labels',
 ] as const
 
 export function CreateCreditCardModal({

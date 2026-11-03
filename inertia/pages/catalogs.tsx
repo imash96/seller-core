@@ -1,4 +1,3 @@
-import { Grid } from '@astryxdesign/core/Grid'
 import { Stack, VStack, HStack } from '@astryxdesign/core/Stack'
 import { Table, proportional } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
@@ -976,10 +975,7 @@ export default function Catalogs({
             badge={`${Object.keys(modularConfig.colorCodes).length} Colors · 3 Tiers`}
             badgeVariant="info"
           >
-            <Grid
-              columns={{ minWidth: 220, max: 1 }}
-              className="md:grid-cols-2 lg:grid-cols-4 text-xs"
-            >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 text-xs gap-3.5">
               <Stack gap={2} padding={3} className="rounded-xl border border-card-border bg-card">
                 <Stack
                   direction="horizontal"
@@ -1099,7 +1095,7 @@ export default function Catalogs({
                   </Stack>
                 </Stack>
               </Stack>
-            </Grid>
+            </div>
           </AccordionItem>
         </Accordion>
       )}
@@ -1110,10 +1106,7 @@ export default function Catalogs({
         description="Filter catalog SKUs by gender, category, product type, or conversion status. Click 'Convert to Product' on any SKU to preview and edit generated variants before creating the Product."
       >
         <Stack gap={4}>
-          <Grid
-            columns={{ minWidth: 220, max: 1 }}
-            className="md:grid-cols-2 lg:grid-cols-5 rounded-2xl border border-card-border bg-muted/25 p-3.5"
-          >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 rounded-2xl border border-card-border bg-muted/25 p-3.5 gap-3.5">
             <AppInput
               label="Search SKU / Title / Handle"
               icon={Search}
@@ -1173,7 +1166,7 @@ export default function Catalogs({
                 { value: 'converted', label: 'Converted to Product' },
               ]}
             />
-          </Grid>
+          </div>
 
           {filteredItems.length === 0 ? (
             <Stack

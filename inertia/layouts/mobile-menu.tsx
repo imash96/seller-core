@@ -1,5 +1,3 @@
-import { Text } from '@astryxdesign/core/Text'
-import { Stack } from '@astryxdesign/core/Stack'
 import { Link } from '@adonisjs/inertia/react'
 import { Box, LogOut, X } from 'lucide-react'
 import Drawer from '~/ui/drawer'
@@ -15,78 +13,61 @@ export interface MobileMenuProps {
 export default function MobileMenu({ open, close, logout }: MobileMenuProps) {
   return (
     <Drawer open={open} onClose={close} direction="left" hideOnDesktop widthClass="max-w-xs">
-      <Stack className="h-full bg-sidebar text-sidebar-foreground">
-        <Stack
-          direction="horizontal"
-          align="center"
-          justify="between"
-          paddingInline={5}
-          className="h-16 border-b border-sidebar-border"
-        >
+      <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
+        <div className="flex items-center justify-between px-4 h-16 border-b border-sidebar-border shrink-0">
           <Link
             href="/dashboard"
             onClick={close}
-            className="flex items-center gap-2.5 unstyled-link"
+            className="flex items-center gap-2.5 unstyled-link min-w-0"
           >
-            <Stack
-              direction="horizontal"
-              align="center"
-              justify="center"
-              className="w-9 h-9 bg-indigo-600 rounded-xl shadow-sm"
-            >
-              <Box className="w-5 h-5 text-white" />
-            </Stack>
-            <Stack>
-              <Text
-                size="base"
-                weight="bold"
-                className="text-white tracking-tight block leading-none"
-              >
+            <div className="w-9 h-9 bg-sidebar-primary rounded-xl flex items-center justify-center shadow-xs shrink-0">
+              <Box className="w-5 h-5 text-sidebar-primary-foreground" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-base font-bold text-sidebar-foreground tracking-tight block leading-none truncate">
                 Seller Core
-              </Text>
-              <Text size="2xs" className="text-slate-400 block mt-0.5">
+              </span>
+              <span className="text-[11px] text-sidebar-foreground/65 block mt-0.5 truncate">
                 Operations & P&L Suite
-              </Text>
-            </Stack>
+              </span>
+            </div>
           </Link>
           <button
             type="button"
             onClick={close}
-            className="p-2 hover:bg-sidebar-accent rounded-lg text-slate-300 transition-colors"
+            className="p-2 hover:bg-sidebar-accent rounded-xl text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors cursor-pointer"
             aria-label="Close navigation"
           >
             <X className="w-5 h-5" />
           </button>
-        </Stack>
+        </div>
 
-        <nav className="flex-1 px-4 py-5 overflow-y-auto space-y-6">
+        <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-5">
           {NAVIGATION.map((section) => (
-            <Stack key={section.title}>
-              <Stack
-                paddingInline={3}
-                className="mb-2 text-2xs font-semibold uppercase tracking-wider text-slate-400"
-              >
+            <div key={section.title} className="space-y-1.5">
+              <div className="px-3 text-[11px] font-bold uppercase tracking-wider text-sidebar-foreground/55">
                 {section.title}
-              </Stack>
-              <Stack gap={1}>
+              </div>
+              <div className="space-y-1">
                 {section.items.map((item) => (
                   <SidebarLink key={item.href} {...item} onClick={close} />
                 ))}
-              </Stack>
-            </Stack>
+              </div>
+            </div>
           ))}
         </nav>
 
-        <Stack padding={4} className="border-t border-sidebar-border">
+        <div className="p-3 border-t border-sidebar-border shrink-0">
           <button
             type="button"
             onClick={logout}
-            className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-rose-400 w-full hover:bg-rose-500/10 rounded-xl transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-error w-full hover:bg-error-subtle rounded-xl transition-colors cursor-pointer"
           >
-            <LogOut className="w-4 h-4" /> Sign out
+            <LogOut className="w-4 h-4 shrink-0" />
+            <span>Sign out</span>
           </button>
-        </Stack>
-      </Stack>
+        </div>
+      </div>
     </Drawer>
   )
 }

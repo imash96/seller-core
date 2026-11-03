@@ -47,7 +47,7 @@ export default function Drawer({
   return (
     <div className={`fixed inset-0 z-50 ${hideOnDesktop ? 'lg:hidden' : ''}`}>
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -56,27 +56,33 @@ export default function Drawer({
         aria-modal="true"
         className={`fixed top-0 bottom-0 ${
           direction === 'left' ? 'left-0' : 'right-0'
-        } z-50 flex flex-col w-11/12 ${widthClass} bg-card text-card-foreground border-border ${
+        } z-50 flex flex-col w-full sm:w-11/12 ${widthClass} bg-card text-card-foreground border-border ${
           direction === 'left' ? 'border-r' : 'border-l'
-        } shadow-2xl ${className}`}
+        } shadow-2xl overflow-hidden ${className}`}
       >
         {(title || subtitle) && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-            <div>
-              {title && <h3 className="text-lg font-bold text-foreground">{title}</h3>}
-              {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
+          <div className="flex items-start justify-between gap-3 px-4 sm:px-6 py-3.5 sm:py-4 border-b border-border bg-muted/30 shrink-0">
+            <div className="min-w-0">
+              {title && (
+                <h3 className="text-base sm:text-lg font-bold text-foreground break-words">
+                  {title}
+                </h3>
+              )}
+              {subtitle && (
+                <p className="text-xs text-muted-foreground mt-0.5 break-words">{subtitle}</p>
+              )}
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              className="p-2 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0 cursor-pointer"
               aria-label="Close panel"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div className="flex-1 overflow-y-auto min-w-0">{children}</div>
       </aside>
     </div>
   )

@@ -45,7 +45,7 @@ export function ImportJsonModal({
       padding={4}
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
     >
-      <Stack className="relative w-full max-w-3xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl">
+      <Stack className="relative w-full max-w-3xl max-h-[90dvh] flex flex-col overflow-hidden rounded-2xl border border-card-border bg-card text-foreground shadow-2xl">
         <Stack
           direction="horizontal"
           align="center"

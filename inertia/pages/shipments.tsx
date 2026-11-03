@@ -1,5 +1,4 @@
 import { Text } from '@astryxdesign/core/Text'
-import { Grid } from '@astryxdesign/core/Grid'
 import { Stack } from '@astryxdesign/core/Stack'
 import {
   PageHeader,
@@ -254,10 +253,7 @@ export default function Shipments({
         }
       >
         <Stack gap={4}>
-          <Grid
-            columns={{ minWidth: 220, max: 1 }}
-            className="md:grid-cols-3 rounded-2xl border border-card-border bg-muted/25 p-3.5"
-          >
+          <div className="grid grid-cols-1 md:grid-cols-3 rounded-2xl border border-card-border bg-muted/25 p-3.5 gap-3.5">
             <Stack className="md:col-span-2">
               <AppInput
                 label="Search Shipments"
@@ -280,7 +276,7 @@ export default function Shipments({
                 { value: 'exception', label: `Exceptions / Delayed (${stats.exceptions})` },
               ]}
             />
-          </Grid>
+          </div>
 
           {filteredShipments.length === 0 ? (
             <Stack
@@ -299,7 +295,7 @@ export default function Shipments({
               />
             </Stack>
           ) : (
-            <Grid columns={{ minWidth: 220, max: 1 }} className="md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
               {filteredShipments.map((shipment) => {
                 const currency = String(shipment.currencyCode ?? 'USD')
                 const estCost = Number(shipment.estimatedShippingCost ?? 0)
@@ -354,10 +350,7 @@ export default function Shipments({
                         <MonoBadge text={String(shipment.trackingNumber || 'AWAITING_LABEL')} />
                       </Stack>
 
-                      <Grid
-                        columns={{ minWidth: 220, max: 3 }}
-                        className="pt-2 border-t border-divider text-xs"
-                      >
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2 border-t border-divider text-xs">
                         <Stack>
                           <Text
                             size="3xs"
@@ -404,7 +397,7 @@ export default function Shipments({
                             {when(shipment.shippedAt || shipment.createdAt)}
                           </Text>
                         </Stack>
-                      </Grid>
+                      </div>
 
                       {items.length > 0 && (
                         <Stack
@@ -447,7 +440,7 @@ export default function Shipments({
                   </Stack>
                 )
               })}
-            </Grid>
+            </div>
           )}
         </Stack>
       </PageSection>

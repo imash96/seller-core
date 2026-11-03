@@ -1,6 +1,5 @@
 import React from 'react'
 import { Stack } from '@astryxdesign/core/Stack'
-import { Grid } from '@astryxdesign/core/Grid'
 import { Text } from '@astryxdesign/core/Text'
 import { AppButton, MonoBadge, Badge, type Row } from '~/lib/ui'
 import { X } from 'lucide-react'
@@ -50,7 +49,7 @@ export function ConvertToListingModal({
       padding={4}
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
     >
-      <Stack className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden">
+      <Stack className="relative w-full max-w-2xl max-h-[90dvh] flex flex-col overflow-hidden rounded-2xl border border-card-border bg-card text-foreground shadow-2xl">
         <Stack
           direction="horizontal"
           align="start"
@@ -116,7 +115,7 @@ export function ConvertToListingModal({
             <label className="block font-semibold text-foreground mb-1.5">
               2. Select Target E-Commerce Platforms *
             </label>
-            <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {platforms.map((plat) => {
                 const checked = selectedPlatforms.includes(plat.id)
                 return (
@@ -138,10 +137,10 @@ export function ConvertToListingModal({
                   </label>
                 )
               })}
-            </Grid>
+            </div>
           </Stack>
 
-          <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <Stack>
               <label className="block font-medium text-muted-foreground mb-1">
                 Seller Account (Auto-resolved per platform if blank)
@@ -173,7 +172,7 @@ export function ConvertToListingModal({
                 className="w-full rounded-xl border border-input-border bg-input-background px-3 py-2 text-xs text-foreground"
               />
             </Stack>
-          </Grid>
+          </div>
         </Stack>
 
         <Stack

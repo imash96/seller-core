@@ -1,5 +1,6 @@
 @import '@astryxdesign/core/reset.css';
 @import '@astryxdesign/core/astryx.css';
+@import '@astryxdesign/theme-neutral/theme.css';
 @import 'tailwindcss';
 @import './light.css';
 @import './dark.css';
@@ -218,6 +219,7 @@
   *::before,
   *::after {
     border-color: var(--border);
+    box-sizing: border-box;
   }
 
   html,
@@ -227,10 +229,24 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
 
   a.unstyled-link {
     text-decoration: none;
     color: inherit;
+  }
+
+  /* Ensure native form controls & options always have readable contrast in both modes */
+  select,
+  input,
+  textarea {
+    color: var(--input-text);
+    background-color: var(--input-background);
+  }
+
+  select option {
+    background-color: var(--card);
+    color: var(--card-foreground);
   }
 }

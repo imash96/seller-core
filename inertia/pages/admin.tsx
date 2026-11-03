@@ -1,5 +1,4 @@
 import { Text } from '@astryxdesign/core/Text'
-import { Grid } from '@astryxdesign/core/Grid'
 import { Stack } from '@astryxdesign/core/Stack'
 import {
   PageHeader,
@@ -119,7 +118,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
         ]}
       />
 
-      <Grid columns={{ minWidth: 220, max: 1 }} className="md:grid-cols-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
         <Stack
           gap={2}
           padding={5}
@@ -185,7 +184,7 @@ export default function Admin({ allUsers, allRoles, allPermissions, moduleEntitl
             audit logging.
           </p>
         </Stack>
-      </Grid>
+      </div>
 
       {/* Provision User Modal */}
       <FormModal

@@ -1,5 +1,3 @@
-import { Text } from '@astryxdesign/core/Text'
-import { Stack } from '@astryxdesign/core/Stack'
 import { Link } from '@adonisjs/inertia/react'
 import { usePage } from '@inertiajs/react'
 import { ChevronRight, Home } from 'lucide-react'
@@ -15,28 +13,26 @@ export function BreadcrumbNav() {
 
   if (segments.length === 0 || (segments.length === 1 && segments[0] === 'dashboard')) {
     return (
-      <nav className="flex items-center gap-2 text-sm" aria-label="Breadcrumb">
-        <Stack
-          direction="horizontal"
-          align="center"
-          gap={2}
-          className="text-foreground font-semibold"
-        >
-          <Home className="w-4 h-4 text-primary" />
-          <Text>Dashboard</Text>
-        </Stack>
+      <nav className="flex items-center gap-2 text-sm min-w-0" aria-label="Breadcrumb">
+        <div className="flex items-center gap-2 text-foreground font-semibold truncate">
+          <Home className="w-4 h-4 text-primary shrink-0" />
+          <span className="truncate">Dashboard</span>
+        </div>
       </nav>
     )
   }
 
   return (
-    <nav className="flex items-center gap-1.5 text-sm flex-wrap" aria-label="Breadcrumb">
+    <nav
+      className="flex items-center gap-1.5 text-xs sm:text-sm min-w-0 overflow-hidden"
+      aria-label="Breadcrumb"
+    >
       <Link
         href="/dashboard"
-        className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+        className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors shrink-0 unstyled-link"
       >
-        <Home className="w-4 h-4" />
-        <Text className="hidden sm:inline">Dashboard</Text>
+        <Home className="w-4 h-4 shrink-0" />
+        <span className="hidden sm:inline">Dashboard</span>
       </Link>
 
       {segments.map((segment, index) => {
@@ -49,21 +45,21 @@ export function BreadcrumbNav() {
         const isLast = index === segments.length - 1
 
         return (
-          <Stack direction="horizontal" align="center" gap={1.5} key={href}>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          <div className="flex items-center gap-1.5 min-w-0" key={href}>
+            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
             {isLast ? (
-              <Text color="primary" weight="semibold" aria-current="page">
+              <span className="font-semibold text-foreground truncate" aria-current="page">
                 {label}
-              </Text>
+              </span>
             ) : (
               <Link
                 href={href}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors truncate unstyled-link"
               >
                 {label}
               </Link>
             )}
-          </Stack>
+          </div>
         )
       })}
     </nav>

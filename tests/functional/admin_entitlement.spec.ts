@@ -28,16 +28,16 @@ test.group('Admin entitlements over HTTP', () => {
     })
     const jar = new Map<string, string>()
     const send = async (path: string, body?: Record<string, unknown>) => {
-      const res = await fetch(`${process.env.APP_URL || 'http://localhost:3333'}${path}`, {
+      const res = await fetch(`${process.env.APP_URL || 'http://localhost:3334'}${path}`, {
         method: body ? 'POST' : 'GET',
         redirect: 'manual',
         headers: {
           cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '),
           ...(body
             ? {
-              'content-type': 'application/json',
-              'x-xsrf-token': decodeURIComponent(jar.get('XSRF-TOKEN') ?? ''),
-            }
+                'content-type': 'application/json',
+                'x-xsrf-token': decodeURIComponent(jar.get('XSRF-TOKEN') ?? ''),
+              }
             : {}),
         },
         ...(body ? { body: JSON.stringify(body) } : {}),

@@ -1,6 +1,5 @@
 import React from 'react'
 import { Stack } from '@astryxdesign/core/Stack'
-import { Grid } from '@astryxdesign/core/Grid'
 import { AppButton, AppInput, AppSelect, AppTextarea, type Row } from '~/lib/ui'
 import { X } from 'lucide-react'
 
@@ -35,7 +34,7 @@ export function EditCatalogModal({
     >
       <form
         onSubmit={onSubmit}
-        className="relative w-full max-w-5xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl max-h-screen flex flex-col"
+        className="relative w-full max-w-5xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl max-h-[90dvh] flex flex-col"
       >
         <Stack
           direction="horizontal"
@@ -65,18 +64,13 @@ export function EditCatalogModal({
           </button>
         </Stack>
 
-        <Stack
-          direction="horizontal"
-          gap={6}
-          padding={6}
-          className="flex-1 overflow-y-auto text-xs"
-        >
+        <Stack gap={6} padding={6} className="flex-1 overflow-y-auto text-xs">
           {/* SECTION 1: IDENTITY & MULTI-LENGTH TITLES */}
           <Stack gap={3} padding={4} className="rounded-2xl border border-card-border bg-muted/20">
             <Stack className="text-xs font-extrabold uppercase tracking-wider text-primary">
               1. Catalog Identity & Multi-Length Marketplace Titles
             </Stack>
-            <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
               <AppInput
                 label="Catalog SKU Key *"
                 required
@@ -124,7 +118,7 @@ export function EditCatalogModal({
                   onChange={(e) => setFormState({ ...formState, subTitle: e.target.value })}
                 />
               </Stack>
-            </Grid>
+            </div>
           </Stack>
 
           {/* SECTION 2: MEDUSA TAXONOMY & MODULAR SKU CODES */}
@@ -132,7 +126,7 @@ export function EditCatalogModal({
             <Stack className="text-xs font-extrabold uppercase tracking-wider text-primary">
               2. Medusa Category Taxonomy & Modular SKU Code Segments
             </Stack>
-            <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
               <AppInput
                 label="Product Type *"
                 required
@@ -214,7 +208,7 @@ export function EditCatalogModal({
                 onChange={(e) => setFormState({ ...formState, pattern: e.target.value })}
                 placeholder="Solid"
               />
-            </Grid>
+            </div>
           </Stack>
 
           {/* SECTION 3: CARTESIAN VARIANT MATRIX & MEDIA */}
@@ -222,7 +216,7 @@ export function EditCatalogModal({
             <Stack className="text-xs font-extrabold uppercase tracking-wider text-primary">
               3. Cartesian Variant Matrix (Colors × Sizes), Stock & Media
             </Stack>
-            <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
               <Stack className="sm:col-span-2">
                 <AppInput
                   label="Color Codes (comma-separated 3-letter codes)"
@@ -264,7 +258,7 @@ export function EditCatalogModal({
                   placeholder="leather, duster coat, outerwear, mens"
                 />
               </Stack>
-            </Grid>
+            </div>
           </Stack>
 
           {/* SECTION 4: GARMENT CONSTRUCTION ATTRIBUTES & DESCRIPTIONS */}
@@ -272,7 +266,7 @@ export function EditCatalogModal({
             <Stack className="text-xs font-extrabold uppercase tracking-wider text-primary">
               4. Garment Construction Attributes & Multi-Marketplace Copy
             </Stack>
-            <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
               <AppInput
                 label="Outer Material"
                 value={formState.material}
@@ -352,9 +346,9 @@ export function EditCatalogModal({
                 value={formState.careInstructions}
                 onChange={(e) => setFormState({ ...formState, careInstructions: e.target.value })}
               />
-            </Grid>
+            </div>
 
-            <Grid columns={{ minWidth: 220, max: 1 }} className="md:grid-cols-3 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 pt-2 gap-3.5">
               <AppTextarea
                 label="SEO Product Description"
                 rows={3}
@@ -381,7 +375,7 @@ export function EditCatalogModal({
                   setFormState({ ...formState, specialFeaturesLines: e.target.value })
                 }
               />
-            </Grid>
+            </div>
           </Stack>
         </Stack>
 

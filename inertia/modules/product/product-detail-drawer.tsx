@@ -1,6 +1,5 @@
 import React from 'react'
 import { Stack } from '@astryxdesign/core/Stack'
-import { Grid } from '@astryxdesign/core/Grid'
 import { Text } from '@astryxdesign/core/Text'
 import {
   AppButton,
@@ -86,10 +85,7 @@ export function ProductDetailDrawer({
     >
       {product && (
         <Stack gap={5} className="text-xs">
-          <Grid
-            columns={{ minWidth: 220, max: 1 }}
-            className="sm:grid-cols-2 rounded-2xl border border-card-border bg-muted/25 p-4"
-          >
+          <div className="grid grid-cols-1 sm:grid-cols-2 rounded-2xl border border-card-border bg-muted/25 p-4 gap-3.5">
             <Stack>
               <Text size="3xs" color="secondary" weight="bold" className="uppercase block">
                 Title (75 / 80 Char)
@@ -124,7 +120,7 @@ export function ProductDetailDrawer({
                 {String(product.description || product.shortDescription || '—')}
               </p>
             </Stack>
-          </Grid>
+          </div>
 
           <Stack gap={2}>
             <Stack direction="horizontal" align="center" justify="between">

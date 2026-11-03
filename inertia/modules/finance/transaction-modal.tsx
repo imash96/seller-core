@@ -2,16 +2,12 @@ import React from 'react'
 import { FormModal, type Row } from '~/lib/ui'
 
 export const TX_TYPES = [
-  'income_payout',
-  'expense_inventory',
-  'expense_shipping',
-  'expense_software',
-  'expense_ads',
-  'tax_payment',
+  'income',
+  'expense',
   'transfer',
-  'refund',
-  'loan_disbursement',
-  'loan_repayment',
+  'credit_card_payment',
+  'refund_payout',
+  'marketplace_settlement',
 ] as const
 
 export function CreateTransactionModal({
@@ -143,4 +139,3 @@ export function CreateTransactionModal({
     />
   )
 }
-

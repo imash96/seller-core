@@ -1,4 +1,3 @@
-import { Grid } from '@astryxdesign/core/Grid'
 import { Text } from '@astryxdesign/core/Text'
 import { Stack } from '@astryxdesign/core/Stack'
 import { useState, useMemo } from 'react'
@@ -363,10 +362,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
         description="Left: Product thumbnail stack (tilted layered images when multi-item). Center: Multi-currency OrderPrice & OrderLineItemPrice P&L breakdown. Right: Customer address & Repeat/Fraud intelligence."
       >
         <Stack gap={4}>
-          <Grid
-            columns={{ minWidth: 220, max: 1 }}
-            className="md:grid-cols-2 lg:grid-cols-4 rounded-2xl border border-card-border bg-muted/25 p-3.5"
-          >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 rounded-2xl border border-card-border bg-muted/25 p-3.5 gap-3.5">
             <AppInput
               label="Search Order / SKU / Customer"
               icon={Search}
@@ -424,7 +420,7 @@ export default function Orders({ orders, sellerAccounts, savedViews }: Props) {
                 { value: 'fraud_risk', label: 'Fraud / High-Risk Buyers' },
               ]}
             />
-          </Grid>
+          </div>
 
           {paginatedOrders.length === 0 ? (
             <Stack

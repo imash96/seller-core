@@ -1,5 +1,3 @@
-import { Text } from '@astryxdesign/core/Text'
-import { Stack } from '@astryxdesign/core/Stack'
 import { Menu, Bell, Shield, MapPin } from 'lucide-react'
 import { Link } from '@adonisjs/inertia/react'
 import { BreadcrumbNav } from './breadcrumb-nav'
@@ -24,94 +22,67 @@ export function TopBar({ onMenu, user }: TopBarProps) {
   }
 
   return (
-    <header className="sticky top-0 z-30 h-16 border-b border-border bg-background/85 backdrop-blur-xl">
-      <Stack
-        direction="horizontal"
-        align="center"
-        justify="between"
-        gap={4}
-        className="h-full mx-auto px-4 sm:px-6 lg:px-8"
-      >
-        <Stack direction="horizontal" align="center" gap={3} className="min-w-0">
+    <header className="sticky top-0 z-30 h-16 border-b border-border bg-card/90 backdrop-blur-xl shrink-0">
+      <div className="flex items-center justify-between gap-2 sm:gap-4 h-full mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
           <button
             type="button"
             onClick={onMenu}
-            className="p-2 rounded-lg hover:bg-muted text-foreground transition-colors lg:hidden"
+            className="p-2 rounded-xl border border-border bg-card hover:bg-muted text-foreground transition-colors lg:hidden shrink-0 cursor-pointer"
             aria-label="Open navigation menu"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <BreadcrumbNav />
-        </Stack>
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <BreadcrumbNav />
+          </div>
+        </div>
 
-        <Stack direction="horizontal" align="center" gap={2} className="sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <Link
             href="/address-cleanup"
-            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border bg-card hover:bg-muted text-foreground transition-colors unstyled-link"
+            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-border bg-card hover:bg-muted text-foreground transition-colors unstyled-link"
           >
-            <MapPin className="w-3.5 h-3.5 text-primary" />
-            Address Cleaner
+            <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+            <span>Address Cleaner</span>
           </Link>
 
           <ThemeToggleButton />
 
           <Link
             href="/tasks"
-            className="relative p-2 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            className="relative p-2 rounded-xl border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Tasks & reminders"
             title="Tasks & Reminders"
           >
             <Bell className="w-4 h-4" />
-            <Stack
-              as="span"
-              className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full ring-2 ring-card"
-            />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full ring-2 ring-card" />
           </Link>
 
-          <Stack className="hidden sm:block h-6 w-px bg-border" />
+          <div className="hidden sm:block h-6 w-px bg-border" />
 
           {user && (
-            <Stack direction="horizontal" align="center" gap={2}>
-              <Stack
-                direction="horizontal"
-                align="center"
-                justify="center"
-                className="w-8 h-8 rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-xs"
-              >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-primary text-xs font-bold text-primary-foreground flex items-center justify-center shadow-xs shrink-0">
                 {getInitials()}
-              </Stack>
-              <Stack className="hidden sm:block text-left leading-tight">
-                <Stack
-                  direction="horizontal"
-                  align="center"
-                  gap={1.5}
-                  className="text-xs font-semibold text-foreground"
-                >
-                  <Text maxLines={1} className="max-w-36">
-                    {user.fullName || user.email}
-                  </Text>
+              </div>
+              <div className="hidden sm:block text-left leading-tight min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <span className="truncate max-w-36">{user.fullName || user.email}</span>
                   {user.isSuperAdmin && (
-                    <Stack
-                      direction="horizontal"
-                      align="center"
-                      gap={0.5}
-                      as="span"
-                      paddingInline={1.5}
-                      paddingBlock={0.5}
-                      className="rounded text-3xs font-bold bg-primary/15 text-primary"
-                    >
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary-subtle text-primary">
                       <Shield className="w-2.5 h-2.5" /> Admin
-                    </Stack>
+                    </span>
                   )}
-                </Stack>
-                <Stack className="text-2xs text-muted-foreground truncate max-w-40">
+                </div>
+                <div className="text-[11px] text-muted-foreground truncate max-w-40">
                   {user.email}
-                </Stack>
-              </Stack>
-            </Stack>
+                </div>
+              </div>
+            </div>
           )}
-        </Stack>
-      </Stack>
+        </div>
+      </div>
     </header>
   )
 }

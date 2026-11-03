@@ -1,4 +1,3 @@
-import { Grid } from '@astryxdesign/core/Grid'
 import { Text } from '@astryxdesign/core/Text'
 import { Stack } from '@astryxdesign/core/Stack'
 import {
@@ -198,7 +197,7 @@ export default function Audit({ auditLogs }: Props) {
       >
         {inspectRow && (
           <Stack gap={4}>
-            <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 text-xs gap-3.5">
               <Stack padding={3} className="rounded-xl border border-border bg-muted/20">
                 <Text color="secondary" className="block">
                   SHA-256 Checksum
@@ -217,7 +216,7 @@ export default function Audit({ auditLogs }: Props) {
                     : '—'}
                 </Text>
               </Stack>
-            </Grid>
+            </div>
 
             <Stack gap={1.5}>
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">

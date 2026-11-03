@@ -1,13 +1,11 @@
-import { Text } from '@astryxdesign/core/Text'
-import { Stack } from '@astryxdesign/core/Stack'
 import { Form } from '@adonisjs/inertia/react'
-import { Button } from '@astryxdesign/core/Button'
 import AuthLayout from '~/layouts/auth'
 import { useState } from 'react'
-import { Lock } from 'lucide-react'
+import { Lock, Mail } from 'lucide-react'
+import { AppButton } from '~/components/atoms/button'
+import { AppInput } from '~/components/atoms/input'
 import { StatusBadge } from '~/components/atoms/status-badge'
 import { PasswordField } from '~/components/molecules/password-field'
-import { VStack } from '@astryxdesign/core'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -18,48 +16,34 @@ export default function Login() {
       title="Sign in to Seller Core"
       subtitle="Multi-channel e-commerce operations, carrier reconciliation & financial P&L suite."
     >
-      <Stack gap={5}>
-        <Stack gap={2} padding={3} className="rounded-xl bg-muted/50 border border-border">
-          <Stack direction="horizontal" align="center" wrap="wrap" gap={2}>
+      <div className="space-y-5">
+        <div className="p-3.5 rounded-xl bg-muted/60 border border-border space-y-2">
+          <div className="flex items-center flex-wrap gap-2">
             <StatusBadge variant="info" label="Admin-provisioned accounts only" />
             <StatusBadge variant="success" label="AES-256-GCM + Bouncer RBAC" />
-          </Stack>
+          </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
             Public self-registration is disabled. Sign in with credentials provisioned by your
             System Super Administrator.
           </p>
-        </Stack>
+        </div>
 
         <Form action="/" method="post">
           {({ errors, processing }) => (
-            <VStack gap={4}>
-              <Stack gap={1.5} className="w-full">
-                <label
-                  htmlFor="field-email"
-                  className="text-xs font-semibold text-foreground flex items-center gap-1"
-                >
-                  <Text>Email Address</Text>
-                  <Text className="text-rose-500">*</Text>
-                </label>
-                <input
-                  id="field-email"
-                  name="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  placeholder="admin@sellercore.io"
-                  className={`w-full h-10 px-3.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
-                    errors.email ? 'border-rose-500 focus:ring-rose-500/30' : 'border-border'
-                  }`}
-                />
-                {errors.email && (
-                  <p className="text-xs font-medium text-rose-600 dark:text-rose-400">
-                    {errors.email}
-                  </p>
-                )}
-              </Stack>
+            <div className="space-y-4">
+              <AppInput
+                id="field-email"
+                name="email"
+                type="email"
+                label="Email Address"
+                icon={Mail}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                placeholder="admin@sellercore.io"
+                error={errors.email}
+              />
 
               <PasswordField
                 label="Password"
@@ -71,33 +55,28 @@ export default function Login() {
                 error={errors.password}
               />
 
-              <Stack className="pt-1">
-                <Button
+              <div className="pt-1">
+                <AppButton
                   label={processing ? 'Signing in…' : 'Sign in to Workspace'}
                   type="submit"
                   variant="primary"
                   size="lg"
-                  width="100%"
-                  isDisabled={processing}
+                  fullWidth
+                  loading={processing}
                 />
-              </Stack>
+              </div>
 
-              <Stack
-                direction="horizontal"
-                align="start"
-                gap={2}
-                className="pt-1 text-xs text-muted-foreground leading-relaxed"
-              >
+              <div className="flex items-start gap-2 pt-1 text-xs text-muted-foreground leading-relaxed">
                 <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" />
-                <Text>
+                <span>
                   Sessions are secured with SHA-256 token hashes and a 2-hour idle expiry. Brute
                   force lockout engages after 5 failed attempts.
-                </Text>
-              </Stack>
-            </VStack>
+                </span>
+              </div>
+            </div>
           )}
         </Form>
-      </Stack>
+      </div>
     </AuthLayout>
   )
 }

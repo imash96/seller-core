@@ -4,10 +4,10 @@ import { FormModal, moneyAmountString, moneyCurrencyCode, type Row } from '~/lib
 export const ACCOUNT_TYPES = [
   'bank_checking',
   'bank_savings',
-  'credit_card_clearing',
+  'cash',
+  'credit_card',
   'marketplace_clearing',
-  'cash_on_hand',
-  'petty_cash',
+  'payment_gateway',
 ] as const
 
 export function CreateAccountModal({

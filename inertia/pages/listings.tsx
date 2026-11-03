@@ -1,4 +1,3 @@
-import { Grid } from '@astryxdesign/core/Grid'
 import { Text } from '@astryxdesign/core/Text'
 import { Stack } from '@astryxdesign/core/Stack'
 import { router } from '@inertiajs/react'
@@ -743,10 +742,7 @@ export default function Listings({
                         />
                       </Stack>
                     ) : (
-                      <Grid
-                        columns={{ minWidth: 220, max: 1 }}
-                        className="md:grid-cols-2 xl:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-divider"
-                      >
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-divider">
                         {group.platforms.map((listing) => {
                           const platKey = String(listing.platform ?? 'medusa').toLowerCase()
                           const platMeta = PLATFORM_BADGES[platKey] ?? {
@@ -862,7 +858,7 @@ export default function Listings({
                             </Stack>
                           )
                         })}
-                      </Grid>
+                      </div>
                     )}
                   </Stack>
                 ))}

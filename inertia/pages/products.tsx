@@ -1,4 +1,3 @@
-import { Grid } from '@astryxdesign/core/Grid'
 import { Text } from '@astryxdesign/core/Text'
 import { Stack } from '@astryxdesign/core/Stack'
 import { router } from '@inertiajs/react'
@@ -426,10 +425,7 @@ export default function Products({
         }
       >
         <Stack gap={4}>
-          <Grid
-            columns={{ minWidth: 220, max: 1 }}
-            className="md:grid-cols-2 lg:grid-cols-4 rounded-2xl border border-card-border bg-muted/25 p-3.5"
-          >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 rounded-2xl border border-card-border bg-muted/25 p-3.5 gap-3.5">
             <AppInput
               label="Search Products"
               icon={Search}
@@ -472,7 +468,7 @@ export default function Products({
                 ...categories.map((c) => ({ value: String(c.id), label: String(c.name) })),
               ]}
             />
-          </Grid>
+          </div>
 
           {filteredProducts.length === 0 ? (
             <Stack
@@ -499,7 +495,7 @@ export default function Products({
               </Stack>
             </Stack>
           ) : (
-            <Grid columns={{ minWidth: 220, max: 1 }} className="md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
               {filteredProducts.map((product) => {
                 const pVariants = (product.variants as Row[]) ?? []
                 const pImages = Array.isArray(product.images) ? product.images : []
@@ -673,7 +669,7 @@ export default function Products({
                   </Stack>
                 )
               })}
-            </Grid>
+            </div>
           )}
         </Stack>
       </PageSection>
@@ -705,7 +701,7 @@ export default function Products({
             />
           </Stack>
         ) : (
-          <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {brands.map((brand) => (
               <Stack
                 justify="between"
@@ -765,7 +761,7 @@ export default function Products({
                 </Stack>
               </Stack>
             ))}
-          </Grid>
+          </div>
         )}
       </PageSection>
 

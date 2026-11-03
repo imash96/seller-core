@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Form } from '@adonisjs/inertia/react'
-import { Button } from '@astryxdesign/core/Button'
+import { AppButton } from '../atoms/button'
 
 export function RowAction({
   action,
@@ -24,14 +24,14 @@ export function RowAction({
           {(fields ?? []).map((f) => (
             <input key={f.name} type="hidden" name={f.name} value={f.value} />
           ))}
-          <Button
+          <AppButton
             label={label}
             type="submit"
-            size="sm"
-            variant={(variant as 'secondary') || 'secondary'}
-            isDisabled={processing}
-            onClick={(e: { preventDefault?: () => void }) => {
-              if (confirmText && !window.confirm(confirmText)) e.preventDefault?.()
+            size="xs"
+            variant={variant === 'danger' ? 'destructive' : (variant as any) || 'secondary'}
+            disabled={processing}
+            onClick={(e) => {
+              if (confirmText && !window.confirm(confirmText)) e.preventDefault()
             }}
           />
         </span>
@@ -71,12 +71,12 @@ export function StatusForm({
               </option>
             ))}
           </select>
-          <Button
+          <AppButton
             label="Apply"
             type="submit"
-            size="sm"
+            size="xs"
             variant="secondary"
-            isDisabled={processing}
+            disabled={processing}
           />
         </div>
       )}

@@ -7,7 +7,6 @@ import {
   KpiScorecard,
   StatStrip,
   DataTable,
-  StatusBadge,
   ProgressMeter,
   WaterfallChart,
   RevenueTrendChart,
@@ -32,7 +31,7 @@ import {
   CreditCard,
   Activity,
 } from 'lucide-react'
-import { Grid, VStack } from '@astryxdesign/core'
+import { VStack } from '@astryxdesign/core'
 import { Text } from '@astryxdesign/core/Text'
 import { resolvePriceMoney } from '~/lib/utils'
 
@@ -213,8 +212,8 @@ export default function Dashboard(props: Props) {
 
   const totalCostBurden =
     Number(activeKpis.totalCogs) +
-      Number(activeKpis.totalMarketplaceFees) +
-      Number(activeKpis.totalShippingCost) || 1
+    Number(activeKpis.totalMarketplaceFees) +
+    Number(activeKpis.totalShippingCost) || 1
 
   return (
     <Stack gap={6}>
@@ -239,38 +238,28 @@ export default function Dashboard(props: Props) {
       </Text>
 
       {/* Top Executive Filter Bar */}
-      <Stack
-        direction="horizontal"
-        align="center"
-        justify="between"
-        wrap="wrap"
-        gap={3}
-        padding={3}
-        className="bg-card text-card-foreground border border-border rounded-xl shadow-xs"
-      >
-        <Stack direction="horizontal" align="center" gap={1.5} className="overflow-x-auto pb-0.5">
-          {CHANNEL_FILTERS.map((ch) => {
-            const active = channelFilter === ch.value
-            return (
-              <button
-                key={ch.value}
-                type="button"
-                onClick={() => setChannelFilter(ch.value)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors whitespace-nowrap ${
-                  active
-                    ? 'bg-primary text-primary-foreground border-primary shadow-2xs'
-                    : 'bg-background text-muted-foreground border-border hover:text-foreground hover:bg-muted'
+
+      <Stack direction="horizontal" align="center" gap={1.5} className="overflow-x-auto pb-0.5">
+        {CHANNEL_FILTERS.map((ch) => {
+          const active = channelFilter === ch.value
+          return (
+            <button
+              key={ch.value}
+              type="button"
+              onClick={() => setChannelFilter(ch.value)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors whitespace-nowrap ${active
+                ? 'bg-primary text-primary-foreground border-primary shadow-2xs'
+                : 'bg-background text-muted-foreground border-border hover:text-foreground hover:bg-muted'
                 }`}
-              >
-                {ch.label}
-              </button>
-            )
-          })}
-        </Stack>
+            >
+              {ch.label}
+            </button>
+          )
+        })}
       </Stack>
 
       {/* 4 Hero KPI Scorecards */}
-      <Grid columns={{ minWidth: 280, max: 3 }} gap={4}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiScorecard
           title="Gross & Net Revenue"
           value={money('USD', activeKpis.grossSales)}
@@ -378,7 +367,7 @@ export default function Dashboard(props: Props) {
             </Text>
           </Stack>
         </KpiScorecard>
-      </Grid>
+      </div>
 
       {/* Secondary Compact Operational Health Strip */}
       <StatStrip
@@ -393,7 +382,7 @@ export default function Dashboard(props: Props) {
       />
 
       {/* 4 Interactive Visual Charts Grid */}
-      <Grid columns={{ minWidth: 220, max: 1 }} className="lg:grid-cols-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
         <PageSection
           title="Order Economics & P&L Waterfall"
           description="Gross Sales → − Refunds → = Net Sales → − COGS → − Channel Fees → − Shipping → = Order Net Profit."
@@ -417,10 +406,10 @@ export default function Dashboard(props: Props) {
           description="Distribution by sales channel and fulfillment lifecycle stage."
           actions={<PieChart className="w-4 h-4 text-primary" />}
         >
-          <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <DonutChart title="Channel Mix" segments={marketplaceSegments} />
             <DonutChart title="Status Funnel" segments={statusSegments} />
-          </Grid>
+          </div>
         </PageSection>
 
         <PageSection
@@ -430,7 +419,7 @@ export default function Dashboard(props: Props) {
         >
           <CreditUtilizationBars cards={creditCards} transactions={financialTransactions} />
         </PageSection>
-      </Grid>
+      </div>
 
       {/* Interactive Tabbed Operational Queues */}
       <PageSection
@@ -451,11 +440,10 @@ export default function Dashboard(props: Props) {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
-                    active
-                      ? 'bg-primary text-primary-foreground shadow-xs'
-                      : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${active
+                    ? 'bg-primary text-primary-foreground shadow-xs'
+                    : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -515,7 +503,7 @@ export default function Dashboard(props: Props) {
           )}
 
           {activeTab === 'returns' && (
-            <Grid columns={{ minWidth: 220, max: 1 }} className="lg:grid-cols-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
               <VStack gap={3}>
                 <Stack direction="horizontal" align="center" justify="between">
                   <Text size="xsm" color="primary" weight="semibold">
@@ -557,11 +545,11 @@ export default function Dashboard(props: Props) {
                   ]}
                 />
               </VStack>
-            </Grid>
+            </div>
           )}
 
           {activeTab === 'finance' && (
-            <Grid columns={{ minWidth: 220, max: 1 }} className="lg:grid-cols-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
               <VStack gap={3}>
                 <Stack direction="horizontal" align="center" justify="between">
                   <Text size="xsm" color="primary" weight="semibold">
@@ -608,11 +596,11 @@ export default function Dashboard(props: Props) {
                   ]}
                 />
               </VStack>
-            </Grid>
+            </div>
           )}
 
           {activeTab === 'governance' && (
-            <Grid columns={{ minWidth: 220, max: 1 }} className="lg:grid-cols-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
               <VStack gap={3}>
                 <Stack direction="horizontal" align="center" justify="between">
                   <Text size="xsm" color="primary" weight="semibold">
@@ -661,7 +649,7 @@ export default function Dashboard(props: Props) {
                   ]}
                 />
               </VStack>
-            </Grid>
+            </div>
           )}
         </VStack>
       </PageSection>

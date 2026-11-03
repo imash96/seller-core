@@ -1,6 +1,5 @@
 import React from 'react'
 import { Stack } from '@astryxdesign/core/Stack'
-import { Grid } from '@astryxdesign/core/Grid'
 import {
   AppButton,
   AppInput,
@@ -37,7 +36,7 @@ export function EditListingModal({
     >
       <form
         onSubmit={onSubmit}
-        className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden max-h-screen flex flex-col"
+        className="relative w-full max-w-2xl rounded-2xl border border-card-border bg-card text-foreground shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col"
       >
         <Stack
           direction="horizontal"
@@ -63,13 +62,8 @@ export function EditListingModal({
             <X className="h-5 w-5" />
           </button>
         </Stack>
-        <Stack
-          direction="horizontal"
-          gap={4}
-          padding={6}
-          className="flex-1 overflow-y-auto text-xs"
-        >
-          <Grid columns={{ minWidth: 220, max: 1 }} className="sm:grid-cols-2">
+        <Stack gap={4} padding={6} className="flex-1 overflow-y-auto text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <AppInput
               label="External Listing ID / Offer ID *"
               required
@@ -180,7 +174,7 @@ export function EditListingModal({
                 onChange={(e) => setEditForm({ ...editForm, channelDescription: e.target.value })}
               />
             </Stack>
-          </Grid>
+          </div>
         </Stack>
         <Stack
           direction="horizontal"

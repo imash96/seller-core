@@ -1,4 +1,3 @@
-import { Grid } from '@astryxdesign/core/Grid'
 import { Stack } from '@astryxdesign/core/Stack'
 import { Head, router } from '@inertiajs/react'
 import { useState, useMemo } from 'react'
@@ -208,10 +207,7 @@ export default function InventoryPage({ products }: Props) {
         >
           <Stack gap={4}>
             {/* Filter Bar */}
-            <Grid
-              columns={{ minWidth: 220, max: 1 }}
-              className="md:grid-cols-3 rounded-2xl border border-card-border bg-muted/25 p-3.5"
-            >
+            <div className="grid grid-cols-1 md:grid-cols-3 rounded-2xl border border-card-border bg-muted/25 p-3.5 gap-3.5">
               <Stack className="md:col-span-2">
                 <AppInput
                   label="Search SKU / Product / Variant"
@@ -239,7 +235,7 @@ export default function InventoryPage({ products }: Props) {
                   { value: 'out_of_stock', label: 'Out of Stock (0 Available)' },
                 ]}
               />
-            </Grid>
+            </div>
 
             {paginatedRows.length === 0 ? (
               <Stack

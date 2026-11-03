@@ -1,13 +1,9 @@
 import { type ReactNode, useState, useEffect, useMemo } from 'react'
 import { Table, proportional, pixel } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
-import { Button } from '@astryxdesign/core/Button'
-import { Card } from '@astryxdesign/core/Card'
-import { Stack, VStack } from '@astryxdesign/core/Stack'
-import { Grid } from '@astryxdesign/core/Grid'
-import { Text } from '@astryxdesign/core/Text'
 import { Package, Filter } from 'lucide-react'
-import { convertToLocale, resolvePriceMoney, formatDate, shortId } from '~/lib/utils'
+import { convertToLocale, formatDate, shortId } from '~/lib/utils'
+import { AppButton } from '../atoms/button'
 import { StatusBadge } from '../atoms/status-badge'
 import { MonoBadge } from '../atoms/mono-badge'
 import { MultiCurrencyPriceStack } from '../atoms/currency-text'
@@ -51,26 +47,26 @@ export function DataTable({
 }) {
   if (!rows || rows.length === 0) {
     return (
-      <Card variant="muted" padding={5}>
-        <Text type="supporting" justify="center" display="block">
-          {empty ?? 'No records yet.'}
-        </Text>
-      </Card>
+      <div className="rounded-xl border border-dashed border-border bg-muted/25 p-6 text-center text-sm text-muted-foreground">
+        {empty ?? 'No records yet.'}
+      </div>
     )
   }
   return (
-    <Card padding={0}>
+    <div className="w-full overflow-x-auto rounded   border border-border bg-card">
       <Table
         data={rows}
         columns={columns}
         idKey={(row: Row) => String(row.id ?? JSON.stringify(row).slice(0, 40))}
-        density="compact"
+        density="spacious"
         dividers="rows"
         isStriped
         hasHover
         textOverflow="truncate"
+        verticalAlign="top"
+        rowCount={rows.length}
       />
-    </Card>
+    </div>
   )
 }
 
@@ -80,9 +76,9 @@ export const col = {
     header,
     width: width ? pixel(width) : proportional(1),
     renderCell: (row: Row) => (
-      <Text type="body" size="sm" maxLines={1}>
+      <span className="text-xs sm:text-sm text-foreground truncate block">
         {displayValue(row[key])}
-      </Text>
+      </span>
     ),
   }),
   id: (key: string, header = 'ID'): TableColumn<Row> => ({
@@ -94,13 +90,12 @@ export const col = {
   money: (key: string, header: string, currencyKey = 'currencyCode'): TableColumn<Row> => ({
     key,
     header,
-    width: pixel(135),
+    width: pixel(140),
     align: 'end',
     renderCell: (row: Row) => {
       const moneyKey = key.endsWith('Amount') ? `${key.slice(0, -6)}Money` : `${key}Money`
       const moneyObj = row[moneyKey] ?? row[`${key}Money`] ?? row[key]
       const fallbackCur = String(row[currencyKey] ?? row.currencyCode ?? 'USD')
-      // MoneyDisplay always renders the currency carried by the amount itself.
       return <MoneyDisplay value={moneyObj} fallbackCurrency={fallbackCur} />
     },
   }),
@@ -122,15 +117,15 @@ export const col = {
     header,
     width: pixel(150),
     renderCell: (row: Row) => (
-      <Text type="supporting" size="xsm">
+      <span className="text-xs text-muted-foreground whitespace-nowrap">
         {formatDate(row[key])}
-      </Text>
+      </span>
     ),
   }),
   badge: (key: string, header: string, toneMap?: Record<string, string>): TableColumn<Row> => ({
     key,
     header,
-    width: pixel(130),
+    width: pixel(135),
     renderCell: (row: Row) => {
       const v = String(row[key] ?? '—')
       const tone = toneMap?.[v] ?? 'neutral'
@@ -290,7 +285,12 @@ export function ResponsiveDataView({
           <div className="pt-1 flex items-center justify-center">
             {emptyAction ??
               (onCreateClick && createLabel ? (
-                <Button label={createLabel} variant="primary" size="sm" onClick={onCreateClick} />
+                <AppButton
+                  label={createLabel}
+                  variant="primary"
+                  size="sm"
+                  onClick={onCreateClick}
+                />
               ) : null)}
           </div>
         )}
@@ -299,19 +299,25 @@ export function ResponsiveDataView({
   }
 
   return (
-    <VStack gap={4} width="100%">
+    <div className="space-y-4 w-full min-w-0">
       {/* Toolbar */}
-      <Card variant="muted" padding={3}>
-        <VStack gap={3}>
-          {searchKeys.length > 0 && <SearchInputBar value={search} onChange={setSearch} />}
+      <div className="rounded-2xl border border-card-border bg-muted/30 p-3.5 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {searchKeys.length > 0 ? (
+            <div className="flex-1 min-w-0">
+              <SearchInputBar value={search} onChange={setSearch} />
+            </div>
+          ) : (
+            <div />
+          )}
 
-          <Stack direction="horizontal" gap={2} wrap="wrap" hAlign="end">
+          <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap shrink-0">
             <ViewModeSwitcher value={viewMode} onChange={setViewMode} />
             {onCreateClick && createLabel && (
-              <Button label={createLabel} variant="primary" size="sm" onClick={onCreateClick} />
+              <AppButton label={createLabel} variant="primary" size="sm" onClick={onCreateClick} />
             )}
-          </Stack>
-        </VStack>
+          </div>
+        </div>
 
         {filterPills && filterKey && (
           <FilterPillGroup
@@ -326,7 +332,7 @@ export function ResponsiveDataView({
           />
         )}
 
-        <Stack gap={3} wrap="wrap" vAlign="center" hAlign="between">
+        <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-muted-foreground pt-1 border-t border-border/60">
           <div>
             Showing <strong className="text-foreground font-semibold">{paginated.length}</strong> of{' '}
             <strong className="text-foreground font-semibold">{sorted.length}</strong>{' '}
@@ -355,8 +361,8 @@ export function ResponsiveDataView({
               ))}
             </select>
           )}
-        </Stack>
-      </Card>
+        </div>
+      </div>
 
       {/* Content */}
       {sorted.length === 0 ? (
@@ -371,7 +377,7 @@ export function ResponsiveDataView({
             </p>
           </div>
           <div className="pt-1 flex items-center justify-center">
-            <Button
+            <AppButton
               label="Clear filters"
               variant="secondary"
               size="sm"
@@ -383,17 +389,17 @@ export function ResponsiveDataView({
           </div>
         </div>
       ) : effectiveMode === 'cards' ? (
-        <Grid columns={{ minWidth: 200, max: 3 }} gap={4}>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {paginated.map((row) => (
             <RecordCard
               key={String(row.id ?? JSON.stringify(row).slice(0, 24))}
               card={toCard(row)}
             />
           ))}
-        </Grid>
+        </div>
       ) : (
-        <VStack gap={3}>
-          <Card padding={0}>
+        <div className="space-y-3 w-full min-w-0">
+          <div className="w-full overflow-x-auto rounded-xl border border-border bg-card">
             <Table
               data={paginated}
               columns={columns.map((c) => {
@@ -413,7 +419,7 @@ export function ResponsiveDataView({
               hasHover
               textOverflow="truncate"
             />
-          </Card>
+          </div>
 
           <SortPillBar
             columns={columns.map((c) => ({ key: c.key, header: String(c.header) }))}
@@ -421,7 +427,7 @@ export function ResponsiveDataView({
             sortDir={sortDir}
             onSort={handleSort}
           />
-        </VStack>
+        </div>
       )}
 
       <PaginationBar
@@ -430,6 +436,6 @@ export function ResponsiveDataView({
         totalRecords={sorted.length}
         onPageChange={setPage}
       />
-    </VStack>
+    </div>
   )
 }

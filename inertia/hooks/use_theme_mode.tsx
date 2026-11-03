@@ -49,7 +49,9 @@ export function ThemeModeProvider({
     const isDark = nextMode === 'dark'
     const el = document.documentElement
     el.classList.toggle('dark', isDark)
+    el.classList.toggle('light', !isDark)
     el.setAttribute('data-theme', nextMode)
+    el.style.colorScheme = nextMode
     document.cookie = `app_theme=${nextMode}; path=/; max-age=31536000; SameSite=Lax`
   }, [])
 
@@ -78,7 +80,7 @@ export function ThemeModeProvider({
   return (
     <ThemeModeContext.Provider value={{ mode, isDark: mode === 'dark', setMode, toggleMode }}>
       <ThemeAny theme={themes[defaultThemeSlug]} mode={mode} colorScheme={mode}>
-        {children}
+        <div className="min-h-screen bg-background text-foreground">{children}</div>
       </ThemeAny>
     </ThemeModeContext.Provider>
   )

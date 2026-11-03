@@ -67,4 +67,3 @@ export type GeneratedProductPreview = {
 }
 
 export type CatalogItemRow = Row
-

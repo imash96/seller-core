@@ -1,6 +1,6 @@
 import { type ReactNode, useState, useEffect, useMemo } from 'react'
 import { Form } from '@adonisjs/inertia/react'
-import { Button } from '@astryxdesign/core/Button'
+import { AppButton } from '../atoms/button'
 import { X, Sparkles } from 'lucide-react'
 import { FormField, type FieldDef } from '../molecules/form-field'
 import { moneyAwareDefaults, withMoneyPairs } from '~/lib/money-form'
@@ -95,12 +95,13 @@ export function SmartForm({
             ))}
           </div>
           <div className="flex items-center justify-end">
-            <Button
+            <AppButton
               label={submitLabel}
               type="submit"
               variant="primary"
               size="md"
-              isDisabled={processing || (actionFor ? !values[fields[0]?.name] : false)}
+              loading={processing}
+              disabled={processing || (actionFor ? !values[fields[0]?.name] : false)}
             />
           </div>
         </VStack>
@@ -203,7 +204,7 @@ export function FormModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6">
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
         onClick={() => onOpenChange(false)}
@@ -213,7 +214,7 @@ export function FormModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className="relative z-10 flex flex-col w-full max-w-2xl max-h-[88dvh] rounded-2xl bg-card text-card-foreground border border-border shadow-2xl overflow-hidden"
+        className="relative z-10 flex flex-col w-full max-w-2xl max-h-[92dvh] sm:max-h-[88dvh] rounded-2xl bg-card text-card-foreground border border-border shadow-2xl overflow-hidden"
       >
         <Form
           action={actionFor ? actionFor(values) : action}
@@ -227,9 +228,9 @@ export function FormModal({
           }}
         >
           {({ errors, processing }) => (
-            <div className="flex flex-col max-h-[88dvh]">
+            <div className="flex flex-col max-h-[92dvh] sm:max-h-[88dvh]">
               {/* Sticky Modal Header */}
-              <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-border bg-muted/40 shrink-0">
+              <div className="flex items-start justify-between gap-3 px-4 sm:px-6 py-3.5 sm:py-4 border-b border-border bg-muted/40 shrink-0">
                 <div className="min-w-0 flex-1">
                   <h3
                     id="modal-title"
@@ -255,7 +256,7 @@ export function FormModal({
               </div>
 
               {/* Scrollable Modal Body */}
-              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+              <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-5">
                 {presetActions && presetActions.length > 0 && (
                   <div className="flex items-center gap-2 flex-wrap p-3 rounded-xl bg-muted/50 border border-border">
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mr-1">
@@ -304,18 +305,21 @@ export function FormModal({
               </div>
 
               {/* Sticky Modal Footer */}
-              <div className="px-6 py-4 border-t border-border bg-muted/35 flex items-center justify-end gap-2.5 shrink-0">
-                <Button
+              <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-t border-border bg-muted/35 flex items-center justify-end gap-2.5 flex-wrap shrink-0">
+                <AppButton
                   label="Cancel"
                   variant="secondary"
+                  size="md"
                   onClick={() => onOpenChange(false)}
-                  isDisabled={processing}
+                  disabled={processing}
                 />
-                <Button
+                <AppButton
                   label={processing ? 'Saving…' : submitLabel}
                   type="submit"
                   variant="primary"
-                  isDisabled={processing}
+                  size="md"
+                  loading={processing}
+                  disabled={processing}
                 />
               </div>
             </div>
@@ -381,8 +385,13 @@ export function ConfirmDialog({
           </button>
         </div>
 
-        <div className="px-6 py-4 bg-muted/20 flex items-center justify-end gap-2.5">
-          <Button label="Cancel" variant="secondary" onClick={() => onOpenChange(false)} />
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-muted/20 flex items-center justify-end gap-2.5 flex-wrap">
+          <AppButton
+            label="Cancel"
+            variant="secondary"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+          />
           <Form
             action={action}
             method="post"
@@ -391,11 +400,13 @@ export function ConfirmDialog({
             }}
           >
             {({ processing }) => (
-              <Button
+              <AppButton
                 label={processing ? 'Working…' : confirmLabel}
                 type="submit"
                 variant="primary"
-                isDisabled={processing}
+                size="sm"
+                loading={processing}
+                disabled={processing}
               />
             )}
           </Form>

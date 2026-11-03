@@ -1,6 +1,5 @@
 import React from 'react'
 import { Stack } from '@astryxdesign/core/Stack'
-import { Grid } from '@astryxdesign/core/Grid'
 import { AppButton, MonoBadge, SlideOverDrawer, type Row } from '~/lib/ui'
 import { Layers, Edit3, Sparkles } from 'lucide-react'
 
@@ -63,7 +62,7 @@ export function CatalogDetailDrawer({
         <Stack gap={4} className="text-xs">
           <Stack gap={2} padding={4} className="rounded-xl border border-card-border bg-muted/20">
             <Stack className="font-bold text-foreground">Taxonomy & Modular Codes</Stack>
-            <Grid columns={{ minWidth: 220, max: 2 }} className="text-muted-foreground">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-muted-foreground">
               <Stack>
                 <strong>Category Handle:</strong> {String(item.categoryHandle)}
               </Stack>
@@ -83,7 +82,7 @@ export function CatalogDetailDrawer({
                 <strong>Material / Tier:</strong> {String(item.leatherCode ?? item.materialCode)} /
                 Tier {String(item.priceTierCode ?? item.priceTier)}
               </Stack>
-            </Grid>
+            </div>
           </Stack>
 
           <Stack gap={2} padding={4} className="rounded-xl border border-card-border bg-muted/20">

@@ -1,101 +1,118 @@
 /* ============================================================================
  * Seller Core — Light Mode Semantic Token Palette (`inertia/css/light.css`)
  * Activated on :root and [data-theme='light']
+ * WCAG AA/AAA calibrated contrast for enterprise data density
  * ============================================================================ */
 :root,
 [data-theme='light'] {
+  color-scheme: light;
+
   /* --- Brand & Core Interactive Tokens --- */
-  --primary: oklch(0.51 0.21 262);
-  --primary-foreground: oklch(0.99 0.005 240);
-  --primary-hover: oklch(0.46 0.21 262);
-  --primary-active: oklch(0.41 0.2 262);
-  --primary-subtle: oklch(0.95 0.03 262);
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --primary-hover: #4338ca;
+  --primary-active: #3730a3;
+  --primary-subtle: #eef2ff;
 
-  --secondary: oklch(0.95 0.015 245);
-  --secondary-foreground: oklch(0.24 0.04 248);
-  --secondary-hover: oklch(0.91 0.02 245);
-  --secondary-active: oklch(0.87 0.025 245);
-  --secondary-subtle: oklch(0.97 0.008 245);
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --secondary-hover: #e2e8f0;
+  --secondary-active: #cbd5e1;
+  --secondary-subtle: #f8fafc;
 
-  --accent: oklch(0.56 0.19 292);
-  --accent-foreground: oklch(0.99 0.005 290);
-  --accent-hover: oklch(0.51 0.19 292);
-  --accent-active: oklch(0.46 0.18 292);
-  --accent-subtle: oklch(0.95 0.03 292);
+  --accent: #7c3aed;
+  --accent-foreground: #ffffff;
+  --accent-hover: #6d28d9;
+  --accent-active: #5b21b6;
+  --accent-subtle: #f5f3ff;
 
   /* --- Canvas, Surface, Card & Popover Tokens --- */
-  --background: oklch(0.982 0.006 245);
-  --background-secondary: oklch(0.962 0.01 245);
-  --background-tertiary: oklch(0.938 0.014 245);
+  --background: #f8fafc;
+  --background-secondary: #f1f5f9;
+  --background-tertiary: #e2e8f0;
 
-  --foreground: oklch(0.17 0.03 248);
-  --foreground-secondary: oklch(0.36 0.035 248);
-  --foreground-tertiary: oklch(0.52 0.03 248);
+  --foreground: #0f172a;
+  --foreground-secondary: #334155;
+  --foreground-tertiary: #64748b;
 
-  --surface: oklch(1 0 0);
-  --surface-foreground: oklch(0.17 0.03 248);
-  --surface-elevated: oklch(1 0 0);
-  --surface-sunken: oklch(0.955 0.01 245);
+  --surface: #ffffff;
+  --surface-foreground: #0f172a;
+  --surface-elevated: #ffffff;
+  --surface-sunken: #f1f5f9;
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.17 0.03 248);
-  --card-hover: oklch(0.99 0.005 250);
-  --card-border: oklch(0.895 0.014 245);
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --card-hover: #f8fafc;
+  --card-border: #e2e8f0;
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.17 0.03 248);
-  --popover-border: oklch(0.88 0.016 245);
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --popover-border: #cbd5e1;
 
-  --muted: oklch(0.955 0.01 245);
-  --muted-foreground: oklch(0.46 0.032 248);
-  --muted-hover: oklch(0.925 0.014 245);
-  --subtle: oklch(0.97 0.008 245);
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --muted-hover: #e2e8f0;
+  --subtle: #f8fafc;
 
   /* --- Borders, Dividers & Typography Hierarchy --- */
-  --border: oklch(0.89 0.014 245);
-  --border-subtle: oklch(0.93 0.01 245);
-  --border-strong: oklch(0.79 0.022 245);
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --border-strong: #cbd5e1;
 
-  --divider: oklch(0.91 0.012 245);
-  --divider-strong: oklch(0.82 0.02 245);
+  --divider: #e2e8f0;
+  --divider-strong: #cbd5e1;
 
-  --text-primary: oklch(0.17 0.03 248);
-  --text-secondary: oklch(0.38 0.034 248);
-  --text-tertiary: oklch(0.53 0.028 248);
-  --text-disabled: oklch(0.68 0.018 245);
-  --text-inverse: oklch(0.99 0.005 240);
-  --text-accent: oklch(0.49 0.21 262);
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-tertiary: #64748b;
+  --text-disabled: #94a3b8;
+  --text-inverse: #ffffff;
+  --text-accent: #4f46e5;
+
+  /* --- Astryx Core Token Bridge (Light Mode) --- */
+  --color-background-body: #f8fafc;
+  --color-background-surface: #ffffff;
+  --color-background-card: #ffffff;
+  --color-background-popover: #ffffff;
+  --color-background-muted: #f1f5f9;
+  --color-background-inverted: #0f172a;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #334155;
+  --color-text-supporting: #475569;
+  --color-text-disabled: #94a3b8;
+  --color-on-accent: #ffffff;
+  --color-border-emphasized: #cbd5e1;
 
   /* --- Semantic Status Feedback Tokens --- */
-  --success: oklch(0.58 0.17 152);
-  --success-foreground: oklch(0.99 0.005 152);
-  --success-hover: oklch(0.52 0.17 152);
-  --success-active: oklch(0.47 0.16 152);
-  --success-subtle: oklch(0.95 0.04 152);
+  --success: #059669;
+  --success-foreground: #ffffff;
+  --success-hover: #047857;
+  --success-active: #065f46;
+  --success-subtle: #ecfdf5;
 
-  --destructive: oklch(0.56 0.21 24);
-  --destructive-foreground: oklch(0.99 0.005 24);
-  --destructive-hover: oklch(0.5 0.21 24);
-  --destructive-active: oklch(0.45 0.2 24);
-  --destructive-subtle: oklch(0.95 0.035 24);
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --destructive-hover: #b91c1c;
+  --destructive-active: #991b1b;
+  --destructive-subtle: #fef2f2;
 
-  --error: oklch(0.56 0.21 24);
-  --error-foreground: oklch(0.99 0.005 24);
-  --error-hover: oklch(0.5 0.21 24);
-  --error-active: oklch(0.45 0.2 24);
-  --error-subtle: oklch(0.95 0.035 24);
+  --error: #dc2626;
+  --error-foreground: #ffffff;
+  --error-hover: #b91c1c;
+  --error-active: #991b1b;
+  --error-subtle: #fef2f2;
 
-  --warning: oklch(0.68 0.17 72);
-  --warning-foreground: oklch(0.18 0.04 70);
-  --warning-hover: oklch(0.62 0.17 72);
-  --warning-active: oklch(0.56 0.16 72);
-  --warning-subtle: oklch(0.96 0.045 78);
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+  --warning-hover: #b45309;
+  --warning-active: #92400e;
+  --warning-subtle: #fffbeb;
 
-  --info: oklch(0.56 0.18 242);
-  --info-foreground: oklch(0.99 0.005 242);
-  --info-hover: oklch(0.5 0.18 242);
-  --info-active: oklch(0.45 0.17 242);
-  --info-subtle: oklch(0.95 0.035 242);
+  --info: #0284c7;
+  --info-foreground: #ffffff;
+  --info-hover: #0369a1;
+  --info-active: #075985;
+  --info-subtle: #f0f9ff;
 
   /* --- Overlays, Scrims & State Layers --- */
   --overlay: rgba(15, 23, 42, 0.52);
@@ -108,98 +125,98 @@
   --active-overlay-opacity: 0.08;
 
   /* --- E-Commerce Domain Tokens (Badges, Pricing, Ratings & Links) --- */
-  --badge-new: oklch(0.53 0.2 262);
-  --badge-new-foreground: oklch(0.99 0.005 262);
-  --badge-sale: oklch(0.57 0.22 24);
-  --badge-sale-foreground: oklch(0.99 0.005 24);
-  --badge-limited: oklch(0.66 0.17 68);
-  --badge-limited-foreground: oklch(0.18 0.04 68);
+  --badge-new: #4f46e5;
+  --badge-new-foreground: #ffffff;
+  --badge-sale: #e11d48;
+  --badge-sale-foreground: #ffffff;
+  --badge-limited: #d97706;
+  --badge-limited-foreground: #ffffff;
 
-  --price-current: oklch(0.19 0.04 248);
-  --price-original: oklch(0.58 0.025 248);
-  --price-sale: oklch(0.54 0.21 24);
-  --price-save: oklch(0.53 0.17 152);
+  --price-current: #0f172a;
+  --price-original: #64748b;
+  --price-sale: #dc2626;
+  --price-save: #059669;
 
-  --rating-filled: oklch(0.76 0.17 78);
-  --rating-empty: oklch(0.88 0.015 245);
-  --rating-half: oklch(0.76 0.17 78);
+  --rating-filled: #f59e0b;
+  --rating-empty: #e2e8f0;
+  --rating-half: #f59e0b;
 
-  --link: oklch(0.49 0.21 262);
-  --link-hover: oklch(0.42 0.21 262);
-  --link-visited: oklch(0.48 0.18 295);
-  --link-active: oklch(0.38 0.2 262);
+  --link: #4f46e5;
+  --link-hover: #4338ca;
+  --link-visited: #6d28d9;
+  --link-active: #3730a3;
 
   /* --- Form Controls & Focus Rings --- */
-  --input: oklch(0.89 0.014 245);
-  --input-background: oklch(1 0 0);
-  --input-border: oklch(0.86 0.018 245);
-  --input-border-hover: oklch(0.74 0.03 250);
-  --input-border-focus: oklch(0.51 0.21 262);
-  --input-text: oklch(0.17 0.03 248);
-  --input-placeholder: oklch(0.56 0.025 248);
-  --input-disabled-background: oklch(0.95 0.008 245);
-  --input-disabled-text: oklch(0.64 0.02 245);
-  --input-disabled-border: oklch(0.9 0.01 245);
+  --input: #cbd5e1;
+  --input-background: #ffffff;
+  --input-border: #cbd5e1;
+  --input-border-hover: #94a3b8;
+  --input-border-focus: #4f46e5;
+  --input-text: #0f172a;
+  --input-placeholder: #64748b;
+  --input-disabled-background: #f1f5f9;
+  --input-disabled-text: #94a3b8;
+  --input-disabled-border: #e2e8f0;
 
-  --ring: oklch(0.51 0.21 262);
-  --ring-offset: oklch(1 0 0);
+  --ring: #4f46e5;
+  --ring-offset: #ffffff;
   --focus-ring: 0 0 0 3px rgba(79, 70, 229, 0.22);
 
   /* --- Component-Scoped Button Tokens --- */
-  --button-primary: oklch(0.51 0.21 262);
-  --button-primary-foreground: oklch(0.99 0.005 240);
-  --button-primary-hover: oklch(0.46 0.21 262);
-  --button-primary-active: oklch(0.41 0.2 262);
+  --button-primary: #4f46e5;
+  --button-primary-foreground: #ffffff;
+  --button-primary-hover: #4338ca;
+  --button-primary-active: #3730a3;
 
-  --button-secondary: oklch(0.95 0.015 245);
-  --button-secondary-foreground: oklch(0.22 0.04 248);
-  --button-secondary-hover: oklch(0.91 0.02 245);
-  --button-secondary-active: oklch(0.87 0.025 245);
+  --button-secondary: #f1f5f9;
+  --button-secondary-foreground: #0f172a;
+  --button-secondary-hover: #e2e8f0;
+  --button-secondary-active: #cbd5e1;
 
-  --button-destructive: oklch(0.56 0.21 24);
-  --button-destructive-foreground: oklch(0.99 0.005 24);
-  --button-destructive-hover: oklch(0.5 0.21 24);
-  --button-destructive-active: oklch(0.45 0.2 24);
+  --button-destructive: #dc2626;
+  --button-destructive-foreground: #ffffff;
+  --button-destructive-hover: #b91c1c;
+  --button-destructive-active: #991b1b;
 
-  --button-accent: oklch(0.56 0.19 292);
-  --button-accent-foreground: oklch(0.99 0.005 290);
-  --button-accent-hover: oklch(0.51 0.19 292);
-  --button-accent-active: oklch(0.46 0.18 292);
+  --button-accent: #7c3aed;
+  --button-accent-foreground: #ffffff;
+  --button-accent-hover: #6d28d9;
+  --button-accent-active: #5b21b6;
 
   --button-ghost: transparent;
-  --button-ghost-foreground: oklch(0.32 0.035 248);
-  --button-ghost-hover: oklch(0.94 0.012 245);
-  --button-ghost-active: oklch(0.9 0.018 245);
+  --button-ghost-foreground: #334155;
+  --button-ghost-hover: #f1f5f9;
+  --button-ghost-active: #e2e8f0;
 
-  --button-outline: oklch(1 0 0);
-  --button-outline-foreground: oklch(0.22 0.035 248);
-  --button-outline-border: oklch(0.85 0.018 245);
-  --button-outline-hover: oklch(0.96 0.01 245);
-  --button-outline-hover-foreground: oklch(0.16 0.035 248);
+  --button-outline: #ffffff;
+  --button-outline-foreground: #0f172a;
+  --button-outline-border: #cbd5e1;
+  --button-outline-hover: #f8fafc;
+  --button-outline-hover-foreground: #0f172a;
 
-  --button-cart: oklch(0.56 0.17 152);
-  --button-cart-foreground: oklch(0.99 0.005 152);
-  --button-cart-hover: oklch(0.5 0.17 152);
+  --button-cart: #059669;
+  --button-cart-foreground: #ffffff;
+  --button-cart-hover: #047857;
 
-  --button-wishlist: oklch(0.95 0.03 12);
-  --button-wishlist-foreground: oklch(0.52 0.2 16);
-  --button-wishlist-hover: oklch(0.91 0.05 12);
+  --button-wishlist: #fff1f2;
+  --button-wishlist-foreground: #e11d48;
+  --button-wishlist-hover: #ffe4e6;
 
-  --button-badge: oklch(0.51 0.21 262);
-  --button-badge-foreground: oklch(0.99 0.005 240);
+  --button-badge: #4f46e5;
+  --button-badge-foreground: #ffffff;
 
   /* --- Neutral Scale --- */
-  --neutral-50: oklch(0.985 0.004 245);
-  --neutral-100: oklch(0.965 0.007 245);
-  --neutral-200: oklch(0.925 0.011 245);
-  --neutral-300: oklch(0.865 0.015 245);
-  --neutral-400: oklch(0.71 0.022 248);
-  --neutral-500: oklch(0.55 0.027 248);
-  --neutral-600: oklch(0.44 0.03 248);
-  --neutral-700: oklch(0.35 0.03 248);
-  --neutral-800: oklch(0.25 0.028 248);
-  --neutral-900: oklch(0.18 0.026 248);
-  --neutral-950: oklch(0.12 0.024 250);
+  --neutral-50: #f8fafc;
+  --neutral-100: #f1f5f9;
+  --neutral-200: #e2e8f0;
+  --neutral-300: #cbd5e1;
+  --neutral-400: #94a3b8;
+  --neutral-500: #64748b;
+  --neutral-600: #475569;
+  --neutral-700: #334155;
+  --neutral-800: #1e293b;
+  --neutral-900: #0f172a;
+  --neutral-950: #020617;
 
   /* --- Elevation Shadows --- */
   --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
@@ -209,37 +226,23 @@
   --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.06);
   --shadow-2xl: 0 25px 50px -12px rgba(15, 23, 42, 0.22);
   --shadow-inner: inset 0 2px 4px 0 rgba(15, 23, 42, 0.05);
-  --shadow-accent: 0 8px 20px -4px rgba(139, 92, 246, 0.28);
-  --shadow-primary: 0 8px 20px -4px rgba(79, 70, 229, 0.28);
+  --shadow-accent: 0 8px 20px -4px rgba(124, 58, 237, 0.25);
+  --shadow-primary: 0 8px 20px -4px rgba(79, 70, 229, 0.25);
 
-  /* --- Gradients & Masks --- */
-  --gradient-primary: linear-gradient(135deg, oklch(0.51 0.21 262) 0%, oklch(0.56 0.19 292) 100%);
-  --gradient-accent: linear-gradient(135deg, oklch(0.56 0.19 292) 0%, oklch(0.6 0.18 320) 100%);
-  --gradient-warm: linear-gradient(135deg, oklch(0.66 0.18 45) 0%, oklch(0.58 0.21 24) 100%);
-  --gradient-hero: linear-gradient(
-    135deg,
-    oklch(0.16 0.04 255) 0%,
-    oklch(0.24 0.08 268) 55%,
-    oklch(0.2 0.06 290) 100%
-  );
-  --gradient-card: linear-gradient(180deg, oklch(1 0 0) 0%, oklch(0.985 0.005 245) 100%);
-  --gradient-surface: linear-gradient(180deg, oklch(0.99 0.004 245) 0%, oklch(0.965 0.01 245) 100%);
-  --marquee-mask: linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%);
-
-  /* --- Radius, Charts & Sidebar --- */
+  /* --- Radius, Charts & Sidebar (Light Mode Harmonized) --- */
   --radius: 0.75rem;
-  --chart-1: oklch(0.53 0.21 262);
-  --chart-2: oklch(0.6 0.17 156);
-  --chart-3: oklch(0.7 0.17 74);
-  --chart-4: oklch(0.58 0.2 296);
-  --chart-5: oklch(0.58 0.21 22);
+  --chart-1: #4f46e5;
+  --chart-2: #059669;
+  --chart-3: #d97706;
+  --chart-4: #7c3aed;
+  --chart-5: #dc2626;
 
-  --sidebar: oklch(0.14 0.03 252);
-  --sidebar-foreground: oklch(0.96 0.01 240);
-  --sidebar-primary: oklch(0.56 0.21 262);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.22 0.04 252);
-  --sidebar-accent-foreground: oklch(0.97 0.01 240);
-  --sidebar-border: oklch(0.24 0.03 252);
-  --sidebar-ring: oklch(0.56 0.21 262);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #4f46e5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1f5f9;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #4f46e5;
 }
